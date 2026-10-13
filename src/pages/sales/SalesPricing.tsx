@@ -5,10 +5,10 @@ import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import { platformItems } from '../../data/platforms';
 import {
-  salesQuotationRules,
   calcPlatformNetPrice,
   type SalesQuotationRule,
 } from '../../data/prices';
+import { usePriceStore } from '../../stores/priceStore';
 
 /* ── 工具函数 ── */
 function formatMoney(n: number): string {
@@ -38,8 +38,9 @@ export default function SalesPricing() {
   // 编辑状态
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState<string>('');
-  // 数据副本（可编辑）
-  const [rules, setRules] = useState<SalesQuotationRule[]>([...salesQuotationRules]);
+  // 数据接入共享价格数据源：价格管理调价后此处实时可见，调整报价同步写回 store
+  const rules = usePriceStore((s) => s.salesQuotations);
+  const updateSalesQuotationPrice = usePriceStore((s) => s.updateSalesQuotationPrice);
 
   /* ── 直营客户报价数据 ── */
   const directNoPlatformRules = useMemo(
@@ -77,17 +78,7 @@ export default function SalesPricing() {
 
   const handleSaveEdit = (ruleId: string) => {
     const newPrice = Number(editPrice) || 0;
-    setRules(prev => prev.map(r => {
-      if (r.id === ruleId) {
-        const updated = { ...r, quotedPrice: newPrice };
-        // 经平台直营客户：自动重新计算平台实得价
-        if (r.quotationType === 'direct_with_platform' && r.platformCommissionRate) {
-          updated.platformNetPrice = calcPlatformNetPrice(newPrice, r.platformCommissionRate);
-        }
-        return updated;
-      }
-      return r;
-    }));
+    updateSalesQuotationPrice(ruleId, newPrice);
     setEditingId(null);
     setEditPrice('');
   };
@@ -108,7 +99,7 @@ export default function SalesPricing() {
 
   return (
     <>
-      <ContentHeader title="客户报价" breadcrumbs={['销售', '客户报价']} />
+      <ContentHeader title="销售报（调）价" breadcrumbs={['销售', '销售报（调）价']} />
       <div className="content-body">
         {/* Tab 切换 */}
         <div style={{ display: 'flex', gap: 4, padding: 2, background: 'var(--color-neutral-100)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-5)', width: 'fit-content' }}>

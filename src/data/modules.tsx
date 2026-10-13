@@ -250,7 +250,7 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
       { key: 'sales-overview', label: '销售概览', icon: <OverviewIcon /> },
       { key: 'sales-order-create', label: '销售下单', icon: <CreateOrderIcon /> },
       { key: 'sales-orders', label: '销售订单', icon: <OrdersIcon /> },
-      { key: 'sales-pricing', label: '客户报价', icon: <QuotationIcon /> },
+      { key: 'sales-pricing', label: '销售报（调）价', icon: <QuotationIcon /> },
       { key: 'sales-customers', label: '客户管理', icon: <CustomersIcon /> },
       { key: 'sales-reconciliation', label: '客户对账', icon: <ReconciliationIcon /> },
       { key: 'sales-return', label: '销售退货', icon: <ReturnIcon /> },

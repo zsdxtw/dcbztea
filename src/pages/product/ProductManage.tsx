@@ -5,7 +5,8 @@ import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Tag from '../../components/common/Tag';
 import StatusTag from '../../components/common/StatusTag';
-import { teaProducts as initialProducts, getShelfStatusLabel, getPurchaseStatusLabel, getProductionStatusLabel } from '../../data/teaProducts';
+import { getShelfStatusLabel, getPurchaseStatusLabel, getProductionStatusLabel } from '../../data/teaProducts';
+import { usePriceStore } from '../../stores/priceStore';
 import { TeaProduct, TeaCategory } from '../../types';
 import {
   teaCategoryData,
@@ -154,7 +155,11 @@ export default function ProductManage({ categoryType, pageTitle, breadcrumbs }: 
   const l1Label = productCategoryLabels[categoryType];
   const currentCategoryData = getCategoryDataByType(categoryType);
 
-  const [products, setProducts] = useState<TeaProduct[]>(initialProducts);
+  // 商品档案接入共享价格数据源：价格管理调价后此处实时可见
+  const storeProducts = usePriceStore((s) => s.products);
+  const storeAddProduct = usePriceStore((s) => s.addProduct);
+  const storeDeleteProducts = usePriceStore((s) => s.deleteProducts);
+  const products = storeProducts;
   const [keyword, setKeyword] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set());
   const [l3Filter, setL3Filter] = useState<Set<string>>(new Set());
@@ -525,8 +530,7 @@ export default function ProductManage({ categoryType, pageTitle, breadcrumbs }: 
     });
   };
   const handleConfirmDelete = () => {
-    const next = products.filter((p) => !selectedForDelete.has(p.id));
-    setProducts(next);
+    storeDeleteProducts([...selectedForDelete]);
     setDeleteMode(false);
     setSelectedForDelete(new Set());
   };
@@ -612,7 +616,7 @@ export default function ProductManage({ categoryType, pageTitle, breadcrumbs }: 
       remark: form.remark,
     };
 
-    setProducts((prev) => [...prev, newProduct]);
+    storeAddProduct(newProduct);
     setShowDrawer(false);
   };
 
