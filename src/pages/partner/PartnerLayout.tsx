@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
+import './partner.css';
 
 /** 登录态存取 */
 export interface PartnerAuth {
@@ -57,7 +58,17 @@ const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode
   },
 ];
 
-/** 合作商终端布局：登录校验 + 顶栏 + 侧边栏（5 个一级菜单，翡翠绿主题） */
+/** 品牌茶叶图形 */
+export function TeaLeafMark() {
+  return (
+    <svg viewBox="0 0 28 28" fill="none">
+      <path d="M14 3C9 7 6 11 6 15a8 8 0 0016 0c0-4-3-8-8-12z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M14 10c-2 2-3.5 4-3.5 6a3.5 3.5 0 007 0c0-2-1.5-4-3.5-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** 合作商终端布局：简约侧边栏（品牌 + 菜单 + 用户），无顶栏 */
 export default function PartnerLayout() {
   const auth = getPartnerAuth();
   const location = useLocation();
@@ -85,78 +96,76 @@ export default function PartnerLayout() {
   )?.key ?? 'dashboard';
 
   return (
-    <div className="app-layout">
-      {/* 顶栏 */}
-      <header className="topnav">
-        <div className="topnav-brand">
-          <svg className="topnav-brand-icon" viewBox="0 0 28 28" fill="none">
-            <path d="M14 3C9 7 6 11 6 15a8 8 0 0016 0c0-4-3-8-8-12z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-            <path d="M14 10c-2 2-3.5 4-3.5 6a3.5 3.5 0 007 0c0-2-1.5-4-3.5-6z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-          </svg>
-          <span className="topnav-brand-text">淡茶半盏 · 合作商终端</span>
+    <div className="partner-shell">
+      {/* 侧边栏 */}
+      <aside className={`pk-side${collapsed ? ' collapsed' : ''}`}>
+        {/* 品牌 */}
+        <div className="pk-brand">
+          <div className="pk-brand-mark"><TeaLeafMark /></div>
+          <div className="pk-brand-text">
+            <div className="pk-brand-name">淡茶半盏</div>
+            <div className="pk-brand-sub">合作商终端</div>
+          </div>
         </div>
-        <div className="topnav-right">
-          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-600)' }}>{auth.name}</span>
-          <button
-            onClick={handleLogout}
-            style={{
-              padding: '5px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-neutral-200)',
-              background: 'var(--color-neutral-0)', color: 'var(--color-neutral-600)', fontSize: 'var(--text-sm)',
-              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
-            }}
-          >
-            <svg viewBox="0 0 16 16" fill="none" style={{ width: 13, height: 13 }}><path d="M6 14H3.5A1.5 1.5 0 012 12.5v-9A1.5 1.5 0 013.5 2H6M10.5 11l3-3-3-3M13.5 8H6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            退出登录
-          </button>
-        </div>
-      </header>
 
-      {/* 主体 */}
-      <div className="main-wrapper">
-        {/* 侧边栏 */}
-        <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
-          <nav className="sidebar-nav">
-            {PARTNER_MENUS.map(menu => {
-              const isActive = activeKey === menu.key;
-              return (
-                <div key={menu.key}>
-                  <button
-                    className={`sidebar-item${isActive ? ' active' : ''}`}
-                    onClick={() => navigate(menu.path)}
-                    title={menu.label}
-                  >
-                    <span className="sidebar-item-icon">{menu.icon}</span>
-                    <span className="sidebar-item-label">{menu.label}</span>
-                  </button>
-                  {isActive && menu.children && !collapsed && (
-                    <div className="sidebar-submenu">
-                      {menu.children.map(child => (
-                        <button
-                          key={child.path}
-                          className={`sidebar-item sidebar-subitem${location.pathname === child.path ? ' active' : ''}`}
-                          onClick={() => navigate(child.path)}
-                        >
-                          <span className="sidebar-item-label">{child.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </nav>
-          <button className="sidebar-collapse" onClick={() => setCollapsed(!collapsed)} title="折叠/展开">
-            <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14, transform: collapsed ? 'rotate(180deg)' : 'none' }}>
+        {/* 菜单 */}
+        <nav className="pk-nav">
+          <div className="pk-nav-label">MENU</div>
+          {PARTNER_MENUS.map(menu => {
+            const isActive = activeKey === menu.key;
+            return (
+              <div key={menu.key}>
+                <button
+                  className={`pk-nav-item${isActive ? ' active' : ''}`}
+                  onClick={() => navigate(menu.path)}
+                  title={menu.label}
+                >
+                  {menu.icon}
+                  <span className="pk-nav-item-text">{menu.label}</span>
+                </button>
+                {isActive && menu.children && !collapsed && (
+                  <div className="pk-subnav">
+                    {menu.children.map(child => (
+                      <button
+                        key={child.path}
+                        className={`pk-subnav-item${location.pathname === child.path ? ' active' : ''}`}
+                        onClick={() => navigate(child.path)}
+                      >
+                        {child.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </nav>
+
+        {/* 底部用户 */}
+        <div className="pk-side-foot">
+          <div className="pk-user">
+            <div className="pk-avatar">{auth.name.charAt(0)}</div>
+            <div className="pk-user-text">
+              <div className="pk-user-name">{auth.name}</div>
+              <div className="pk-user-role">合作商账号</div>
+            </div>
+            <button className="pk-icon-btn" onClick={handleLogout} title="退出登录">
+              <svg viewBox="0 0 16 16" fill="none"><path d="M6 14H3.5A1.5 1.5 0 012 12.5v-9A1.5 1.5 0 013.5 2H6M10.5 11l3-3-3-3M13.5 8H6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+          </div>
+          <button className="pk-collapse" onClick={() => setCollapsed(!collapsed)} title={collapsed ? '展开菜单' : '收起菜单'}>
+            <svg viewBox="0 0 16 16" fill="none" style={{ transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform .2s ease' }}>
               <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
+            {!collapsed && <span>收起菜单</span>}
           </button>
-        </aside>
+        </div>
+      </aside>
 
-        {/* 内容 */}
-        <main className="content-area">
-          <Outlet />
-        </main>
-      </div>
+      {/* 内容 */}
+      <main className="pk-main">
+        <Outlet />
+      </main>
     </div>
   );
 }

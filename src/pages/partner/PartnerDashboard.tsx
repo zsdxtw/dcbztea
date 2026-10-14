@@ -1,14 +1,14 @@
 import { useNavigate } from 'react-router-dom';
-import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
-import Card from '../../components/common/Card';
-import Button from '../../components/common/Button';
-import type { StatCardData } from '../../types';
+import { PageHead, Pill, ORDER_STATUS_TONE } from './PartnerUI';
+import { getPartnerAuth } from './PartnerLayout';
 import { partnerOrders, partnerCustomers, partnerSettlements, partnerReports, PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
 
-/** 合作商工作台：核心统计 + 待办事项 + 快捷入口 */
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
+/** 合作商工作台：统计带 + 待办事项 + 快捷入口 + 最新订单 */
 export default function PartnerDashboard() {
   const navigate = useNavigate();
+  const auth = getPartnerAuth();
 
   const pendingCount = partnerOrders.filter(o => o.status === 'pending').length;
   const shippingCount = partnerOrders.filter(o => o.status === 'accepted' || o.status === 'shipping').length;
@@ -16,37 +16,22 @@ export default function PartnerDashboard() {
   const customerCount = partnerCustomers.filter(c => c.status === 'cooperating').length;
   const reportPending = partnerReports.filter(r => r.status === 'pending').length;
 
-  const stats: StatCardData[] = [
-    {
-      label: '待接单', value: String(pendingCount), unit: '单',
-      trend: { direction: 'up', value: '需及时处理' },
-      icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="4" width="12" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M3 8h12M7 2v3M11 2v3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
-    },
-    {
-      label: '履约中', value: String(shippingCount), unit: '单',
-      trend: { direction: 'up', value: '接单/发货中' },
-      icon: <svg viewBox="0 0 18 18" fill="none"><path d="M2 12l3-4 3 2 4-6 4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><circle cx="9" cy="14" r="1.5" stroke="currentColor" strokeWidth="1.2"/></svg>,
-    },
-    {
-      label: '本月待结算', value: unsettled ? unsettled.settleAmount.toLocaleString() : '0', unit: '元',
-      trend: { direction: 'up', value: `${unsettled?.orderCount ?? 0} 笔订单` },
-      icon: <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="5" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 9h2M5 11.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><circle cx="13" cy="9.5" r="1.8" stroke="currentColor" strokeWidth="1.2"/></svg>,
-    },
-    {
-      label: '合作客户', value: String(customerCount), unit: '家',
-      trend: { direction: 'up', value: '营销中' },
-      icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="7" cy="6.5" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 15a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="14" cy="7.5" r="2.5" stroke="currentColor" strokeWidth="1.2"/></svg>,
-    },
+  const now = new Date();
+  const dateStr = `${now.getFullYear()} 年 ${now.getMonth() + 1} 月 ${now.getDate()} 日 · 星期${WEEKDAYS[now.getDay()]}`;
+
+  const stats = [
+    { label: '待接单', value: String(pendingCount), unit: '单', sub: '需尽快确认接单', accent: false },
+    { label: '履约中', value: String(shippingCount), unit: '单', sub: '接单 / 发货进行中', accent: false },
+    { label: '本月待结算', value: (unsettled?.settleAmount ?? 0).toLocaleString(), unit: '元', sub: `${unsettled?.orderCount ?? 0} 笔订单待结算`, accent: true },
+    { label: '合作客户', value: String(customerCount), unit: '家', sub: '本地营销进行中', accent: false },
   ];
 
-  // 待办事项
   const todos = [
     { label: '待接单订单', count: pendingCount, path: '/partner/orders', desc: '请尽快确认接单并安排发货' },
-    { label: '履约中订单', count: shippingCount, path: '/partner/orders', desc: '跟进物流并确认签收' },
-    { label: '待审核报备', count: reportPending, path: '/partner/reports', desc: '报备审核中，请留意结果' },
+    { label: '履约中订单', count: shippingCount, path: '/partner/orders', desc: '跟进物流并确认客户签收' },
+    { label: '审核中报备', count: reportPending, path: '/partner/reports', desc: '报备审核中，请留意审核结果' },
   ];
 
-  // 快捷入口
   const shortcuts = [
     { label: '订单管理', path: '/partner/orders', desc: '处理平台分发的订单' },
     { label: '新增报备', path: '/partner/reports', desc: '报备订单 / 商品 / 客户' },
@@ -55,82 +40,87 @@ export default function PartnerDashboard() {
   ];
 
   return (
-    <>
-      <ContentHeader title="工作台" breadcrumbs={['合作商终端', '工作台']} />
-      <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
+    <div className="pk-page">
+      <PageHead
+        eyebrow="合作商终端 · 工作台"
+        title="工作台"
+        desc={`${auth?.name ?? ''}，您好。今天是 ${dateStr}，祝您生意兴隆。`}
+      />
 
-        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 'var(--space-5)' }}>
-          {/* 待办事项 */}
-          <Card>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
-              <span style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-800)' }}>待办事项</span>
-              <Button size="sm" variant="ghost" onClick={() => navigate('/partner/orders')}>查看全部</Button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              {todos.map(t => (
-                <div
-                  key={t.label}
-                  onClick={() => navigate(t.path)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
-                >
-                  <div style={{
-                    minWidth: 40, height: 40, borderRadius: 'var(--radius-md)', background: 'var(--color-module-current-lightest)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 'var(--text-base)', fontWeight: 'var(--font-bold)', color: 'var(--color-module-current-base)',
-                  }}>{t.count}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: 'var(--color-neutral-800)' }}>{t.label}</div>
-                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{t.desc}</div>
-                  </div>
-                  <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14, color: 'var(--color-neutral-300)' }}><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* 快捷入口 */}
-          <Card>
-            <div style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-800)', marginBottom: 'var(--space-4)' }}>快捷入口</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-              {shortcuts.map(sc => (
-                <div
-                  key={sc.label}
-                  onClick={() => navigate(sc.path)}
-                  style={{ padding: 'var(--space-3)', border: '1px solid var(--color-neutral-200)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
-                >
-                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: 'var(--color-module-current-base)', marginBottom: 4 }}>{sc.label}</div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{sc.desc}</div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-
-        {/* 最新订单 */}
-        <Card>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
-            <span style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-800)' }}>最新分发订单</span>
-            <Button size="sm" variant="ghost" onClick={() => navigate('/partner/orders')}>全部订单</Button>
+      {/* 统计带 */}
+      <div className="pk-stats">
+        {stats.map(s => (
+          <div key={s.label} className={`pk-stat${s.accent ? ' accent' : ''}`}>
+            <div className="pk-stat-label">{s.label}</div>
+            <div className="pk-stat-value">{s.value}<small>{s.unit}</small></div>
+            <div className="pk-stat-sub">{s.sub}</div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            {partnerOrders.slice(0, 5).map(o => (
-              <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)' }}>
-                <span className="mono" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: 'var(--color-neutral-700)' }}>{o.code}</span>
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-800)', flex: 1 }}>{o.customerName}</span>
-                <span className="mono" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)' }}>¥{o.totalAmount.toLocaleString()}</span>
-                <span style={{
-                  padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)',
-                  background: o.status === 'pending' ? '#FFF3E0' : o.status === 'settled' ? '#F3E5F5' : o.status === 'rejected' ? '#FFEBEE' : '#E8F5E9',
-                  color: o.status === 'pending' ? '#E65100' : o.status === 'settled' ? '#7B1FA2' : o.status === 'rejected' ? '#C62828' : '#01795D',
-                }}>{PARTNER_ORDER_STATUS_LABELS[o.status]}</span>
+        ))}
+      </div>
+
+      <div className="pk-grid pk-grid-32">
+        {/* 待办事项 */}
+        <div className="pk-panel">
+          <div className="pk-panel-head">
+            <span className="pk-panel-title">待办事项</span>
+            <button className="pk-link" onClick={() => navigate('/partner/orders')}>
+              查看全部
+              <svg viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+          </div>
+          <div className="pk-rows">
+            {todos.map(t => (
+              <div key={t.label} className="pk-row" onClick={() => navigate(t.path)}>
+                <div className="pk-num">{t.count}</div>
+                <div className="pk-row-main">
+                  <div className="pk-row-title">{t.label}</div>
+                  <div className="pk-row-sub">{t.desc}</div>
+                </div>
+                <svg className="pk-row-arrow" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </div>
             ))}
           </div>
-        </Card>
+        </div>
+
+        {/* 快捷入口 */}
+        <div className="pk-panel">
+          <div className="pk-panel-head">
+            <span className="pk-panel-title">快捷入口</span>
+          </div>
+          <div className="pk-shortcuts">
+            {shortcuts.map(sc => (
+              <div key={sc.label} className="pk-shortcut" onClick={() => navigate(sc.path)}>
+                <div className="pk-shortcut-t">
+                  {sc.label}
+                  <svg viewBox="0 0 16 16" fill="none"><path d="M3 13L13 3M6 3h7v7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </div>
+                <div className="pk-shortcut-d">{sc.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-    </>
+
+      {/* 最新订单 */}
+      <div className="pk-panel">
+        <div className="pk-panel-head">
+          <span className="pk-panel-title">最新分发订单</span>
+          <button className="pk-link" onClick={() => navigate('/partner/orders')}>
+            全部订单
+            <svg viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+        </div>
+        <div className="pk-rows">
+          {partnerOrders.slice(0, 5).map(o => (
+            <div key={o.id} className="pk-row" onClick={() => navigate('/partner/orders')}>
+              <span className="mono" style={{ fontSize: 13, color: 'var(--pk-ink2)' }}>{o.code}</span>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--pk-ink)', flex: 1 }}>{o.customerName}</span>
+              <span className="mono" style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--pk-accent)' }}>¥{o.totalAmount.toLocaleString()}</span>
+              <Pill tone={ORDER_STATUS_TONE[o.status]}>{PARTNER_ORDER_STATUS_LABELS[o.status]}</Pill>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

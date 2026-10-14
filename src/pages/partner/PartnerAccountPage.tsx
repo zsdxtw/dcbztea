@@ -1,9 +1,8 @@
 import { useState, useMemo } from 'react';
-import ContentHeader from '../../components/layout/ContentHeader';
-import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
+import { PageHead, Pill, ACCOUNT_ROLE_TONE } from './PartnerUI';
 import type { PartnerAccount } from '../../types';
 import { partnerAccounts as initialAccounts, PARTNER_ACCOUNT_ROLE_LABELS } from '../../data/partner';
 
@@ -16,12 +15,6 @@ interface AccountForm {
 }
 
 const EMPTY_FORM: AccountForm = { username: '', name: '', role: 'business', phone: '' };
-
-const ROLE_STYLE: Record<string, { bg: string; color: string }> = {
-  admin: { bg: '#F3E5F5', color: '#7B1FA2' },
-  business: { bg: '#E3F2FD', color: '#0F64B5' },
-  warehouse: { bg: '#FFF8E1', color: '#B8860B' },
-};
 
 /** 合作商系统-账号管理：子账号增删与启停 */
 export default function PartnerAccountPage() {
@@ -57,45 +50,47 @@ export default function PartnerAccountPage() {
     setSelected(prev => (prev && prev.id === id ? { ...prev, status: prev.status === 'active' ? 'disabled' : 'active' } : prev));
   };
 
+  const statusPill = (status: string) => (
+    <Pill tone={status === 'active' ? 'green' : 'red'}>{status === 'active' ? '启用' : '停用'}</Pill>
+  );
+
   return (
-    <>
-      <ContentHeader title="账号管理" breadcrumbs={['合作商终端', '系统', '账号管理']} />
-      <div className="content-body">
-        {/* 筛选 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
-          <input className="filter-input" placeholder="搜索账号、姓名、手机号..." value={keyword} onChange={e => setKeyword(e.target.value)} />
+    <div className="pk-page">
+      <PageHead
+        eyebrow="合作商终端 · 系统"
+        title="账号管理"
+        desc="管理合作商终端的登录子账号，按角色分配业务与仓管权限。"
+        actions={
           <Button onClick={() => { setForm(EMPTY_FORM); setShowAdd(true); }}>
             <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14 }}><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
             新增账号
           </Button>
-          <span style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>共 {filtered.length} 个账号</span>
-        </div>
+        }
+      />
 
-        <Card style={{ padding: 0 }}>
-          <Table
-            headers={['账号', '姓名', '角色', '手机号', '状态', '创建时间', '最近登录', '操作']}
-            rows={filtered.map(a => [
-              <span key="u" className="cell-mono-emph">{a.username}</span>,
-              <span key="n" className="cell-emph">{a.name}</span>,
-              <span key="r" style={{
-                padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)',
-                background: ROLE_STYLE[a.role].bg, color: ROLE_STYLE[a.role].color,
-              }}>{PARTNER_ACCOUNT_ROLE_LABELS[a.role]}</span>,
-              <span key="p" className="mono cell-muted">{a.phone}</span>,
-              <span key="st" style={{
-                padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)',
-                background: a.status === 'active' ? '#E8F5E9' : '#FFEBEE',
-                color: a.status === 'active' ? '#01795D' : '#C62828',
-              }}>{a.status === 'active' ? '启用' : '停用'}</span>,
-              <span key="c" className="cell-muted">{a.createTime}</span>,
-              <span key="l" className="cell-muted">{a.lastLogin || '—'}</span>,
-              <div key="act" className="row-actions">
-                <Button size="sm" variant="ghost" onClick={() => setSelected(a)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => toggleStatus(a.id)}>{a.status === 'active' ? '停用' : '启用'}</Button>
-              </div>,
-            ])}
-          />
-        </Card>
+      {/* 筛选 */}
+      <div className="pk-toolbar">
+        <input className="filter-input" placeholder="搜索账号、姓名、手机号..." value={keyword} onChange={e => setKeyword(e.target.value)} />
+        <span className="pk-count">共 {filtered.length} 个账号</span>
+      </div>
+
+      <div className="pk-table-panel">
+        <Table
+          headers={['账号', '姓名', '角色', '手机号', '状态', '创建时间', '最近登录', '操作']}
+          rows={filtered.map(a => [
+            <span key="u" className="cell-mono-emph">{a.username}</span>,
+            <span key="n" className="cell-emph">{a.name}</span>,
+            <Pill key="r" tone={ACCOUNT_ROLE_TONE[a.role]}>{PARTNER_ACCOUNT_ROLE_LABELS[a.role]}</Pill>,
+            <span key="p" className="mono cell-muted">{a.phone}</span>,
+            statusPill(a.status),
+            <span key="c" className="cell-muted">{a.createTime}</span>,
+            <span key="l" className="cell-muted">{a.lastLogin || '—'}</span>,
+            <div key="act" className="row-actions">
+              <Button size="sm" variant="ghost" onClick={() => setSelected(a)}>查看</Button>
+              <Button size="sm" variant="ghost" onClick={() => toggleStatus(a.id)}>{a.status === 'active' ? '停用' : '启用'}</Button>
+            </div>,
+          ])}
+        />
       </div>
 
       {/* 账号详情抽屉 */}
@@ -104,13 +99,7 @@ export default function PartnerAccountPage() {
         onClose={() => setSelected(null)}
         badge="AC"
         title={selected?.username ?? ''}
-        statusTag={selected ? (
-          <span style={{
-            padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)',
-            background: selected.status === 'active' ? '#E8F5E9' : '#FFEBEE',
-            color: selected.status === 'active' ? '#01795D' : '#C62828',
-          }}>{selected.status === 'active' ? '启用' : '停用'}</span>
-        ) : null}
+        statusTag={selected ? statusPill(selected.status) : null}
         subtitle={selected ? `${selected.name} · ${PARTNER_ACCOUNT_ROLE_LABELS[selected.role]}` : ''}
       >
         {selected && (
@@ -132,7 +121,7 @@ export default function PartnerAccountPage() {
       {showAdd && (
         <div className="category-dialog-overlay" onClick={() => setShowAdd(false)}>
           <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 460 }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-4)' }}>新增账号</div>
+            <div className="pk-dialog-title">新增账号</div>
 
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>账号 *</label>
@@ -148,11 +137,11 @@ export default function PartnerAccountPage() {
                 {(['admin', 'business', 'warehouse'] as PartnerAccount['role'][]).map(r => (
                   <button key={r} onClick={() => setForm({ ...form, role: r })}
                     style={{
-                      flex: 1, padding: '8px 0', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', cursor: 'pointer',
-                      border: `1px solid ${form.role === r ? 'var(--color-module-current-base)' : 'var(--color-neutral-200)'}`,
-                      background: form.role === r ? 'var(--color-module-current-lightest)' : 'var(--color-neutral-0)',
-                      color: form.role === r ? 'var(--color-module-current-base)' : 'var(--color-neutral-600)',
-                      fontWeight: form.role === r ? 'var(--font-medium)' : 'normal',
+                      flex: 1, padding: '8px 0', borderRadius: '9px', fontSize: 'var(--text-sm)', cursor: 'pointer',
+                      border: `1px solid ${form.role === r ? 'var(--pk-accent)' : 'var(--pk-line)'}`,
+                      background: form.role === r ? 'var(--pk-accent-soft)' : '#fff',
+                      color: form.role === r ? 'var(--pk-accent-dark)' : 'var(--pk-ink2)',
+                      fontWeight: form.role === r ? 600 : 400,
                     }}>{PARTNER_ACCOUNT_ROLE_LABELS[r]}</button>
                 ))}
               </div>
@@ -169,6 +158,6 @@ export default function PartnerAccountPage() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

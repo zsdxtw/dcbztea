@@ -1,16 +1,14 @@
 import { useState, useMemo } from 'react';
-import ContentHeader from '../../components/layout/ContentHeader';
-import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
+import { PageHead, Pill, ORDER_STATUS_TONE } from './PartnerUI';
 import type { PartnerOrder, PartnerOrderStatus } from '../../types';
 import {
   partnerOrders as initialOrders,
   PARTNER_DELIVERY_LABELS,
   PARTNER_COOP_LABELS,
   PARTNER_ORDER_STATUS_LABELS,
-  PARTNER_ORDER_STATUS_COLORS,
 } from '../../data/partner';
 
 /** 合作商订单管理：处理淡茶半盏后台分发的订单（直送/入库 × 供应商/服务商模式） */
@@ -35,71 +33,63 @@ export default function PartnerOrders() {
     setSelected(prev => (prev && prev.id === id ? { ...prev, status } : prev));
   };
 
-  const statusTag = (status: PartnerOrderStatus) => (
-    <span style={{
-      padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)',
-      background: PARTNER_ORDER_STATUS_COLORS[status].bg, color: PARTNER_ORDER_STATUS_COLORS[status].color,
-    }}>{PARTNER_ORDER_STATUS_LABELS[status]}</span>
-  );
-
-  const modeTag = (bg: string, color: string, text: string) => (
-    <span style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: bg, color }}>{text}</span>
+  const statusPill = (status: PartnerOrderStatus) => (
+    <Pill tone={ORDER_STATUS_TONE[status]}>{PARTNER_ORDER_STATUS_LABELS[status]}</Pill>
   );
 
   return (
-    <>
-      <ContentHeader title="订单管理" breadcrumbs={['合作商终端', '订单', '订单管理']} />
-      <div className="content-body">
-        <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)' }}>
-          订单来源于淡茶半盏后台分发。配送方式：<strong>直送订单</strong>（合作商直发客户）与<strong>入库订单</strong>（先入合作仓再发）；合作模式：<strong>供应商模式</strong>与<strong>服务商模式</strong>。
-        </div>
+    <div className="pk-page">
+      <PageHead
+        eyebrow="合作商终端 · 订单"
+        title="订单管理"
+        desc="订单来源于淡茶半盏后台分发。配送方式：直送订单（合作商直发客户）与入库订单（先入合作仓再发）；合作模式：供应商模式与服务商模式。"
+      />
 
-        {/* 筛选 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
-          <input className="filter-input" placeholder="搜索订单号、客户、收货人..." value={keyword} onChange={e => setKeyword(e.target.value)} />
-          <select className="filter-select" value={filterDelivery} onChange={e => setFilterDelivery(e.target.value)}>
-            <option value="">全部配送方式</option>
-            <option value="direct">直送订单</option>
-            <option value="warehouse">入库订单</option>
-          </select>
-          <select className="filter-select" value={filterCoop} onChange={e => setFilterCoop(e.target.value)}>
-            <option value="">全部合作模式</option>
-            <option value="supplier">供应商模式</option>
-            <option value="service">服务商模式</option>
-          </select>
-          <select className="filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-            <option value="">全部状态</option>
-            <option value="pending">待接单</option>
-            <option value="accepted">已接单</option>
-            <option value="shipping">发货中</option>
-            <option value="delivered">已签收</option>
-            <option value="settled">已结算</option>
-            <option value="rejected">已驳回</option>
-          </select>
-          <span style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>共 {filtered.length} 单</span>
-        </div>
+      {/* 筛选 */}
+      <div className="pk-toolbar">
+        <input className="filter-input" placeholder="搜索订单号、客户、收货人..." value={keyword} onChange={e => setKeyword(e.target.value)} />
+        <select className="filter-select" value={filterDelivery} onChange={e => setFilterDelivery(e.target.value)}>
+          <option value="">全部配送方式</option>
+          <option value="direct">直送订单</option>
+          <option value="warehouse">入库订单</option>
+        </select>
+        <select className="filter-select" value={filterCoop} onChange={e => setFilterCoop(e.target.value)}>
+          <option value="">全部合作模式</option>
+          <option value="supplier">供应商模式</option>
+          <option value="service">服务商模式</option>
+        </select>
+        <select className="filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <option value="">全部状态</option>
+          <option value="pending">待接单</option>
+          <option value="accepted">已接单</option>
+          <option value="shipping">发货中</option>
+          <option value="delivered">已签收</option>
+          <option value="settled">已结算</option>
+          <option value="rejected">已驳回</option>
+        </select>
+        <span className="pk-count">共 {filtered.length} 单</span>
+      </div>
 
-        <Card style={{ padding: 0 }}>
-          <Table
-            headers={['订单编号', '客户', '商品数', '总金额', '配送方式', '合作模式', '状态', '下单日期', '操作']}
-            rows={filtered.map(o => [
-              <span key="code" className="cell-mono-emph">{o.code}</span>,
-              <span key="cust" className="cell-emph">{o.customerName}</span>,
-              <span key="cnt" className="mono">{o.items.length} 种</span>,
-              <span key="amt" className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)' }}>¥{o.totalAmount.toLocaleString()}</span>,
-              <span key="dm">{modeTag(o.deliveryMode === 'direct' ? '#E8F5E9' : '#E3F2FD', o.deliveryMode === 'direct' ? '#01795D' : '#0F64B5', PARTNER_DELIVERY_LABELS[o.deliveryMode])}</span>,
-              <span key="cm">{modeTag(o.coopMode === 'supplier' ? '#FFF8E1' : '#F3E5F5', o.coopMode === 'supplier' ? '#B8860B' : '#7B1FA2', PARTNER_COOP_LABELS[o.coopMode])}</span>,
-              statusTag(o.status),
-              <span key="date" className="cell-muted">{o.orderDate}</span>,
-              <div key="act" className="row-actions">
-                {o.status === 'pending' && <Button size="sm" variant="ghost" onClick={() => updateStatus(o.id, 'accepted')}>接单</Button>}
-                {o.status === 'accepted' && <Button size="sm" variant="ghost" onClick={() => updateStatus(o.id, 'shipping')}>发货</Button>}
-                {o.status === 'shipping' && <Button size="sm" variant="ghost" onClick={() => updateStatus(o.id, 'delivered')}>确认签收</Button>}
-                <Button size="sm" variant="ghost" onClick={() => setSelected(o)}>查看</Button>
-              </div>,
-            ])}
-          />
-        </Card>
+      <div className="pk-table-panel">
+        <Table
+          headers={['订单编号', '客户', '商品数', '总金额', '配送方式', '合作模式', '状态', '下单日期', '操作']}
+          rows={filtered.map(o => [
+            <span key="code" className="cell-mono-emph">{o.code}</span>,
+            <span key="cust" className="cell-emph">{o.customerName}</span>,
+            <span key="cnt" className="mono">{o.items.length} 种</span>,
+            <span key="amt" className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--pk-accent)' }}>¥{o.totalAmount.toLocaleString()}</span>,
+            <Pill key="dm" tone={o.deliveryMode === 'direct' ? 'green' : 'blue'}>{PARTNER_DELIVERY_LABELS[o.deliveryMode]}</Pill>,
+            <Pill key="cm" tone={o.coopMode === 'supplier' ? 'amber' : 'purple'}>{PARTNER_COOP_LABELS[o.coopMode]}</Pill>,
+            statusPill(o.status),
+            <span key="date" className="cell-muted">{o.orderDate}</span>,
+            <div key="act" className="row-actions">
+              {o.status === 'pending' && <Button size="sm" variant="ghost" onClick={() => updateStatus(o.id, 'accepted')}>接单</Button>}
+              {o.status === 'accepted' && <Button size="sm" variant="ghost" onClick={() => updateStatus(o.id, 'shipping')}>发货</Button>}
+              {o.status === 'shipping' && <Button size="sm" variant="ghost" onClick={() => updateStatus(o.id, 'delivered')}>确认签收</Button>}
+              <Button size="sm" variant="ghost" onClick={() => setSelected(o)}>查看</Button>
+            </div>,
+          ])}
+        />
       </div>
 
       {/* 订单详情抽屉 */}
@@ -108,7 +98,7 @@ export default function PartnerOrders() {
         onClose={() => setSelected(null)}
         badge="PO"
         title={selected?.code ?? ''}
-        statusTag={selected ? statusTag(selected.status) : null}
+        statusTag={selected ? statusPill(selected.status) : null}
         subtitle={selected ? `${selected.customerName}（${selected.customerType}）· ${PARTNER_DELIVERY_LABELS[selected.deliveryMode]} · ${PARTNER_COOP_LABELS[selected.coopMode]}` : ''}
         hideFooter
         footer={
@@ -168,6 +158,6 @@ export default function PartnerOrders() {
           </>
         )}
       </DetailDrawer>
-    </>
+    </div>
   );
 }

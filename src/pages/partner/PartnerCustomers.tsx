@@ -1,9 +1,8 @@
 import { useState, useMemo } from 'react';
-import ContentHeader from '../../components/layout/ContentHeader';
-import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
+import { PageHead, Pill, CUSTOMER_TYPE_TONE } from './PartnerUI';
 import type { PartnerCustomer } from '../../types';
 import { partnerCustomers } from '../../data/partner';
 
@@ -19,52 +18,47 @@ export default function PartnerCustomers() {
     return true;
   }), [keyword, filterStatus]);
 
+  const statusPill = (status: string) => (
+    <Pill tone={status === 'cooperating' ? 'green' : 'amber'}>{status === 'cooperating' ? '合作中' : '已暂停'}</Pill>
+  );
+
   return (
-    <>
-      <ContentHeader title="客户" breadcrumbs={['合作商终端', '客户']} />
-      <div className="content-body">
-        <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)' }}>
-          展示当前合作客户及其可下单商品（含供货价与市场价），合作商可据此开展当地客户营销。
-        </div>
+    <div className="pk-page">
+      <PageHead
+        eyebrow="合作商终端 · 客户"
+        title="客户"
+        desc="展示当前合作客户及其可下单商品（含供货价与市场价），合作商可据此开展当地客户营销。"
+      />
 
-        {/* 筛选 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
-          <input className="filter-input" placeholder="搜索客户名称、区域、联系人..." value={keyword} onChange={e => setKeyword(e.target.value)} />
-          <select className="filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-            <option value="">全部状态</option>
-            <option value="cooperating">合作中</option>
-            <option value="paused">已暂停</option>
-          </select>
-          <span style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>共 {filtered.length} 家客户</span>
-        </div>
+      {/* 筛选 */}
+      <div className="pk-toolbar">
+        <input className="filter-input" placeholder="搜索客户名称、区域、联系人..." value={keyword} onChange={e => setKeyword(e.target.value)} />
+        <select className="filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <option value="">全部状态</option>
+          <option value="cooperating">合作中</option>
+          <option value="paused">已暂停</option>
+        </select>
+        <span className="pk-count">共 {filtered.length} 家客户</span>
+      </div>
 
-        <Card style={{ padding: 0 }}>
-          <Table
-            headers={['客户名称', '客户类型', '区域', '联系人', '联系电话', '可下单商品', '累计订单', '累计金额', '状态', '操作']}
-            rows={filtered.map(c => [
-              <span key="name" className="cell-emph">{c.name}</span>,
-              <span key="type" style={{
-                padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)',
-                background: c.type === '直营客户' ? '#E8F5E9' : c.type === '平台客户' ? '#E3F2FD' : c.type === '渠道客户' ? '#FFF8E1' : '#FCE4EC',
-                color: c.type === '直营客户' ? '#01795D' : c.type === '平台客户' ? '#0F64B5' : c.type === '渠道客户' ? '#B8860B' : '#C2185B',
-              }}>{c.type}</span>,
-              <span key="region">{c.region}</span>,
-              <span key="cp">{c.contactPerson}</span>,
-              <span key="phone" className="mono cell-muted">{c.contactPhone}</span>,
-              <span key="prods" className="mono">{c.products.length} 款</span>,
-              <span key="orders" className="mono">{c.totalOrders} 单</span>,
-              <span key="amt" className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)' }}>¥{c.totalAmount.toLocaleString()}</span>,
-              <span key="st" style={{
-                padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)',
-                background: c.status === 'cooperating' ? '#E8F5E9' : '#FFF3E0',
-                color: c.status === 'cooperating' ? '#01795D' : '#E65100',
-              }}>{c.status === 'cooperating' ? '合作中' : '已暂停'}</span>,
-              <div key="act" className="row-actions">
-                <Button size="sm" variant="ghost" onClick={() => setSelected(c)}>查看</Button>
-              </div>,
-            ])}
-          />
-        </Card>
+      <div className="pk-table-panel">
+        <Table
+          headers={['客户名称', '客户类型', '区域', '联系人', '联系电话', '可下单商品', '累计订单', '累计金额', '状态', '操作']}
+          rows={filtered.map(c => [
+            <span key="name" className="cell-emph">{c.name}</span>,
+            <Pill key="type" tone={CUSTOMER_TYPE_TONE[c.type] ?? 'gray'}>{c.type}</Pill>,
+            <span key="region">{c.region}</span>,
+            <span key="cp">{c.contactPerson}</span>,
+            <span key="phone" className="mono cell-muted">{c.contactPhone}</span>,
+            <span key="prods" className="mono">{c.products.length} 款</span>,
+            <span key="orders" className="mono">{c.totalOrders} 单</span>,
+            <span key="amt" className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--pk-accent)' }}>¥{c.totalAmount.toLocaleString()}</span>,
+            statusPill(c.status),
+            <div key="act" className="row-actions">
+              <Button size="sm" variant="ghost" onClick={() => setSelected(c)}>查看</Button>
+            </div>,
+          ])}
+        />
       </div>
 
       {/* 客户详情抽屉（含可下单商品表） */}
@@ -73,13 +67,7 @@ export default function PartnerCustomers() {
         onClose={() => setSelected(null)}
         badge="PC"
         title={selected?.name ?? ''}
-        statusTag={selected ? (
-          <span style={{
-            padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)',
-            background: selected.status === 'cooperating' ? '#E8F5E9' : '#FFF3E0',
-            color: selected.status === 'cooperating' ? '#01795D' : '#E65100',
-          }}>{selected.status === 'cooperating' ? '合作中' : '已暂停'}</span>
-        ) : null}
+        statusTag={selected ? statusPill(selected.status) : null}
         subtitle={selected ? `${selected.type} · ${selected.region} · 合作起始 ${selected.cooperationDate}` : ''}
       >
         {selected && (
@@ -113,7 +101,7 @@ export default function PartnerCustomers() {
                         <td>{p.spec}</td>
                         <td className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)' }}>¥{p.supplyPrice}</td>
                         <td className="mono">¥{p.marketPrice}</td>
-                        <td className="mono" style={{ color: gapRate >= 25 ? '#01795D' : '#B8860B' }}>¥{gap}（{gapRate}%）</td>
+                        <td className="mono" style={{ color: gapRate >= 25 ? '#01795D' : '#9A7A1C' }}>¥{gap}（{gapRate}%）</td>
                       </tr>
                     );
                   })}
@@ -126,6 +114,6 @@ export default function PartnerCustomers() {
           </>
         )}
       </DetailDrawer>
-    </>
+    </div>
   );
 }
