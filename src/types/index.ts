@@ -780,6 +780,8 @@ export interface StoreItem {
 }
 
 /** 供应商 */
+export type SupplierChannelSource = 'manual' | 'terminal';
+
 export interface SupplierItem {
   id: string;
   type: SupplierType;
@@ -788,6 +790,10 @@ export interface SupplierItem {
   cooperationAgreements: string[];
   brandAuthAgreements: string[];
   businessLicense: string;
+  /** 资质文件（最多 5 个：营业执照、生产许可、食品经营许可等） */
+  qualificationFiles: string[];
+  /** 渠道来源：manual=手动创建 / terminal=终端注册 */
+  channelSource: SupplierChannelSource;
   /** 注册地址-省份 */
   registeredProvince?: string;
   /** 注册地址-城市 */
@@ -1106,4 +1112,106 @@ export interface EmployeePerformance {
   totalProfit: number;
   /** 关联订单数 */
   orderCount: number;
+}
+
+/* ─────────────────────────── 合作商终端（合作商后台） ─────────────────────────── */
+
+/** 合作商订单配送方式：direct=直送订单 / warehouse=入库订单 */
+export type PartnerDeliveryMode = 'direct' | 'warehouse';
+
+/** 合作商合作模式：supplier=供应商模式 / service=服务商模式 */
+export type PartnerCoopMode = 'supplier' | 'service';
+
+/** 合作商订单状态 */
+export type PartnerOrderStatus = 'pending' | 'accepted' | 'shipping' | 'delivered' | 'settled' | 'rejected';
+
+/** 合作商订单 */
+export interface PartnerOrder {
+  id: string;
+  /** 订单编号 */
+  code: string;
+  customerName: string;
+  customerType: string;
+  items: { productName: string; spec: string; quantity: number; price: number }[];
+  /** 订单总金额 */
+  totalAmount: number;
+  /** 配送方式：直送 / 入库 */
+  deliveryMode: PartnerDeliveryMode;
+  /** 合作模式：供应商模式 / 服务商模式 */
+  coopMode: PartnerCoopMode;
+  status: PartnerOrderStatus;
+  orderDate: string;
+  expectedShipDate: string;
+  receiver: string;
+  receiverPhone: string;
+  receiverAddress: string;
+  remark?: string;
+}
+
+/** 合作商报备类型：order=订单报备 / product=商品报备 / customer=客户报备 */
+export type PartnerReportType = 'order' | 'product' | 'customer';
+
+/** 合作商报备状态 */
+export type PartnerReportStatus = 'pending' | 'approved' | 'rejected';
+
+/** 合作商报备记录 */
+export interface PartnerReport {
+  id: string;
+  code: string;
+  type: PartnerReportType;
+  title: string;
+  summary: string;
+  /** 预计金额（订单报备） */
+  amount?: number;
+  status: PartnerReportStatus;
+  submitTime: string;
+  reviewNote?: string;
+}
+
+/** 合作商合作客户 */
+export interface PartnerCustomer {
+  id: string;
+  name: string;
+  type: string;
+  region: string;
+  contactPerson: string;
+  contactPhone: string;
+  /** 可下单商品（合作商据此营销） */
+  products: { productId: string; productName: string; spec: string; supplyPrice: number; marketPrice: number }[];
+  cooperationDate: string;
+  status: 'cooperating' | 'paused';
+  totalOrders: number;
+  totalAmount: number;
+}
+
+/** 合作商结算单（发货订单结算） */
+export interface PartnerSettlement {
+  id: string;
+  code: string;
+  /** 结算周期 */
+  period: string;
+  orderCount: number;
+  orderAmount: number;
+  /** 扣除费用（平台服务费/佣金） */
+  deduction: number;
+  /** 应结金额 */
+  settleAmount: number;
+  method: string;
+  status: 'unsettled' | 'pending' | 'settled';
+  createTime: string;
+  settleTime?: string;
+  /** 关联订单编号 */
+  orders: string[];
+}
+
+/** 合作商后台子账号 */
+export interface PartnerAccount {
+  id: string;
+  username: string;
+  name: string;
+  role: 'admin' | 'business' | 'warehouse';
+  phone: string;
+  status: 'active' | 'disabled';
+  createTime: string;
+  lastLogin?: string;
 }

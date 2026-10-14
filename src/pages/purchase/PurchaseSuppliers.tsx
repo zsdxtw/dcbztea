@@ -116,6 +116,19 @@ export default function PurchaseSuppliers() {
     setTimeout(() => { setOcrLoading(false); }, 2000);
   };
 
+  // 资质文件上传（最多 5 个）
+  const handleAddQualificationFiles = (files: FileList | null) => {
+    if (!files || files.length === 0 || !editForm) return;
+    const remaining = 5 - editForm.qualificationFiles.length;
+    if (remaining <= 0) { window.alert('资质文件最多上传 5 个'); return; }
+    const names = Array.from(files).map(f => f.name);
+    if (names.length > remaining) window.alert(`资质文件最多上传 5 个，本次仅保留前 ${remaining} 个文件`);
+    setEditForm(prev => prev ? { ...prev, qualificationFiles: [...prev.qualificationFiles, ...names.slice(0, remaining)] } : prev);
+  };
+  const handleRemoveQualificationFile = (idx: number) => {
+    setEditForm(prev => prev ? { ...prev, qualificationFiles: prev.qualificationFiles.filter((_, i) => i !== idx) } : prev);
+  };
+
   return (
     <>
       <ContentHeader title="供应商管理" breadcrumbs={['采购', '供应商管理']} />
@@ -176,12 +189,13 @@ export default function PurchaseSuppliers() {
         <Table
           headers={[
             ...(deleteMode ? [<input key="chk" type="checkbox" checked={selectedForDelete.size === filtered.length && filtered.length > 0} onChange={e => { if (e.target.checked) setSelectedForDelete(new Set(filtered.map(s => s.id))); else setSelectedForDelete(new Set()); }} />] : []),
-            '供应商名称', '类型', '评价等级', '主营品类', '联系人', '联系电话', '仓库', '一件代发', '状态', '操作',
+            '供应商名称', '类型', '渠道来源', '评价等级', '主营品类', '联系人', '联系电话', '仓库', '一件代发', '状态', '操作',
           ]}
           rows={filtered.map(s => [
             ...(deleteMode ? [<input key="chk" type="checkbox" checked={selectedForDelete.has(s.id)} onChange={() => handleToggleSelect(s.id)} />] : []),
             <span key="name" className="cell-emph">{s.name}</span>,
             <span key="type" style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: `${SUPPLIER_TYPE_COLORS[s.type]}15`, color: SUPPLIER_TYPE_COLORS[s.type], border: `1px solid ${SUPPLIER_TYPE_COLORS[s.type]}30` }}>{SUPPLIER_TYPE_LABELS[s.type]}</span>,
+            <span key="src" style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: s.channelSource === 'terminal' ? '#E8F5E9' : 'var(--color-neutral-100)', color: s.channelSource === 'terminal' ? '#01795D' : 'var(--color-neutral-600)' }}>{s.channelSource === 'terminal' ? '终端注册' : '手动创建'}</span>,
             <span key="grade" style={{ fontWeight: 'var(--font-bold)', color: GRADE_COLORS[s.grade] || GRADE_COLORS['C'] }}>{s.grade}级</span>,
             <span key="cat" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{s.mainCategories.join('、')}</span>,
             <span key="cp" style={{ fontSize: 'var(--text-sm)' }}>{s.contactPerson}</span>,
@@ -310,6 +324,40 @@ export default function PurchaseSuppliers() {
                   );
                 })}
               </div>
+              {/* 渠道来源（编辑态只读：由创建方式决定） */}
+              <div style={{ marginTop: 'var(--space-3)' }}>
+                <label className="drawer-label">渠道来源</label>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+                  <span style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: (editForm?.channelSource ?? 'manual') === 'terminal' ? '#E8F5E9' : 'var(--color-neutral-100)', color: (editForm?.channelSource ?? 'manual') === 'terminal' ? '#01795D' : 'var(--color-neutral-600)' }}>
+                    {(editForm?.channelSource ?? 'manual') === 'terminal' ? '终端注册' : '手动创建'}
+                  </span>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>由创建方式决定，不可修改</span>
+                </div>
+              </div>
+            </DrawerSection>
+
+            {/* 资质文件（编辑，最多5个） */}
+            <DrawerSection title={`资质文件（${editForm?.qualificationFiles.length ?? 0}/5）`}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+                {(editForm?.qualificationFiles ?? []).map((f, i) => (
+                  <div key={`${f}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                    <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14, color: 'var(--color-module-current-base)', flexShrink: 0 }}><path d="M4 1.5h5.5L13 5v9.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-12a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/><path d="M9.5 1.5V5H13" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
+                    <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', flex: 1 }}>{f}</span>
+                    <Button size="sm" variant="ghost" style={{ color: 'var(--color-semantic-error)' }} onClick={() => handleRemoveQualificationFile(i)}>删除</Button>
+                  </div>
+                ))}
+              </div>
+              {(editForm?.qualificationFiles.length ?? 0) < 5 ? (
+                <label style={{ display: 'block', border: '2px dashed var(--color-border-primary)', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)', textAlign: 'center', cursor: 'pointer' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: 'var(--color-text-primary)', marginBottom: 4 }}>点击上传资质文件</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>支持营业执照、生产许可证等，最多 5 个，还可上传 {5 - (editForm?.qualificationFiles.length ?? 0)} 个</div>
+                  <input type="file" multiple style={{ display: 'none' }} onChange={e => { handleAddQualificationFiles(e.target.files); e.target.value = ''; }} />
+                </label>
+              ) : (
+                <div style={{ border: '2px dashed var(--color-border-primary)', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
+                  已达上限（5/5），如需更换请先删除已有文件
+                </div>
+              )}
             </DrawerSection>
 
             {/* 经营信息（编辑） */}
@@ -498,10 +546,31 @@ export default function PurchaseSuppliers() {
                 <InfoItem label="联系邮箱">{selectedSupplier.contactEmail || '—'}</InfoItem>
                 <InfoItem label="主营品类">{selectedSupplier.mainCategories.join('、') || '—'}</InfoItem>
                 <InfoItem label="资质状态">{String(selectedSupplier.qualificationStatus ?? '—')}</InfoItem>
+                <InfoItem label="渠道来源">
+                  <span style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: selectedSupplier.channelSource === 'terminal' ? '#E8F5E9' : 'var(--color-neutral-100)', color: selectedSupplier.channelSource === 'terminal' ? '#01795D' : 'var(--color-neutral-600)' }}>
+                    {selectedSupplier.channelSource === 'terminal' ? '终端注册' : '手动创建'}
+                  </span>
+                </InfoItem>
                 <InfoItem label="注册地址" span={3}>{[[selectedSupplier.registeredProvince, selectedSupplier.registeredCity, selectedSupplier.registeredDistrict].filter(Boolean).join(' / '), selectedSupplier.registeredAddress].filter(Boolean).join(' ') || '—'}</InfoItem>
                 <InfoItem label="联系地址" span={3}>{[[selectedSupplier.contactProvince, selectedSupplier.contactCity, selectedSupplier.contactDistrict].filter(Boolean).join(' / '), selectedSupplier.contactAddress].filter(Boolean).join(' ') || '—'}</InfoItem>
                 <InfoItem label="经营范围" span={3}>{selectedSupplier.businessScope || '—'}</InfoItem>
               </InfoGrid>
+            </DrawerSection>
+
+            {/* 资质文件（查看） */}
+            <DrawerSection title={`资质文件（${selectedSupplier.qualificationFiles.length}/5）`}>
+              {selectedSupplier.qualificationFiles.length === 0 ? (
+                <p style={{ color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-4)' }}>暂无资质文件</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  {selectedSupplier.qualificationFiles.map((f, i) => (
+                    <div key={`${f}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                      <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14, color: 'var(--color-module-current-base)', flexShrink: 0 }}><path d="M4 1.5h5.5L13 5v9.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-12a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/><path d="M9.5 1.5V5H13" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
+                      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)' }}>{f}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </DrawerSection>
 
             {/* 经营信息（查看） */}

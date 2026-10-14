@@ -1,7 +1,10 @@
 /** 供应商管理共享数据源 */
 import type { SupplierItem } from '../types';
 
-export const supplierItems: SupplierItem[] = [
+/** 原始数据（资质文件与渠道来源由导出层统一注入） */
+type RawSupplierItem = Omit<SupplierItem, 'qualificationFiles' | 'channelSource'>;
+
+const rawSupplierItems: RawSupplierItem[] = [
   {
     id: '1',
     type: 'brand',
@@ -483,6 +486,32 @@ export const supplierItems: SupplierItem[] = [
     status: 'inactive',
   },
 ];
+
+/** 历史供应商资质文件与渠道来源补录 */
+const QUALIFICATION_FILES_MAP: Record<string, string[]> = {
+  '1': ['营业执照.pdf', '食品生产许可证.pdf', 'SC认证证书.pdf'],
+  '2': ['营业执照.pdf', '食品生产许可证.pdf'],
+  '3': ['营业执照.pdf', '食品经营许可证.pdf', 'ISO22000认证证书.pdf'],
+  '4': ['营业执照.pdf', '食品生产许可证.pdf', '普洱茶地理标志授权书.pdf'],
+  '5': ['营业执照.pdf', '食品生产许可证.pdf'],
+  '6': ['营业执照.pdf', '出口食品生产企业备案.pdf'],
+  '7': ['营业执照.pdf', '食品生产许可证.pdf', '祁红非遗传承证书.pdf'],
+  '8': ['营业执照.pdf', '食品生产许可证.pdf', '有机产品认证证书.pdf'],
+  '9': ['营业执照.pdf', '食品生产许可证.pdf'],
+  '10': ['营业执照.pdf', '食品经营许可证.pdf'],
+};
+
+/** 渠道来源：3、8 号供应商由合作商终端注册，其余为后台手动创建 */
+const CHANNEL_SOURCE_MAP: Record<string, 'manual' | 'terminal'> = {
+  '3': 'terminal',
+  '8': 'terminal',
+};
+
+export const supplierItems: SupplierItem[] = rawSupplierItems.map((s) => ({
+  ...s,
+  qualificationFiles: QUALIFICATION_FILES_MAP[s.id] ?? ['营业执照.pdf'],
+  channelSource: CHANNEL_SOURCE_MAP[s.id] ?? 'manual',
+}));
 
 /** 供应商类型标签 */
 export const SUPPLIER_TYPE_LABELS: Record<string, string> = {
