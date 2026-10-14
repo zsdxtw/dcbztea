@@ -95,6 +95,14 @@ export default function PartnerLogin() {
         <div style={{ textAlign: 'center', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 16 }}>
           演示账号 admin　密码 123456
         </div>
+        <div style={{ textAlign: 'center', marginTop: 8 }}>
+          <button
+            onClick={() => navigate('/dashboard')}
+            style={{ background: 'none', border: 'none', color: 'var(--color-neutral-400)', fontSize: 'var(--text-xs)', cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            返回平台主系统
+          </button>
+        </div>
       </div>
     </div>
   );

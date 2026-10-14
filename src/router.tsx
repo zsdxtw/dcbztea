@@ -79,6 +79,17 @@ import PersonnelTeaProfessional from './pages/personnel/PersonnelTeaProfessional
 import PersonnelEmployee from './pages/personnel/PersonnelEmployee';
 import PersonnelStreamer from './pages/personnel/PersonnelStreamer';
 
+/* ── 合作商终端（独立后台） ── */
+import PartnerLogin from './pages/partner/PartnerLogin';
+import PartnerLayout from './pages/partner/PartnerLayout';
+import PartnerDashboard from './pages/partner/PartnerDashboard';
+import PartnerOrders from './pages/partner/PartnerOrders';
+import PartnerReports from './pages/partner/PartnerReports';
+import PartnerCustomers from './pages/partner/PartnerCustomers';
+import PartnerSettlement from './pages/partner/PartnerSettlement';
+import PartnerAccountPage from './pages/partner/PartnerAccountPage';
+import PartnerProfile from './pages/partner/PartnerProfile';
+
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -174,6 +185,22 @@ export const router = createBrowserRouter([
       { path: 'personnel/personnel-tea-professional', element: <PersonnelTeaProfessional /> },
       { path: 'personnel/personnel-streamer', element: <PersonnelStreamer /> },
       { path: 'personnel/personnel-stores', element: <SalesStores /> },
+    ],
+  },
+  /* ── 合作商终端（独立布局：登录页 + 5 个一级菜单） ── */
+  { path: '/partner/login', element: <PartnerLogin /> },
+  {
+    path: '/partner',
+    element: <PartnerLayout />,
+    children: [
+      { index: true, element: <Navigate to="/partner/dashboard" replace /> },
+      { path: 'dashboard', element: <PartnerDashboard /> },
+      { path: 'orders', element: <PartnerOrders /> },
+      { path: 'reports', element: <PartnerReports /> },
+      { path: 'customers', element: <PartnerCustomers /> },
+      { path: 'settlement', element: <PartnerSettlement /> },
+      { path: 'account', element: <PartnerAccountPage /> },
+      { path: 'profile', element: <PartnerProfile /> },
     ],
   },
 ]);

@@ -30,8 +30,9 @@ export default function App() {
     }
   }, []);
 
-  // 模块切换时同步 data-module 属性
+  // 模块切换时同步 data-module 属性（合作商终端路由除外，由 PartnerLayout 自行设置）
   useEffect(() => {
+    if (window.location.pathname.startsWith('/partner')) return;
     document.body.dataset.module = currentModule;
   }, [currentModule]);
 

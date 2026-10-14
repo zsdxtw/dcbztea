@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useAppStore } from '../../stores/appStore';
 
 /** 登录态存取 */
 export interface PartnerAuth {
@@ -63,9 +64,12 @@ export default function PartnerLayout() {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
 
-  // 合作商终端使用翡翠绿主题（商品模块色）
+  // 合作商终端使用翡翠绿主题（商品模块色）；卸载时恢复主系统当前模块主题
   useEffect(() => {
     document.body.dataset.module = 'product';
+    return () => {
+      document.body.dataset.module = useAppStore.getState().currentModule;
+    };
   }, []);
 
   if (!auth) return <Navigate to="/partner/login" replace />;

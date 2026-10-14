@@ -57,6 +57,22 @@ export default function TopNav() {
           </svg>
           <span className="notification-dot"></span>
         </button>
+        <button
+          onClick={() => navigate('/partner/login')}
+          title="合作商终端"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+            borderRadius: 'var(--radius-md)', border: '1px solid var(--color-neutral-200)',
+            background: 'var(--color-neutral-0)', color: '#01795D', fontSize: 'var(--text-xs)',
+            fontWeight: 'var(--font-medium)', cursor: 'pointer', whiteSpace: 'nowrap',
+          }}
+        >
+          <svg viewBox="0 0 16 16" fill="none" style={{ width: 13, height: 13 }}>
+            <path d="M2 3h12v9H2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+            <path d="M2 6h12M5.5 6v6" stroke="currentColor" strokeWidth="1.2"/>
+          </svg>
+          合作商终端
+        </button>
         <div className="topnav-avatar">陈</div>
       </div>
 
