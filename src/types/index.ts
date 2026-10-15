@@ -1146,10 +1146,17 @@ export interface PartnerOrder {
   receiverPhone: string;
   receiverAddress: string;
   remark?: string;
+  /** 报备转入来源（报备编号），由平台报备规则自动转入的订单才有 */
+  sourceReport?: string;
+  /** 报备转入类型：order-self=自营订单报备 / order-opportunity=商机订单报备（平台履约）/ product=商品报备 / customer=客户报备 */
+  transferKind?: 'order-self' | 'order-opportunity' | 'product' | 'customer';
 }
 
 /** 合作商报备类型：order=订单报备 / product=商品报备 / customer=客户报备 */
 export type PartnerReportType = 'order' | 'product' | 'customer';
+
+/** 订单报备模式：self=自营报备（订单转合作商履约）/ opportunity=商机报备（订单同步展示，由平台进货发货处理） */
+export type PartnerOrderReportKind = 'self' | 'opportunity';
 
 /** 合作商报备状态 */
 export type PartnerReportStatus = 'pending' | 'approved' | 'rejected';
@@ -1166,6 +1173,44 @@ export interface PartnerReport {
   status: PartnerReportStatus;
   submitTime: string;
   reviewNote?: string;
+  /** 发起报备的合作商名称 */
+  partnerName: string;
+  /** 审批时间（管理台审批后） */
+  reviewTime?: string;
+  /** 订单报备模式：self=自营报备 / opportunity=商机报备 */
+  orderKind?: PartnerOrderReportKind;
+  /** 订单报备：关联的平台订单编号 */
+  relatedOrderCode?: string;
+  /** 商品报备：报备商品名称 */
+  productName?: string;
+  /** 商品报备：报备商品规格 */
+  productSpec?: string;
+  /** 商品报备：报备区域（"全部地区" 或具体区域如"江苏"） */
+  region?: string;
+  /** 商品报备：报备客户（"全部客户" 或具体客户名） */
+  customer?: string;
+  /** 客户报备：报备的客户名称 */
+  targetCustomer?: string;
+}
+
+/** 平台待分发订单（管理台创建，可被报备规则匹配后自动转入合作商名下） */
+export interface PlatformOrder {
+  id: string;
+  code: string;
+  customerName: string;
+  customerType: string;
+  /** 客户所在区域（如"江苏南京"） */
+  customerRegion: string;
+  items: { productName: string; spec: string; quantity: number; price: number }[];
+  totalAmount: number;
+  deliveryMode: PartnerDeliveryMode;
+  coopMode: PartnerCoopMode;
+  orderDate: string;
+  expectedShipDate: string;
+  receiver: string;
+  receiverPhone: string;
+  receiverAddress: string;
+  remark?: string;
 }
 
 /** 合作商合作客户 */

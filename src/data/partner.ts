@@ -8,6 +8,7 @@ import type {
   PartnerCustomer,
   PartnerSettlement,
   PartnerAccount,
+  PlatformOrder,
 } from '../types';
 
 /* ── 合作商自身信息（字段与采购 > 供应商管理的供应商档案一致） ── */
@@ -142,39 +143,120 @@ export const partnerOrders: PartnerOrder[] = [
   },
 ];
 
-/* ── 报备记录（合作商主动报备订单 / 商品 / 客户） ── */
+/* ── 报备记录（合作商主动报备订单 / 商品 / 客户，提交至管理台审批） ── */
 export const partnerReports: PartnerReport[] = [
   {
-    id: 'pr1', code: 'BB20260912001', type: 'order', title: '华茗堂茶庄中秋团购订单报备',
-    summary: '客户中秋福利采购西湖龙井·明前特级 60 罐、碧螺春·一级 40 袋，预计 9 月 20 日前下单',
-    amount: 43840, status: 'pending', submitTime: '2026-09-12 10:30',
+    id: 'pr1', code: 'BB20261013001', type: 'order', orderKind: 'self',
+    title: '华茗堂茶庄中秋团购订单报备（自营）',
+    relatedOrderCode: 'HHSO20261013001',
+    summary: '华茗堂茶庄中秋福利团购西湖龙井·明前特级 60 罐，客户已明确下单，申请自营报备，订单转我方履约',
+    amount: 27120, status: 'pending', submitTime: '2026-10-13 10:30',
+    partnerName: '杭州云茶供应链管理有限公司',
   },
   {
-    id: 'pr2', code: 'BB20260911002', type: 'customer', title: '南京翠竹茶行报备',
-    summary: '渠道客户，主营雨花茶与绿茶批发，月采购额约 3 万元，已实地拜访并建立联系',
-    status: 'approved', submitTime: '2026-09-11 16:20', reviewNote: '同意合作，按渠道客户价格体系执行',
+    id: 'pr2', code: 'BB20261012002', type: 'order', orderKind: 'opportunity',
+    title: '清心茶坊金骏眉订单商机报备',
+    relatedOrderCode: 'HHSO20261011004',
+    summary: '清心茶坊金骏眉·特级采购需求由本合作商推介达成，申请商机报备，订单由平台进货发货，同步我方查看',
+    amount: 10240, status: 'pending', submitTime: '2026-10-12 16:20',
+    partnerName: '杭州云茶供应链管理有限公司',
   },
   {
-    id: 'pr3', code: 'BB20260910003', type: 'product', title: '武夷岩茶·水金龟新商品报备',
-    summary: '武夷山产区水金龟岩茶，轻火慢焙，建议供货价 420 元/50g，市场对标价 688 元',
-    status: 'approved', submitTime: '2026-09-10 09:15', reviewNote: '商品资质齐全，纳入秋季选品',
+    id: 'pr3', code: 'BB20260910003', type: 'product',
+    title: '武夷岩茶·水金龟商品报备（江苏 · 全部客户）',
+    productName: '武夷岩茶·水金龟', productSpec: '50g/罐',
+    region: '江苏', customer: '全部客户',
+    summary: '武夷山产区水金龟岩茶，轻火慢焙，我方已在江苏区域重点推广，申请该区域该商品订单自动转给我方履约',
+    status: 'approved', submitTime: '2026-09-10 09:15',
+    reviewNote: '商品资质齐全，同意江苏区域报备', reviewTime: '2026-09-11 14:20',
+    partnerName: '杭州云茶供应链管理有限公司',
   },
   {
-    id: 'pr4', code: 'BB20260908004', type: 'order', title: '浦发银行年度慰问品订单报备',
-    summary: '浦发银行上海分行 Q4 慰问品采购意向，以金骏眉 + 白毫银针礼盒为主，预计金额 12 万元',
-    amount: 120000, status: 'pending', submitTime: '2026-09-08 14:00',
+    id: 'pr4', code: 'BB20261013004', type: 'customer',
+    title: '南京翠竹茶行客户报备',
+    targetCustomer: '南京翠竹茶行',
+    summary: '渠道客户，主营雨花茶与绿茶批发，月采购额约 3 万元，已实地拜访建立合作，该客户新订单申请转给我方',
+    status: 'pending', submitTime: '2026-10-13 11:40',
+    partnerName: '杭州云茶供应链管理有限公司',
   },
   {
-    id: 'pr5', code: 'BB20260905005', type: 'customer', title: '苏州吴门茶事报备',
-    summary: '个人工作室客户，主打苏州本地茶客社群，月流水 1.5 万左右，申请个人客户价格',
-    status: 'rejected', submitTime: '2026-09-05 11:40', reviewNote: '与现有渠道客户重合，建议并入天福茗茶渠道',
+    id: 'pr5', code: 'BB20260905005', type: 'customer',
+    title: '苏州吴门茶事客户报备',
+    targetCustomer: '苏州吴门茶事',
+    summary: '个人工作室客户，主打苏州本地茶客社群，月流水 1.5 万左右，申请该客户订单转给我方',
+    status: 'rejected', submitTime: '2026-09-05 11:40',
+    reviewNote: '客户整体转交与现有渠道客户重合，建议并入天福茗茶渠道', reviewTime: '2026-09-06 09:30',
+    partnerName: '杭州云茶供应链管理有限公司',
   },
   {
-    id: 'pr6', code: 'BB20260901006', type: 'product', title: '冷泡茶便携装报备',
-    summary: '针对夏季冷泡场景的便携三角袋泡装，茉莉花茶与白茶两个口味，建议零售价 8 元/袋',
-    status: 'approved', submitTime: '2026-09-01 17:30', reviewNote: '试产 2000 袋投放市场',
+    id: 'pr6', code: 'BB20260901006', type: 'product',
+    title: '冷泡茶便携装商品报备（全部地区 · 全部客户）',
+    productName: '冷泡茶便携装', productSpec: '3g/袋',
+    region: '全部地区', customer: '全部客户',
+    summary: '针对夏季冷泡场景的便携三角袋泡装，茉莉花茶与白茶两个口味，申请全国范围订单转给我方',
+    status: 'approved', submitTime: '2026-09-01 17:30',
+    reviewNote: '试产 2000 袋投放市场，同意报备', reviewTime: '2026-09-02 10:00',
+    partnerName: '杭州云茶供应链管理有限公司',
   },
 ];
+
+/* ── 平台待分发订单池（管理台创建的新订单，可被审批通过的报备规则匹配转入合作商名下） ── */
+export const platformOrders: PlatformOrder[] = [
+  {
+    id: 'pto1', code: 'HHSO20261013001', customerName: '华茗堂茶庄', customerType: '直营客户', customerRegion: '江苏南京',
+    items: [{ productName: '西湖龙井·明前特级', spec: '50g/罐', quantity: 60, price: 452 }],
+    totalAmount: 27120, deliveryMode: 'direct', coopMode: 'supplier',
+    orderDate: '2026-10-13', expectedShipDate: '2026-10-16',
+    receiver: '林掌柜', receiverPhone: '138****6677', receiverAddress: '江苏南京市秦淮区夫子庙街道贡院街12号',
+    remark: '中秋团购订单，匹配自营订单报备后转合作商履约',
+  },
+  {
+    id: 'pto2', code: 'HHSO20261013002', customerName: '南京翠竹茶行', customerType: '渠道客户', customerRegion: '江苏南京',
+    items: [{ productName: '雨花茶·特级', spec: '100g/罐', quantity: 30, price: 268 }],
+    totalAmount: 8040, deliveryMode: 'warehouse', coopMode: 'supplier',
+    orderDate: '2026-10-13', expectedShipDate: '2026-10-15',
+    receiver: '翠竹茶行采购部', receiverPhone: '025-8463****', receiverAddress: '江苏南京市玄武区中山东路198号',
+  },
+  {
+    id: 'pto3', code: 'HHSO20261012003', customerName: '苏州吴门茶事', customerType: '个人客户', customerRegion: '江苏苏州',
+    items: [{ productName: '武夷岩茶·水金龟', spec: '50g/罐', quantity: 20, price: 420 }],
+    totalAmount: 8400, deliveryMode: 'direct', coopMode: 'service',
+    orderDate: '2026-10-12', expectedShipDate: '2026-10-14',
+    receiver: '吴门茶事主理人', receiverPhone: '137****8899', receiverAddress: '江苏苏州市姑苏区平江路历史街区46号',
+    remark: '水金龟岩茶订单，命中商品报备（江苏区域）自动转入',
+  },
+  {
+    id: 'pto4', code: 'HHSO20261011004', customerName: '清心茶坊', customerType: '直营客户', customerRegion: '浙江宁波',
+    items: [{ productName: '金骏眉·特级', spec: '50g/罐', quantity: 10, price: 1024 }],
+    totalAmount: 10240, deliveryMode: 'warehouse', coopMode: 'service',
+    orderDate: '2026-10-11', expectedShipDate: '2026-10-14',
+    receiver: '清心茶坊收发部', receiverPhone: '139****2210', receiverAddress: '浙江宁波市鄞州区中山东路2001号',
+    remark: '商机报备订单，由平台进货发货',
+  },
+];
+
+/* ── 报备表单选项 ── */
+/** 商品报备可选商品（含平台订单池中的商品，便于规则命中演示） */
+export const REPORT_PRODUCT_OPTIONS: { name: string; spec: string }[] = [
+  { name: '西湖龙井·明前特级', spec: '50g/罐' },
+  { name: '碧螺春·一级', spec: '100g/袋' },
+  { name: '正山小种·特级', spec: '100g/罐' },
+  { name: '金骏眉·特级', spec: '50g/罐' },
+  { name: '白毫银针·特级', spec: '50g/罐' },
+  { name: '雨花茶·特级', spec: '100g/罐' },
+  { name: '武夷岩茶·水金龟', spec: '50g/罐' },
+  { name: '凤凰单丛·蜜兰香', spec: '100g/袋' },
+  { name: '冷泡茶便携装', spec: '3g/袋' },
+];
+
+/** 商品报备可选区域 */
+export const REPORT_REGION_OPTIONS = ['全部地区', '江苏', '浙江', '上海', '福建', '广东'];
+
+/** 商品报备可选客户范围 */
+export const REPORT_CUSTOMER_OPTIONS = ['全部客户', '华茗堂茶庄', '清心茶坊', '浦发银行', '天福茗茶', '南京翠竹茶行', '苏州吴门茶事'];
+
+/** 客户报备可选客户 */
+export const CUSTOMER_REPORT_OPTIONS = ['南京翠竹茶行', '苏州吴门茶事', '华茗堂茶庄', '清心茶坊', '浦发银行', '天福茗茶', '茗香阁直播'];
 
 /* ── 合作客户（含可下单商品） ── */
 export const partnerCustomers: PartnerCustomer[] = [
@@ -272,4 +354,13 @@ export const PARTNER_ORDER_STATUS_COLORS: Record<string, { bg: string; color: st
 };
 export const PARTNER_REPORT_TYPE_LABELS: Record<string, string> = { order: '订单报备', product: '商品报备', customer: '客户报备' };
 export const PARTNER_REPORT_STATUS_LABELS: Record<string, string> = { pending: '待审核', approved: '已通过', rejected: '已驳回' };
+/** 订单报备模式：self=合作商自营履约 / opportunity=平台进货发货 */
+export const PARTNER_ORDER_KIND_LABELS: Record<string, string> = { self: '自营报备', opportunity: '商机报备' };
+/** 报备转入类型标签（合作商订单列表展示） */
+export const PARTNER_TRANSFER_KIND_LABELS: Record<string, string> = {
+  'order-self': '自营报备转入',
+  'order-opportunity': '商机报备转入',
+  product: '商品报备转入',
+  customer: '客户报备转入',
+};
 export const PARTNER_ACCOUNT_ROLE_LABELS: Record<string, string> = { admin: '管理员', business: '业务员', warehouse: '仓管员' };

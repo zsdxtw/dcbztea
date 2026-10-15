@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { PageHead, Pill, ORDER_STATUS_TONE } from './PartnerUI';
 import { getPartnerAuth } from './PartnerLayout';
-import { partnerOrders, partnerCustomers, partnerSettlements, partnerReports, PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
+import { useReportStore, getTransferredOrders } from '../../stores/reportStore';
+import { partnerOrders, partnerCustomers, partnerSettlements, PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -9,12 +10,16 @@ const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 export default function PartnerDashboard() {
   const navigate = useNavigate();
   const auth = getPartnerAuth();
+  const reports = useReportStore((s) => s.reports);
+  /** 报备审批通过后自动转入的订单 */
+  const transferred = getTransferredOrders(reports);
 
-  const pendingCount = partnerOrders.filter(o => o.status === 'pending').length;
-  const shippingCount = partnerOrders.filter(o => o.status === 'accepted' || o.status === 'shipping').length;
+  const pendingCount = transferred.filter(o => o.status === 'pending').length + partnerOrders.filter(o => o.status === 'pending').length;
+  const shippingCount = transferred.filter(o => o.status === 'accepted' || o.status === 'shipping').length
+    + partnerOrders.filter(o => o.status === 'accepted' || o.status === 'shipping').length;
   const unsettled = partnerSettlements.find(s => s.status === 'unsettled');
   const customerCount = partnerCustomers.filter(c => c.status === 'cooperating').length;
-  const reportPending = partnerReports.filter(r => r.status === 'pending').length;
+  const reportPending = reports.filter(r => r.status === 'pending').length;
 
   const now = new Date();
   const dateStr = `${now.getFullYear()} 年 ${now.getMonth() + 1} 月 ${now.getDate()} 日 · 星期${WEEKDAYS[now.getDay()]}`;
