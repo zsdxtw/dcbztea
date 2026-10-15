@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
 import { TOPNAV_TABS } from '../../data/modules';
 import { ModuleKey } from '../../types';
+import BrandLogo from '../common/BrandLogo';
 
 /** 顶部导航栏 */
 export default function TopNav() {
@@ -18,12 +19,7 @@ export default function TopNav() {
     <header className="topnav">
       {/* 品牌 */}
       <div className="topnav-brand">
-        <svg className="topnav-brand-icon" viewBox="0 0 28 28" fill="none">
-          <rect x="2" y="6" width="24" height="18" rx="3" stroke="currentColor" strokeWidth="1.5"/>
-          <path d="M8 6V4a2 2 0 012-2h8a2 2 0 012 2v2" stroke="currentColor" strokeWidth="1.5"/>
-          <path d="M7 14h14M7 18h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          <circle cx="14" cy="10" r="2" fill="currentColor" opacity="0.3"/>
-        </svg>
+        <BrandLogo className="topnav-brand-icon" />
         <span className="topnav-brand-text">淡茶半盏</span>
       </div>
 

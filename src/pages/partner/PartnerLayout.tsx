@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
+import BrandLogo from '../../components/common/BrandLogo';
 import './partner.css';
 
 /** 登录态存取 */
@@ -58,15 +59,8 @@ const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode
   },
 ];
 
-/** 品牌茶叶图形 */
-export function TeaLeafMark() {
-  return (
-    <svg viewBox="0 0 28 28" fill="none">
-      <path d="M14 3C9 7 6 11 6 15a8 8 0 0016 0c0-4-3-8-8-12z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-      <path d="M14 10c-2 2-3.5 4-3.5 6a3.5 3.5 0 007 0c0-2-1.5-4-3.5-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-    </svg>
-  );
-}
+/** 品牌茶叶图形（统一使用公共 BrandLogo 组件） */
+export const TeaLeafMark = BrandLogo;
 
 /** 合作商终端布局：简约侧边栏（品牌 + 菜单 + 用户），无顶栏 */
 export default function PartnerLayout() {
