@@ -69,6 +69,24 @@ export default function TopNav() {
           </svg>
           合作商终端
         </button>
+        <button
+          onClick={() => navigate('/customer/login')}
+          title="客户终端"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+            borderRadius: 'var(--radius-md)', border: '1px solid var(--color-neutral-200)',
+            background: 'var(--color-neutral-0)', color: '#01795D', fontSize: 'var(--text-xs)',
+            fontWeight: 'var(--font-medium)', cursor: 'pointer', whiteSpace: 'nowrap',
+          }}
+        >
+          <svg viewBox="0 0 16 16" fill="none" style={{ width: 13, height: 13 }}>
+            <circle cx="6.5" cy="5.5" r="2.6" stroke="currentColor" strokeWidth="1.3"/>
+            <path d="M2.5 13a4 4 0 018 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+            <circle cx="12.5" cy="10" r="1.6" stroke="currentColor" strokeWidth="1.2"/>
+            <path d="M14 11.5l1.5 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          </svg>
+          客户终端
+        </button>
         <div className="topnav-avatar">陈</div>
       </div>
 
