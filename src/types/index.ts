@@ -1260,3 +1260,81 @@ export interface PartnerAccount {
   createTime: string;
   lastLogin?: string;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+ * 客户终端（直营客户下单终端）
+ * ═══════════════════════════════════════════════════════════════ */
+
+/** 客户终端订单状态 */
+export type CustomerOrderStatus =
+  | 'pending'    // 待确认（客户刚下单）
+  | 'confirmed'  // 已确认（管理台已确认）
+  | 'shipping'   // 配送中
+  | 'delivered'  // 已送达（待客户确认收货）
+  | 'completed'  // 已完成（客户已确认收货）
+  | 'cancelled'; // 已取消
+
+/** 客户终端下单账号（管理台开通，客户终端登录使用，关联直营客户） */
+export interface CustomerAccount {
+  id: string;
+  /** 登录账号 */
+  username: string;
+  /** 登录密码（演示环境明文存储） */
+  password: string;
+  /** 账号名称 */
+  name: string;
+  /** 关联直营客户名称 */
+  customerName: string;
+  /** 关联客户编号 */
+  customerCode: string;
+  /** 联系手机 */
+  phone: string;
+  status: 'active' | 'disabled';
+  /** 开通时间 */
+  createTime: string;
+  /** 最近登录 */
+  lastLogin?: string;
+  /** 开通备注 */
+  remark?: string;
+}
+
+/** 客户终端订单商品明细 */
+export interface CustomerOrderItem {
+  productId: string;
+  productName: string;
+  spec: string;
+  quantity: number;
+  /** 成交单价（下单时的销售价） */
+  price: number;
+}
+
+/** 客户终端订单（客户在终端自助下单产生） */
+export interface CustomerOrder {
+  id: string;
+  /** 订单编号（KHD + 日期 + 3 位序号） */
+  code: string;
+  /** 下单客户名称 */
+  customerName: string;
+  items: CustomerOrderItem[];
+  /** 订单总金额 */
+  totalAmount: number;
+  status: CustomerOrderStatus;
+  /** 下单日期 */
+  orderDate: string;
+  receiver: string;
+  receiverPhone: string;
+  receiverAddress: string;
+  /** 买家备注 */
+  remark?: string;
+  /** 卖家回复（管理台确认/驳回时的说明） */
+  sellerNote?: string;
+}
+
+/** 购物车条目（客户终端，会话内共享） */
+export interface CartItem {
+  productId: string;
+  productName: string;
+  spec: string;
+  price: number;
+  quantity: number;
+}

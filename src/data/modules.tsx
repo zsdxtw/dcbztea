@@ -215,6 +215,9 @@ const EmployeeIcon = () => (
 const StreamerIcon = () => (
   <svg viewBox="0 0 20 20" fill="none"><path d="M3 10l2 2 4-6 4 8 2-4h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg>
 );
+const CustomerAccountIcon = () => (
+  <svg viewBox="0 0 20 20" fill="none"><circle cx="8" cy="6.5" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M3 16a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="15" cy="11.5" r="1.8" stroke="currentColor" strokeWidth="1.2"/><path d="M16.4 12.9L18 14.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+);
 const ReportMgmtIcon = () => (
   <svg viewBox="0 0 20 20" fill="none"><rect x="4" y="2" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h6M7 9h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><circle cx="13.2" cy="13.2" r="2.7" stroke="currentColor" strokeWidth="1.1"/><path d="M12.1 13.2l0.8 0.8 1.5-1.6" stroke="currentColor" strokeWidth="1.0" strokeLinecap="round" strokeLinejoin="round"/></svg>
 );
@@ -256,6 +259,7 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
       { key: 'sales-reports', label: '报备管理', icon: <ReportMgmtIcon /> },
       { key: 'sales-pricing', label: '销售报（调）价', icon: <QuotationIcon /> },
       { key: 'sales-customers', label: '客户管理', icon: <CustomersIcon /> },
+      { key: 'sales-customer-accounts', label: '客户下单账号', icon: <CustomerAccountIcon /> },
       { key: 'sales-reconciliation', label: '客户对账', icon: <ReconciliationIcon /> },
       { key: 'sales-return', label: '销售退货', icon: <ReturnIcon /> },
     ],

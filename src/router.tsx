@@ -25,6 +25,7 @@ import SalesCustomers from './pages/sales/SalesCustomers';
 import SalesStores from './pages/sales/SalesStores';
 import SalesReturn from './pages/sales/SalesReturn';
 import SalesReports from './pages/sales/SalesReports';
+import SalesCustomerAccounts from './pages/sales/SalesCustomerAccounts';
 
 import InventoryOverview from './pages/inventory/InventoryOverview';
 import InventoryPurchaseInbound from './pages/inventory/InventoryPurchaseInbound';
@@ -91,6 +92,15 @@ import PartnerSettlement from './pages/partner/PartnerSettlement';
 import PartnerAccountPage from './pages/partner/PartnerAccountPage';
 import PartnerProfile from './pages/partner/PartnerProfile';
 
+/* ── 客户终端（独立后台） ── */
+import CustomerLogin from './pages/customer/CustomerLogin';
+import CustomerLayout from './pages/customer/CustomerLayout';
+import CustomerDashboard from './pages/customer/CustomerDashboard';
+import CustomerProducts from './pages/customer/CustomerProducts';
+import CustomerCart from './pages/customer/CustomerCart';
+import CustomerOrders from './pages/customer/CustomerOrders';
+import CustomerAccountPage from './pages/customer/CustomerAccountPage';
+
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -121,6 +131,7 @@ export const router = createBrowserRouter([
       { path: 'sales/sales-reports', element: <SalesReports /> },
       { path: 'sales/sales-pricing', element: <SalesPricing /> },
       { path: 'sales/sales-customers', element: <SalesCustomers /> },
+      { path: 'sales/sales-customer-accounts', element: <SalesCustomerAccounts /> },
       { path: 'sales/sales-platforms', element: <Navigate to="/sales/sales-customers" replace /> },
       { path: 'sales/sales-reconciliation', element: <SalesReconciliation /> },
       { path: 'sales/sales-return', element: <SalesReturn /> },
@@ -203,6 +214,20 @@ export const router = createBrowserRouter([
       { path: 'settlement', element: <PartnerSettlement /> },
       { path: 'account', element: <PartnerAccountPage /> },
       { path: 'profile', element: <PartnerProfile /> },
+    ],
+  },
+  /* ── 客户终端（独立布局：登录页 + 工作台/商品/购物车/订单/账号） ── */
+  { path: '/customer/login', element: <CustomerLogin /> },
+  {
+    path: '/customer',
+    element: <CustomerLayout />,
+    children: [
+      { index: true, element: <Navigate to="/customer/dashboard" replace /> },
+      { path: 'dashboard', element: <CustomerDashboard /> },
+      { path: 'products', element: <CustomerProducts /> },
+      { path: 'cart', element: <CustomerCart /> },
+      { path: 'orders', element: <CustomerOrders /> },
+      { path: 'account', element: <CustomerAccountPage /> },
     ],
   },
 ]);
