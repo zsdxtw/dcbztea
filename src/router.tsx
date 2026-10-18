@@ -50,6 +50,7 @@ import ProductCategory from './pages/product/ProductCategory';
 import ProductBrand from './pages/product/ProductBrand';
 import ProductBrandDetail from './pages/product/ProductBrandDetail';
 import ProductPrice from './pages/product/ProductPrice';
+import ProductNewArrivals from './pages/product/ProductNewArrivals';
 
 import FinanceOverview from './pages/finance/FinanceOverview';
 import FinancePurchasePayment from './pages/finance/FinancePurchasePayment';
@@ -88,6 +89,7 @@ import PartnerRegister from './pages/partner/PartnerRegister';
 import PartnerLayout from './pages/partner/PartnerLayout';
 import PartnerDashboard from './pages/partner/PartnerDashboard';
 import PartnerOrders from './pages/partner/PartnerOrders';
+import PartnerQuotes from './pages/partner/PartnerQuotes';
 import PartnerReports from './pages/partner/PartnerReports';
 import PartnerCustomers from './pages/partner/PartnerCustomers';
 import PartnerSettlement from './pages/partner/PartnerSettlement';
@@ -166,6 +168,7 @@ export const router = createBrowserRouter([
       { path: 'product/product-brand', element: <ProductBrand /> },
       { path: 'product/product-brand/:id', element: <ProductBrandDetail /> },
       { path: 'product/product-price', element: <ProductPrice /> },
+      { path: 'product/product-new-arrivals', element: <ProductNewArrivals /> },
       /* ── 财务 ── */
       { path: 'finance', element: <FinanceOverview /> },
       { path: 'finance/finance-overview', element: <FinanceOverview /> },
@@ -214,6 +217,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/partner/dashboard" replace /> },
       { path: 'dashboard', element: <PartnerDashboard /> },
       { path: 'orders', element: <PartnerOrders /> },
+      { path: 'quotes', element: <PartnerQuotes /> },
       { path: 'reports', element: <PartnerReports /> },
       { path: 'customers', element: <PartnerCustomers /> },
       { path: 'settlement', element: <PartnerSettlement /> },

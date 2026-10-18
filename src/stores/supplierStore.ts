@@ -1,16 +1,22 @@
 /**
  * 供应商共享数据与注册审批流（管理端 ↔ 合作商终端共享）
- * - 管理端：注册审批（通过后创建/更新供应商）、供应商列表
- * - 合作商终端：注册提交、信息修改申请
+ * - 管理端：注册审批（通过后创建/更新供应商）、供应商列表、新品提醒处理
+ * - 合作商终端：注册提交、信息修改申请、报价设置、新品提醒提报
  */
 import { create } from 'zustand';
-import type { SupplierItem, SupplierApproval, SupplierTerminal, SupplierTerminalAccount } from '../types';
+import type {
+  SupplierItem, SupplierApproval, SupplierTerminal, SupplierTerminalAccount,
+  NewArrivalReminder, PartnerQuoteSetting,
+} from '../types';
 import { supplierItems } from '../data/suppliers';
 
 const now = () => new Date().toISOString().slice(0, 10);
 
 /** 生成审批编号 */
 const genCode = (n: number) => `SP-${String(n).padStart(3, '0')}`;
+
+/** 生成新品提醒编号 */
+const genReminderCode = (n: number) => `XPTX-${String(n).padStart(4, '0')}`;
 
 /** 读取终端账号列表；未初始化 accounts 时由 username/password 派生管理员账号（旧数据兼容） */
 export const getTerminalAccounts = (t: SupplierTerminal): SupplierTerminalAccount[] => {
@@ -100,11 +106,69 @@ const seedApprovals: SupplierApproval[] = [
   },
 ];
 
+/** 演示种子新品提醒：1 条待处理（云茶供应链）、1 条已上架（八马） */
+const seedReminders: NewArrivalReminder[] = [
+  {
+    id: 'nar_seed_1',
+    code: 'XPTX-0001',
+    supplierId: '11',
+    supplierName: '杭州云茶供应链管理有限公司',
+    brand: '武夷星',
+    productName: '武夷星大红袍·岩韵典藏',
+    productUrl: 'https://wuyixing.tmall.com/item/yanyun.htm',
+    submitter: 'admin',
+    submitTime: '2026-10-14',
+    status: 'pending',
+  },
+  {
+    id: 'nar_seed_2',
+    code: 'XPTX-0002',
+    supplierId: '3',
+    supplierName: '八马茶业股份有限公司',
+    brand: '八马',
+    productName: '八马铁观音·耿茨联名款',
+    productUrl: 'https://bama.jd.com/item/gengci.htm',
+    submitter: 'bama01',
+    submitTime: '2026-09-28',
+    status: 'listed',
+    handleNote: '已上架至商品管理-茶叶',
+    handleTime: '2026-10-02',
+  },
+];
+
+/** 演示种子报价设置：3（八马）、8（竹叶青）、11（云茶供应链，多品牌） */
+const seedQuoteSettings: Record<string, PartnerQuoteSetting> = {
+  '3': {
+    supplierId: '3',
+    brandDiscounts: { 八马: 86 },
+    productOverrides: {},
+    updateTime: '2026-10-08',
+  },
+  '8': {
+    supplierId: '8',
+    brandDiscounts: { 竹叶青: 90 },
+    productOverrides: {},
+    updateTime: '2026-09-20',
+  },
+  '11': {
+    supplierId: '11',
+    brandDiscounts: { 西湖牌: 82, 正山堂: 85, 八马: 88, 大益: 90, 品品香: 84 },
+    productOverrides: {
+      '1': { type: 'price', value: 448 },
+    },
+    updateTime: '2026-10-12',
+  },
+};
+
 interface SupplierStoreState {
   /** 供应商列表 */
   suppliers: SupplierItem[];
   /** 注册/修改审批单 */
   approvals: SupplierApproval[];
+  /** 新品提醒（合作商提报 → 管理端「商品 > 新品提醒」处理） */
+  arrivalReminders: NewArrivalReminder[];
+  /** 合作商报价设置（键=合作商/供应商 ID） */
+  quoteSettings: Record<string, PartnerQuoteSetting>;
   /** 提交注册申请（合作商终端注册页） */
   submitRegistration: (draft: SupplierItem, applicant: string, note?: string) => SupplierApproval;
   /** 提交信息修改申请（合作商终端信息维护） */
@@ -117,11 +181,19 @@ interface SupplierStoreState {
   updateSupplier: (s: SupplierItem) => void;
   /** 更新终端账号列表（管理端终端 Tab / 合作商终端账号管理共用）：管理员账号名/密码自动同步 terminal.username/password */
   updateTerminalAccounts: (supplierId: string, accounts: SupplierTerminalAccount[]) => void;
+  /** 提报新品提醒（合作商终端报价菜单） */
+  submitArrivalReminder: (input: { supplierId: string; supplierName: string; brand: string; productName: string; productUrl: string; submitter: string }) => NewArrivalReminder;
+  /** 处理新品提醒（管理端：标记已上架 / 忽略） */
+  handleArrivalReminder: (id: string, status: 'listed' | 'dismissed', note?: string) => void;
+  /** 更新合作商报价设置（品牌整体折扣 + 单品覆盖） */
+  updateQuoteSetting: (supplierId: string, setting: PartnerQuoteSetting) => void;
 }
 
 export const useSupplierStore = create<SupplierStoreState>((set, get) => ({
   suppliers: supplierItems,
   approvals: seedApprovals,
+  arrivalReminders: seedReminders,
+  quoteSettings: seedQuoteSettings,
 
   submitRegistration: (draft, applicant, note) => {
     const { approvals } = get();
@@ -201,5 +273,31 @@ export const useSupplierStore = create<SupplierStoreState>((set, get) => ({
         },
       };
     }),
+  }),
+
+  submitArrivalReminder: (input) => {
+    const { arrivalReminders } = get();
+    const reminder: NewArrivalReminder = {
+      id: `nar_${Date.now()}`,
+      code: genReminderCode(arrivalReminders.length + 1),
+      ...input,
+      submitTime: now(),
+      status: 'pending',
+    };
+    set({ arrivalReminders: [reminder, ...arrivalReminders] });
+    return reminder;
+  },
+
+  handleArrivalReminder: (id, status, note) => set({
+    arrivalReminders: get().arrivalReminders.map(r => r.id === id ? {
+      ...r,
+      status,
+      handleNote: note,
+      handleTime: now(),
+    } : r),
+  }),
+
+  updateQuoteSetting: (supplierId, setting) => set({
+    quoteSettings: { ...get().quoteSettings, [supplierId]: { ...setting, supplierId, updateTime: now() } },
   }),
 }));

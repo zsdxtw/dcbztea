@@ -7,16 +7,16 @@
 import type { PurchasePriceRule, VipPriceRule } from '../types';
 import { teaProducts } from './teaProducts';
 
-/* ── 供应商列表（与 ProductPrice.tsx 保持一致） ── */
+/* ── 供应商列表（与 ProductPrice.tsx 保持一致；type 用于区分品牌方/合作商报价） ── */
 export const PRICE_SUPPLIERS = [
-  { id: 's1', name: '西湖龙井合作社' },
-  { id: 's2', name: '武夷山茶业' },
-  { id: 's3', name: '安溪铁观音集团' },
-  { id: 's4', name: '福鼎白茶厂' },
-  { id: 's5', name: '云南普洱茶业' },
-  { id: 's6', name: '正山堂茶业' },
-  { id: 's7', name: '八马茶业供应链' },
-  { id: 's8', name: '大益集团' },
+  { id: 's1', name: '西湖龙井合作社', type: 'brand' as const },
+  { id: 's2', name: '武夷山茶业', type: 'partner' as const },
+  { id: 's3', name: '安溪铁观音集团', type: 'partner' as const },
+  { id: 's4', name: '福鼎白茶厂', type: 'partner' as const },
+  { id: 's5', name: '云南普洱茶业', type: 'partner' as const },
+  { id: 's6', name: '正山堂茶业', type: 'brand' as const },
+  { id: 's7', name: '八马茶业供应链', type: 'partner' as const },
+  { id: 's8', name: '大益集团', type: 'brand' as const },
 ];
 
 /* ── 客户列表（与 ProductPrice.tsx 保持一致） ── */
@@ -144,6 +144,34 @@ export function getPurchaseDefaultPrice(productId: string, supplierId: string): 
   const product = teaProducts.find(p => p.id === productId);
   if (product) return { price: Math.round(product.marketPrice * 0.55), source: 'market' };
   return { price: 0, source: 'market' };
+}
+
+/* ── 中位数统计（合作商终端报价菜单展示，数据来源于管理后台） ── */
+
+const average = (nums: number[]) => (nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null);
+
+/**
+ * 中位数报价：去除品牌方报价外，其余合作商（合作方）报价的平均数
+ * 数据源：采购价规则（商品 + 供应商）
+ */
+export function getMedianQuote(productId: string): number | null {
+  const quotes = purchasePriceRules.filter(r => r.productId === productId && r.status === 'active');
+  if (quotes.length === 0) return null;
+  const partnerQuotes = quotes.filter(q => PRICE_SUPPLIERS.find(s => s.id === q.supplierId)?.type !== 'brand');
+  const pool = partnerQuotes.length > 0 ? partnerQuotes : quotes;
+  return average(pool.map(q => q.purchasePrice));
+}
+
+/**
+ * 中位数售价：所有客户售价的平均数
+ * 数据源：商品标准销售价 + 各客户 VIP 销售价（管理后台价格规则）
+ */
+export function getMedianSalesPrice(productId: string): number | null {
+  const product = teaProducts.find(p => p.id === productId);
+  if (!product) return null;
+  const vipPrices = vipPriceRules.filter(r => r.productId === productId && r.status === 'active').map(r => r.vipPrice);
+  const pool = [product.salesPrice, ...vipPrices].filter(v => v > 0);
+  return average(pool);
 }
 
 /* ════════════════════════════════════════════════════════════

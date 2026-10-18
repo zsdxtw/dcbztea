@@ -555,6 +555,42 @@ const CHANNEL_SOURCE_MAP: Record<string, 'manual' | 'terminal'> = {
   '8': 'terminal',
 };
 
+/** 主营品牌补录（来源于商品-品牌管理，支持多选） */
+const MAIN_BRANDS_MAP: Record<string, string[]> = {
+  '1': ['西湖牌'],
+  '2': ['正山堂'],
+  '3': ['八马'],
+  '4': ['大益'],
+  '5': ['品品香'],
+  '6': ['海堤'],
+  '7': ['天之红'],
+  '8': ['竹叶青'],
+  '9': ['白沙溪'],
+  '10': ['张一元'],
+  '11': ['西湖牌', '正山堂', '八马', '大益', '品品香'],
+};
+
+/** 品牌授权资质文件补录（键=品牌名称） */
+const BRAND_AUTH_FILES_MAP: Record<string, Record<string, string[]>> = {
+  '1': { 西湖牌: ['西湖牌品牌授权书.pdf'] },
+  '2': { 正山堂: ['正山堂品牌授权书.pdf'] },
+  '3': { 八马: ['八马品牌授权书.pdf'] },
+  '4': { 大益: ['大益品牌授权书.pdf'] },
+  '5': { 品品香: ['品品香品牌授权书.pdf'] },
+  '6': { 海堤: ['海堤品牌授权书.pdf'] },
+  '7': { 天之红: ['天之红品牌授权书.pdf'] },
+  '8': { 竹叶青: ['竹叶青品牌授权书.pdf'] },
+  '9': { 白沙溪: ['白沙溪品牌授权书.pdf'] },
+  '10': { 张一元: ['张一元品牌授权书.pdf'] },
+  '11': {
+    西湖牌: ['西湖牌授权书.pdf'],
+    正山堂: ['正山堂授权书.pdf'],
+    八马: ['八马授权书.pdf'],
+    大益: ['大益授权书.pdf'],
+    品品香: ['品品香授权书.pdf'],
+  },
+};
+
 /** 供应商门店补录 */
 const STORES_MAP: Record<string, SupplierStore[]> = {
   '1': [
@@ -623,6 +659,8 @@ export const supplierItems: SupplierItem[] = rawSupplierItems.map((s) => ({
   ...s,
   qualificationFiles: QUALIFICATION_FILES_MAP[s.id] ?? ['营业执照.pdf'],
   channelSource: CHANNEL_SOURCE_MAP[s.id] ?? 'manual',
+  mainBrands: MAIN_BRANDS_MAP[s.id] ?? [],
+  brandAuthFiles: BRAND_AUTH_FILES_MAP[s.id] ?? {},
   stores: STORES_MAP[s.id] ?? [],
   terminal: TERMINAL_MAP[s.id] ?? EMPTY_TERMINAL,
 }));

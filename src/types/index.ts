@@ -510,6 +510,9 @@ export interface SupplierWarehouse {
   isDefault: boolean;
 }
 
+/** 品牌授权资质文件（按品牌维度维护：键=品牌名称） */
+export type BrandAuthFiles = Record<string, string[]>;
+
 /** 供应商门店 */
 export interface SupplierStore {
   id: string;
@@ -884,6 +887,10 @@ export interface SupplierItem {
   contactPhone: string;
   contactEmail: string;
   warehouses: SupplierWarehouse[];
+  /** 主营品牌（品牌名称，来源于商品-品牌管理，支持多选） */
+  mainBrands?: string[];
+  /** 品牌授权资质文件（键=品牌名称；选择主营品牌后需上传对应品牌的授权资质） */
+  brandAuthFiles?: BrandAuthFiles;
   /** 供应商门店 */
   stores: SupplierStore[];
   /** 供应商终端账号 */
@@ -930,6 +937,57 @@ export interface SupplierApproval {
   reviewTime?: string;
   reviewer?: string;
   reviewNote?: string;
+}
+
+/* ─────────────────────────── 新品提醒 / 合作商报价 ─────────────────────────── */
+
+/** 新品提醒处理状态：pending=待处理 / listed=已上架 / dismissed=已忽略 */
+export type NewArrivalStatus = 'pending' | 'listed' | 'dismissed';
+
+/** 新品提醒：合作商提报品牌方已上市、平台未上架的商品 */
+export interface NewArrivalReminder {
+  id: string;
+  /** 提醒编号（XPTX-0001） */
+  code: string;
+  /** 提报合作商（供应商）ID */
+  supplierId: string;
+  /** 提报合作商名称 */
+  supplierName: string;
+  /** 品牌（来源于商品-品牌管理） */
+  brand: string;
+  /** 商品名称（品牌方已上市商品） */
+  productName: string;
+  /** 商品电商平台链接 */
+  productUrl: string;
+  /** 提报人（合作商终端账号名） */
+  submitter: string;
+  /** 提报时间 */
+  submitTime: string;
+  status: NewArrivalStatus;
+  /** 处理备注（上架/忽略说明） */
+  handleNote?: string;
+  /** 处理时间 */
+  handleTime?: string;
+}
+
+/** 合作商单品报价覆盖方式 */
+export interface PartnerQuoteOverride {
+  /** discount=单独折扣（百分比）/ price=单独价格（元） */
+  type: 'discount' | 'price';
+  /** type=discount 时为折扣百分比（如 85 表示市场价的 85%）；type=price 时为报价（元） */
+  value: number;
+}
+
+/** 合作商报价设置（按合作商维度：品牌整体折扣 + 单品覆盖） */
+export interface PartnerQuoteSetting {
+  /** 合作商（供应商）ID */
+  supplierId: string;
+  /** 品牌整体报价折扣（百分比，基于市场价；键=品牌名称） */
+  brandDiscounts: Record<string, number>;
+  /** 单品报价覆盖（键=商品 ID；优先于品牌整体折扣） */
+  productOverrides: Record<string, PartnerQuoteOverride>;
+  /** 最近更新时间 */
+  updateTime?: string;
 }
 
 /* ─────────────────────────── 价格体系类型 ─────────────────────────── */

@@ -3,9 +3,10 @@ import { InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { PageHead, Pill } from './PartnerUI';
 import { getPartnerAuth } from './PartnerLayout';
 import { useSupplierStore } from '../../stores/supplierStore';
+import { BrandMultiSelect, BrandAuthUploader } from '../../components/common/BrandPicker';
 import { SUPPLIER_TYPE_LABELS, TAX_TYPE_LABELS, SETTLEMENT_METHOD_LABELS } from '../../data/suppliers';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
-import type { SupplierItem, SupplierStore, SupplierWarehouse } from '../../types';
+import type { SupplierItem, SupplierStore, SupplierWarehouse, BrandAuthFiles } from '../../types';
 import './partner.css';
 
 /** 可选资质文件（演示 mock 上传） */
@@ -68,6 +69,21 @@ export default function PartnerProfile() {
   };
   const updateStoreRow = (idx: number, p: Partial<SupplierStore>) => {
     setForm(prev => prev ? { ...prev, stores: prev.stores.map((st, i) => i === idx ? { ...st, ...p } : st) } : prev);
+  };
+
+  /** 主营品牌变更：同步裁剪品牌授权文件与门店主营品牌（保持门店品牌 ⊆ 主营品牌） */
+  const handleMainBrandsChange = (next: string[]) => {
+    setForm(prev => {
+      if (!prev) return prev;
+      const authFiles: BrandAuthFiles = {};
+      next.forEach(b => { if (prev.brandAuthFiles?.[b]?.length) authFiles[b] = prev.brandAuthFiles![b]; });
+      return {
+        ...prev,
+        mainBrands: next,
+        brandAuthFiles: authFiles,
+        stores: prev.stores.map(st => ({ ...st, mainBrands: st.mainBrands.filter(b => next.includes(b)) })),
+      };
+    });
   };
 
   /** 提交信息修改申请 → 平台注册审批 */
@@ -139,6 +155,24 @@ export default function PartnerProfile() {
               <div className="span-3">
                 <label className="pk-reg-label">经营范围</label>
                 <textarea className="pk-reg-textarea" value={form.businessScope} onChange={e => patch({ businessScope: e.target.value })} />
+              </div>
+            </div>
+          </div>
+
+          {/* 主营品牌与品牌授权 */}
+          <div className="pk-section">
+            <h3 className="pk-section-title">主营品牌与品牌授权</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label className="pk-reg-label">主营品牌（品牌列表来源于平台「商品 &gt; 品牌管理」）</label>
+                <BrandMultiSelect value={form.mainBrands ?? []} onChange={handleMainBrandsChange} accent="#01795D" />
+                <div style={{ fontSize: 12, color: '#99A29D', marginTop: 6 }}>
+                  修改主营品牌需经平台审批生效；移除品牌将同步清理该品牌的授权文件与门店主营品牌
+                </div>
+              </div>
+              <div>
+                <label className="pk-reg-label">品牌授权资质</label>
+                <BrandAuthUploader brands={form.mainBrands ?? []} files={form.brandAuthFiles ?? {}} onChange={next => patch({ brandAuthFiles: next })} accent="#01795D" />
               </div>
             </div>
           </div>
@@ -235,8 +269,12 @@ export default function PartnerProfile() {
                       <input className="pk-reg-input" type="number" value={st.area || ''} onChange={e => updateStoreRow(i, { area: Number(e.target.value) || 0 })} />
                     </div>
                     <div className="span-2">
-                      <label className="pk-reg-label">主营品牌</label>
-                      <input className="pk-reg-input" placeholder="多个品牌用「、」分隔" value={st.mainBrands.join('、')} onChange={e => updateStoreRow(i, { mainBrands: e.target.value.split(/[，,、]/).map(v => v.trim()).filter(Boolean) })} />
+                      <label className="pk-reg-label">主营品牌（可选范围不超过基本信息主营品牌）</label>
+                      {(form.mainBrands?.length ?? 0) > 0 ? (
+                        <BrandMultiSelect value={st.mainBrands} options={form.mainBrands!} onChange={v => updateStoreRow(i, { mainBrands: v })} accent="#01795D" />
+                      ) : (
+                        <div style={{ fontSize: 12.5, color: '#99A29D' }}>请先在上方「主营品牌与品牌授权」中选择主营品牌</div>
+                      )}
                     </div>
                     <div>
                       <label className="pk-reg-label">营业状态</label>
@@ -332,6 +370,29 @@ export default function PartnerProfile() {
             <InfoItem label="渠道来源"><Pill tone="green">终端注册</Pill></InfoItem>
             <InfoItem label="合作时间">{supplier.cooperationDate}</InfoItem>
             <InfoItem label="税务类型">{TAX_TYPE_LABELS[supplier.taxType] ?? supplier.taxType}</InfoItem>
+            <InfoItem label="主营品牌" span={3}>
+              {(supplier.mainBrands?.length ?? 0) > 0 ? (
+                <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 6 }}>
+                  {supplier.mainBrands!.map(b => (
+                    <span key={b} style={{ padding: '2px 10px', borderRadius: 'var(--radius-full)', fontSize: 12, fontWeight: 500, background: '#E6F2ED', border: '1px solid rgba(1,121,93,0.3)', color: '#01795D' }}>{b}</span>
+                  ))}
+                </span>
+              ) : '—'}
+            </InfoItem>
+            <InfoItem label="品牌授权资质" span={3}>
+              {(Object.keys(supplier.brandAuthFiles ?? {}).length) > 0 ? (
+                <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4 }}>
+                  {Object.entries(supplier.brandAuthFiles!).map(([brand, files]) => (
+                    <span key={brand} style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                      <span style={{ padding: '1px 8px', borderRadius: 4, fontSize: 12, fontWeight: 500, background: '#E6F2ED', color: '#01795D' }}>{brand}</span>
+                      {(files.length ? files : ['未上传']).map(f => (
+                        <span key={f} style={{ padding: '1px 8px', borderRadius: 4, fontSize: 12, background: '#F4F7F6', border: '1px solid var(--pk-line2, #E4EAE8)', color: 'var(--pk-ink2)' }}>{f}</span>
+                      ))}
+                    </span>
+                  ))}
+                </span>
+              ) : '—'}
+            </InfoItem>
             <InfoItem label="注册地址" span={3}>{[supplier.registeredProvince, supplier.registeredCity, supplier.registeredDistrict, supplier.registeredAddress].filter(Boolean).join(' ')}</InfoItem>
             <InfoItem label="经营范围" span={3}>{supplier.businessScope || '—'}</InfoItem>
           </InfoGrid>
