@@ -4,13 +4,28 @@
  * - 合作商终端：注册提交、信息修改申请
  */
 import { create } from 'zustand';
-import type { SupplierItem, SupplierApproval } from '../types';
+import type { SupplierItem, SupplierApproval, SupplierTerminal, SupplierTerminalAccount } from '../types';
 import { supplierItems } from '../data/suppliers';
 
 const now = () => new Date().toISOString().slice(0, 10);
 
 /** 生成审批编号 */
 const genCode = (n: number) => `SP-${String(n).padStart(3, '0')}`;
+
+/** 读取终端账号列表；未初始化 accounts 时由 username/password 派生管理员账号（旧数据兼容） */
+export const getTerminalAccounts = (t: SupplierTerminal): SupplierTerminalAccount[] => {
+  if (t.accounts?.length) return t.accounts;
+  return [{
+    id: `ta_admin_${t.username}`,
+    role: 'admin',
+    username: t.username,
+    password: t.password ?? '',
+    name: '管理员',
+    phone: '',
+    status: t.status,
+    createTime: t.openTime,
+  }];
+};
 
 /** 演示种子审批单：1 条待审批注册、1 条已通过注册（历史） */
 const seedApprovals: SupplierApproval[] = [
@@ -100,6 +115,8 @@ interface SupplierStoreState {
   addSupplier: (s: SupplierItem) => void;
   /** 直改供应商（管理端列表编辑保存 / 审批通过时内部调用） */
   updateSupplier: (s: SupplierItem) => void;
+  /** 更新终端账号列表（管理端终端 Tab / 合作商终端账号管理共用）：管理员账号名/密码自动同步 terminal.username/password */
+  updateTerminalAccounts: (supplierId: string, accounts: SupplierTerminalAccount[]) => void;
 }
 
 export const useSupplierStore = create<SupplierStoreState>((set, get) => ({
@@ -168,4 +185,21 @@ export const useSupplierStore = create<SupplierStoreState>((set, get) => ({
   addSupplier: (s) => set({ suppliers: [...get().suppliers, s] }),
 
   updateSupplier: (s) => set({ suppliers: get().suppliers.map(x => x.id === s.id ? s : x) }),
+
+  updateTerminalAccounts: (supplierId, accounts) => set({
+    suppliers: get().suppliers.map(s => {
+      if (s.id !== supplierId) return s;
+      const admin = accounts.find(a => a.role === 'admin');
+      return {
+        ...s,
+        terminal: {
+          ...s.terminal,
+          accounts,
+          username: admin?.username ?? s.terminal.username,
+          password: admin?.password ?? s.terminal.password,
+          status: admin?.status ?? s.terminal.status,
+        },
+      };
+    }),
+  }),
 }));

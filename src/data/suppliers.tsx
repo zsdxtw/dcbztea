@@ -1,5 +1,5 @@
 /** 供应商管理共享数据源 */
-import type { SupplierItem, SupplierStore, SupplierTerminal } from '../types';
+import type { SupplierItem, SupplierStore, SupplierTerminal, SupplierTerminalAccount } from '../types';
 
 /** 原始数据（资质文件、渠道来源、门店与终端由导出层统一注入） */
 type RawSupplierItem = Omit<SupplierItem, 'qualificationFiles' | 'channelSource' | 'stores' | 'terminal'>;
@@ -591,11 +591,29 @@ const STORES_MAP: Record<string, SupplierStore[]> = {
   ],
 };
 
+/** 终端账号列表（管理员 + 操作员，与终端「账号管理」联动） */
+const TERMINAL_ACCOUNTS: Record<string, SupplierTerminalAccount[]> = {
+  '3': [
+    { id: 'ta_bama_admin', role: 'admin', username: 'bama01', password: '123456', name: '林振华', phone: '138****1001', status: 'active', createTime: '2025-06-12', lastLogin: '2026-10-15' },
+    { id: 'ta_bama_op1', role: 'operator', username: 'bama_sales', password: '123456', name: '郑晓琳', phone: '138****1002', status: 'active', createTime: '2025-07-01', lastLogin: '2026-10-14' },
+  ],
+  '8': [
+    { id: 'ta_zyq_admin', role: 'admin', username: 'zyq001', password: '123456', name: '何云松', phone: '139****2001', status: 'active', createTime: '2025-09-01', lastLogin: '2026-10-16' },
+    { id: 'ta_zyq_op1', role: 'operator', username: 'zyq_wh', password: '123456', name: '罗永康', phone: '139****2002', status: 'active', createTime: '2025-10-08', lastLogin: '2026-10-12' },
+    { id: 'ta_zyq_op2', role: 'operator', username: 'zyq_cs', password: '123456', name: '陈思远', phone: '139****2003', status: 'inactive', createTime: '2025-11-20' },
+  ],
+  '11': [
+    { id: 'ta_admin', role: 'admin', username: 'admin', password: '123456', name: '陈建国', phone: '139****0001', status: 'active', createTime: '2025-03-01', lastLogin: '2026-10-16' },
+    { id: 'ta_op1', role: 'operator', username: 'sales01', password: '123456', name: '李慧敏', phone: '139****0002', status: 'active', createTime: '2025-06-15', lastLogin: '2026-10-11' },
+    { id: 'ta_op2', role: 'operator', username: 'wh01', password: '123456', name: '周仓管', phone: '139****0003', status: 'inactive', createTime: '2025-08-01' },
+  ],
+};
+
 /** 供应商终端账号补录：3、8、11 号供应商已开通终端 */
 const TERMINAL_MAP: Record<string, SupplierTerminal> = {
-  '3': { enabled: true, username: 'bama01', password: '123456', status: 'active', openTime: '2025-06-12', lastLogin: '2026-10-15', remark: '合作商终端注册供应商' },
-  '8': { enabled: true, username: 'zyq001', password: '123456', status: 'active', openTime: '2025-09-01', lastLogin: '2026-10-16', remark: '合作商终端注册供应商' },
-  '11': { enabled: true, username: 'admin', password: '123456', status: 'active', openTime: '2025-03-01', lastLogin: '2026-10-16', remark: '云茶供应链（合作商终端演示账号）' },
+  '3': { enabled: true, username: 'bama01', password: '123456', status: 'active', openTime: '2025-06-12', lastLogin: '2026-10-15', remark: '合作商终端注册供应商', accounts: TERMINAL_ACCOUNTS['3'] },
+  '8': { enabled: true, username: 'zyq001', password: '123456', status: 'active', openTime: '2025-09-01', lastLogin: '2026-10-16', remark: '合作商终端注册供应商', accounts: TERMINAL_ACCOUNTS['8'] },
+  '11': { enabled: true, username: 'admin', password: '123456', status: 'active', openTime: '2025-03-01', lastLogin: '2026-10-16', remark: '云茶供应链（合作商终端演示账号）', accounts: TERMINAL_ACCOUNTS['11'] },
 };
 
 /** 未开通终端的默认结构 */

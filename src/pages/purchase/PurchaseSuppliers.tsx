@@ -14,10 +14,10 @@ import {
   SHIPPING_SETTLEMENT_LABELS,
   QUALIFICATION_STATUS_LABELS,
 } from '../../data/suppliers';
-import type { SupplierItem, SupplierType, SupplierGrade, SupplierWarehouse, SupplierStore, SupplierTerminal } from '../../types';
+import type { SupplierItem, SupplierType, SupplierGrade, SupplierWarehouse, SupplierStore, SupplierTerminal, SupplierTerminalAccount } from '../../types';
 import type { StatCardData } from '../../types';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
-import { useSupplierStore } from '../../stores/supplierStore';
+import { useSupplierStore, getTerminalAccounts } from '../../stores/supplierStore';
 
 /* ── 供应商类型筛选配置 ── */
 const TYPE_FILTER: { key: SupplierType | 'all'; label: string; color: string; desc: string }[] = [
@@ -97,8 +97,29 @@ export default function PurchaseSuppliers() {
 
   // 查看详情
   const handleView = (s: SupplierItem) => { setSelectedSupplier(s); setEditing(false); setEditForm(null); setActiveTab('basic'); setShowDetail(true); };
+  // 列表行编辑：直接以编辑态打开抽屉
+  const handleEdit = (s: SupplierItem) => {
+    setSelectedSupplier(s);
+    setEditForm({
+      ...s,
+      stores: s.stores.map(st => ({ ...st })),
+      terminal: { ...s.terminal, accounts: getTerminalAccounts(s.terminal).map(a => ({ ...a })) },
+    });
+    setEditing(true);
+    setActiveTab('basic');
+    setShowDetail(true);
+  };
   // 进入编辑
-  const handleStartEdit = () => { if (selectedSupplier) { setEditForm({ ...selectedSupplier, stores: selectedSupplier.stores.map(st => ({ ...st })), terminal: { ...selectedSupplier.terminal } }); setEditing(true); } };
+  const handleStartEdit = () => {
+    if (selectedSupplier) {
+      setEditForm({
+        ...selectedSupplier,
+        stores: selectedSupplier.stores.map(st => ({ ...st })),
+        terminal: { ...selectedSupplier.terminal, accounts: getTerminalAccounts(selectedSupplier.terminal).map(a => ({ ...a })) },
+      });
+      setEditing(true);
+    }
+  };
   // 取消编辑
   const handleCancelEdit = () => { setEditing(false); setEditForm(null); };
   // 保存编辑（同步列表，门店数量等随之更新）
@@ -137,25 +158,66 @@ export default function PurchaseSuppliers() {
   const updateTerminal = (patch: Partial<SupplierTerminal>) => {
     setEditForm(prev => prev ? { ...prev, terminal: { ...prev.terminal, ...patch } } : prev);
   };
-  /** 编辑态切换终端开通状态 */
+  /** 编辑态切换终端开通状态（开通时初始化账号列表） */
   const handleTerminalEnable = (enable: boolean) => {
     setEditForm(prev => {
       if (!prev) return prev;
       if (enable) {
-        return { ...prev, terminal: { ...prev.terminal, enabled: true, username: prev.terminal.username || suggestTerminalUsername(prev), password: prev.terminal.password || '123456', openTime: prev.terminal.openTime || new Date().toISOString().slice(0, 10) } };
+        const username = prev.terminal.username || suggestTerminalUsername(prev);
+        const password = prev.terminal.password || '123456';
+        const accounts = getTerminalAccounts({ ...prev.terminal, username, password }).map(a => ({ ...a }));
+        return { ...prev, terminal: { ...prev.terminal, enabled: true, username, password, openTime: prev.terminal.openTime || new Date().toISOString().slice(0, 10), accounts } };
       }
       return { ...prev, terminal: { ...prev.terminal, enabled: false } };
     });
   };
-  /** 查看态一键开通终端（进入编辑态预填默认账号） */
+  /** 查看态一键开通终端（进入编辑态预填默认管理员账号） */
   const handleEnableTerminal = () => {
     if (!selectedSupplier) return;
+    const username = suggestTerminalUsername(selectedSupplier);
+    const today = new Date().toISOString().slice(0, 10);
+    const accounts: SupplierTerminalAccount[] = [{
+      id: `ta_admin_${username}`, role: 'admin', username, password: '123456',
+      name: selectedSupplier.contactPerson || '管理员', phone: selectedSupplier.contactPhone || '',
+      status: 'active', createTime: today,
+    }];
     setEditForm({
       ...selectedSupplier,
       stores: selectedSupplier.stores.map(st => ({ ...st })),
-      terminal: { enabled: true, username: suggestTerminalUsername(selectedSupplier), password: '123456', status: 'active', openTime: new Date().toISOString().slice(0, 10) },
+      terminal: { enabled: true, username, password: '123456', status: 'active', openTime: today, accounts },
     });
     setEditing(true);
+  };
+
+  // 终端账号编辑（管理后台：管理员+操作员均可改账号/密码/姓名/手机号）
+  const updateAccount = (id: string, patch: Partial<SupplierTerminalAccount>) => {
+    setEditForm(prev => {
+      if (!prev) return prev;
+      const accounts = getTerminalAccounts(prev.terminal).map(a => a.id === id ? { ...a, ...patch } : a);
+      const admin = accounts.find(a => a.role === 'admin');
+      // 管理员账号名/密码/状态同步 terminal，保证终端登录匹配
+      return { ...prev, terminal: { ...prev.terminal, accounts, username: admin?.username ?? prev.terminal.username, password: admin?.password ?? prev.terminal.password, status: admin?.status ?? prev.terminal.status } };
+    });
+  };
+  const addOperatorAccount = () => {
+    setEditForm(prev => {
+      if (!prev) return prev;
+      const accounts = getTerminalAccounts(prev.terminal);
+      const newAcc: SupplierTerminalAccount = {
+        id: `ta_${Date.now()}`, role: 'operator', username: '', password: '123456',
+        name: '', phone: '', status: 'active', createTime: new Date().toISOString().slice(0, 10),
+      };
+      return { ...prev, terminal: { ...prev.terminal, accounts: [...accounts, newAcc] } };
+    });
+  };
+  const removeAccount = (id: string) => {
+    setEditForm(prev => prev ? { ...prev, terminal: { ...prev.terminal, accounts: getTerminalAccounts(prev.terminal).filter(a => a.id !== id) } } : prev);
+  };
+  /** 删除管理员账号确认弹窗（删除=关闭终端） */
+  const [showAdminDeleteConfirm, setShowAdminDeleteConfirm] = useState(false);
+  const confirmAdminDelete = () => {
+    updateTerminal({ enabled: false });
+    setShowAdminDeleteConfirm(false);
   };
 
   // OCR 模拟
@@ -254,7 +316,7 @@ export default function PurchaseSuppliers() {
             <span key="st" style={{ padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: s.status === 'active' ? '#E8F5E9' : '#FFF3E0', color: s.status === 'active' ? '#2E7D32' : '#E65100' }}>{s.status === 'active' ? '在册' : '停用'}</span>,
             <div key="view" className="row-actions">
               <Button size="sm" variant="ghost" onClick={() => handleView(s)}>查看</Button>
-              <Button size="sm" variant="ghost" onClick={() => handleView(s)}>编辑</Button>
+              <Button size="sm" variant="ghost" onClick={() => handleEdit(s)}>编辑</Button>
             </div>,
           ])}
         />
@@ -668,38 +730,60 @@ export default function PurchaseSuppliers() {
                     </div>
                   </div>
                   {editForm.terminal.enabled && (
-                    <>
-                      <div>
-                        <label className="drawer-label">账号状态</label>
-                        <select className="filter-select" style={{ width: '100%' }} value={editForm.terminal.status} onChange={e => updateTerminal({ status: e.target.value as SupplierTerminal['status'] })}>
-                          <option value="active">启用</option>
-                          <option value="inactive">停用</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="drawer-label">终端登录账号</label>
-                        <input className="filter-input" style={{ width: '100%' }} value={editForm.terminal.username} onChange={e => updateTerminal({ username: e.target.value })} />
-                      </div>
-                      <div>
-                        <label className="drawer-label">初始密码</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', height: 34 }}>
-                          <span className="mono" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{editForm.terminal.password || '—'}</span>
-                          <Button size="sm" variant="ghost" onClick={() => updateTerminal({ password: '123456' })}>重置密码</Button>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="drawer-label">开通时间</label>
-                        <input className="filter-input" style={{ width: '100%' }} value={editForm.terminal.openTime ?? ''} onChange={e => updateTerminal({ openTime: e.target.value })} />
-                      </div>
-                      <div style={{ gridColumn: '1 / -1' }}>
-                        <label className="drawer-label">备注</label>
-                        <input className="filter-input" style={{ width: '100%' }} value={editForm.terminal.remark ?? ''} onChange={e => updateTerminal({ remark: e.target.value })} />
-                      </div>
-                    </>
+                    <div>
+                      <label className="drawer-label">开通时间</label>
+                      <input className="filter-input" style={{ width: '100%' }} value={editForm.terminal.openTime ?? ''} onChange={e => updateTerminal({ openTime: e.target.value })} />
+                    </div>
                   )}
                 </div>
                 {editForm.terminal.enabled ? (
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', lineHeight: 1.7 }}>供应商可凭该账号登录供应商终端，进行商品维护、订单接收等操作；密码遗忘可随时重置。</div>
+                  <>
+                    {/* 终端账号列表（管理员 + 操作员，与终端「账号管理」联动） */}
+                    <label className="drawer-label" style={{ display: 'block', marginBottom: 'var(--space-2)' }}>终端账号（管理员 + 操作员）</label>
+                    <div className="detail-inline-table">
+                      <table>
+                        <thead>
+                          <tr><th>角色</th><th>账号</th><th>姓名</th><th>手机号码</th><th>密码</th><th>状态</th><th>操作</th></tr>
+                        </thead>
+                        <tbody>
+                          {getTerminalAccounts(editForm.terminal).map(acc => (
+                            <tr key={acc.id}>
+                              <td>
+                                {acc.role === 'admin'
+                                  ? <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#F3E5F5', color: '#7B1FA2', whiteSpace: 'nowrap' }}>管理员</span>
+                                  : <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5', whiteSpace: 'nowrap' }}>操作员</span>}
+                              </td>
+                              <td><input className="filter-input" style={{ width: 120 }} placeholder="登录账号" value={acc.username} onChange={e => updateAccount(acc.id, { username: e.target.value })} /></td>
+                              <td><input className="filter-input" style={{ width: 100 }} placeholder="姓名" value={acc.name} onChange={e => updateAccount(acc.id, { name: e.target.value })} /></td>
+                              <td><input className="filter-input" style={{ width: 135 }} placeholder="手机号码" value={acc.phone} onChange={e => updateAccount(acc.id, { phone: e.target.value })} /></td>
+                              <td><input className="filter-input" style={{ width: 100 }} placeholder="登录密码" value={acc.password} onChange={e => updateAccount(acc.id, { password: e.target.value })} /></td>
+                              <td>
+                                <select className="filter-select" style={{ width: 80 }} value={acc.status} onChange={e => updateAccount(acc.id, { status: e.target.value as SupplierTerminalAccount['status'] })}>
+                                  <option value="active">启用</option>
+                                  <option value="inactive">停用</option>
+                                </select>
+                              </td>
+                              <td>
+                                <Button size="sm" variant="ghost" style={{ color: 'var(--color-semantic-error)' }}
+                                  onClick={() => (acc.role === 'admin' ? setShowAdminDeleteConfirm(true) : removeAccount(acc.id))}>删除</Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', margin: 'var(--space-2) 0 var(--space-3)' }}>
+                      <Button size="sm" variant="ghost" onClick={addOperatorAccount}>+ 新增操作员账号</Button>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>删除管理员账号将同时关闭该供应商终端</span>
+                    </div>
+                    <div>
+                      <label className="drawer-label">备注</label>
+                      <input className="filter-input" style={{ width: '100%' }} value={editForm.terminal.remark ?? ''} onChange={e => updateTerminal({ remark: e.target.value })} />
+                    </div>
+                    <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', lineHeight: 1.7 }}>
+                      账号列表与合作商终端「系统 &gt; 账号管理」实时联动。此处可修改管理员与操作员账号、密码、姓名、手机号码；合作商终端仅支持管理员维护操作员账号及本人的姓名、手机号码、密码。
+                    </div>
+                  </>
                 ) : (
                   <div style={{ fontSize: 'var(--text-xs)', color: '#E65100', background: '#FFF3E0', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)' }}>保存后该供应商的终端将被关闭，终端账号将无法登录</div>
                 )}
@@ -853,13 +937,39 @@ export default function PurchaseSuppliers() {
                 <div>
                   <InfoGrid cols={3}>
                     <InfoItem label="终端状态"><span style={{ padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E8F5E9', color: '#2E7D32' }}>已开通</span></InfoItem>
-                    <InfoItem label="登录账号" mono emph>{selectedSupplier.terminal.username || '—'}</InfoItem>
-                    <InfoItem label="账号状态"><span style={{ padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: selectedSupplier.terminal.status === 'active' ? '#E3F2FD' : '#FFF3E0', color: selectedSupplier.terminal.status === 'active' ? '#1565C0' : '#E65100' }}>{selectedSupplier.terminal.status === 'active' ? '启用' : '停用'}</span></InfoItem>
                     <InfoItem label="开通时间">{selectedSupplier.terminal.openTime ?? '—'}</InfoItem>
-                    <InfoItem label="最近登录">{selectedSupplier.terminal.lastLogin ?? '—'}</InfoItem>
                     <InfoItem label="备注">{selectedSupplier.terminal.remark || '—'}</InfoItem>
                   </InfoGrid>
-                  <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', lineHeight: 1.7 }}>供应商可凭该账号登录供应商终端，进行商品维护、订单接收等操作。如需调整账号或停用终端，点击「编辑」。</div>
+                  {/* 终端账号列表（管理员 + 操作员，与终端「账号管理」联动） */}
+                  <label className="drawer-label" style={{ display: 'block', marginTop: 'var(--space-4)', marginBottom: 'var(--space-2)' }}>终端账号（{getTerminalAccounts(selectedSupplier.terminal).length} 个）</label>
+                  <div className="detail-inline-table">
+                    <table>
+                      <thead>
+                        <tr><th>角色</th><th>账号</th><th>姓名</th><th>手机号码</th><th>状态</th><th>最近登录</th></tr>
+                      </thead>
+                      <tbody>
+                        {getTerminalAccounts(selectedSupplier.terminal).map(acc => (
+                          <tr key={acc.id}>
+                            <td>
+                              {acc.role === 'admin'
+                                ? <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#F3E5F5', color: '#7B1FA2', whiteSpace: 'nowrap' }}>管理员</span>
+                                : <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5', whiteSpace: 'nowrap' }}>操作员</span>}
+                            </td>
+                            <td className="cell-mono-emph">{acc.username || '—'}</td>
+                            <td className="cell-emph">{acc.name || '—'}</td>
+                            <td className="mono cell-muted">{acc.phone || '—'}</td>
+                            <td>
+                              <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: acc.status === 'active' ? '#E3F2FD' : '#FFF3E0', color: acc.status === 'active' ? '#1565C0' : '#E65100' }}>{acc.status === 'active' ? '启用' : '停用'}</span>
+                            </td>
+                            <td className="cell-muted">{acc.lastLogin || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', lineHeight: 1.7 }}>
+                    账号列表与合作商终端「系统 &gt; 账号管理」实时联动。管理员账号名与删除仅支持在管理后台操作；如需调整账号、密码、姓名、手机号码，点击「编辑」。
+                  </div>
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-4)', border: '2px dashed var(--color-border-primary)', borderRadius: 'var(--radius-lg)' }}>
@@ -867,7 +977,7 @@ export default function PurchaseSuppliers() {
                     <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><rect x="3" y="4" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                   </div>
                   <div style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)', marginBottom: 'var(--space-1)' }}>该供应商尚未开通终端</div>
-                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>开通后供应商可凭账号登录供应商终端，<br />在线维护商品、接收订单、查看对账等</div>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>开通后自动创建管理员账号，合作商凭账号登录合作商终端，<br />并可自主维护操作员账号</div>
                   <Button onClick={handleEnableTerminal}>开通终端</Button>
                 </div>
               )
@@ -1053,6 +1163,22 @@ export default function PurchaseSuppliers() {
             <div className="drawer-footer">
               <Button variant="ghost" onClick={() => setShowAddDrawer(false)}>取消</Button>
               <Button onClick={() => setShowAddDrawer(false)}>保存</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 删除管理员账号确认弹窗（删除 = 关闭终端） */}
+      {showAdminDeleteConfirm && (
+        <div className="category-dialog-overlay" onClick={() => setShowAdminDeleteConfirm(false)}>
+          <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 420 }}>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>删除管理员账号</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
+              删除管理员账号将同时关闭该供应商的终端，所有终端账号（含操作员）将无法登录合作商终端。确认删除？
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
+              <Button variant="ghost" onClick={() => setShowAdminDeleteConfirm(false)}>取消</Button>
+              <Button variant="danger" onClick={confirmAdminDelete}>确认删除</Button>
             </div>
           </div>
         </div>

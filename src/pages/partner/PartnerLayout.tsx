@@ -10,6 +10,10 @@ export interface PartnerAuth {
   name: string;
   /** 关联供应商 ID（登录时按终端账号匹配） */
   supplierId?: string;
+  /** 登录账号角色（admin=管理员 / operator=操作员） */
+  role?: 'admin' | 'operator';
+  /** 登录账号 ID（账号管理页定位本人账号） */
+  accountId?: string;
 }
 
 export function getPartnerAuth(): PartnerAuth | null {
@@ -143,7 +147,7 @@ export default function PartnerLayout() {
             <div className="pk-avatar">{auth.name.charAt(0)}</div>
             <div className="pk-user-text">
               <div className="pk-user-name">{auth.name}</div>
-              <div className="pk-user-role">合作商账号</div>
+              <div className="pk-user-role">{auth.role === 'operator' ? '操作员账号' : '合作商管理员'}</div>
             </div>
             <button className="pk-icon-btn" onClick={handleLogout} title="退出登录">
               <svg viewBox="0 0 16 16" fill="none"><path d="M6 14H3.5A1.5 1.5 0 012 12.5v-9A1.5 1.5 0 013.5 2H6M10.5 11l3-3-3-3M13.5 8H6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>

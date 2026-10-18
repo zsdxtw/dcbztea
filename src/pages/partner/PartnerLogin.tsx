@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { setPartnerAuth, TeaLeafMark } from './PartnerLayout';
-import { useSupplierStore } from '../../stores/supplierStore';
+import { useSupplierStore, getTerminalAccounts } from '../../stores/supplierStore';
 import './partner.css';
+
+const today = () => new Date().toISOString().slice(0, 10);
 
 /** 合作商终端登录页：左侧品牌视觉 + 右侧极简表单 */
 export default function PartnerLogin() {
@@ -16,17 +18,44 @@ export default function PartnerLogin() {
       setError('请输入账号和密码');
       return;
     }
-    if (password !== '123456') {
-      setError('账号或密码错误（演示密码 123456）');
+    const uname = username.trim();
+    const pwd = password.trim();
+    // 遍历开通终端的账号列表（管理员 + 操作员）匹配登录
+    let matchedSupplier = null;
+    let matchedAccount = null;
+    for (const s of useSupplierStore.getState().suppliers) {
+      if (!s.terminal.enabled) continue;
+      const acc = getTerminalAccounts(s.terminal).find(a => a.username === uname);
+      if (acc) { matchedSupplier = s; matchedAccount = acc; break; }
+    }
+    if (!matchedAccount) {
+      setError('账号不存在，请确认终端已开通且账号正确');
       return;
     }
-    // 按终端账号匹配关联供应商（新注册审批通过的账号亦自动关联）
-    const uname = username.trim();
-    const matched = useSupplierStore.getState().suppliers.find(
-      s => s.terminal.enabled && s.terminal.username === uname,
-    );
-    const fallbackName = matched?.contactPerson || matched?.legalRepresentative || '合作商';
-    setPartnerAuth({ username: uname, name: fallbackName, supplierId: matched?.id });
+    if (matchedAccount.status !== 'active') {
+      setError('该账号已停用，请联系管理员启用');
+      return;
+    }
+    if (matchedAccount.password && pwd !== matchedAccount.password) {
+      setError('账号或密码错误');
+      return;
+    }
+    const displayName = matchedAccount.name || matchedSupplier?.contactPerson || '合作商';
+    // 登录成功：回写该账号「最近登录」日期（与管理端「终端管理」Tab 联动展示）
+    if (matchedSupplier && matchedAccount.lastLogin !== today()) {
+      useSupplierStore.getState().updateTerminalAccounts(
+        matchedSupplier.id,
+        getTerminalAccounts(matchedSupplier.terminal).map(a =>
+          a.id === matchedAccount.id ? { ...a, lastLogin: today() } : a),
+      );
+    }
+    setPartnerAuth({
+      username: uname,
+      name: displayName,
+      supplierId: matchedSupplier?.id,
+      role: matchedAccount.role,
+      accountId: matchedAccount.id,
+    });
     navigate('/partner/dashboard');
   };
 

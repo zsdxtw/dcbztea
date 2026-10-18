@@ -535,11 +535,32 @@ export interface SupplierStore {
   status: 'active' | 'inactive';
 }
 
+/** 终端账号（管理员 / 操作员） */
+export interface SupplierTerminalAccount {
+  id: string;
+  /** admin=管理员（每个终端唯一，不可删除）/ operator=操作员 */
+  role: 'admin' | 'operator';
+  /** 登录账号 */
+  username: string;
+  /** 登录密码 */
+  password: string;
+  /** 姓名 */
+  name: string;
+  /** 手机号码 */
+  phone: string;
+  /** 账号状态 */
+  status: 'active' | 'inactive';
+  /** 创建时间 */
+  createTime?: string;
+  /** 最近登录 */
+  lastLogin?: string;
+}
+
 /** 供应商终端账号 */
 export interface SupplierTerminal {
   /** 是否开通终端 */
   enabled: boolean;
-  /** 终端登录账号 */
+  /** 终端登录账号（= 管理员账号名，登录匹配用） */
   username: string;
   /** 初始密码 */
   password?: string;
@@ -551,6 +572,8 @@ export interface SupplierTerminal {
   lastLogin?: string;
   /** 备注 */
   remark?: string;
+  /** 终端账号列表（管理员 + 操作员）；未初始化时由 username/password 派生管理员账号 */
+  accounts?: SupplierTerminalAccount[];
 }
 
 /** 仓库归属类型：独立仓库（自有的纯仓库）/ 门店仓库（自有的在茶叶门店的仓库）/ 合作仓库（供应商的合作仓库） */

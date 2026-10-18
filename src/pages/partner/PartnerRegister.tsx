@@ -121,7 +121,14 @@ export default function PartnerRegister() {
         mainBrands: st.mainBrands.split(/[，,、]/).map(v => v.trim()).filter(Boolean),
         status: 'active',
       })),
-      terminal: { enabled: true, username: username.trim(), password: password.trim(), status: 'active', openTime: today },
+      terminal: {
+        enabled: true, username: username.trim(), password: password.trim(), status: 'active', openTime: today,
+        accounts: [{
+          id: `ta_admin_${username.trim()}`, role: 'admin', username: username.trim(), password: password.trim(),
+          name: contactPerson.trim() || legalRepresentative.trim(), phone: contactPhone.trim(),
+          status: 'active', createTime: today,
+        }],
+      },
       taxType: 'general',
       invoiceInfo: {
         title: name.trim(), taxNo: taxNo.trim(), taxRate: 13,
