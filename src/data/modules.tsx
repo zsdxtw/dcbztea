@@ -50,6 +50,12 @@ const InboundIcon = () => (
 const SuppliersIcon = () => (
   <svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a5 5 0 0110 0M14 10h4M16 8v4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
 );
+const SupplierApprovalIcon = () => (
+  <svg viewBox="0 0 20 20" fill="none"><rect x="4" y="2.5" width="12" height="15" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 9l1.8 1.8L13 7.5M7.5 13.5h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+);
+const SupplierListIcon = () => (
+  <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3.5" width="14" height="13" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 7.5h7M6.5 10.5h7M6.5 13.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+);
 const OutboundIcon = () => (
   <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="6" width="14" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M10 13V8M7 10l3 3 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
 );
@@ -244,7 +250,10 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
       { key: 'purchase-orders', label: '采购订单', icon: <OrdersIcon /> },
       { key: 'purchase-pricing', label: '采购报（调）价', icon: <PriceIcon /> },
       { key: 'purchase-inbound', label: '入库管理', icon: <InboundIcon /> },
-      { key: 'purchase-suppliers', label: '供应商管理', icon: <SuppliersIcon /> },
+      { key: 'purchase-suppliers', label: '供应商管理', icon: <SuppliersIcon />, children: [
+        { key: 'purchase-supplier-approvals', label: '注册审批', icon: <SupplierApprovalIcon /> },
+        { key: 'purchase-supplier-list', label: '供应商列表', icon: <SupplierListIcon /> },
+      ] },
       { key: 'purchase-reconciliation', label: '供应商对账', icon: <ReconciliationIcon /> },
       { key: 'purchase-return', label: '采购退货', icon: <ReturnIcon /> },
     ],

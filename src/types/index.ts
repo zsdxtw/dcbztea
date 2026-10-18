@@ -887,6 +887,28 @@ export interface SupplierItem {
   status: 'active' | 'inactive';
 }
 
+/** 供应商注册/信息修改审批单（合作商终端 → 管理端注册审批） */
+export interface SupplierApproval {
+  id: string;
+  /** 审批编号 */
+  code: string;
+  /** 类型：register=注册申请 / modify=信息修改申请 */
+  type: 'register' | 'modify';
+  /** 申请人（合作商终端账号名 / 注册时填写的登录账号） */
+  applicant: string;
+  /** 申请说明 */
+  applyNote?: string;
+  /** 供应商完整档案（注册=草稿档案；修改=修改后的档案） */
+  payload: SupplierItem;
+  /** 关联供应商 ID（modify 时必填） */
+  supplierId?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  submitTime: string;
+  reviewTime?: string;
+  reviewer?: string;
+  reviewNote?: string;
+}
+
 /* ─────────────────────────── 价格体系类型 ─────────────────────────── */
 
 /** 采购价规则：按「商品 + 供应商」维度维护 */

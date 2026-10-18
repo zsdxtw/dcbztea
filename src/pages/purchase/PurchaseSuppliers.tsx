@@ -6,7 +6,6 @@ import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import DetailDrawer, { InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import {
-  supplierItems,
   SUPPLIER_TYPE_LABELS,
   SUPPLIER_TYPE_COLORS,
   GRADE_COLORS,
@@ -18,6 +17,7 @@ import {
 import type { SupplierItem, SupplierType, SupplierGrade, SupplierWarehouse, SupplierStore, SupplierTerminal } from '../../types';
 import type { StatCardData } from '../../types';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
+import { useSupplierStore } from '../../stores/supplierStore';
 
 /* ── 供应商类型筛选配置 ── */
 const TYPE_FILTER: { key: SupplierType | 'all'; label: string; color: string; desc: string }[] = [
@@ -44,8 +44,9 @@ export default function PurchaseSuppliers() {
   const [ocrLoading, setOcrLoading] = useState(false);
   /** 抽屉当前激活 Tab */
   const [activeTab, setActiveTab] = useState<DrawerTabKey>('basic');
-  /** 列表数据（编辑保存后同步门店数量等变化） */
-  const [list, setList] = useState<SupplierItem[]>(supplierItems);
+  /** 列表数据（共享 store：编辑保存 / 注册审批通过后全局同步） */
+  const list = useSupplierStore(s => s.suppliers);
+  const updateSupplierInStore = useSupplierStore(s => s.updateSupplier);
 
   // 筛选
   const filtered = useMemo(() => {
@@ -101,7 +102,7 @@ export default function PurchaseSuppliers() {
   // 取消编辑
   const handleCancelEdit = () => { setEditing(false); setEditForm(null); };
   // 保存编辑（同步列表，门店数量等随之更新）
-  const handleSaveEdit = () => { if (editForm) { setSelectedSupplier(editForm); setList(prev => prev.map(s => s.id === editForm.id ? editForm : s)); setEditing(false); setEditForm(null); } };
+  const handleSaveEdit = () => { if (editForm) { setSelectedSupplier(editForm); updateSupplierInStore(editForm); setEditing(false); setEditForm(null); } };
 
   // 仓库编辑（合作仓库联动仓储 > 仓库设置）
   const updateWarehouse = (idx: number, patch: Partial<SupplierWarehouse>) => {
@@ -178,7 +179,7 @@ export default function PurchaseSuppliers() {
 
   return (
     <>
-      <ContentHeader title="供应商管理" breadcrumbs={['采购', '供应商管理']} />
+      <ContentHeader title="供应商列表" breadcrumbs={['采购', '供应商管理', '供应商列表']} />
 
       <div className="content-body">
       {/* 统计卡片 */}

@@ -1,0 +1,434 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { TeaLeafMark } from './PartnerLayout';
+import { useSupplierStore } from '../../stores/supplierStore';
+import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
+import type { SupplierItem, SupplierWarehouse, SupplierStore } from '../../types';
+import './partner.css';
+
+/** 可选资质文件（演示 mock 上传） */
+const QUALIFICATION_OPTIONS = ['营业执照.pdf', '食品生产许可证.pdf', '食品经营许可证.pdf', 'SC认证证书.pdf', '质量管理体系认证.pdf', '品牌授权书.pdf'];
+
+interface RegWarehouseDraft { id: string; name: string; address: string; contactPerson: string; contactPhone: string; }
+interface RegStoreDraft { id: string; name: string; province: string; city: string; district: string; address: string; area: number; mainBrands: string; }
+
+const EMPTY_WAREHOUSE: RegWarehouseDraft = { id: '', name: '', address: '', contactPerson: '', contactPhone: '' };
+const EMPTY_STORE: RegStoreDraft = { id: '', name: '', province: '', city: '', district: '', address: '', area: 0, mainBrands: '' };
+
+const newWarehouse = (): RegWarehouseDraft => ({ ...EMPTY_WAREHOUSE, id: `w${Date.now()}` });
+const newStore = (): RegStoreDraft => ({ ...EMPTY_STORE, id: `st${Date.now()}` });
+
+/** 合作商终端注册页：填写供应商档案（基本信息 + 资质文件必填），提交后进入平台注册审批 */
+export default function PartnerRegister() {
+  const navigate = useNavigate();
+  const submitRegistration = useSupplierStore(s => s.submitRegistration);
+
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState<{ code: string; username: string } | null>(null);
+
+  // 基本信息（必填）
+  const [name, setName] = useState('');
+  const [type, setType] = useState<'brand' | 'partner'>('brand');
+  const [unifiedCreditCode, setUnifiedCreditCode] = useState('');
+  const [legalRepresentative, setLegalRepresentative] = useState('');
+  const [contactPerson, setContactPerson] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [registeredProvince, setRegisteredProvince] = useState('');
+  const [registeredCity, setRegisteredCity] = useState('');
+  const [registeredDistrict, setRegisteredDistrict] = useState('');
+  const [registeredAddress, setRegisteredAddress] = useState('');
+  const [businessScope, setBusinessScope] = useState('');
+  // 资质文件（必填）
+  const [qualificationFiles, setQualificationFiles] = useState<string[]>([]);
+  // 终端账号（必填）
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [applyNote, setApplyNote] = useState('');
+  // 仓库信息（选填）
+  const [warehouses, setWarehouses] = useState<RegWarehouseDraft[]>([]);
+  // 门店信息（选填）
+  const [stores, setStores] = useState<RegStoreDraft[]>([]);
+  // 财务信息（选填）
+  const [bankName, setBankName] = useState('');
+  const [accountNo, setAccountNo] = useState('');
+  const [accountName, setAccountName] = useState('');
+  const [taxNo, setTaxNo] = useState('');
+
+  const updateWarehouse = (idx: number, patch: Partial<RegWarehouseDraft>) => {
+    setWarehouses(prev => prev.map((w, i) => i === idx ? { ...w, ...patch } : w));
+  };
+  const updateStoreRow = (idx: number, patch: Partial<RegStoreDraft>) => {
+    setStores(prev => prev.map((st, i) => i === idx ? { ...st, ...patch } : st));
+  };
+
+  const toggleQualification = (f: string) => {
+    setQualificationFiles(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
+  };
+
+  /** 校验必填项并提交注册审批 */
+  const handleSubmit = () => {
+    if (!name.trim()) return setError('请填写供应商名称');
+    if (!unifiedCreditCode.trim()) return setError('请填写统一社会信用代码');
+    if (!legalRepresentative.trim()) return setError('请填写法定代表人');
+    if (!contactPerson.trim()) return setError('请填写联系人');
+    if (!contactPhone.trim()) return setError('请填写联系电话');
+    if (!registeredAddress.trim()) return setError('请填写注册地址');
+    if (qualificationFiles.length === 0) return setError('请至少上传 1 份资质文件（如营业执照）');
+    if (!username.trim()) return setError('请设置终端登录账号');
+    if (!password.trim()) return setError('请设置登录密码');
+
+    const today = new Date().toISOString().slice(0, 10);
+    const draft: SupplierItem = {
+      id: `sup_${Date.now()}`,
+      type,
+      name: name.trim(),
+      unifiedCreditCode: unifiedCreditCode.trim(),
+      cooperationAgreements: [],
+      brandAuthAgreements: [],
+      businessLicense: qualificationFiles[0],
+      qualificationFiles,
+      channelSource: 'terminal',
+      registeredProvince,
+      registeredCity,
+      registeredDistrict,
+      registeredAddress: registeredAddress.trim(),
+      legalRepresentative: legalRepresentative.trim(),
+      establishmentDate: '',
+      registeredCapital: '',
+      companyType: '',
+      businessScope: businessScope.trim(),
+      contactPerson: contactPerson.trim(),
+      contactPosition: '',
+      contactProvince: registeredProvince,
+      contactCity: registeredCity,
+      contactDistrict: registeredDistrict,
+      contactAddress: registeredAddress.trim(),
+      contactPhone: contactPhone.trim(),
+      contactEmail: '',
+      warehouses: warehouses.filter(w => w.name.trim()).map<SupplierWarehouse>((w, i) => ({
+        id: w.id, name: w.name.trim(), address: w.address.trim(),
+        contactPerson: w.contactPerson.trim(), contactPhone: w.contactPhone.trim(), isDefault: i === 0,
+      })),
+      stores: stores.filter(st => st.name.trim()).map<SupplierStore>(st => ({
+        id: st.id, name: st.name.trim(), province: st.province, city: st.city, district: st.district,
+        address: st.address.trim(), area: st.area || 0,
+        mainBrands: st.mainBrands.split(/[，,、]/).map(v => v.trim()).filter(Boolean),
+        status: 'active',
+      })),
+      terminal: { enabled: true, username: username.trim(), password: password.trim(), status: 'active', openTime: today },
+      taxType: 'general',
+      invoiceInfo: {
+        title: name.trim(), taxNo: taxNo.trim(), taxRate: 13,
+        address: [registeredProvince, registeredCity, registeredDistrict, registeredAddress.trim()].filter(Boolean).join(''),
+        phone: contactPhone.trim(), bankName: bankName.trim(), bankAccount: accountNo.trim(),
+      },
+      cooperationDate: today,
+      grade: 'B',
+      mainCategories: [],
+      introduction: '',
+      settlementMethod: 'monthly',
+      bankAccount: { accountName: accountName.trim() || name.trim(), accountNo: accountNo.trim(), bankName: bankName.trim(), bankNo: '', remark: '' },
+      shippingSettlement: 'not_free_fixed',
+      supportDropship: false,
+      qualificationStatus: 'pending',
+      paymentTerms: '月结30天',
+      deliveryCycle: '5-7个工作日',
+      minOrderAmount: 0,
+      returnPolicy: '',
+      qualityGuarantee: '',
+      remark: '合作商终端注册',
+      status: 'active',
+    };
+
+    const approval = submitRegistration(draft, username.trim(), applyNote.trim() || undefined);
+    setSuccess({ code: approval.code, username: username.trim() });
+    window.scrollTo({ top: 0 });
+  };
+
+  const sectionTitle = (text: string, required: boolean) => (
+    <h3 className="pk-reg-section-title">
+      {text}
+      {required
+        ? <span className="pk-reg-req">必填</span>
+        : <span className="pk-reg-opt">选填 · 可审批后在合作商终端维护</span>}
+    </h3>
+  );
+
+  if (success) {
+    return (
+      <div className="pk-register">
+        <div className="pk-register-inner">
+          <div className="pk-reg-success">
+            <div className="pk-reg-success-icon">
+              <svg viewBox="0 0 24 24" fill="none" style={{ width: 30, height: 30 }}><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+            <div className="pk-reg-success-t">注册申请已提交</div>
+            <div className="pk-reg-success-d">
+              审批编号 <b className="mono">{success.code}</b> 已进入平台「注册审批」流程，
+              审批通过后您的供应商档案将自动创建，<br />
+              即可使用账号 <b className="mono">{success.username}</b> 登录合作商终端，
+              维护仓库、门店与财务等补充信息。
+            </div>
+            <button className="pk-reg-submit" style={{ padding: '0 40px', letterSpacing: 'normal', textIndent: 0 }} onClick={() => navigate('/partner/login')}>
+              返回登录
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pk-register">
+      <div className="pk-register-inner">
+        {/* 头部品牌 + 返回 */}
+        <div className="pk-register-head">
+          <div className="pk-register-brand">
+            <div className="pk-register-brand-mark"><TeaLeafMark /></div>
+            <div>
+              <div className="pk-register-brand-name">淡茶半盏</div>
+              <div className="pk-register-brand-sub">PARTNER REGISTER</div>
+            </div>
+          </div>
+          <button className="pk-register-back" onClick={() => navigate('/partner/login')}>
+            <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14 }}><path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            返回登录
+          </button>
+        </div>
+
+        <h1 className="pk-register-title">合作商入驻注册</h1>
+        <p className="pk-register-desc">
+          填写企业信息提交入驻申请，平台审批通过后即可承接订单分发、客户经营与月度结算。
+        </p>
+        <div className="pk-register-tip">
+          带 * 的基本信息与资质文件为必填内容；仓库、门店、财务信息可先不填写，
+          待注册审批通过后，登录合作商终端在「合作商信息」中继续维护，维护结果同样需平台审批生效。
+        </div>
+
+        {error && <div className="pk-reg-error">{error}</div>}
+
+        {/* 基本信息（必填） */}
+        <div className="pk-reg-panel">
+          {sectionTitle('基本信息', true)}
+          <div className="pk-reg-grid">
+            <div>
+              <label className="pk-reg-label">供应商名称<span className="pk-reg-star">*</span></label>
+              <input className="pk-reg-input" placeholder="企业全称" value={name} onChange={e => { setName(e.target.value); setError(''); }} />
+            </div>
+            <div>
+              <label className="pk-reg-label">供应商类型<span className="pk-reg-star">*</span></label>
+              <select className="pk-reg-select" value={type} onChange={e => setType(e.target.value as 'brand' | 'partner')}>
+                <option value="brand">品牌方</option>
+                <option value="partner">合作方</option>
+              </select>
+            </div>
+            <div>
+              <label className="pk-reg-label">统一社会信用代码<span className="pk-reg-star">*</span></label>
+              <input className="pk-reg-input" placeholder="18 位信用代码" value={unifiedCreditCode} onChange={e => { setUnifiedCreditCode(e.target.value); setError(''); }} />
+            </div>
+            <div>
+              <label className="pk-reg-label">法定代表人<span className="pk-reg-star">*</span></label>
+              <input className="pk-reg-input" placeholder="法定代表人姓名" value={legalRepresentative} onChange={e => { setLegalRepresentative(e.target.value); setError(''); }} />
+            </div>
+            <div>
+              <label className="pk-reg-label">联系人<span className="pk-reg-star">*</span></label>
+              <input className="pk-reg-input" placeholder="业务联系人" value={contactPerson} onChange={e => { setContactPerson(e.target.value); setError(''); }} />
+            </div>
+            <div>
+              <label className="pk-reg-label">联系电话<span className="pk-reg-star">*</span></label>
+              <input className="pk-reg-input" placeholder="手机或座机" value={contactPhone} onChange={e => { setContactPhone(e.target.value); setError(''); }} />
+            </div>
+            <div>
+              <label className="pk-reg-label">省份</label>
+              <select className="pk-reg-select" value={registeredProvince} onChange={e => { setRegisteredProvince(e.target.value); setRegisteredCity(''); setRegisteredDistrict(''); }}>
+                <option value="">请选择</option>
+                {PROVINCE_NAMES.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="pk-reg-label">城市</label>
+              <select className="pk-reg-select" value={registeredCity} disabled={!registeredProvince} onChange={e => { setRegisteredCity(e.target.value); setRegisteredDistrict(''); }}>
+                <option value="">请选择</option>
+                {registeredProvince && getCityNames(registeredProvince).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="pk-reg-label">区县</label>
+              <select className="pk-reg-select" value={registeredDistrict} disabled={!registeredCity} onChange={e => setRegisteredDistrict(e.target.value)}>
+                <option value="">请选择</option>
+                {registeredProvince && registeredCity && getDistricts(registeredProvince, registeredCity).map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div className="span-3">
+              <label className="pk-reg-label">注册详细地址<span className="pk-reg-star">*</span></label>
+              <input className="pk-reg-input" placeholder="街道、门牌号" value={registeredAddress} onChange={e => { setRegisteredAddress(e.target.value); setError(''); }} />
+            </div>
+            <div className="span-3">
+              <label className="pk-reg-label">经营范围</label>
+              <textarea className="pk-reg-textarea" placeholder="如：茶叶种植、加工、销售" value={businessScope} onChange={e => setBusinessScope(e.target.value)} />
+            </div>
+          </div>
+        </div>
+
+        {/* 资质文件（必填） */}
+        <div className="pk-reg-panel">
+          {sectionTitle('资质文件', true)}
+          <div className="pk-reg-grid" style={{ marginBottom: 14 }}>
+            {QUALIFICATION_OPTIONS.map(f => (
+              <button key={f} type="button" className="pk-reg-add" style={{ textAlign: 'left' }}
+                onClick={() => toggleQualification(f)}>
+                {qualificationFiles.includes(f) ? '✓ ' : '+ '}{f.replace('.pdf', '')}
+              </button>
+            ))}
+          </div>
+          {qualificationFiles.length > 0 ? (
+            <div className="pk-reg-files">
+              {qualificationFiles.map(f => (
+                <span key={f} className="pk-reg-file">
+                  <svg viewBox="0 0 16 16" fill="none" style={{ width: 13, height: 13, color: '#01795D' }}><path d="M4 1.5h5.5L13 5v9.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-12a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
+                  {f}
+                  <button className="pk-reg-file-x" onClick={() => toggleQualification(f)}>×</button>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: 12.5, color: '#99A29D' }}>请至少选择 1 份资质文件（点击上方文件类型即可添加演示文件）</div>
+          )}
+        </div>
+
+        {/* 终端登录账号（必填） */}
+        <div className="pk-reg-panel">
+          {sectionTitle('终端登录账号', true)}
+          <div className="pk-reg-grid">
+            <div>
+              <label className="pk-reg-label">登录账号<span className="pk-reg-star">*</span></label>
+              <input className="pk-reg-input" placeholder="审批通过后用于登录合作商终端" value={username} onChange={e => { setUsername(e.target.value); setError(''); }} />
+            </div>
+            <div>
+              <label className="pk-reg-label">登录密码<span className="pk-reg-star">*</span></label>
+              <input className="pk-reg-input" type="password" placeholder="设置密码" value={password} onChange={e => { setPassword(e.target.value); setError(''); }} />
+            </div>
+            <div className="span-3" style={{ gridColumn: 'span 1' }}>
+              <label className="pk-reg-label">申请说明</label>
+              <input className="pk-reg-input" placeholder="简要介绍企业情况（选填）" value={applyNote} onChange={e => setApplyNote(e.target.value)} />
+            </div>
+          </div>
+        </div>
+
+        {/* 仓库信息（选填） */}
+        <div className="pk-reg-panel">
+          {sectionTitle('仓库信息', false)}
+          {warehouses.map((w, i) => (
+            <div key={w.id} className="pk-reg-item">
+              <div className="pk-reg-item-idx">{i + 1}</div>
+              <div className="pk-reg-item-body">
+                <div className="pk-reg-grid">
+                  <div>
+                    <label className="pk-reg-label">仓库名称</label>
+                    <input className="pk-reg-input" placeholder="如：华东中心仓" value={w.name} onChange={e => updateWarehouse(i, { name: e.target.value })} />
+                  </div>
+                  <div className="span-2">
+                    <label className="pk-reg-label">仓库地址</label>
+                    <input className="pk-reg-input" placeholder="省市区 + 详细地址" value={w.address} onChange={e => updateWarehouse(i, { address: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="pk-reg-label">仓库联系人</label>
+                    <input className="pk-reg-input" placeholder="选填" value={w.contactPerson} onChange={e => updateWarehouse(i, { contactPerson: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="pk-reg-label">联系电话</label>
+                    <input className="pk-reg-input" placeholder="选填" value={w.contactPhone} onChange={e => updateWarehouse(i, { contactPhone: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+              <button className="pk-reg-item-del" onClick={() => setWarehouses(prev => prev.filter((_, x) => x !== i))}>删除</button>
+            </div>
+          ))}
+          <button className="pk-reg-add" onClick={() => setWarehouses(prev => [...prev, newWarehouse()])}>+ 添加仓库</button>
+        </div>
+
+        {/* 门店信息（选填） */}
+        <div className="pk-reg-panel">
+          {sectionTitle('门店信息', false)}
+          {stores.map((st, i) => (
+            <div key={st.id} className="pk-reg-item">
+              <div className="pk-reg-item-idx">{i + 1}</div>
+              <div className="pk-reg-item-body">
+                <div className="pk-reg-grid">
+                  <div>
+                    <label className="pk-reg-label">门店名称</label>
+                    <input className="pk-reg-input" placeholder="如：品牌体验店" value={st.name} onChange={e => updateStoreRow(i, { name: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="pk-reg-label">所在省份</label>
+                    <select className="pk-reg-select" value={st.province} onChange={e => updateStoreRow(i, { province: e.target.value, city: '', district: '' })}>
+                      <option value="">请选择</option>
+                      {PROVINCE_NAMES.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="pk-reg-label">城市</label>
+                    <select className="pk-reg-select" value={st.city} disabled={!st.province} onChange={e => updateStoreRow(i, { city: e.target.value, district: '' })}>
+                      <option value="">请选择</option>
+                      {st.province && getCityNames(st.province).map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="pk-reg-label">区县</label>
+                    <select className="pk-reg-select" value={st.district} disabled={!st.city} onChange={e => updateStoreRow(i, { district: e.target.value })}>
+                      <option value="">请选择</option>
+                      {st.province && st.city && getDistricts(st.province, st.city).map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="pk-reg-label">详细地址</label>
+                    <input className="pk-reg-input" placeholder="街道、门牌号" value={st.address} onChange={e => updateStoreRow(i, { address: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="pk-reg-label">门店面积（㎡）</label>
+                    <input className="pk-reg-input" type="number" placeholder="如：200" value={st.area || ''} onChange={e => updateStoreRow(i, { area: Number(e.target.value) || 0 })} />
+                  </div>
+                  <div className="span-3">
+                    <label className="pk-reg-label">主营品牌</label>
+                    <input className="pk-reg-input" placeholder="多个品牌用「、」分隔" value={st.mainBrands} onChange={e => updateStoreRow(i, { mainBrands: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+              <button className="pk-reg-item-del" onClick={() => setStores(prev => prev.filter((_, x) => x !== i))}>删除</button>
+            </div>
+          ))}
+          <button className="pk-reg-add" onClick={() => setStores(prev => [...prev, newStore()])}>+ 添加门店</button>
+        </div>
+
+        {/* 财务信息（选填） */}
+        <div className="pk-reg-panel">
+          {sectionTitle('财务信息', false)}
+          <div className="pk-reg-grid">
+            <div>
+              <label className="pk-reg-label">开户银行</label>
+              <input className="pk-reg-input" placeholder="如：招商银行杭州滨江支行" value={bankName} onChange={e => setBankName(e.target.value)} />
+            </div>
+            <div>
+              <label className="pk-reg-label">银行账号</label>
+              <input className="pk-reg-input" placeholder="对公账户账号" value={accountNo} onChange={e => setAccountNo(e.target.value)} />
+            </div>
+            <div>
+              <label className="pk-reg-label">户名</label>
+              <input className="pk-reg-input" placeholder="默认为企业名称" value={accountName} onChange={e => setAccountName(e.target.value)} />
+            </div>
+            <div>
+              <label className="pk-reg-label">税号</label>
+              <input className="pk-reg-input" placeholder="开票税号" value={taxNo} onChange={e => setTaxNo(e.target.value)} />
+            </div>
+          </div>
+        </div>
+
+        {/* 提交 */}
+        <div className="pk-reg-footer">
+          <button className="pk-reg-cancel" onClick={() => navigate('/partner/login')}>取消</button>
+          <button className="pk-reg-submit" onClick={handleSubmit}>提交注册申请</button>
+        </div>
+      </div>
+    </div>
+  );
+}

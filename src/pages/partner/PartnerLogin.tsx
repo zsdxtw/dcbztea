@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { setPartnerAuth, TeaLeafMark } from './PartnerLayout';
+import { useSupplierStore } from '../../stores/supplierStore';
 import './partner.css';
 
 /** 合作商终端登录页：左侧品牌视觉 + 右侧极简表单 */
@@ -19,7 +20,13 @@ export default function PartnerLogin() {
       setError('账号或密码错误（演示密码 123456）');
       return;
     }
-    setPartnerAuth({ username: username.trim(), name: '陈建国' });
+    // 按终端账号匹配关联供应商（新注册审批通过的账号亦自动关联）
+    const uname = username.trim();
+    const matched = useSupplierStore.getState().suppliers.find(
+      s => s.terminal.enabled && s.terminal.username === uname,
+    );
+    const fallbackName = matched?.contactPerson || matched?.legalRepresentative || '合作商';
+    setPartnerAuth({ username: uname, name: fallbackName, supplierId: matched?.id });
     navigate('/partner/dashboard');
   };
 
@@ -107,6 +114,10 @@ export default function PartnerLogin() {
           </button>
 
           <div className="pk-login-demo">演示账号 <b>admin</b>　密码 <b>123456</b></div>
+
+          <button className="pk-login-back" style={{ color: '#01795D', fontWeight: 600, fontSize: 13 }} onClick={() => navigate('/partner/register')}>
+            还没有账号？立即注册入驻 →
+          </button>
 
           <button className="pk-login-back" onClick={() => navigate('/dashboard')}>
             ← 返回平台主系统

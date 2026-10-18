@@ -13,6 +13,7 @@ import PurchaseOrders from './pages/purchase/PurchaseOrders';
 import PurchasePricing from './pages/purchase/PurchasePricing';
 import PurchaseInbound from './pages/purchase/PurchaseInbound';
 import PurchaseSuppliers from './pages/purchase/PurchaseSuppliers';
+import PurchaseSupplierApprovals from './pages/purchase/PurchaseSupplierApprovals';
 import PurchaseReconciliation from './pages/purchase/PurchaseReconciliation';
 import PurchaseReturn from './pages/purchase/PurchaseReturn';
 
@@ -83,6 +84,7 @@ import PersonnelStreamer from './pages/personnel/PersonnelStreamer';
 
 /* ── 合作商终端（独立后台） ── */
 import PartnerLogin from './pages/partner/PartnerLogin';
+import PartnerRegister from './pages/partner/PartnerRegister';
 import PartnerLayout from './pages/partner/PartnerLayout';
 import PartnerDashboard from './pages/partner/PartnerDashboard';
 import PartnerOrders from './pages/partner/PartnerOrders';
@@ -120,7 +122,9 @@ export const router = createBrowserRouter([
       { path: 'purchase/purchase-orders', element: <PurchaseOrders /> },
       { path: 'purchase/purchase-pricing', element: <PurchasePricing /> },
       { path: 'purchase/purchase-inbound', element: <PurchaseInbound /> },
-      { path: 'purchase/purchase-suppliers', element: <PurchaseSuppliers /> },
+      { path: 'purchase/purchase-suppliers', element: <Navigate to="/purchase/purchase-supplier-list" replace /> },
+      { path: 'purchase/purchase-supplier-approvals', element: <PurchaseSupplierApprovals /> },
+      { path: 'purchase/purchase-supplier-list', element: <PurchaseSuppliers /> },
       { path: 'purchase/purchase-reconciliation', element: <PurchaseReconciliation /> },
       { path: 'purchase/purchase-return', element: <PurchaseReturn /> },
       /* ── 销售 ── */
@@ -200,8 +204,9 @@ export const router = createBrowserRouter([
       { path: 'personnel/personnel-stores', element: <SalesStores /> },
     ],
   },
-  /* ── 合作商终端（独立布局：登录页 + 5 个一级菜单） ── */
+  /* ── 合作商终端（独立布局：登录页 + 注册页 + 5 个一级菜单） ── */
   { path: '/partner/login', element: <PartnerLogin /> },
+  { path: '/partner/register', element: <PartnerRegister /> },
   {
     path: '/partner',
     element: <PartnerLayout />,

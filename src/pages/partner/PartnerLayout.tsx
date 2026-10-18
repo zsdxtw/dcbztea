@@ -8,6 +8,8 @@ import './partner.css';
 export interface PartnerAuth {
   username: string;
   name: string;
+  /** 关联供应商 ID（登录时按终端账号匹配） */
+  supplierId?: string;
 }
 
 export function getPartnerAuth(): PartnerAuth | null {

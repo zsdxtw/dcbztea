@@ -485,6 +485,54 @@ const rawSupplierItems: RawSupplierItem[] = [
     remark: '年度返利4%，季度结算，提供品牌宣传支持',
     status: 'inactive',
   },
+  {
+    id: '11',
+    type: 'partner',
+    name: '杭州云茶供应链管理有限公司',
+    unifiedCreditCode: '91330106MA2P8KQ3X7',
+    cooperationAgreements: ['云茶供应链合作协议.pdf'],
+    brandAuthAgreements: [],
+    businessLicense: '',
+    registeredProvince: '浙江',
+    registeredCity: '杭州市',
+    registeredDistrict: '滨江区',
+    registeredAddress: '滨盛路1870号创新大厦18层',
+    legalRepresentative: '陈建国',
+    establishmentDate: '2016-09-20',
+    registeredCapital: '1000万元',
+    companyType: '有限责任公司',
+    businessScope: '茶叶及茶制品供应链服务；仓储配送服务；供应链管理咨询',
+    contactPerson: '陈建国',
+    contactPosition: '总经理',
+    contactProvince: '浙江',
+    contactCity: '杭州市',
+    contactDistrict: '滨江区',
+    contactAddress: '滨盛路1870号创新大厦18层',
+    contactPhone: '0571-8899****',
+    contactEmail: 'chenjg@yuntea.com',
+    warehouses: [
+      { id: 'pw1', name: '云茶滨江中心仓', province: '浙江', city: '杭州市', district: '滨江区', address: '滨盛路1870号B2层', contactPerson: '周仓管', contactPhone: '0571-8898****', isDefault: true },
+      { id: 'pw2', name: '云茶宁波分仓', province: '浙江', city: '宁波市', district: '鄞州区', address: '首南街道泰康中路456号', contactPerson: '吴仓管', contactPhone: '0574-5512****', isDefault: false },
+    ],
+    taxType: 'general',
+    invoiceInfo: { title: '杭州云茶供应链管理有限公司', taxNo: '91330106MA2P8KQ3X7', taxRate: 13, address: '浙江省杭州市滨江区滨盛路1870号创新大厦18层', phone: '0571-8899****', bankName: '招商银行杭州滨江支行', bankAccount: '5719****2233' },
+    cooperationDate: '2025-03-01',
+    grade: 'A',
+    mainCategories: ['绿茶', '红茶', '青茶'],
+    introduction: '淡茶半盏授权合作商，负责华东区域订单履约、本地客户营销与售后。供应商模式 + 服务商模式双模式运营。',
+    settlementMethod: 'monthly',
+    bankAccount: { accountName: '杭州云茶供应链管理有限公司', accountNo: '5719****8866', bankName: '招商银行杭州滨江支行', bankNo: '308331000013', remark: '结算款按月汇总支付，发票随款开具' },
+    shippingSettlement: 'free',
+    supportDropship: true,
+    qualificationStatus: 'qualified',
+    paymentTerms: '月结30天',
+    deliveryCycle: '3-5个工作日',
+    minOrderAmount: 3000,
+    returnPolicy: '质量问题7天内可退换',
+    qualityGuarantee: '符合供应链服务标准',
+    remark: '合作商终端注册，供应商模式+服务商模式双模式',
+    status: 'active',
+  },
 ];
 
 /** 历史供应商资质文件与渠道来源补录 */
@@ -543,10 +591,11 @@ const STORES_MAP: Record<string, SupplierStore[]> = {
   ],
 };
 
-/** 供应商终端账号补录：3、8 号供应商已开通终端 */
+/** 供应商终端账号补录：3、8、11 号供应商已开通终端 */
 const TERMINAL_MAP: Record<string, SupplierTerminal> = {
   '3': { enabled: true, username: 'bama01', password: '123456', status: 'active', openTime: '2025-06-12', lastLogin: '2026-10-15', remark: '合作商终端注册供应商' },
   '8': { enabled: true, username: 'zyq001', password: '123456', status: 'active', openTime: '2025-09-01', lastLogin: '2026-10-16', remark: '合作商终端注册供应商' },
+  '11': { enabled: true, username: 'admin', password: '123456', status: 'active', openTime: '2025-03-01', lastLogin: '2026-10-16', remark: '云茶供应链（合作商终端演示账号）' },
 };
 
 /** 未开通终端的默认结构 */
