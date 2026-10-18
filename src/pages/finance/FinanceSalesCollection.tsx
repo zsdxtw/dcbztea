@@ -95,7 +95,7 @@ export default function FinanceSalesCollection() {
               <StatusTag variant={collectionStatusToVariant(c.status)} label={collectionStatusLabel(c.status)} />,
               <div className="row-actions">
                 <Button size="sm" variant="ghost" onClick={() => handleView(c)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                <Button size="sm" variant="ghost" onClick={() => handleView(c)}>编辑</Button>
               </div>,
             ])}
           />
@@ -110,7 +110,6 @@ export default function FinanceSalesCollection() {
         statusTag={selectedCollection && <StatusTag variant={collectionStatusToVariant(selectedCollection.status)} label={collectionStatusLabel(selectedCollection.status)} />}
         subtitle={selectedCollection && `${selectedCollection.customer} · ${selectedCollection.amount}`}
         mode="view"
-        onEdit={() => window.alert('编辑功能（演示）')}
       >
         {selectedCollection && (
           <>

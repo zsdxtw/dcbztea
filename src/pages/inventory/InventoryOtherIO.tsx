@@ -138,7 +138,7 @@ export default function InventoryOtherIO() {
               <StatusTag variant={ioStatusToVariant(r.status)} label={ioStatusLabel(r.status)} />,
               <div className="row-actions">
                 <Button size="sm" variant="ghost" onClick={() => handleView(r)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                <Button size="sm" variant="ghost" onClick={() => handleView(r)}>编辑</Button>
               </div>,
             ])}
           />
@@ -154,7 +154,6 @@ export default function InventoryOtherIO() {
         statusTag={selectedRecord && <StatusTag variant={ioStatusToVariant(selectedRecord.status)} label={ioStatusLabel(selectedRecord.status)} />}
         subtitle={selectedRecord && `${selectedRecord.ioType} · ${selectedRecord.product}`}
         mode="view"
-        onEdit={() => window.alert('编辑功能（演示）')}
       >
         {selectedRecord && (
           <DrawerSection title="单据信息">

@@ -241,7 +241,7 @@ export default function SalesReconciliation() {
               <StatusTag variant={reconciliationStatusToVariant(r.status)} label={reconciliationStatusLabel(r.status)} />,
               <div className="row-actions" key="act">
                 <Button size="sm" variant="ghost" onClick={() => handleView(r)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                <Button size="sm" variant="ghost" onClick={() => handleView(r)}>编辑</Button>
               </div>,
             ])}
           />
@@ -257,7 +257,6 @@ export default function SalesReconciliation() {
         statusTag={selectedRecord && <StatusTag variant={reconciliationStatusToVariant(selectedRecord.status)} label={reconciliationStatusLabel(selectedRecord.status)} />}
         subtitle={selectedRecord && `${selectedRecord.customer} · ${selectedRecord.period}`}
         mode="view"
-        onEdit={() => window.alert('编辑功能（演示）')}
       >
         {selectedRecord && (
           <>

@@ -225,7 +225,7 @@ export default function PurchaseReturn() {
               <StatusTag variant={returnStatusToVariant(r.status)} label={returnStatusLabel(r.status)} />,
               <div className="row-actions">
                 <Button size="sm" variant="ghost" onClick={() => handleView(r)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                <Button size="sm" variant="ghost" onClick={() => handleView(r)}>编辑</Button>
               </div>,
             ])}
           />
@@ -242,7 +242,6 @@ export default function PurchaseReturn() {
           <StatusTag variant={returnStatusToVariant(selectedReturn.status)} label={returnStatusLabel(selectedReturn.status)} />
         )}
         subtitle={selectedReturn && `${selectedReturn.supplier} · ${selectedReturn.product} · 退货日期 ${selectedReturn.returnDate}`}
-        onEdit={() => window.alert('编辑功能（演示）')}
       >
         {selectedReturn && (
           <>

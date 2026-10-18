@@ -126,7 +126,7 @@ export default function InventoryTransfer() {
               <StatusTag variant={transferStatusToVariant(o.status)} label={transferStatusLabel(o.status)} />,
               <div className="row-actions">
                 <Button size="sm" variant="ghost" onClick={() => handleView(o)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                <Button size="sm" variant="ghost" onClick={() => handleView(o)}>编辑</Button>
               </div>,
             ])}
           />
@@ -142,7 +142,6 @@ export default function InventoryTransfer() {
         statusTag={selectedOrder && <StatusTag variant={transferStatusToVariant(selectedOrder.status)} label={transferStatusLabel(selectedOrder.status)} />}
         subtitle={selectedOrder && `${selectedOrder.fromWarehouse} → ${selectedOrder.toWarehouse}`}
         mode="view"
-        onEdit={() => window.alert('编辑功能（演示）')}
       >
         {selectedOrder && (
           <DrawerSection title="调拨信息">

@@ -162,7 +162,7 @@ export default function SalesStores() {
               <span key="st">{statusTag(s.status)}</span>,
               <div className="row-actions" key="act">
                 <Button size="sm" variant="ghost" onClick={() => setDetailStore(s)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                <Button size="sm" variant="ghost" onClick={() => setDetailStore(s)}>编辑</Button>
               </div>,
             ])}
           />

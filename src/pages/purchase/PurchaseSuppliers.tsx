@@ -205,7 +205,7 @@ export default function PurchaseSuppliers() {
             <span key="st" style={{ padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: s.status === 'active' ? '#E8F5E9' : '#FFF3E0', color: s.status === 'active' ? '#2E7D32' : '#E65100' }}>{s.status === 'active' ? '在册' : '停用'}</span>,
             <div key="view" className="row-actions">
               <Button size="sm" variant="ghost" onClick={() => handleView(s)}>查看</Button>
-              <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+              <Button size="sm" variant="ghost" onClick={() => handleView(s)}>编辑</Button>
             </div>,
           ])}
         />

@@ -148,7 +148,7 @@ export default function InventorySalesOutbound() {
               <StatusTag variant={outboundStatusToVariant(o.status)} label={outboundStatusLabel(o.status)} />,
               <div className="row-actions">
                 <Button size="sm" variant="ghost" onClick={() => handleView(o)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                <Button size="sm" variant="ghost" onClick={() => handleView(o)}>编辑</Button>
               </div>,
             ])}
           />
@@ -164,7 +164,6 @@ export default function InventorySalesOutbound() {
         statusTag={selectedOrder && <StatusTag variant={outboundStatusToVariant(selectedOrder.status)} label={outboundStatusLabel(selectedOrder.status)} />}
         subtitle={selectedOrder && `${selectedOrder.customer} · ${selectedOrder.product}`}
         mode="view"
-        onEdit={() => window.alert('编辑功能（演示）')}
       >
         {selectedOrder && (
           <>

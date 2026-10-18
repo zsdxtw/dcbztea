@@ -96,7 +96,7 @@ export default function FinancePurchasePayment() {
               <StatusTag variant={paymentStatusToVariant(p.status)} label={paymentStatusLabel(p.status)} />,
               <div className="row-actions">
                 <Button size="sm" variant="ghost" onClick={() => handleView(p)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                <Button size="sm" variant="ghost" onClick={() => handleView(p)}>编辑</Button>
               </div>,
             ])}
           />
@@ -111,7 +111,6 @@ export default function FinancePurchasePayment() {
         statusTag={selectedPayment && <StatusTag variant={paymentStatusToVariant(selectedPayment.status)} label={paymentStatusLabel(selectedPayment.status)} />}
         subtitle={selectedPayment && `${selectedPayment.supplier} · ${selectedPayment.amount}`}
         mode="view"
-        onEdit={() => window.alert('编辑功能（演示）')}
       >
         {selectedPayment && (
           <>

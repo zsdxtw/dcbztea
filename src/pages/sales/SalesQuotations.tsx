@@ -343,7 +343,7 @@ export default function SalesQuotations() {
                 <StatusTag variant={quotationStatusToVariant(q.status)} label={quotationStatusLabel(q.status)} />,
                 <div className="row-actions">
                   <Button size="sm" variant="ghost" onClick={() => handleView(q)}>查看</Button>
-                  <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                  <Button size="sm" variant="ghost" onClick={() => handleView(q)}>编辑</Button>
                 </div>,
               ];
             })}
@@ -360,7 +360,6 @@ export default function SalesQuotations() {
         statusTag={selectedQuotation && <StatusTag variant={quotationStatusToVariant(selectedQuotation.status)} label={quotationStatusLabel(selectedQuotation.status)} />}
         subtitle={selectedQuotation && `${selectedQuotation.customer} · ${selectedQuotation.validFrom} ~ ${selectedQuotation.validUntil}`}
         mode="view"
-        onEdit={() => window.alert('编辑功能（演示）')}
       >
         {selectedQuotation && (
           <>

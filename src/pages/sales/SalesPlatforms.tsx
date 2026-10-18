@@ -100,7 +100,7 @@ export default function SalesPlatforms() {
             <span key="st">{statusTag(p.status)}</span>,
             <div key="act" className="row-actions">
               <Button size="sm" variant="ghost" onClick={() => handleView(p)}>查看</Button>
-              <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+              <Button size="sm" variant="ghost" onClick={() => handleView(p)}>编辑</Button>
             </div>,
           ])}
         />

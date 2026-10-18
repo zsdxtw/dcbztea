@@ -393,7 +393,7 @@ export default function PurchasePricing() {
                 <StatusTag variant={pricingStatusToVariant(r.status)} label={pricingStatusLabel(r.status)} />,
                 <div className="row-actions">
                   <Button size="sm" variant="ghost" onClick={() => handleView(r)}>查看</Button>
-                  <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                  <Button size="sm" variant="ghost" onClick={() => handleView(r)}>编辑</Button>
                 </div>,
               ];
             })}
@@ -410,7 +410,6 @@ export default function PurchasePricing() {
         statusTag={selectedRecord && <StatusTag variant={pricingStatusToVariant(selectedRecord.status)} label={pricingStatusLabel(selectedRecord.status)} />}
         subtitle={selectedRecord && `${selectedRecord.supplier} · ${selectedRecord.product}`}
         mode="view"
-        onEdit={() => window.alert('编辑功能（演示）')}
         footer={
           <>
             <Button variant="ghost" onClick={handleCloseDrawer}>关闭</Button>

@@ -376,7 +376,7 @@ export default function SalesCustomers() {
                   <span key="st">{statusTag(p.status, 'platform')}</span>,
                   <div className="row-actions" key="act">
                     <Button size="sm" variant="ghost" onClick={() => handleViewPlatform(p)}>查看</Button>
-                    <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                    <Button size="sm" variant="ghost" onClick={() => handleViewPlatform(p)}>编辑</Button>
                   </div>,
                 ])}
               />
@@ -447,7 +447,7 @@ export default function SalesCustomers() {
                       {activeTab === 'personal' && (
                         <Button size="sm" variant="ghost" onClick={() => handleConvertPersonal(c)}>转直营</Button>
                       )}
-                      <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                      <Button size="sm" variant="ghost" onClick={() => handleViewCustomer(c)}>编辑</Button>
                     </div>,
                   );
                   return cells;
@@ -498,7 +498,6 @@ export default function SalesCustomers() {
           statusTag={detailCustomer && <>{levelTag(detailCustomer.level)}{statusTag(detailCustomer.status)}</>}
           subtitle={detailCustomer && `${CUSTOMER_TYPE_LABELS[detailCustomer.type]}${detailCustomer.viaPlatform ? ' · 经平台' : ''} · ${detailCustomer.region} · ${detailCustomer.contactPerson} ${detailCustomer.contactPhone}`}
           mode="view"
-          onEdit={() => window.alert('编辑功能（演示）')}
         >
           {detailCustomer && (
             <>

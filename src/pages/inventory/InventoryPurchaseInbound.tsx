@@ -176,7 +176,7 @@ export default function InventoryPurchaseInbound() {
               <StatusTag variant={inboundStatusToVariant(o.status)} label={inboundStatusLabel(o.status)} />,
               <div className="row-actions">
                 <Button size="sm" variant="ghost" onClick={() => handleView(o)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                <Button size="sm" variant="ghost" onClick={() => handleView(o)}>编辑</Button>
               </div>,
             ])}
           />
@@ -192,7 +192,6 @@ export default function InventoryPurchaseInbound() {
         statusTag={selectedOrder && <StatusTag variant={inboundStatusToVariant(selectedOrder.status)} label={inboundStatusLabel(selectedOrder.status)} />}
         subtitle={selectedOrder && `${selectedOrder.supplier} · ${selectedOrder.product}`}
         mode="view"
-        onEdit={() => window.alert('编辑功能（演示）')}
       >
         {selectedOrder && (
           <>

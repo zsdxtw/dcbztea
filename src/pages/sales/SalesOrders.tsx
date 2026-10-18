@@ -375,7 +375,7 @@ export default function SalesOrders() {
               <StatusTag variant={orderStatusToVariant(o.status)} label={orderStatusLabel(o.status)} />,
               <div className="row-actions">
                 <Button size="sm" variant="ghost" onClick={() => handleView(o)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                <Button size="sm" variant="ghost" onClick={() => handleView(o)}>编辑</Button>
               </div>,
             ];})}
           />
@@ -400,7 +400,6 @@ export default function SalesOrders() {
         statusTag={selectedOrder && <StatusTag variant={orderStatusToVariant(selectedOrder.status)} label={orderStatusLabel(selectedOrder.status)} />}
         subtitle={selectedOrder && `${selectedOrder.customer} · ${selectedOrder.date}`}
         mode="view"
-        onEdit={() => window.alert('编辑功能（演示）')}
       >
         {selectedOrder && (
           <>

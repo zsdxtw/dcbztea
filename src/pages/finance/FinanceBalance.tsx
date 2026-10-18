@@ -139,7 +139,7 @@ export default function FinanceBalance() {
               <StatusTag variant={a.status === 'active' ? 'success' : 'error'} label={a.status === 'active' ? '正常' : '冻结'} />,
               <div className="row-actions">
                 <Button size="sm" variant="ghost" onClick={() => handleView(a)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                <Button size="sm" variant="ghost" onClick={() => handleView(a)}>编辑</Button>
               </div>,
             ])}
           />
@@ -154,7 +154,6 @@ export default function FinanceBalance() {
         statusTag={selectedAccount && <StatusTag variant={selectedAccount.status === 'active' ? 'success' : 'error'} label={selectedAccount.status === 'active' ? '正常' : '冻结'} />}
         subtitle={selectedAccount && `${selectedAccount.type} · ${selectedAccount.bank}`}
         mode="view"
-        onEdit={() => window.alert('编辑功能（演示）')}
       >
         {selectedAccount && (
           <>

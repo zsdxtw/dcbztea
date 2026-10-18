@@ -188,7 +188,7 @@ export default function SalesReturn() {
               <StatusTag variant={returnStatusToVariant(r.status)} label={returnStatusLabel(r.status)} />,
               <div className="row-actions">
                 <Button size="sm" variant="ghost" onClick={() => handleView(r)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                <Button size="sm" variant="ghost" onClick={() => handleView(r)}>编辑</Button>
               </div>,
             ])}
           />
@@ -204,7 +204,6 @@ export default function SalesReturn() {
         statusTag={selectedRecord && <StatusTag variant={returnStatusToVariant(selectedRecord.status)} label={returnStatusLabel(selectedRecord.status)} />}
         subtitle={selectedRecord && `${selectedRecord.customer} · ${selectedRecord.returnDate}`}
         mode="view"
-        onEdit={() => window.alert('编辑功能（演示）')}
       >
         {selectedRecord && (
           <>

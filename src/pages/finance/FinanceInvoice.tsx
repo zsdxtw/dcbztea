@@ -94,7 +94,7 @@ export default function FinanceInvoice() {
               <StatusTag variant={invoiceStatusToVariant(inv.status)} label={invoiceStatusLabel(inv.status)} />,
               <div className="row-actions">
                 <Button size="sm" variant="ghost" onClick={() => handleView(inv)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                <Button size="sm" variant="ghost" onClick={() => handleView(inv)}>编辑</Button>
               </div>,
             ])}
           />
@@ -109,7 +109,6 @@ export default function FinanceInvoice() {
         statusTag={selectedInvoice && <StatusTag variant={invoiceStatusToVariant(selectedInvoice.status)} label={invoiceStatusLabel(selectedInvoice.status)} />}
         subtitle={selectedInvoice && `${selectedInvoice.type} · ${selectedInvoice.party}`}
         mode="view"
-        onEdit={() => window.alert('编辑功能（演示）')}
       >
         {selectedInvoice && (
           <>

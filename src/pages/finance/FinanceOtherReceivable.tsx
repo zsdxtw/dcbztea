@@ -139,7 +139,7 @@ export default function FinanceOtherReceivable() {
               <StatusTag variant={receivableStatusToVariant(r.status)} label={receivableStatusLabel(r.status)} />,
               <div className="row-actions">
                 <Button size="sm" variant="ghost" onClick={() => handleView(r)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => window.alert('编辑功能（演示）')}>编辑</Button>
+                <Button size="sm" variant="ghost" onClick={() => handleView(r)}>编辑</Button>
               </div>,
             ])}
           />
@@ -154,7 +154,6 @@ export default function FinanceOtherReceivable() {
         statusTag={selectedItem && <StatusTag variant={receivableStatusToVariant(selectedItem.status)} label={receivableStatusLabel(selectedItem.status)} />}
         subtitle={selectedItem && `${selectedItem.partner} · ${selectedItem.amount}`}
         mode="view"
-        onEdit={() => window.alert('编辑功能（演示）')}
       >
         {selectedItem && (
           <DrawerSection title="基本信息">
