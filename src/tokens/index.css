@@ -735,6 +735,15 @@ tbody tr:last-child td { border-bottom: none; }
 .drawer-section-title { font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--color-neutral-700); margin: var(--space-5) 0 var(--space-3); padding: 0 0 var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-neutral-100); position: relative; }
 .drawer-section-title::before { content: ''; position: absolute; left: 0; top: 1px; bottom: calc(var(--space-2) + 1px); width: 3px; border-radius: var(--radius-xs); background: var(--color-module-current-base); transition: background var(--duration-module) var(--ease-default); }
 .drawer-section-title:first-child { margin-top: 0; }
+
+/* ── 详情抽屉内 Tab 栏（分区标题标签化） ── */
+.drawer-tab-bar { display: flex; align-items: stretch; gap: var(--space-1); border-bottom: 1px solid var(--color-neutral-200); margin: calc(-1 * var(--space-2)) 0 var(--space-5); flex-wrap: wrap; }
+.drawer-tab { padding: var(--space-2) var(--space-4) calc(var(--space-2) + 1px); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--color-neutral-500); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border-radius: var(--radius-sm) var(--radius-sm) 0 0; transition: color var(--transition-fast), background var(--transition-fast); margin-bottom: -1px; }
+.drawer-tab:hover { color: var(--color-neutral-800); background: var(--color-neutral-50); }
+.drawer-tab.active { color: var(--color-module-current-base); border-bottom-color: var(--color-module-current-base); font-weight: var(--font-semibold); }
+.drawer-tab-count { font-size: var(--text-xs); font-weight: var(--font-medium); padding: 0 6px; border-radius: var(--radius-full); background: var(--color-neutral-100); color: var(--color-neutral-500); }
+.drawer-tab.active .drawer-tab-count { background: var(--color-module-current-lightest); color: var(--color-module-current-base); }
+.drawer-tab-contents > .drawer-section-title:first-child { margin-top: 0; }
 .drawer-label { display: block; font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--color-neutral-600); margin-bottom: var(--space-1); }
 .drawer-form-row { display: flex; gap: var(--space-4); margin-bottom: var(--space-4); }
 .drawer-form-field { flex: 1; min-width: 0; }

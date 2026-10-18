@@ -510,6 +510,49 @@ export interface SupplierWarehouse {
   isDefault: boolean;
 }
 
+/** 供应商门店 */
+export interface SupplierStore {
+  id: string;
+  /** 门店名称 */
+  name: string;
+  /** 省份 */
+  province?: string;
+  /** 城市 */
+  city?: string;
+  /** 区县 */
+  district?: string;
+  /** 详细地址 */
+  address: string;
+  /** 门店面积（㎡） */
+  area: number;
+  /** 负责人 */
+  manager?: string;
+  /** 联系电话 */
+  phone?: string;
+  /** 主营品牌 */
+  mainBrands: string[];
+  /** 营业状态 */
+  status: 'active' | 'inactive';
+}
+
+/** 供应商终端账号 */
+export interface SupplierTerminal {
+  /** 是否开通终端 */
+  enabled: boolean;
+  /** 终端登录账号 */
+  username: string;
+  /** 初始密码 */
+  password?: string;
+  /** 账号状态 */
+  status: 'active' | 'inactive';
+  /** 开通时间 */
+  openTime?: string;
+  /** 最近登录 */
+  lastLogin?: string;
+  /** 备注 */
+  remark?: string;
+}
+
 /** 仓库归属类型：独立仓库（自有的纯仓库）/ 门店仓库（自有的在茶叶门店的仓库）/ 合作仓库（供应商的合作仓库） */
 export type WarehouseCategory = 'independent' | 'store' | 'partner';
 
@@ -818,6 +861,10 @@ export interface SupplierItem {
   contactPhone: string;
   contactEmail: string;
   warehouses: SupplierWarehouse[];
+  /** 供应商门店 */
+  stores: SupplierStore[];
+  /** 供应商终端账号 */
+  terminal: SupplierTerminal;
   taxType: TaxType;
   invoiceInfo: InvoiceInfo;
   cooperationDate: string;

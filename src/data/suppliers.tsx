@@ -1,8 +1,8 @@
 /** 供应商管理共享数据源 */
-import type { SupplierItem } from '../types';
+import type { SupplierItem, SupplierStore, SupplierTerminal } from '../types';
 
-/** 原始数据（资质文件与渠道来源由导出层统一注入） */
-type RawSupplierItem = Omit<SupplierItem, 'qualificationFiles' | 'channelSource'>;
+/** 原始数据（资质文件、渠道来源、门店与终端由导出层统一注入） */
+type RawSupplierItem = Omit<SupplierItem, 'qualificationFiles' | 'channelSource' | 'stores' | 'terminal'>;
 
 const rawSupplierItems: RawSupplierItem[] = [
   {
@@ -507,10 +507,57 @@ const CHANNEL_SOURCE_MAP: Record<string, 'manual' | 'terminal'> = {
   '8': 'terminal',
 };
 
+/** 供应商门店补录 */
+const STORES_MAP: Record<string, SupplierStore[]> = {
+  '1': [
+    { id: 'st1-1', name: '西湖品牌馆', province: '浙江', city: '杭州市', district: '西湖区', address: '龙井路88号', area: 320, manager: '陈店长', phone: '0571-8766***1', mainBrands: ['西湖牌'], status: 'active' },
+    { id: 'st1-2', name: '龙井茶体验店', province: '浙江', city: '杭州市', district: '上城区', address: '南山路101号', area: 180, manager: '周店长', phone: '0571-8766***2', mainBrands: ['西湖牌'], status: 'active' },
+  ],
+  '2': [
+    { id: 'st2-1', name: '正山堂武夷山旗舰店', province: '福建', city: '南平市', district: '武夷山市', address: '大王峰北路12号', area: 260, manager: '吴店长', phone: '0599-510***1', mainBrands: ['正山堂'], status: 'active' },
+  ],
+  '3': [
+    { id: 'st3-1', name: '八马茶业杭州大厦店', province: '浙江', city: '杭州市', district: '下城区', address: '武林广场1号', area: 150, manager: '林店长', phone: '0571-8888***1', mainBrands: ['八马'], status: 'active' },
+    { id: 'st3-2', name: '八马茶业西湖店', province: '浙江', city: '杭州市', district: '西湖区', address: '杨公堤23号', area: 210, manager: '郑店长', phone: '0571-8888***2', mainBrands: ['八马'], status: 'active' },
+    { id: 'st3-3', name: '八马茶业滨江店', province: '浙江', city: '杭州市', district: '滨江区', address: '江南大道588号', area: 130, manager: '冯店长', phone: '0571-8888***3', mainBrands: ['八马'], status: 'inactive' },
+  ],
+  '4': [
+    { id: 'st4-1', name: '大益茶体验馆', province: '云南', city: '昆明市', district: '盘龙区', address: '白龙路288号', area: 400, manager: '杨店长', phone: '0871-6565***1', mainBrands: ['大益'], status: 'active' },
+    { id: 'st4-2', name: '大益茶专营店（勐海）', province: '云南', city: '西双版纳傣族自治州', district: '勐海县', address: '勐海镇茶厂路1号', area: 220, manager: '李店长', phone: '0691-512***2', mainBrands: ['大益'], status: 'active' },
+  ],
+  '5': [
+    { id: 'st5-1', name: '品品香白茶专营店', province: '福建', city: '宁德市', district: '福鼎市', address: '桐山街道太姥大道66号', area: 170, manager: '王店长', phone: '0593-787***1', mainBrands: ['品品香'], status: 'active' },
+  ],
+  '7': [
+    { id: 'st7-1', name: '祁红品牌体验店', province: '安徽', city: '黄山市', district: '祁门县', address: '祁山镇中心路18号', area: 140, manager: '许店长', phone: '0559-451***1', mainBrands: ['祁门红茶'], status: 'active' },
+  ],
+  '8': [
+    { id: 'st8-1', name: '竹叶青成都春熙店', province: '四川', city: '成都市', district: '锦江区', address: '春熙路步行街88号', area: 190, manager: '何店长', phone: '028-8666***1', mainBrands: ['竹叶青'], status: 'active' },
+    { id: 'st8-2', name: '竹叶青峨眉形象店', province: '四川', city: '乐山市', district: '峨眉山市', address: '绥山镇名山路99号', area: 240, manager: '罗店长', phone: '0833-552***2', mainBrands: ['竹叶青'], status: 'active' },
+  ],
+  '9': [
+    { id: 'st9-1', name: '白沙溪黑茶体验馆', province: '湖南', city: '益阳市', district: '安化县', address: '东坪镇沿江路36号', area: 200, manager: '谌店长', phone: '0737-722***1', mainBrands: ['白沙溪'], status: 'active' },
+  ],
+  '10': [
+    { id: 'st10-1', name: '张一元大栅栏总店', province: '北京', city: '北京市', district: '西城区', address: '大栅栏街22号', area: 300, manager: '赵店长', phone: '010-6301***1', mainBrands: ['张一元'], status: 'active' },
+  ],
+};
+
+/** 供应商终端账号补录：3、8 号供应商已开通终端 */
+const TERMINAL_MAP: Record<string, SupplierTerminal> = {
+  '3': { enabled: true, username: 'bama01', password: '123456', status: 'active', openTime: '2025-06-12', lastLogin: '2026-10-15', remark: '合作商终端注册供应商' },
+  '8': { enabled: true, username: 'zyq001', password: '123456', status: 'active', openTime: '2025-09-01', lastLogin: '2026-10-16', remark: '合作商终端注册供应商' },
+};
+
+/** 未开通终端的默认结构 */
+const EMPTY_TERMINAL: SupplierTerminal = { enabled: false, username: '', status: 'active' };
+
 export const supplierItems: SupplierItem[] = rawSupplierItems.map((s) => ({
   ...s,
   qualificationFiles: QUALIFICATION_FILES_MAP[s.id] ?? ['营业执照.pdf'],
   channelSource: CHANNEL_SOURCE_MAP[s.id] ?? 'manual',
+  stores: STORES_MAP[s.id] ?? [],
+  terminal: TERMINAL_MAP[s.id] ?? EMPTY_TERMINAL,
 }));
 
 /** 供应商类型标签 */

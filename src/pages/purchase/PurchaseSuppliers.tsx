@@ -4,7 +4,7 @@ import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
-import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
+import DetailDrawer, { InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import {
   supplierItems,
   SUPPLIER_TYPE_LABELS,
@@ -15,7 +15,7 @@ import {
   SHIPPING_SETTLEMENT_LABELS,
   QUALIFICATION_STATUS_LABELS,
 } from '../../data/suppliers';
-import type { SupplierItem, SupplierType, SupplierGrade, SupplierWarehouse } from '../../types';
+import type { SupplierItem, SupplierType, SupplierGrade, SupplierWarehouse, SupplierStore, SupplierTerminal } from '../../types';
 import type { StatCardData } from '../../types';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
 
@@ -25,6 +25,9 @@ const TYPE_FILTER: { key: SupplierType | 'all'; label: string; color: string; de
   { key: 'brand', label: '品牌方', color: 'var(--color-module-current-base)', desc: '品牌方直接合作，拥有品牌授权' },
   { key: 'partner', label: '合作方', color: '#0DAFC6', desc: '合作方间接合作，非品牌持有方' },
 ];
+
+/** 详情抽屉 Tab 键 */
+type DrawerTabKey = 'basic' | 'qualification' | 'operation' | 'warehouse' | 'store' | 'finance' | 'terminal';
 
 export default function PurchaseSuppliers() {
   const [activeType, setActiveType] = useState<SupplierType | 'all'>('all');
@@ -39,46 +42,50 @@ export default function PurchaseSuppliers() {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<SupplierItem | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
+  /** 抽屉当前激活 Tab */
+  const [activeTab, setActiveTab] = useState<DrawerTabKey>('basic');
+  /** 列表数据（编辑保存后同步门店数量等变化） */
+  const [list, setList] = useState<SupplierItem[]>(supplierItems);
 
   // 筛选
   const filtered = useMemo(() => {
-    return supplierItems.filter(s => {
+    return list.filter(s => {
       if (activeType !== 'all' && s.type !== activeType) return false;
       if (filterGrade && s.grade !== filterGrade) return false;
       if (keyword && !s.name.includes(keyword) && !s.unifiedCreditCode.includes(keyword) && !s.contactPerson.includes(keyword)) return false;
       return true;
     });
-  }, [activeType, keyword, filterGrade]);
+  }, [list, activeType, keyword, filterGrade]);
 
   // 统计
   const stats: StatCardData[] = useMemo(() => {
-    const brandCount = supplierItems.filter(s => s.type === 'brand').length;
-    const partnerCount = supplierItems.filter(s => s.type === 'partner').length;
-    const activeCount = supplierItems.filter(s => s.status === 'active').length;
-    const gradeA = supplierItems.filter(s => s.grade === 'A' || s.grade === 'S').length;
+    const brandCount = list.filter(s => s.type === 'brand').length;
+    const partnerCount = list.filter(s => s.type === 'partner').length;
+    const activeCount = list.filter(s => s.status === 'active').length;
+    const gradeA = list.filter(s => s.grade === 'A' || s.grade === 'S').length;
     return [
       {
         label: '品牌方', value: String(brandCount), unit: '家',
-        trend: { direction: 'up', value: `在册 ${supplierItems.filter(s => s.type === 'brand' && s.status === 'active').length} 家` },
+        trend: { direction: 'up', value: `在册 ${list.filter(s => s.type === 'brand' && s.status === 'active').length} 家` },
         icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2L3 5v5c0 5 3.5 7.5 7 9 3.5-1.5 7-4 7-9V5L9 2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
       },
       {
         label: '合作方', value: String(partnerCount), unit: '家',
-        trend: { direction: 'up', value: `在册 ${supplierItems.filter(s => s.type === 'partner' && s.status === 'active').length} 家` },
+        trend: { direction: 'up', value: `在册 ${list.filter(s => s.type === 'partner' && s.status === 'active').length} 家` },
         icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="14" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.2"/></svg>,
       },
       {
         label: '在册供应商', value: String(activeCount), unit: '家',
-        trend: { direction: 'up', value: `总计 ${supplierItems.length} 家` },
+        trend: { direction: 'up', value: `总计 ${list.length} 家` },
         icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M3 9h12M7 5V3h4v2" stroke="currentColor" strokeWidth="1.3"/></svg>,
       },
       {
         label: 'A级以上', value: String(gradeA), unit: '家',
-        trend: { direction: 'up', value: `占比 ${(gradeA / supplierItems.length * 100).toFixed(0)}%` },
+        trend: { direction: 'up', value: `占比 ${(gradeA / list.length * 100).toFixed(0)}%` },
         icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2l2.5 5 5.5.8-4 3.9.9 5.5L9 14.7 5.1 17.2l.9-5.5-4-3.9L7.5 7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
       },
     ];
-  }, []);
+  }, [list]);
 
   // 删除
   const handleEnterDeleteMode = () => { setDeleteMode(true); setSelectedForDelete(new Set()); };
@@ -88,13 +95,13 @@ export default function PurchaseSuppliers() {
   };
 
   // 查看详情
-  const handleView = (s: SupplierItem) => { setSelectedSupplier(s); setEditing(false); setEditForm(null); setShowDetail(true); };
+  const handleView = (s: SupplierItem) => { setSelectedSupplier(s); setEditing(false); setEditForm(null); setActiveTab('basic'); setShowDetail(true); };
   // 进入编辑
-  const handleStartEdit = () => { if (selectedSupplier) { setEditForm({ ...selectedSupplier }); setEditing(true); } };
+  const handleStartEdit = () => { if (selectedSupplier) { setEditForm({ ...selectedSupplier, stores: selectedSupplier.stores.map(st => ({ ...st })), terminal: { ...selectedSupplier.terminal } }); setEditing(true); } };
   // 取消编辑
   const handleCancelEdit = () => { setEditing(false); setEditForm(null); };
-  // 保存编辑
-  const handleSaveEdit = () => { if (editForm) { setSelectedSupplier(editForm); setEditing(false); setEditForm(null); } };
+  // 保存编辑（同步列表，门店数量等随之更新）
+  const handleSaveEdit = () => { if (editForm) { setSelectedSupplier(editForm); setList(prev => prev.map(s => s.id === editForm.id ? editForm : s)); setEditing(false); setEditForm(null); } };
 
   // 仓库编辑（合作仓库联动仓储 > 仓库设置）
   const updateWarehouse = (idx: number, patch: Partial<SupplierWarehouse>) => {
@@ -108,6 +115,46 @@ export default function PurchaseSuppliers() {
   };
   const setDefaultWarehouse = (idx: number) => {
     setEditForm(prev => prev ? { ...prev, warehouses: prev.warehouses.map((w, i) => ({ ...w, isDefault: i === idx })) } : prev);
+  };
+
+  // 门店编辑（增删改）
+  /** 门店主营品牌输入草稿（解决「、」分隔符输入被吞问题） */
+  const [brandDrafts, setBrandDrafts] = useState<Record<number, string>>({});
+  const updateStore = (idx: number, patch: Partial<SupplierStore>) => {
+    setEditForm(prev => prev ? { ...prev, stores: prev.stores.map((st, i) => i === idx ? { ...st, ...patch } : st) } : prev);
+  };
+  const addStore = () => {
+    setEditForm(prev => prev ? { ...prev, stores: [...prev.stores, { id: `st${Date.now()}`, name: '', address: '', area: 0, mainBrands: [], status: 'active' }] } : prev);
+  };
+  const removeStore = (idx: number) => {
+    setEditForm(prev => prev ? { ...prev, stores: prev.stores.filter((_, i) => i !== idx) } : prev);
+    setBrandDrafts({});
+  };
+
+  // 终端编辑
+  const suggestTerminalUsername = (s: SupplierItem) => `gys${s.id.padStart(3, '0')}`;
+  const updateTerminal = (patch: Partial<SupplierTerminal>) => {
+    setEditForm(prev => prev ? { ...prev, terminal: { ...prev.terminal, ...patch } } : prev);
+  };
+  /** 编辑态切换终端开通状态 */
+  const handleTerminalEnable = (enable: boolean) => {
+    setEditForm(prev => {
+      if (!prev) return prev;
+      if (enable) {
+        return { ...prev, terminal: { ...prev.terminal, enabled: true, username: prev.terminal.username || suggestTerminalUsername(prev), password: prev.terminal.password || '123456', openTime: prev.terminal.openTime || new Date().toISOString().slice(0, 10) } };
+      }
+      return { ...prev, terminal: { ...prev.terminal, enabled: false } };
+    });
+  };
+  /** 查看态一键开通终端（进入编辑态预填默认账号） */
+  const handleEnableTerminal = () => {
+    if (!selectedSupplier) return;
+    setEditForm({
+      ...selectedSupplier,
+      stores: selectedSupplier.stores.map(st => ({ ...st })),
+      terminal: { enabled: true, username: suggestTerminalUsername(selectedSupplier), password: '123456', status: 'active', openTime: new Date().toISOString().slice(0, 10) },
+    });
+    setEditing(true);
   };
 
   // OCR 模拟
@@ -142,7 +189,7 @@ export default function PurchaseSuppliers() {
       {/* 类型筛选卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
         {TYPE_FILTER.map(tf => {
-          const count = tf.key === 'all' ? supplierItems.length : supplierItems.filter(s => s.type === tf.key).length;
+          const count = tf.key === 'all' ? list.length : list.filter(s => s.type === tf.key).length;
           const isActive = activeType === tf.key;
           return (
             <div key={tf.key} style={{ cursor: 'pointer', border: isActive ? `2px solid ${tf.color}` : '1px solid var(--color-border-primary)', background: isActive ? `${tf.color}08` : 'var(--color-bg-primary)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)', boxShadow: 'var(--shadow-sm)' }} onClick={() => setActiveType(isActive ? 'all' : tf.key)}>
@@ -189,7 +236,7 @@ export default function PurchaseSuppliers() {
         <Table
           headers={[
             ...(deleteMode ? [<input key="chk" type="checkbox" checked={selectedForDelete.size === filtered.length && filtered.length > 0} onChange={e => { if (e.target.checked) setSelectedForDelete(new Set(filtered.map(s => s.id))); else setSelectedForDelete(new Set()); }} />] : []),
-            '供应商名称', '类型', '渠道来源', '评价等级', '主营品类', '联系人', '联系电话', '仓库', '一件代发', '状态', '操作',
+            '供应商名称', '类型', '渠道来源', '评价等级', '主营品类', '联系人', '联系电话', '仓库', '门店', '一件代发', '状态', '操作',
           ]}
           rows={filtered.map(s => [
             ...(deleteMode ? [<input key="chk" type="checkbox" checked={selectedForDelete.has(s.id)} onChange={() => handleToggleSelect(s.id)} />] : []),
@@ -201,6 +248,7 @@ export default function PurchaseSuppliers() {
             <span key="cp" style={{ fontSize: 'var(--text-sm)' }}>{s.contactPerson}</span>,
             <span key="cph" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{s.contactPhone}</span>,
             <span key="wh" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{s.warehouses.length}个</span>,
+            <span key="store" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{s.stores.length}个</span>,
             <span key="drop" style={{ fontSize: 'var(--text-sm)', color: s.supportDropship ? '#01795D' : 'var(--color-text-tertiary)' }}>{s.supportDropship ? '是' : '否'}</span>,
             <span key="st" style={{ padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: s.status === 'active' ? '#E8F5E9' : '#FFF3E0', color: s.status === 'active' ? '#2E7D32' : '#E65100' }}>{s.status === 'active' ? '在册' : '停用'}</span>,
             <div key="view" className="row-actions">
@@ -244,10 +292,33 @@ export default function PurchaseSuppliers() {
         onCancelEdit={handleCancelEdit}
         onSave={handleSaveEdit}
       >
-        {selectedSupplier && (editing && editForm ? (
+        {selectedSupplier && (
           <>
-            {/* 基本信息（编辑） */}
-            <DrawerSection title="基本信息">
+            {/* Tab 栏：分区标题标签化展示于抽屉顶部 */}
+            <div className="drawer-tab-bar">
+              {([
+                ['basic', '基本信息'],
+                ['qualification', '资质文件'],
+                ['operation', '经营信息'],
+                ['warehouse', '仓库信息'],
+                ['store', '门店信息'],
+                ['finance', '财务信息'],
+                ['terminal', '终端管理'],
+              ] as [DrawerTabKey, string][]).map(([key, label]) => (
+                <button key={key} type="button" className={`drawer-tab${activeTab === key ? ' active' : ''}`} onClick={() => setActiveTab(key)}>
+                  {label}
+                  {key === 'qualification' && <span className="drawer-tab-count">{selectedSupplier.qualificationFiles.length}</span>}
+                  {key === 'warehouse' && <span className="drawer-tab-count">{selectedSupplier.warehouses.length}</span>}
+                  {key === 'store' && <span className="drawer-tab-count">{selectedSupplier.stores.length}</span>}
+                  {key === 'terminal' && selectedSupplier.terminal.enabled && <span className="drawer-tab-count">已开通</span>}
+                </button>
+              ))}
+            </div>
+            <div className="drawer-tab-contents">
+            {editing && editForm ? (
+              <>
+            {activeTab === 'basic' && (
+              <div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
                 {([
                   ['统一社会信用代码', 'unifiedCreditCode', 'text'],
@@ -334,10 +405,11 @@ export default function PurchaseSuppliers() {
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>由创建方式决定，不可修改</span>
                 </div>
               </div>
-            </DrawerSection>
+              </div>
+            )}
 
-            {/* 资质文件（编辑，最多5个） */}
-            <DrawerSection title={`资质文件（${editForm?.qualificationFiles.length ?? 0}/5）`}>
+            {activeTab === 'qualification' && (
+              <div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
                 {(editForm?.qualificationFiles ?? []).map((f, i) => (
                   <div key={`${f}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
@@ -358,10 +430,11 @@ export default function PurchaseSuppliers() {
                   已达上限（5/5），如需更换请先删除已有文件
                 </div>
               )}
-            </DrawerSection>
+              </div>
+            )}
 
-            {/* 经营信息（编辑） */}
-            <DrawerSection title="经营信息">
+            {activeTab === 'operation' && (
+              <div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
                 {([
                   ['结算方式', 'settlementMethod', 'select', Object.entries(SETTLEMENT_METHOD_LABELS)],
@@ -401,10 +474,11 @@ export default function PurchaseSuppliers() {
                   );
                 })}
               </div>
-            </DrawerSection>
+              </div>
+            )}
 
-            {/* 仓库信息（编辑） */}
-            <DrawerSection title="仓库信息">
+            {activeTab === 'warehouse' && (
+              <div>
               <div>
                 {editing && editForm ? (
                   <>
@@ -448,10 +522,58 @@ export default function PurchaseSuppliers() {
                   <p style={{ color: 'var(--color-text-tertiary)' }}>—</p>
                 )}
               </div>
-            </DrawerSection>
+              </div>
+            )}
 
-            {/* 财务信息（编辑） */}
-            <DrawerSection title="财务信息">
+            {activeTab === 'store' && (
+              <div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  {editForm.stores.map((st, i) => (
+                    <div key={st.id} style={{ padding: 'var(--space-3)', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+                        <div style={{ width: 24, height: 24, borderRadius: 'var(--radius-sm)', background: 'var(--color-module-current-lightest)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)', flexShrink: 0 }}>{i + 1}</div>
+                        <input className="filter-input" placeholder="门店名称" style={{ flex: 2, height: 30, fontSize: 'var(--text-sm)' }} value={st.name} onChange={e => updateStore(i, { name: e.target.value })} />
+                        <select className="filter-select" style={{ width: 96, height: 30, fontSize: 'var(--text-sm)' }} value={st.status} onChange={e => updateStore(i, { status: e.target.value as SupplierStore['status'] })}>
+                          <option value="active">营业中</option>
+                          <option value="inactive">已停业</option>
+                        </select>
+                        <Button size="sm" variant="ghost" style={{ color: 'var(--color-semantic-error)', flexShrink: 0 }} onClick={() => removeStore(i)}>删除</Button>
+                      </div>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+                        <select className="filter-select" style={{ flex: 1, height: 30, fontSize: 'var(--text-sm)' }} value={st.province ?? ''} onChange={e => updateStore(i, { province: e.target.value, city: '', district: '' })}>
+                          <option value="">省份</option>
+                          {PROVINCE_NAMES.map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                        <select className="filter-select" style={{ flex: 1, height: 30, fontSize: 'var(--text-sm)' }} value={st.city ?? ''} disabled={!st.province} onChange={e => updateStore(i, { city: e.target.value, district: '' })}>
+                          <option value="">城市</option>
+                          {st.province && getCityNames(st.province).map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <select className="filter-select" style={{ flex: 1, height: 30, fontSize: 'var(--text-sm)' }} value={st.district ?? ''} disabled={!st.city} onChange={e => updateStore(i, { district: e.target.value })}>
+                          <option value="">区县</option>
+                          {st.province && st.city && getDistricts(st.province, st.city).map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+                        <input className="filter-input" placeholder="详细地址" style={{ flex: 2, height: 30, fontSize: 'var(--text-sm)' }} value={st.address} onChange={e => updateStore(i, { address: e.target.value })} />
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input className="filter-input" placeholder="面积" type="number" style={{ flex: 1, height: 30, fontSize: 'var(--text-sm)' }} value={st.area || ''} onChange={e => updateStore(i, { area: Number(e.target.value) || 0 })} />
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', flexShrink: 0 }}>㎡</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                        <input className="filter-input" placeholder="主营品牌（多个用「、」分隔）" style={{ flex: 2, height: 30, fontSize: 'var(--text-sm)' }} value={brandDrafts[i] ?? st.mainBrands.join('、')} onChange={e => { setBrandDrafts(prev => ({ ...prev, [i]: e.target.value })); updateStore(i, { mainBrands: e.target.value.split(/[，,、]/).map(v => v.trim()).filter(Boolean) }); }} onBlur={() => setBrandDrafts(prev => { const next = { ...prev }; delete next[i]; return next; })} />
+                        <input className="filter-input" placeholder="负责人" style={{ flex: 1, height: 30, fontSize: 'var(--text-sm)' }} value={st.manager ?? ''} onChange={e => updateStore(i, { manager: e.target.value })} />
+                        <input className="filter-input" placeholder="联系电话" style={{ flex: 1, height: 30, fontSize: 'var(--text-sm)' }} value={st.phone ?? ''} onChange={e => updateStore(i, { phone: e.target.value })} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button size="sm" variant="ghost" style={{ marginTop: 'var(--space-2)' }} onClick={addStore}>+ 新增门店</Button>
+              </div>
+            )}
+
+            {activeTab === 'finance' && (
+              <div>
               <div>
                 <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)', color: 'var(--color-text-secondary)' }}>开票信息</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
@@ -527,12 +649,66 @@ export default function PurchaseSuppliers() {
                   })}
                 </div>
               </div>
-            </DrawerSection>
-          </>
-        ) : (
-          <>
-            {/* 基本信息（查看） */}
-            <DrawerSection title="基本信息">
+              </div>
+            )}
+
+            {activeTab === 'terminal' && (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
+                  <div>
+                    <label className="drawer-label">终端开通状态</label>
+                    <div style={{ display: 'flex', gap: 'var(--space-4)', alignItems: 'center', height: 34 }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                        <input type="radio" checked={editForm.terminal.enabled} onChange={() => handleTerminalEnable(true)} /> 已开通
+                      </label>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                        <input type="radio" checked={!editForm.terminal.enabled} onChange={() => handleTerminalEnable(false)} /> 未开通
+                      </label>
+                    </div>
+                  </div>
+                  {editForm.terminal.enabled && (
+                    <>
+                      <div>
+                        <label className="drawer-label">账号状态</label>
+                        <select className="filter-select" style={{ width: '100%' }} value={editForm.terminal.status} onChange={e => updateTerminal({ status: e.target.value as SupplierTerminal['status'] })}>
+                          <option value="active">启用</option>
+                          <option value="inactive">停用</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="drawer-label">终端登录账号</label>
+                        <input className="filter-input" style={{ width: '100%' }} value={editForm.terminal.username} onChange={e => updateTerminal({ username: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className="drawer-label">初始密码</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', height: 34 }}>
+                          <span className="mono" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{editForm.terminal.password || '—'}</span>
+                          <Button size="sm" variant="ghost" onClick={() => updateTerminal({ password: '123456' })}>重置密码</Button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="drawer-label">开通时间</label>
+                        <input className="filter-input" style={{ width: '100%' }} value={editForm.terminal.openTime ?? ''} onChange={e => updateTerminal({ openTime: e.target.value })} />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label className="drawer-label">备注</label>
+                        <input className="filter-input" style={{ width: '100%' }} value={editForm.terminal.remark ?? ''} onChange={e => updateTerminal({ remark: e.target.value })} />
+                      </div>
+                    </>
+                  )}
+                </div>
+                {editForm.terminal.enabled ? (
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', lineHeight: 1.7 }}>供应商可凭该账号登录供应商终端，进行商品维护、订单接收等操作；密码遗忘可随时重置。</div>
+                ) : (
+                  <div style={{ fontSize: 'var(--text-xs)', color: '#E65100', background: '#FFF3E0', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)' }}>保存后该供应商的终端将被关闭，终端账号将无法登录</div>
+                )}
+              </div>
+            )}
+              </>
+            ) : (
+              <>
+            {activeTab === 'basic' && (
+              <div>
               <InfoGrid cols={3}>
                 <InfoItem label="统一社会信用代码" mono>{selectedSupplier.unifiedCreditCode || '—'}</InfoItem>
                 <InfoItem label="公司类型">{selectedSupplier.companyType || '—'}</InfoItem>
@@ -555,10 +731,11 @@ export default function PurchaseSuppliers() {
                 <InfoItem label="联系地址" span={3}>{[[selectedSupplier.contactProvince, selectedSupplier.contactCity, selectedSupplier.contactDistrict].filter(Boolean).join(' / '), selectedSupplier.contactAddress].filter(Boolean).join(' ') || '—'}</InfoItem>
                 <InfoItem label="经营范围" span={3}>{selectedSupplier.businessScope || '—'}</InfoItem>
               </InfoGrid>
-            </DrawerSection>
+              </div>
+            )}
 
-            {/* 资质文件（查看） */}
-            <DrawerSection title={`资质文件（${selectedSupplier.qualificationFiles.length}/5）`}>
+            {activeTab === 'qualification' && (
+              <div>
               {selectedSupplier.qualificationFiles.length === 0 ? (
                 <p style={{ color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-4)' }}>暂无资质文件</p>
               ) : (
@@ -571,10 +748,11 @@ export default function PurchaseSuppliers() {
                   ))}
                 </div>
               )}
-            </DrawerSection>
+              </div>
+            )}
 
-            {/* 经营信息（查看） */}
-            <DrawerSection title="经营信息">
+            {activeTab === 'operation' && (
+              <div>
               <InfoGrid cols={3}>
                 <InfoItem label="结算方式">{SETTLEMENT_METHOD_LABELS[selectedSupplier.settlementMethod] ?? '—'}</InfoItem>
                 <InfoItem label="付款条件">{selectedSupplier.paymentTerms || '—'}</InfoItem>
@@ -589,10 +767,11 @@ export default function PurchaseSuppliers() {
                 <InfoItem label="税务类型">{TAX_TYPE_LABELS[selectedSupplier.taxType] ?? '—'}</InfoItem>
                 <InfoItem label="备注" span={3}>{selectedSupplier.remark || '—'}</InfoItem>
               </InfoGrid>
-            </DrawerSection>
+              </div>
+            )}
 
-            {/* 仓库信息（查看） */}
-            <DrawerSection title="仓库信息">
+            {activeTab === 'warehouse' && (
+              <div>
               {selectedSupplier.warehouses.length === 0 ? (
                 <p style={{ color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-6)' }}>暂无仓库信息</p>
               ) : (
@@ -614,10 +793,43 @@ export default function PurchaseSuppliers() {
                   <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>供应商仓库已同步至「仓储 &gt; 仓库设置」，作为合作仓库管理</div>
                 </div>
               )}
-            </DrawerSection>
+              </div>
+            )}
 
-            {/* 财务信息（查看） */}
-            <DrawerSection title="财务信息">
+            {activeTab === 'store' && (
+              selectedSupplier.stores.length === 0 ? (
+                <p style={{ color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-6)' }}>暂无门店信息，点击「编辑」可新增门店</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  {selectedSupplier.stores.map((st, i) => (
+                    <div key={st.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', padding: 'var(--space-3)', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', background: 'var(--color-module-current-lightest)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)' }}>
+                        {i + 1}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 2, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 'var(--font-medium)', fontSize: 'var(--text-sm)' }}>{st.name || '（未命名门店）'}</span>
+                          <span style={{ padding: '0 6px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: st.status === 'active' ? '#E8F5E9' : '#FFF3E0', color: st.status === 'active' ? '#2E7D32' : '#E65100' }}>{st.status === 'active' ? '营业中' : '已停业'}</span>
+                          <span className="mono" style={{ padding: '0 6px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: 'var(--color-module-current-lightest)', color: 'var(--color-module-current-base)' }}>{st.area}㎡</span>
+                        </div>
+                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 2 }}>
+                          {[st.province, st.city, st.district].filter(Boolean).join(' / ')} {st.address}{(st.manager || st.phone) ? ` | ${st.manager ?? ''} ${st.phone ?? ''}` : ''}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>主营品牌</span>
+                          {(st.mainBrands.length ? st.mainBrands : ['—']).map(b => (
+                            <span key={b} style={{ padding: '0 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: 'var(--color-bg-primary)', border: '1px solid var(--color-border-primary)', color: 'var(--color-text-secondary)' }}>{b}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+
+            {activeTab === 'finance' && (
+              <div>
               <InfoGrid cols={3}>
                 <InfoItem label="开票抬头">{selectedSupplier.invoiceInfo.title || '—'}</InfoItem>
                 <InfoItem label="税号" mono>{selectedSupplier.invoiceInfo.taxNo || '—'}</InfoItem>
@@ -632,9 +844,38 @@ export default function PurchaseSuppliers() {
                 <InfoItem label="行号" mono>{selectedSupplier.bankAccount.bankNo || '—'}</InfoItem>
                 <InfoItem label="结算备注" span={3}>{selectedSupplier.bankAccount.remark || '—'}</InfoItem>
               </InfoGrid>
-            </DrawerSection>
+              </div>
+            )}
+
+            {activeTab === 'terminal' && (
+              selectedSupplier.terminal.enabled ? (
+                <div>
+                  <InfoGrid cols={3}>
+                    <InfoItem label="终端状态"><span style={{ padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E8F5E9', color: '#2E7D32' }}>已开通</span></InfoItem>
+                    <InfoItem label="登录账号" mono emph>{selectedSupplier.terminal.username || '—'}</InfoItem>
+                    <InfoItem label="账号状态"><span style={{ padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: selectedSupplier.terminal.status === 'active' ? '#E3F2FD' : '#FFF3E0', color: selectedSupplier.terminal.status === 'active' ? '#1565C0' : '#E65100' }}>{selectedSupplier.terminal.status === 'active' ? '启用' : '停用'}</span></InfoItem>
+                    <InfoItem label="开通时间">{selectedSupplier.terminal.openTime ?? '—'}</InfoItem>
+                    <InfoItem label="最近登录">{selectedSupplier.terminal.lastLogin ?? '—'}</InfoItem>
+                    <InfoItem label="备注">{selectedSupplier.terminal.remark || '—'}</InfoItem>
+                  </InfoGrid>
+                  <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', lineHeight: 1.7 }}>供应商可凭该账号登录供应商终端，进行商品维护、订单接收等操作。如需调整账号或停用终端，点击「编辑」。</div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-4)', border: '2px dashed var(--color-border-primary)', borderRadius: 'var(--radius-lg)' }}>
+                  <div style={{ width: 48, height: 48, margin: '0 auto var(--space-3)', borderRadius: 'var(--radius-lg)', background: 'var(--color-module-current-lightest)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-module-current-base)' }}>
+                    <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><rect x="3" y="4" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                  </div>
+                  <div style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)', marginBottom: 'var(--space-1)' }}>该供应商尚未开通终端</div>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>开通后供应商可凭账号登录供应商终端，<br />在线维护商品、接收订单、查看对账等</div>
+                  <Button onClick={handleEnableTerminal}>开通终端</Button>
+                </div>
+              )
+            )}
+              </>
+            )}
+            </div>
           </>
-        ))}
+        )}
       </DetailDrawer>
 
       {/* 新增供应商抽屉 */}
