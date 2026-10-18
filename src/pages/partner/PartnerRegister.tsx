@@ -65,17 +65,23 @@ export default function PartnerRegister() {
     setQualificationFiles(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
   };
 
+  /** 校验失败：显示顶部错误横幅并滚动到可视区 */
+  const showError = (msg: string) => {
+    setError(msg);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   /** 校验必填项并提交注册审批 */
   const handleSubmit = () => {
-    if (!name.trim()) return setError('请填写供应商名称');
-    if (!unifiedCreditCode.trim()) return setError('请填写统一社会信用代码');
-    if (!legalRepresentative.trim()) return setError('请填写法定代表人');
-    if (!contactPerson.trim()) return setError('请填写联系人');
-    if (!contactPhone.trim()) return setError('请填写联系电话');
-    if (!registeredAddress.trim()) return setError('请填写注册地址');
-    if (qualificationFiles.length === 0) return setError('请至少上传 1 份资质文件（如营业执照）');
-    if (!username.trim()) return setError('请设置终端登录账号');
-    if (!password.trim()) return setError('请设置登录密码');
+    if (!name.trim()) return showError('请填写供应商名称');
+    if (!unifiedCreditCode.trim()) return showError('请填写统一社会信用代码');
+    if (!legalRepresentative.trim()) return showError('请填写法定代表人');
+    if (!contactPerson.trim()) return showError('请填写联系人');
+    if (!contactPhone.trim()) return showError('请填写联系电话');
+    if (!registeredAddress.trim()) return showError('请填写注册地址');
+    if (qualificationFiles.length === 0) return showError('请至少上传 1 份资质文件（如营业执照）');
+    if (!username.trim()) return showError('请设置终端登录账号');
+    if (!password.trim()) return showError('请设置登录密码');
 
     const today = new Date().toISOString().slice(0, 10);
     const draft: SupplierItem = {

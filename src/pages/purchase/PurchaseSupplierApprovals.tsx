@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
-import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
+import DetailDrawer, { InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { useSupplierStore } from '../../stores/supplierStore';
 import type { SupplierApproval } from '../../types';
 import { SUPPLIER_TYPE_LABELS, TAX_TYPE_LABELS, SETTLEMENT_METHOD_LABELS } from '../../data/suppliers';
@@ -26,6 +26,9 @@ const FILTERS = [
   { key: 'rejected', label: '已驳回' },
 ] as const;
 
+/** 审批详情抽屉 Tab 键（与供应商详情抽屉 Tab 化保持一致） */
+type ApprovalTabKey = 'approval' | 'basic' | 'qualification' | 'warehouse' | 'store' | 'finance' | 'terminal';
+
 /** 管理台-采购-供应商管理-注册审批：审批合作商终端提交的注册与信息修改申请 */
 export default function PurchaseSupplierApprovals() {
   const approvals = useSupplierStore(s => s.approvals);
@@ -33,6 +36,7 @@ export default function PurchaseSupplierApprovals() {
   const [keyword, setKeyword] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [selected, setSelected] = useState<SupplierApproval | null>(null);
+  const [approvalTab, setApprovalTab] = useState<ApprovalTabKey>('approval');
   /** 审批弹窗：action + 意见 */
   const [reviewing, setReviewing] = useState<{ approval: SupplierApproval; action: 'approved' | 'rejected' } | null>(null);
   const [note, setNote] = useState('');
@@ -61,81 +65,16 @@ export default function PurchaseSupplierApprovals() {
     setNote('');
   };
 
-  /** 审批详情（只读展示申请档案） */
-  const renderPayload = (a: SupplierApproval) => {
-    const p = a.payload;
-    if (a.type === 'register' && !p.name) return null;
-    return (
-      <>
-        <DrawerSection title="基本信息">
-          <InfoGrid>
-            <InfoItem label="供应商名称" emph>{p.name}</InfoItem>
-            <InfoItem label="供应商类型">{SUPPLIER_TYPE_LABELS[p.type] ?? p.type}</InfoItem>
-            <InfoItem label="统一社会信用代码" mono>{p.unifiedCreditCode}</InfoItem>
-            <InfoItem label="法定代表人">{p.legalRepresentative}</InfoItem>
-            <InfoItem label="联系人">{p.contactPerson}</InfoItem>
-            <InfoItem label="联系电话" mono>{p.contactPhone}</InfoItem>
-            <InfoItem label="注册地址" span={3}>{[p.registeredProvince, p.registeredCity, p.registeredDistrict, p.registeredAddress].filter(Boolean).join(' ') || '—'}</InfoItem>
-            <InfoItem label="经营范围" span={3}>{p.businessScope || '—'}</InfoItem>
-          </InfoGrid>
-        </DrawerSection>
-        <DrawerSection title={`资质文件（${p.qualificationFiles?.length ?? 0}/5）`}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            {(p.qualificationFiles ?? []).map((f, i) => (
-              <div key={`${f}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)' }}>
-                <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14, color: 'var(--color-module-current-base)' }}><path d="M4 1.5h5.5L13 5v9.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-12a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
-                <span>{f}</span>
-              </div>
-            ))}
-          </div>
-        </DrawerSection>
-        {p.warehouses?.length > 0 && (
-          <DrawerSection title="仓库信息">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              {p.warehouses.map(w => (
-                <div key={w.id} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)' }}>
-                  <span style={{ fontWeight: 'var(--font-medium)' }}>{w.name}</span>
-                  <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 'var(--space-2)' }}>{[w.province, w.city, w.district].filter(Boolean).join(' ')} {w.address}</span>
-                </div>
-              ))}
-            </div>
-          </DrawerSection>
-        )}
-        {p.stores?.length > 0 && (
-          <DrawerSection title="门店信息">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              {p.stores.map(st => (
-                <div key={st.id} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)' }}>
-                  <span style={{ fontWeight: 'var(--font-medium)' }}>{st.name}</span>
-                  <span className="mono" style={{ marginLeft: 'var(--space-2)', color: 'var(--color-text-tertiary)' }}>{st.area}㎡</span>
-                  <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 'var(--space-2)' }}>{[st.province, st.city, st.district].filter(Boolean).join(' ')} {st.address}</span>
-                </div>
-              ))}
-            </div>
-          </DrawerSection>
-        )}
-        {p.bankAccount?.accountNo && (
-          <DrawerSection title="财务信息">
-            <InfoGrid>
-              <InfoItem label="开户银行">{p.bankAccount.bankName}</InfoItem>
-              <InfoItem label="银行账号" mono>{p.bankAccount.accountNo}</InfoItem>
-              <InfoItem label="户名">{p.bankAccount.accountName}</InfoItem>
-              <InfoItem label="结算方式">{SETTLEMENT_METHOD_LABELS[p.settlementMethod] ?? p.settlementMethod}</InfoItem>
-              <InfoItem label="税务类型">{TAX_TYPE_LABELS[p.taxType] ?? p.taxType}</InfoItem>
-              <InfoItem label="税号" mono>{p.invoiceInfo?.taxNo || '—'}</InfoItem>
-            </InfoGrid>
-          </DrawerSection>
-        )}
-        <DrawerSection title="终端账号">
-          <InfoGrid>
-            <InfoItem label="终端状态">{p.terminal?.enabled ? pill('#E8F5E9', '#01795D', '已开通') : pill('#F5F5F5', '#999', '未开通')}</InfoItem>
-            <InfoItem label="登录账号" mono emph>{p.terminal?.username || '—'}</InfoItem>
-            <InfoItem label="账号状态">{p.terminal?.status === 'active' ? '启用' : '停用'}</InfoItem>
-          </InfoGrid>
-        </DrawerSection>
-      </>
-    );
-  };
+  /** 选填区块为空时的占位提示（注册时未提交，审批通过后可由合作商终端维护） */
+  const emptySection = (title: string) => (
+    <div style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-4)', border: '2px dashed var(--color-border-primary)', borderRadius: 'var(--radius-lg)' }}>
+      <div style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)', marginBottom: 'var(--space-1)' }}>{title}</div>
+      <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', lineHeight: 1.7 }}>该部分为选填内容，未随本申请提交；<br />审批通过后合作商可登录终端在「合作商信息」中维护更新。</div>
+    </div>
+  );
+
+  /** 申请档案是否存在（注册申请在提交时名称必填，无名称视为无档案） */
+  const hasPayload = (a: SupplierApproval) => a.type === 'modify' || !!a.payload.name;
 
   return (
     <>
@@ -171,7 +110,7 @@ export default function PurchaseSupplierApprovals() {
             <span key="time" className="cell-muted">{a.submitTime}</span>,
             statusTag(a.status),
             <div key="actions" className="row-actions">
-              <Button size="sm" variant="ghost" onClick={() => setSelected(a)}>查看</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setSelected(a); setApprovalTab('approval'); }}>查看</Button>
               {a.status === 'pending' && (
                 <>
                   <Button size="sm" variant="ghost" style={{ color: 'var(--color-semantic-success, #01795D)' }} onClick={() => openReview(a, 'approved')}>通过</Button>
@@ -198,24 +137,117 @@ export default function PurchaseSupplierApprovals() {
           subtitle={`${TYPE_LABELS[selected.type]} · 申请人 ${selected.applicant} · 提交于 ${selected.submitTime}`}
           statusTag={statusTag(selected.status)}
         >
-          {/* 审批结果信息 */}
-          <DrawerSection title="审批信息">
-            <InfoGrid>
-              <InfoItem label="审批编号" mono emph>{selected.code}</InfoItem>
-              <InfoItem label="申请类型">{TYPE_LABELS[selected.type]}</InfoItem>
-              <InfoItem label="申请人" mono>{selected.applicant}</InfoItem>
-              <InfoItem label="提交时间">{selected.submitTime}</InfoItem>
-              <InfoItem label="审批状态">{statusTag(selected.status)}</InfoItem>
-              <InfoItem label="审批时间">{selected.reviewTime ?? '—'}</InfoItem>
-              <InfoItem label="申请说明" span={2}>{selected.applyNote || '—'}</InfoItem>
-              <InfoItem label="审批人">{selected.reviewer ?? '—'}</InfoItem>
-              <InfoItem label="审批意见" span={3}>{selected.reviewNote || '—'}</InfoItem>
-            </InfoGrid>
-          </DrawerSection>
-          {renderPayload(selected)}
-          {selected.type === 'modify' && (
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)', lineHeight: 1.7 }}>以上为该合作商提交的修改后完整档案，审批通过后将覆盖现有供应商档案。</div>
-          )}
+          {/* Tab 栏：分区标题标签化展示于抽屉顶部（与供应商详情抽屉一致） */}
+          <div className="drawer-tab-bar">
+            <button type="button" className={`drawer-tab${approvalTab === 'approval' ? ' active' : ''}`} onClick={() => setApprovalTab('approval')}>审批信息</button>
+            {hasPayload(selected) && ([
+              ['basic', '基本信息'],
+              ['qualification', '资质文件'],
+              ['warehouse', '仓库信息'],
+              ['store', '门店信息'],
+              ['finance', '财务信息'],
+              ['terminal', '终端账号'],
+            ] as [ApprovalTabKey, string][]).map(([key, label]) => (
+              <button key={key} type="button" className={`drawer-tab${approvalTab === key ? ' active' : ''}`} onClick={() => setApprovalTab(key)}>
+                {label}
+                {key === 'qualification' && <span className="drawer-tab-count">{selected.payload.qualificationFiles?.length ?? 0}</span>}
+                {key === 'warehouse' && <span className="drawer-tab-count">{selected.payload.warehouses?.length ?? 0}</span>}
+                {key === 'store' && <span className="drawer-tab-count">{selected.payload.stores?.length ?? 0}</span>}
+                {key === 'terminal' && selected.payload.terminal?.enabled && <span className="drawer-tab-count">已开通</span>}
+              </button>
+            ))}
+          </div>
+          <div className="drawer-tab-contents">
+            {/* 审批信息 */}
+            {approvalTab === 'approval' && (
+              <>
+                <InfoGrid>
+                  <InfoItem label="审批编号" mono emph>{selected.code}</InfoItem>
+                  <InfoItem label="申请类型">{TYPE_LABELS[selected.type]}</InfoItem>
+                  <InfoItem label="申请人" mono>{selected.applicant}</InfoItem>
+                  <InfoItem label="提交时间">{selected.submitTime}</InfoItem>
+                  <InfoItem label="审批状态">{statusTag(selected.status)}</InfoItem>
+                  <InfoItem label="审批时间">{selected.reviewTime ?? '—'}</InfoItem>
+                  <InfoItem label="申请说明" span={2}>{selected.applyNote || '—'}</InfoItem>
+                  <InfoItem label="审批人">{selected.reviewer ?? '—'}</InfoItem>
+                  <InfoItem label="审批意见" span={3}>{selected.reviewNote || '—'}</InfoItem>
+                </InfoGrid>
+                {selected.type === 'modify' && (
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-3)', lineHeight: 1.7 }}>
+                    以上为该合作商提交的修改后完整档案，审批通过后将覆盖对应供应商的现有档案；档案详情可在上方标签页中查看。
+                  </div>
+                )}
+              </>
+            )}
+            {hasPayload(selected) && approvalTab === 'basic' && (
+              <InfoGrid>
+                <InfoItem label="供应商名称" emph>{selected.payload.name}</InfoItem>
+                <InfoItem label="供应商类型">{SUPPLIER_TYPE_LABELS[selected.payload.type] ?? selected.payload.type}</InfoItem>
+                <InfoItem label="统一社会信用代码" mono>{selected.payload.unifiedCreditCode}</InfoItem>
+                <InfoItem label="法定代表人">{selected.payload.legalRepresentative}</InfoItem>
+                <InfoItem label="联系人">{selected.payload.contactPerson}</InfoItem>
+                <InfoItem label="联系电话" mono>{selected.payload.contactPhone}</InfoItem>
+                <InfoItem label="注册地址" span={3}>{[selected.payload.registeredProvince, selected.payload.registeredCity, selected.payload.registeredDistrict, selected.payload.registeredAddress].filter(Boolean).join(' ') || '—'}</InfoItem>
+                <InfoItem label="经营范围" span={3}>{selected.payload.businessScope || '—'}</InfoItem>
+              </InfoGrid>
+            )}
+            {hasPayload(selected) && approvalTab === 'qualification' && (
+              (selected.payload.qualificationFiles?.length ?? 0) > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  {selected.payload.qualificationFiles!.map((f, i) => (
+                    <div key={`${f}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)' }}>
+                      <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14, color: 'var(--color-module-current-base)' }}><path d="M4 1.5h5.5L13 5v9.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-12a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
+                      <span>{f}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : emptySection('未提交资质文件')
+            )}
+            {hasPayload(selected) && approvalTab === 'warehouse' && (
+              (selected.payload.warehouses?.length ?? 0) > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  {selected.payload.warehouses!.map(w => (
+                    <div key={w.id} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)' }}>
+                      <span style={{ fontWeight: 'var(--font-medium)' }}>{w.name}</span>
+                      <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 'var(--space-2)' }}>{[w.province, w.city, w.district].filter(Boolean).join(' ')} {w.address}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : emptySection('未提交仓库信息')
+            )}
+            {hasPayload(selected) && approvalTab === 'store' && (
+              (selected.payload.stores?.length ?? 0) > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  {selected.payload.stores!.map(st => (
+                    <div key={st.id} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)' }}>
+                      <span style={{ fontWeight: 'var(--font-medium)' }}>{st.name}</span>
+                      <span className="mono" style={{ marginLeft: 'var(--space-2)', color: 'var(--color-text-tertiary)' }}>{st.area}㎡</span>
+                      <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 'var(--space-2)' }}>{[st.province, st.city, st.district].filter(Boolean).join(' ')} {st.address}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : emptySection('未提交门店信息')
+            )}
+            {hasPayload(selected) && approvalTab === 'finance' && (
+              selected.payload.bankAccount?.accountNo ? (
+                <InfoGrid>
+                  <InfoItem label="开户银行">{selected.payload.bankAccount.bankName}</InfoItem>
+                  <InfoItem label="银行账号" mono>{selected.payload.bankAccount.accountNo}</InfoItem>
+                  <InfoItem label="户名">{selected.payload.bankAccount.accountName}</InfoItem>
+                  <InfoItem label="结算方式">{SETTLEMENT_METHOD_LABELS[selected.payload.settlementMethod] ?? selected.payload.settlementMethod}</InfoItem>
+                  <InfoItem label="税务类型">{TAX_TYPE_LABELS[selected.payload.taxType] ?? selected.payload.taxType}</InfoItem>
+                  <InfoItem label="税号" mono>{selected.payload.invoiceInfo?.taxNo || '—'}</InfoItem>
+                </InfoGrid>
+              ) : emptySection('未提交财务信息')
+            )}
+            {hasPayload(selected) && approvalTab === 'terminal' && (
+              <InfoGrid>
+                <InfoItem label="终端状态">{selected.payload.terminal?.enabled ? pill('#E8F5E9', '#01795D', '已开通') : pill('#F5F5F5', '#999', '未开通')}</InfoItem>
+                <InfoItem label="登录账号" mono emph>{selected.payload.terminal?.username || '—'}</InfoItem>
+                <InfoItem label="账号状态">{selected.payload.terminal?.status === 'active' ? '启用' : '停用'}</InfoItem>
+              </InfoGrid>
+            )}
+          </div>
         </DetailDrawer>
       )}
 
