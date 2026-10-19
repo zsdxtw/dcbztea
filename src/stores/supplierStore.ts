@@ -1,6 +1,6 @@
 /**
- * 供应商共享数据与注册审批流（管理端 ↔ 合作商终端共享）
- * - 管理端：注册审批（通过后创建/更新供应商）、供应商列表、新品提醒处理
+ * 合作商共享数据与注册审批流（管理端 ↔ 合作商终端共享）
+ * - 管理端：注册审批（通过后创建/更新合作商）、合作商列表、新品提醒处理
  * - 合作商终端：注册提交、信息修改申请、报价设置、新品提醒提报
  */
 import { create } from 'zustand';
@@ -43,7 +43,7 @@ const seedApprovals: SupplierApproval[] = [
     applyNote: '福建武夷山岩茶厂商，希望接入平台承接华东订单',
     payload: {
       id: 'sa_reg_1',
-      type: 'brand',
+      types: ['brand'],
       name: '武夷山茶语岩茶业有限公司',
       unifiedCreditCode: '91350783MA9TEA0001',
       cooperationAgreements: [],
@@ -95,7 +95,7 @@ const seedApprovals: SupplierApproval[] = [
     code: 'SP-002',
     type: 'register',
     applicant: 'zyq001',
-    applyNote: '四川峨眉高山绿茶品牌方',
+    applyNote: '四川峨眉高山绿茶品牌商',
     payload: {} as SupplierItem,
     supplierId: '8',
     status: 'approved',
@@ -161,7 +161,7 @@ const seedQuoteSettings: Record<string, PartnerQuoteSetting> = {
 };
 
 interface SupplierStoreState {
-  /** 供应商列表 */
+  /** 合作商列表 */
   suppliers: SupplierItem[];
   /** 注册/修改审批单 */
   approvals: SupplierApproval[];

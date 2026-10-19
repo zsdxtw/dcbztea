@@ -7,7 +7,7 @@ type RawSupplierItem = Omit<SupplierItem, 'qualificationFiles' | 'channelSource'
 const rawSupplierItems: RawSupplierItem[] = [
   {
     id: '1',
-    type: 'brand',
+    types: ['brand'],
     name: '杭州西湖茶叶有限公司',
     unifiedCreditCode: '91330100MA2XXXXX1',
     cooperationAgreements: ['西湖牌合作协议.pdf'],
@@ -54,7 +54,7 @@ const rawSupplierItems: RawSupplierItem[] = [
   },
   {
     id: '2',
-    type: 'brand',
+    types: ['brand'],
     name: '福建正山堂茶业有限责任公司',
     unifiedCreditCode: '91350783MA8XXXXX2',
     cooperationAgreements: ['正山堂合作协议.pdf'],
@@ -102,7 +102,7 @@ const rawSupplierItems: RawSupplierItem[] = [
   },
   {
     id: '3',
-    type: 'brand',
+    types: ['brand'],
     name: '八马茶业股份有限公司',
     unifiedCreditCode: '91350500MA2XXXXX3',
     cooperationAgreements: ['八马合作协议.pdf'],
@@ -150,7 +150,7 @@ const rawSupplierItems: RawSupplierItem[] = [
   },
   {
     id: '4',
-    type: 'brand',
+    types: ['brand'],
     name: '云南大益茶业集团有限公司',
     unifiedCreditCode: '91532800MA6XXXXX4',
     cooperationAgreements: ['大益合作协议.pdf'],
@@ -201,7 +201,7 @@ const rawSupplierItems: RawSupplierItem[] = [
   },
   {
     id: '5',
-    type: 'brand',
+    types: ['brand'],
     name: '福建品品香茶业有限公司',
     unifiedCreditCode: '91350982MA3XXXXX5',
     cooperationAgreements: ['品品香合作协议.pdf'],
@@ -248,7 +248,7 @@ const rawSupplierItems: RawSupplierItem[] = [
   },
   {
     id: '6',
-    type: 'partner',
+    types: ['service'],
     name: '厦门茶叶进出口有限公司',
     unifiedCreditCode: '91350200MA9XXXXX6',
     cooperationAgreements: ['海堤合作协议.pdf'],
@@ -297,7 +297,7 @@ const rawSupplierItems: RawSupplierItem[] = [
   },
   {
     id: '7',
-    type: 'partner',
+    types: ['supplier'],
     name: '安徽省祁门红茶发展有限公司',
     unifiedCreditCode: '91341000MA1XXXXX7',
     cooperationAgreements: ['天之红合作协议.pdf'],
@@ -344,7 +344,7 @@ const rawSupplierItems: RawSupplierItem[] = [
   },
   {
     id: '8',
-    type: 'brand',
+    types: ['brand'],
     name: '四川省峨眉山竹叶青茶业有限公司',
     unifiedCreditCode: '91511100MA7XXXXX8',
     cooperationAgreements: ['竹叶青合作协议.pdf'],
@@ -391,7 +391,7 @@ const rawSupplierItems: RawSupplierItem[] = [
   },
   {
     id: '9',
-    type: 'partner',
+    types: ['supplier'],
     name: '湖南省白沙溪茶厂股份有限公司',
     unifiedCreditCode: '91430900MA4XXXXX9',
     cooperationAgreements: ['白沙溪合作协议.pdf'],
@@ -440,7 +440,7 @@ const rawSupplierItems: RawSupplierItem[] = [
   },
   {
     id: '10',
-    type: 'partner',
+    types: ['supplier'],
     name: '北京张一元茶叶有限责任公司',
     unifiedCreditCode: '91110100MA0XXXX0',
     cooperationAgreements: ['张一元合作协议.pdf'],
@@ -487,7 +487,7 @@ const rawSupplierItems: RawSupplierItem[] = [
   },
   {
     id: '11',
-    type: 'partner',
+    types: ['supplier', 'service'],
     name: '杭州云茶供应链管理有限公司',
     unifiedCreditCode: '91330106MA2P8KQ3X7',
     cooperationAgreements: ['云茶供应链合作协议.pdf'],
@@ -670,16 +670,18 @@ export const supplierItems: SupplierItem[] = rawSupplierItems.map((s) => ({
   terminal: TERMINAL_MAP[s.id] ?? EMPTY_TERMINAL,
 }));
 
-/** 供应商类型标签 */
+/** 合作商类型标签 */
 export const SUPPLIER_TYPE_LABELS: Record<string, string> = {
-  brand: '品牌方',
-  partner: '合作方',
+  brand: '品牌商',
+  supplier: '供应商',
+  service: '服务商',
 };
 
-/** 供应商类型颜色 */
+/** 合作商类型颜色 */
 export const SUPPLIER_TYPE_COLORS: Record<string, string> = {
   brand: 'var(--color-module-current-base)',
-  partner: '#0DAFC6',
+  supplier: '#0DAFC6',
+  service: '#9D73BD',
 };
 
 /** 评价等级颜色 */

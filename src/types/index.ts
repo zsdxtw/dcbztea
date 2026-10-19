@@ -482,8 +482,13 @@ export interface TeaProfessional {
   isStreamer?: boolean;
 }
 
-/** 供应商类型 */
-export type SupplierType = 'brand' | 'partner';
+/**
+ * 合作商类型
+ * - brand：品牌商，品牌拥有方，平台直接合作（与供应商/服务商互斥）
+ * - supplier：供应商，差价模式，平台直接按价格采购、背对背销售
+ * - service：服务商，扣点模式，在售价基础上收取服务费，差价由服务商获得
+ */
+export type SupplierType = 'brand' | 'supplier' | 'service';
 
 /** 供应商评价等级 */
 export type SupplierGrade = 'S' | 'A' | 'B' | 'C' | 'D';
@@ -855,7 +860,8 @@ export type SupplierChannelSource = 'manual' | 'terminal';
 
 export interface SupplierItem {
   id: string;
-  type: SupplierType;
+  /** 合作商类型（可多选：品牌商与供应商/服务商互斥，供应商与服务商可同时选择） */
+  types: SupplierType[];
   name: string;
   unifiedCreditCode: string;
   cooperationAgreements: string[];
@@ -930,7 +936,7 @@ export interface SupplierApproval {
   applicant: string;
   /** 申请说明 */
   applyNote?: string;
-  /** 供应商完整档案（注册=草稿档案；修改=修改后的档案） */
+  /** 合作商完整档案（注册=草稿档案；修改=修改后的档案） */
   payload: SupplierItem;
   /** 关联供应商 ID（modify 时必填） */
   supplierId?: string;

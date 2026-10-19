@@ -21,11 +21,12 @@ import type { StatCardData } from '../../types';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
 import { useSupplierStore, getTerminalAccounts } from '../../stores/supplierStore';
 
-/* ── 供应商类型筛选配置 ── */
+/* ── 合作商类型筛选配置 ── */
 const TYPE_FILTER: { key: SupplierType | 'all'; label: string; color: string; desc: string }[] = [
-  { key: 'all', label: '全部供应商', color: 'var(--color-module-current-base)', desc: '所有合作供应商' },
-  { key: 'brand', label: '品牌方', color: 'var(--color-module-current-base)', desc: '品牌方直接合作，拥有品牌授权' },
-  { key: 'partner', label: '合作方', color: '#0DAFC6', desc: '合作方间接合作，非品牌持有方' },
+  { key: 'all', label: '全部合作商', color: 'var(--color-module-current-base)', desc: '所有合作商' },
+  { key: 'brand', label: '品牌商', color: 'var(--color-module-current-base)', desc: '品牌拥有方，平台直接合作' },
+  { key: 'supplier', label: '供应商', color: '#0DAFC6', desc: '差价模式：平台按价格采购，背对背销售' },
+  { key: 'service', label: '服务商', color: '#9D73BD', desc: '扣点模式：按售价收取服务费，差价归服务商' },
 ];
 
 /** 详情抽屉 Tab 键 */
@@ -57,7 +58,7 @@ export default function PurchaseSuppliers() {
   // 筛选
   const filtered = useMemo(() => {
     return list.filter(s => {
-      if (activeType !== 'all' && s.type !== activeType) return false;
+      if (activeType !== 'all' && !s.types.includes(activeType)) return false;
       if (filterGrade && s.grade !== filterGrade) return false;
       if (keyword && !s.name.includes(keyword) && !s.unifiedCreditCode.includes(keyword) && !s.contactPerson.includes(keyword)) return false;
       return true;
