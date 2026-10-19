@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
@@ -21,6 +21,17 @@ const TRANSFER_TONE: Record<string, 'green' | 'gray' | 'purple' | 'amber'> = {
   customer: 'amber',
 };
 
+/** 订单状态 Tab（原状态下拉框改为列表上方标签页） */
+const STATUS_TABS: { key: PartnerOrderStatus | ''; label: string; icon: ReactNode }[] = [
+  { key: '', label: '全部状态', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><rect x="3.5" y="4.5" width="13" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 8h7M6.5 11.5h4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
+  { key: 'pending', label: '待接单', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M10 6v4l2.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
+  { key: 'accepted', label: '已接单', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M7 10l2 2 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+  { key: 'shipping', label: '发货中', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><path d="M3 6.5h9V14H3zM12 9.5h3l2 3V14h-5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><circle cx="6.5" cy="15.5" r="1.6" stroke="currentColor" strokeWidth="1.3"/><circle cx="14.5" cy="15.5" r="1.6" stroke="currentColor" strokeWidth="1.3"/></svg> },
+  { key: 'delivered', label: '已签收', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><path d="M10 3l7 3v8l-7 3-7-3V6l7-3z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M7 10.5l2 2 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+  { key: 'settled', label: '已结算', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M8 7l2 3 2-3M10 10v4.5M7.8 11h4.4M7.8 13h4.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+  { key: 'rejected', label: '已驳回', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 7.5l5 5M12.5 7.5l-5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
+];
+
 /** 合作商订单管理：平台分发订单 + 报备审批通过后自动转入的订单（直送/入库 × 供应商/服务商模式） */
 export default function PartnerOrders() {
   const reports = useReportStore((s) => s.reports);
@@ -41,13 +52,25 @@ export default function PartnerOrders() {
     ...manualOrders,
   ], [transferred, transferOverrides, manualOrders]);
 
-  const filtered = useMemo(() => allOrders.filter(o => {
+  /** 应用搜索/配送/合作模式筛选（不含状态）后的订单：供状态 Tab 计数与状态过滤复用 */
+  const baseOrders = useMemo(() => allOrders.filter(o => {
     if (keyword && !o.code.includes(keyword) && !o.customerName.includes(keyword) && !o.receiver.includes(keyword)) return false;
     if (filterDelivery && o.deliveryMode !== filterDelivery) return false;
     if (filterCoop && o.coopMode !== filterCoop) return false;
-    if (filterStatus && o.status !== filterStatus) return false;
     return true;
-  }), [allOrders, keyword, filterDelivery, filterCoop, filterStatus]);
+  }), [allOrders, keyword, filterDelivery, filterCoop]);
+
+  /** 各状态 Tab 的订单数（随搜索与其它筛选联动） */
+  const statusCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    STATUS_TABS.forEach(t => { c[t.key] = t.key === '' ? baseOrders.length : baseOrders.filter(o => o.status === t.key).length; });
+    return c;
+  }, [baseOrders]);
+
+  const filtered = useMemo(
+    () => (filterStatus ? baseOrders.filter(o => o.status === filterStatus) : baseOrders),
+    [baseOrders, filterStatus],
+  );
 
   const transferCount = transferred.length;
 
@@ -72,6 +95,17 @@ export default function PartnerOrders() {
         desc="订单来源于平台分发与报备转入。配送方式：直送订单（合作商直发客户）与入库订单（先入合作仓再发）；合作模式：供应商模式与服务商模式。商机报备转入的订单由平台进货发货，仅同步展示。"
       />
 
+      {/* 订单状态 Tab 卡片 */}
+      <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-4)' }}>
+        {STATUS_TABS.map(t => (
+          <button key={t.key || 'all'} className={`tab-card-simple${filterStatus === t.key ? ' active' : ''}`} onClick={() => setFilterStatus(t.key)}>
+            {t.icon}
+            {t.label}
+            <span className="tab-card-simple-count">{statusCounts[t.key] ?? 0} 单</span>
+          </button>
+        ))}
+      </div>
+
       {/* 筛选 */}
       <div className="pk-toolbar">
         <input className="filter-input" placeholder="搜索订单号、客户、收货人..." value={keyword} onChange={e => setKeyword(e.target.value)} />
@@ -84,15 +118,6 @@ export default function PartnerOrders() {
           <option value="">全部合作模式</option>
           <option value="supplier">供应商模式</option>
           <option value="service">服务商模式</option>
-        </select>
-        <select className="filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-          <option value="">全部状态</option>
-          <option value="pending">待接单</option>
-          <option value="accepted">已接单</option>
-          <option value="shipping">发货中</option>
-          <option value="delivered">已签收</option>
-          <option value="settled">已结算</option>
-          <option value="rejected">已驳回</option>
         </select>
         <span className="pk-count">共 {filtered.length} 单{transferCount > 0 ? ` · 含报备转入 ${transferCount} 单` : ''}</span>
       </div>
