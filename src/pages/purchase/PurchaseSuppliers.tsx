@@ -15,6 +15,7 @@ import {
   SETTLEMENT_METHOD_LABELS,
   SHIPPING_SETTLEMENT_LABELS,
   QUALIFICATION_STATUS_LABELS,
+  genSupplierCode,
 } from '../../data/suppliers';
 import type { SupplierItem, SupplierType, SupplierGrade, SupplierWarehouse, SupplierStore, SupplierTerminal, SupplierTerminalAccount, BrandAuthFiles } from '../../types';
 import type { StatCardData } from '../../types';
@@ -330,6 +331,7 @@ export default function PurchaseSuppliers() {
     const newItem: SupplierItem = {
       ...addDraft,
       id: `sup_${Date.now()}`,
+      code: genSupplierCode(list.length + 1),
       types: addTypes,
       name: addDraft.name.trim(),
       shortName: addDraft.shortName?.trim(),
@@ -430,10 +432,11 @@ export default function PurchaseSuppliers() {
         <Table
           headers={[
             ...(deleteMode ? [<input key="chk" type="checkbox" checked={selectedForDelete.size === filtered.length && filtered.length > 0} onChange={e => { if (e.target.checked) setSelectedForDelete(new Set(filtered.map(s => s.id))); else setSelectedForDelete(new Set()); }} />] : []),
-            '合作商名称', '类型', '渠道来源', '评价等级', '主营品类', '联系人', '联系电话', '仓库', '门店', '一件代发', '状态', '操作',
+            '编号', '合作商名称', '类型', '渠道来源', '评价等级', '主营品类', '联系人', '联系电话', '仓库', '门店', '一件代发', '状态', '操作',
           ]}
           rows={filtered.map(s => [
             ...(deleteMode ? [<input key="chk" type="checkbox" checked={selectedForDelete.has(s.id)} onChange={() => handleToggleSelect(s.id)} />] : []),
+            <span key="code" className="cell-mono-emph">{s.code ?? '—'}</span>,
             <span key="name" className="cell-emph">{s.name}</span>,
             <span key="type" style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
               {s.types.map(t => (
@@ -1009,6 +1012,7 @@ export default function PurchaseSuppliers() {
             {activeTab === 'basic' && (
               <div>
               <InfoGrid cols={3}>
+                <InfoItem label="合作商编号" mono emph>{selectedSupplier.code || '—'}</InfoItem>
                 <InfoItem label="合作商类型" span={3}>
                   <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
                     {selectedSupplier.types.map(t => (

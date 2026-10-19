@@ -8,7 +8,7 @@ import type {
   SupplierItem, SupplierApproval, SupplierTerminal, SupplierTerminalAccount,
   NewArrivalReminder, PartnerQuoteSetting,
 } from '../types';
-import { supplierItems } from '../data/suppliers';
+import { supplierItems, genSupplierCode } from '../data/suppliers';
 
 const now = () => new Date().toISOString().slice(0, 10);
 
@@ -196,14 +196,16 @@ export const useSupplierStore = create<SupplierStoreState>((set, get) => ({
   quoteSettings: seedQuoteSettings,
 
   submitRegistration: (draft, applicant, note) => {
-    const { approvals } = get();
+    const { approvals, suppliers } = get();
+    /** 注册即分配合作商编号（档案尚未入库，按现有合作商数顺延） */
+    const payload = { ...draft, code: draft.code ?? genSupplierCode(suppliers.length + 1) };
     const approval: SupplierApproval = {
       id: `sa_${Date.now()}`,
       code: genCode(approvals.length + 1),
       type: 'register',
       applicant,
       applyNote: note,
-      payload: draft,
+      payload,
       status: 'pending',
       submitTime: now(),
     };
@@ -235,8 +237,8 @@ export const useSupplierStore = create<SupplierStoreState>((set, get) => ({
     let nextSuppliers = suppliers;
     if (action === 'approved') {
       if (target.type === 'register') {
-        // 注册通过 → 新供应商入库（渠道来源：终端注册）
-        nextSuppliers = [...suppliers, target.payload];
+        // 注册通过 → 新合作商入库（渠道来源：终端注册）；编号缺失时按顺序兜底分配
+        nextSuppliers = [...suppliers, { ...target.payload, code: target.payload.code ?? genSupplierCode(suppliers.length + 1) }];
       } else if (target.supplierId) {
         // 修改通过 → 更新对应合作商档案；
         // 联系信息与仓库信息为终端免审直改分区，保留档案中的最新值，避免申请提交后终端的直改被申请时的旧快照覆盖

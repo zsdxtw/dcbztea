@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
+import { useSupplierStore } from '../../stores/supplierStore';
 import BrandLogo from '../../components/common/BrandLogo';
 import './partner.css';
 
@@ -77,12 +78,17 @@ const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode
 /** 品牌茶叶图形（统一使用公共 BrandLogo 组件） */
 export const TeaLeafMark = BrandLogo;
 
-/** 合作商终端布局：简约侧边栏（品牌 + 菜单 + 用户），无顶栏 */
+/** 合作商终端布局：简约侧边栏（品牌 + 菜单 + 合作商信息 + 用户），无顶栏 */
 export default function PartnerLayout() {
   const auth = getPartnerAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+  /** 当前登录合作商档案（按登录态关联 ID 或终端账号匹配，与管理后台实时联动） */
+  const suppliers = useSupplierStore(s => s.suppliers);
+  const partner = auth
+    ? suppliers.find(s => s.id === auth.supplierId) ?? suppliers.find(s => s.terminal.enabled && s.terminal.username === auth.username)
+    : undefined;
 
   // 合作商终端使用翡翠绿主题（商品模块色）；卸载时恢复主系统当前模块主题
   useEffect(() => {
@@ -150,8 +156,14 @@ export default function PartnerLayout() {
           })}
         </nav>
 
-        {/* 底部用户 */}
+        {/* 底部：合作商名称及编号 + 用户 */}
         <div className="pk-side-foot">
+          {partner && (
+            <div className="pk-partner-block" title={partner.name}>
+              <div className="pk-partner-name">{partner.name}</div>
+              <div className="pk-partner-code mono">{partner.code ?? '—'}</div>
+            </div>
+          )}
           <div className="pk-user">
             <div className="pk-avatar">{auth.name.charAt(0)}</div>
             <div className="pk-user-text">

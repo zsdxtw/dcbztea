@@ -149,6 +149,7 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
   const basicView = (
     <>
       <InfoGrid>
+        <InfoItem label="合作商编号" mono emph>{supplier.code || '—'}</InfoItem>
         <InfoItem label="合作商名称" emph>{supplier.name}</InfoItem>
         <InfoItem label="合作商类型">
           <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>

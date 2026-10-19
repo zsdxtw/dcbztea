@@ -660,8 +660,12 @@ const TERMINAL_MAP: Record<string, SupplierTerminal> = {
 /** 未开通终端的默认结构 */
 const EMPTY_TERMINAL: SupplierTerminal = { enabled: false, username: '', status: 'active' };
 
-export const supplierItems: SupplierItem[] = rawSupplierItems.map((s) => ({
+/** 生成合作商编号：HZS- + 3 位顺序号 */
+export const genSupplierCode = (seq: number) => `HZS-${String(seq).padStart(3, '0')}`;
+
+export const supplierItems: SupplierItem[] = rawSupplierItems.map((s, idx) => ({
   ...s,
+  code: genSupplierCode(idx + 1),
   qualificationFiles: QUALIFICATION_FILES_MAP[s.id] ?? ['营业执照.pdf'],
   channelSource: CHANNEL_SOURCE_MAP[s.id] ?? 'manual',
   mainBrands: MAIN_BRANDS_MAP[s.id] ?? [],

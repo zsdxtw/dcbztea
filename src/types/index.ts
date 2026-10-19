@@ -862,6 +862,8 @@ export type SupplierChannelSource = 'manual' | 'terminal';
 
 export interface SupplierItem {
   id: string;
+  /** 合作商编号（HZS-001 顺序号，档案创建时生成） */
+  code?: string;
   /** 合作商类型（可多选：品牌商与供应商/服务商互斥，供应商与服务商可同时选择） */
   types: SupplierType[];
   name: string;

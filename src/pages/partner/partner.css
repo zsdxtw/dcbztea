@@ -86,6 +86,14 @@
 .pk-subnav-item.active { color: var(--pk-accent-dark); font-weight: 600; background: var(--pk-accent-soft); }
 
 .pk-side-foot { border-top: 1px solid var(--pk-line2); padding: 12px; }
+/* 合作商名称及编号（底部用户区上方） */
+.pk-partner-block { padding: 6px 8px 10px; margin-bottom: 6px; border-bottom: 1px dashed var(--pk-line2); }
+.pk-partner-name {
+  font-size: 13px; font-weight: 600; color: var(--pk-ink); line-height: 1.35;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pk-partner-code { font-size: 11px; color: var(--pk-ink3); margin-top: 3px; letter-spacing: 0.04em; }
+.pk-side.collapsed .pk-partner-block { display: none; }
 .pk-user { display: flex; align-items: center; gap: 10px; padding: 4px; border-radius: 10px; }
 .pk-avatar {
   width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;

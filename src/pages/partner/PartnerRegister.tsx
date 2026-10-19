@@ -33,6 +33,7 @@ export default function PartnerRegister() {
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<{ code: string; username: string } | null>(null);
+  /** 展示用合作商编号（注册提交时分配，审批通过后随档案生效） */
 
   // 基本信息（必填）
   const [name, setName] = useState('');
@@ -180,7 +181,7 @@ export default function PartnerRegister() {
     };
 
     const approval = submitRegistration(draft, username, applyNote.trim());
-    setSuccess({ code: approval.code, username });
+    setSuccess({ code: approval.payload.code ?? approval.code, username });
     scrollTop(false);
   };
 
