@@ -5,6 +5,7 @@ import { useSupplierStore } from '../../stores/supplierStore';
 import { BrandMultiSelect } from '../../components/common/BrandPicker';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
 import { brandItems } from '../../data/brands';
+import { productCategoryLabels } from '../../data/productCategories';
 import { SUPPLIER_TYPE_LABELS, SUPPLIER_TYPE_COLORS } from '../../data/suppliers';
 import { genAdminAccount } from '../../utils/pinyinInitials';
 import type { SupplierItem, SupplierType } from '../../types';
@@ -17,8 +18,9 @@ const brandAuthFileName = (brand: string) => `${brand}品牌授权书.pdf`;
 /** 管理员账号初始密码 */
 const INITIAL_PASSWORD = '123456';
 
-/** 主营品牌可选分类（来源于品牌管理中的品牌所属分类，去重） */
-const CATEGORY_OPTIONS = Array.from(new Set(brandItems.flatMap(b => b.mainCategories ?? [])));
+/** 主营品牌可选一级分类（来源于商品 > 分类管理：茶叶/茶具/茶周边/其他） */
+const CATEGORY_OPTIONS = (Object.entries(productCategoryLabels) as ['tea' | 'teaware' | 'tea-peripheral' | 'other', string][])
+  .sort((a, b) => ({ tea: 1, teaware: 2, 'tea-peripheral': 3, other: 4 }[a[0]] - { tea: 1, teaware: 2, 'tea-peripheral': 3, other: 4 }[b[0]]));
 
 /** 合作商终端注册页：填写合作商档案（基本信息 + 资质文件必填），提交后进入平台注册审批；
  *  管理员账号由合作商简称自动生成，仓库/门店/财务信息审批通过后在「设置」菜单维护 */
@@ -55,23 +57,23 @@ export default function PartnerRegister() {
   // 申请说明（必填）
   const [applyNote, setApplyNote] = useState('');
 
-  /** 所选分类下的品牌列表 */
+  /** 所选一级分类下的品牌列表 */
   const availableBrands = brandItems
-    .filter(b => (b.mainCategories ?? []).some(c => selectedCategories.includes(c)))
+    .filter(b => selectedCategories.includes(b.categoryType ?? 'tea'))
     .map(b => b.name);
 
   const toggleQualification = (f: string) => {
     setQualificationFiles(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
   };
 
-  /** 分类切换：同步裁剪不属于所选分类的品牌 */
-  const toggleCategory = (c: string) => {
+  /** 一级分类切换：同步裁剪不属于所选分类的品牌 */
+  const toggleCategory = (c: 'tea' | 'teaware' | 'tea-peripheral' | 'other') => {
     setSelectedCategories(prev => {
       const next = prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c];
       setMainBrands(brands => {
         const kept = brands.filter(b => {
           const brand = brandItems.find(x => x.name === b);
-          return brand && (brand.mainCategories ?? []).some(cat => next.includes(cat));
+          return brand && next.includes(brand.categoryType ?? 'tea');
         });
         // 被裁剪品牌的授权书同步移除
         setQualificationFiles(files => files.filter(f =>
@@ -373,27 +375,31 @@ export default function PartnerRegister() {
               <label className="pk-reg-label">经营范围</label>
               <textarea className="pk-reg-textarea" placeholder="如：茶叶种植、加工、销售" value={businessScope} onChange={e => setBusinessScope(e.target.value)} />
             </div>
-            {/* 公司主营品牌：先选分类（多选）再选品牌 */}
+            {/* 公司主营品牌：先选一级分类（多选）再选品牌 */}
             <div className="span-3">
               <label className="pk-reg-label">公司主营品牌<span className="pk-reg-star">*</span></label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-                {CATEGORY_OPTIONS.map(c => {
-                  const active = selectedCategories.includes(c);
+                {CATEGORY_OPTIONS.map(([type, label]) => {
+                  const active = selectedCategories.includes(type);
                   return (
-                    <button key={c} type="button" className="pk-reg-add" style={{ textAlign: 'left' }}
-                      onClick={() => toggleCategory(c)}>
-                      {active ? '✓ ' : '+ '}{c}
+                    <button key={type} type="button" className="pk-reg-add" style={{ textAlign: 'left' }}
+                      onClick={() => toggleCategory(type)}>
+                      {active ? '✓ ' : '+ '}{label}
                     </button>
                   );
                 })}
               </div>
               {selectedCategories.length > 0 ? (
-                <BrandMultiSelect value={mainBrands} options={availableBrands} onChange={setMainBrands} accent="#01795D" />
+                availableBrands.length > 0 ? (
+                  <BrandMultiSelect value={mainBrands} options={availableBrands} onChange={setMainBrands} accent="#01795D" />
+                ) : (
+                  <div style={{ fontSize: 12.5, color: '#99A29D', padding: '6px 0' }}>所选分类下暂无可选品牌，请调整分类选择</div>
+                )
               ) : (
-                <div style={{ fontSize: 12.5, color: '#99A29D', padding: '6px 0' }}>请先选择上方分类（支持多选），选择后展示对应分类下的品牌</div>
+                <div style={{ fontSize: 12.5, color: '#99A29D', padding: '6px 0' }}>请先选择上方一级分类（支持多选），选择后展示该分类下的品牌</div>
               )}
               <div style={{ fontSize: 12, color: '#99A29D', marginTop: 6 }}>
-                分类与品牌列表来源于平台「商品 &gt; 品牌管理」；选择品牌后需在「资质文件」中提交每个品牌对应的品牌授权书
+                分类来源于平台「商品 &gt; 分类管理」一级分类，品牌来源于「商品 &gt; 品牌管理」；选择品牌后需在「资质文件」中提交每个品牌对应的品牌授权书
               </div>
             </div>
           </div>

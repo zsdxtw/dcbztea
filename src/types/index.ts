@@ -348,6 +348,8 @@ export interface BrandItem {
   district?: string;
   address: string;
   mainCategories: string[];
+  /** 品牌所属一级分类（商品 > 分类管理）：tea=茶叶 / teaware=茶具 / tea-peripheral=茶周边 / other=其他 */
+  categoryType?: 'tea' | 'teaware' | 'tea-peripheral' | 'other';
   productCount: number;
   supplierCount: number;
   website: string;
