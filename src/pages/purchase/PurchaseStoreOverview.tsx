@@ -19,7 +19,7 @@ const toShortProvince = (full: string) => full.replace(/(壮族自治区|回族�
 /** 中国地图 GeoJSON（public/china.json，来源于阿里 DataV） */
 const CHINA_GEO_URL = '/china.json';
 /** 地图容器高度 */
-const MAP_HEIGHT = 520;
+const MAP_HEIGHT = 560;
 
 /**
  * 采购-合作商管理-门店总览：
@@ -128,12 +128,27 @@ export default function PurchaseStoreOverview() {
       series: [{
         type: 'map',
         map: 'china',
-        roam: false,
+        /** 允许滚轮缩放与拖拽平移，便于放大查看各省门店数量 */
+        roam: true,
+        scaleLimit: { min: 1, max: 6 },
         selectedMode: 'single',
-        zoom: 1.15,
-        label: { show: true, fontSize: 10, color: 'rgba(30,38,34,0.85)' },
+        zoom: 1.32,
+        label: {
+          show: true,
+          fontSize: 10,
+          color: 'rgba(30,38,34,0.9)',
+          lineHeight: 13,
+          /** 省名下方展示该省门店数量（无门店省份仅显示省名） */
+          formatter: (p: { name: string; value?: number | string }) => {
+            const v = typeof p.value === 'number' ? p.value : 0;
+            return v > 0 ? `${p.name}\n${v}家` : p.name;
+          },
+        },
         itemStyle: { areaColor: '#F2F5F2', borderColor: '#FFFFFF', borderWidth: 1 },
-        emphasis: { label: { show: true, color: '#1E2622' }, itemStyle: { areaColor: '#F2AEBE' } },
+        emphasis: {
+          label: { show: true, color: '#1E2622', fontWeight: 600 },
+          itemStyle: { areaColor: '#F2AEBE' },
+        },
         data,
       }],
     } as echarts.EChartsCoreOption);
