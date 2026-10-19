@@ -32,6 +32,54 @@ const TYPE_FILTER: { key: SupplierType | 'all'; label: string; color: string; de
 /** 详情抽屉 Tab 键 */
 type DrawerTabKey = 'basic' | 'qualification' | 'operation' | 'warehouse' | 'store' | 'finance' | 'terminal';
 
+/** 新增合作商空白草稿（保存后写入共享 store：渠道来源=手动创建，终端默认未开通） */
+const EMPTY_ADD_DRAFT: SupplierItem = {
+  id: '',
+  types: ['supplier'],
+  name: '',
+  shortName: '',
+  unifiedCreditCode: '',
+  cooperationAgreements: [],
+  brandAuthAgreements: [],
+  businessLicense: '营业执照.pdf',
+  qualificationFiles: ['营业执照.pdf'],
+  channelSource: 'manual',
+  registeredAddress: '',
+  legalRepresentative: '',
+  establishmentDate: '',
+  registeredCapital: '',
+  companyType: '',
+  businessScope: '',
+  contactPerson: '',
+  contactPosition: '',
+  contactAddress: '',
+  contactPhone: '',
+  contactEmail: '',
+  warehouses: [],
+  stores: [],
+  mainBrands: [],
+  brandAuthFiles: {},
+  terminal: { enabled: false, username: '', status: 'active' },
+  taxType: 'general',
+  invoiceInfo: { title: '', taxNo: '', taxRate: 13, address: '', phone: '', bankName: '', bankAccount: '' },
+  cooperationDate: '',
+  grade: 'B',
+  mainCategories: [],
+  introduction: '',
+  settlementMethod: 'monthly',
+  bankAccount: { accountName: '', accountNo: '', bankName: '', bankNo: '', remark: '' },
+  shippingSettlement: 'free',
+  supportDropship: false,
+  qualificationStatus: 'pending',
+  paymentTerms: '',
+  deliveryCycle: '',
+  minOrderAmount: 0,
+  returnPolicy: '',
+  qualityGuarantee: '',
+  remark: '',
+  status: 'active',
+};
+
 export default function PurchaseSuppliers() {
   const [activeType, setActiveType] = useState<SupplierType | 'all'>('all');
   const [keyword, setKeyword] = useState('');
@@ -41,12 +89,15 @@ export default function PurchaseSuppliers() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [showAddDrawer, setShowAddDrawer] = useState(false);
-  /** 新增合作商抽屉：合作商类型 / 主营品牌 / 品牌授权资质 / 门店草稿（其余字段为演示占位） */
+  /** 新增合作商抽屉草稿（保存后写入共享 store，合作商终端等读取方全局同步） */
   const [addTypes, setAddTypes] = useState<SupplierType[]>(['supplier']);
+  const [addDraft, setAddDraft] = useState<SupplierItem>(EMPTY_ADD_DRAFT);
+  /** 新增抽屉：单个可选仓库行 */
+  const [addWh, setAddWh] = useState({ name: '', address: '', contactPerson: '', contactPhone: '' });
+  const setAdd = (patch: Partial<SupplierItem>) => setAddDraft(d => ({ ...d, ...patch }));
   const [addMainBrands, setAddMainBrands] = useState<string[]>([]);
   const [addBrandAuthFiles, setAddBrandAuthFiles] = useState<BrandAuthFiles>({});
   const [addStores, setAddStores] = useState<{ id: string; name: string; address: string; mainBrands: string[]; photos: string[] }[]>([]);
-  const [selectedSupplier, setSelectedSupplier] = useState<SupplierItem | null>(null);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<SupplierItem | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -55,6 +106,15 @@ export default function PurchaseSuppliers() {
   /** 列表数据（共享 store：编辑保存 / 注册审批通过后全局同步） */
   const list = useSupplierStore(s => s.suppliers);
   const updateSupplierInStore = useSupplierStore(s => s.updateSupplier);
+  const addSupplierToStore = useSupplierStore(s => s.addSupplier);
+
+  /** 详情抽屉选中 ID：从 store 实时派生选中档案，终端直改 / 审批通过后抽屉内即时同步 */
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** 抽屉展示的档案：编辑态以草稿为准，查看态用 store 实时数据 */
+  const selectedSupplier = useMemo(
+    () => (editing ? editForm : list.find(s => s.id === selectedId) ?? null),
+    [editing, editForm, list, selectedId],
+  );
 
   // 筛选
   const filtered = useMemo(() => {
@@ -105,10 +165,10 @@ export default function PurchaseSuppliers() {
   };
 
   // 查看详情
-  const handleView = (s: SupplierItem) => { setSelectedSupplier(s); setEditing(false); setEditForm(null); setActiveTab('basic'); setShowDetail(true); };
+  const handleView = (s: SupplierItem) => { setSelectedId(s.id); setEditing(false); setEditForm(null); setActiveTab('basic'); setShowDetail(true); };
   // 列表行编辑：直接以编辑态打开抽屉
   const handleEdit = (s: SupplierItem) => {
-    setSelectedSupplier(s);
+    setSelectedId(s.id);
     setEditForm({
       ...s,
       stores: s.stores.map(st => ({ ...st })),
@@ -131,8 +191,8 @@ export default function PurchaseSuppliers() {
   };
   // 取消编辑
   const handleCancelEdit = () => { setEditing(false); setEditForm(null); };
-  // 保存编辑（同步列表，门店数量等随之更新）
-  const handleSaveEdit = () => { if (editForm) { setSelectedSupplier(editForm); updateSupplierInStore(editForm); setEditing(false); setEditForm(null); } };
+  // 保存编辑（写入共享 store：列表、合作商终端等读取方全局同步）
+  const handleSaveEdit = () => { if (editForm) { updateSupplierInStore(editForm); setEditing(false); setEditForm(null); } };
 
   // 仓库编辑（合作仓库联动仓储 > 仓库设置）
   const updateWarehouse = (idx: number, patch: Partial<SupplierWarehouse>) => {
@@ -258,6 +318,43 @@ export default function PurchaseSuppliers() {
   const handleOcr = () => {
     setOcrLoading(true);
     setTimeout(() => { setOcrLoading(false); }, 2000);
+  };
+
+  /** 新增合作商保存：校验必填 → 写入共享 store（列表/合作商终端全局同步）→ 重置草稿 */
+  const handleAddSave = () => {
+    if (addTypes.length === 0) { window.alert('请选择合作商类型'); return; }
+    if (!addDraft.name.trim()) { window.alert('请填写合作商名称'); return; }
+    if (!addDraft.unifiedCreditCode.trim()) { window.alert('请填写统一社会信用代码'); return; }
+    if (addMainBrands.length === 0) { window.alert('请选择公司主营品牌'); return; }
+    const today = new Date().toISOString().slice(0, 10);
+    const newItem: SupplierItem = {
+      ...addDraft,
+      id: `sup_${Date.now()}`,
+      types: addTypes,
+      name: addDraft.name.trim(),
+      shortName: addDraft.shortName?.trim(),
+      unifiedCreditCode: addDraft.unifiedCreditCode.trim(),
+      mainBrands: addMainBrands,
+      brandAuthFiles: addBrandAuthFiles,
+      warehouses: addWh.name.trim()
+        ? [{ id: `w${Date.now()}`, name: addWh.name.trim(), address: addWh.address.trim(), contactPerson: addWh.contactPerson.trim(), contactPhone: addWh.contactPhone.trim(), isDefault: true }]
+        : [],
+      stores: addStores.filter(st => st.name.trim()).map<SupplierStore>(st => ({
+        id: st.id, name: st.name.trim(), province: '', city: '', district: '',
+        address: st.address.trim(), area: 0, mainBrands: st.mainBrands, photos: st.photos, status: 'active',
+      })),
+      terminal: { enabled: false, username: '', status: 'active' },
+      cooperationDate: addDraft.cooperationDate || today,
+    };
+    addSupplierToStore(newItem);
+    // 重置新增抽屉草稿
+    setAddDraft(EMPTY_ADD_DRAFT);
+    setAddTypes(['supplier']);
+    setAddWh({ name: '', address: '', contactPerson: '', contactPhone: '' });
+    setAddMainBrands([]);
+    setAddBrandAuthFiles({});
+    setAddStores([]);
+    setShowAddDrawer(false);
   };
 
   // 资质文件上传（最多 5 个）
@@ -1211,41 +1308,41 @@ export default function PurchaseSuppliers() {
               </div>
               <div className="drawer-form-field">
                 <label className="drawer-label">名称 *</label>
-                <input className="filter-input" placeholder="请输入合作商名称" style={{ width: '100%' }} />
+                <input className="filter-input" placeholder="请输入合作商名称" style={{ width: '100%' }} value={addDraft.name} onChange={e => setAdd({ name: e.target.value })} />
               </div>
               <div className="drawer-form-field">
                 <label className="drawer-label">统一社会信用代码 *</label>
-                <input className="filter-input" placeholder="请输入18位信用代码" style={{ width: '100%' }} />
+                <input className="filter-input" placeholder="请输入18位信用代码" style={{ width: '100%' }} value={addDraft.unifiedCreditCode} onChange={e => setAdd({ unifiedCreditCode: e.target.value })} />
               </div>
             </div>
             <div className="drawer-form-row">
               <div className="drawer-form-field">
                 <label className="drawer-label">公司类型</label>
-                <input className="filter-input" placeholder="如：有限责任公司" style={{ width: '100%' }} />
+                <input className="filter-input" placeholder="如：有限责任公司" style={{ width: '100%' }} value={addDraft.companyType} onChange={e => setAdd({ companyType: e.target.value })} />
               </div>
               <div className="drawer-form-field">
                 <label className="drawer-label">法定代表人</label>
-                <input className="filter-input" placeholder="请输入" style={{ width: '100%' }} />
+                <input className="filter-input" placeholder="请输入" style={{ width: '100%' }} value={addDraft.legalRepresentative} onChange={e => setAdd({ legalRepresentative: e.target.value })} />
               </div>
               <div className="drawer-form-field">
                 <label className="drawer-label">成立日期</label>
-                <input className="filter-input" placeholder="YYYY-MM-DD" style={{ width: '100%' }} />
+                <input className="filter-input" placeholder="YYYY-MM-DD" style={{ width: '100%' }} value={addDraft.establishmentDate} onChange={e => setAdd({ establishmentDate: e.target.value })} />
               </div>
             </div>
             <div className="drawer-form-row">
               <div className="drawer-form-field">
                 <label className="drawer-label">注册资本</label>
-                <input className="filter-input" placeholder="如：500万元" style={{ width: '100%' }} />
+                <input className="filter-input" placeholder="如：500万元" style={{ width: '100%' }} value={addDraft.registeredCapital} onChange={e => setAdd({ registeredCapital: e.target.value })} />
               </div>
               <div className="drawer-form-field" style={{ flex: 2 }}>
                 <label className="drawer-label">注册地址</label>
-                <input className="filter-input" placeholder="请输入注册地址" style={{ width: '100%' }} />
+                <input className="filter-input" placeholder="请输入注册地址" style={{ width: '100%' }} value={addDraft.registeredAddress} onChange={e => setAdd({ registeredAddress: e.target.value })} />
               </div>
             </div>
             <div className="drawer-form-row">
               <div className="drawer-form-field">
                 <label className="drawer-label">经营范围</label>
-                <textarea className="filter-input" placeholder="请输入经营范围" style={{ width: '100%', minHeight: 60, resize: 'vertical' }} />
+                <textarea className="filter-input" placeholder="请输入经营范围" style={{ width: '100%', minHeight: 60, resize: 'vertical' }} value={addDraft.businessScope} onChange={e => setAdd({ businessScope: e.target.value })} />
               </div>
             </div>
             <div className="drawer-form-row">
@@ -1261,66 +1358,65 @@ export default function PurchaseSuppliers() {
             {/* 联系信息 */}
             <div className="drawer-section-title">联系信息</div>
             <div className="drawer-form-row">
-              <div className="drawer-form-field"><label className="drawer-label">联系人 *</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
-              <div className="drawer-form-field"><label className="drawer-label">联系人职务</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
-              <div className="drawer-form-field"><label className="drawer-label">联系电话 *</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">联系人 *</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} value={addDraft.contactPerson} onChange={e => setAdd({ contactPerson: e.target.value })} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">联系人职务</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} value={addDraft.contactPosition} onChange={e => setAdd({ contactPosition: e.target.value })} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">联系电话 *</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} value={addDraft.contactPhone} onChange={e => setAdd({ contactPhone: e.target.value })} /></div>
             </div>
             <div className="drawer-form-row">
-              <div className="drawer-form-field"><label className="drawer-label">联系邮箱</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
-              <div className="drawer-form-field" style={{ flex: 2 }}><label className="drawer-label">联系地址</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">联系邮箱</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} value={addDraft.contactEmail} onChange={e => setAdd({ contactEmail: e.target.value })} /></div>
+              <div className="drawer-form-field" style={{ flex: 2 }}><label className="drawer-label">联系地址</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} value={addDraft.contactAddress} onChange={e => setAdd({ contactAddress: e.target.value })} /></div>
             </div>
 
             {/* 合作信息 */}
             <div className="drawer-section-title">合作信息</div>
             <div className="drawer-form-row">
-              <div className="drawer-form-field"><label className="drawer-label">合作时间</label><input className="filter-input" placeholder="YYYY-MM-DD" style={{ width: '100%' }} /></div>
-              <div className="drawer-form-field"><label className="drawer-label">评价等级</label><select className="filter-select" style={{ width: '100%' }}><option value="">请选择</option><option value="S">S级</option><option value="A">A级</option><option value="B">B级</option><option value="C">C级</option><option value="D">D级</option></select></div>
-              <div className="drawer-form-field"><label className="drawer-label">主营品类</label><input className="filter-input" placeholder="如：绿茶、红茶" style={{ width: '100%' }} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">合作时间</label><input className="filter-input" placeholder="YYYY-MM-DD" style={{ width: '100%' }} value={addDraft.cooperationDate} onChange={e => setAdd({ cooperationDate: e.target.value })} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">评价等级</label><select className="filter-select" style={{ width: '100%' }} value={addDraft.grade} onChange={e => setAdd({ grade: e.target.value as SupplierGrade })}><option value="S">S级</option><option value="A">A级</option><option value="B">B级</option><option value="C">C级</option><option value="D">D级</option></select></div>
+              <div className="drawer-form-field"><label className="drawer-label">主营品类</label><input className="filter-input" placeholder="如：绿茶、红茶" style={{ width: '100%' }} value={addDraft.mainCategories.join('、')} onChange={e => setAdd({ mainCategories: e.target.value.split(/[、,，]/).map(x => x.trim()).filter(Boolean) })} /></div>
             </div>
             <div className="drawer-form-row">
-              <div className="drawer-form-field"><label className="drawer-label">结算方式</label><select className="filter-select" style={{ width: '100%' }}><option value="">请选择</option><option value="period">周期结</option><option value="prepaid">先款结</option><option value="invoice">见票结</option><option value="monthly">月结</option><option value="quarterly">季结</option></select></div>
-              <div className="drawer-form-field"><label className="drawer-label">付款条件</label><input className="filter-input" placeholder="如：月结30天" style={{ width: '100%' }} /></div>
-              <div className="drawer-form-field"><label className="drawer-label">交货周期</label><input className="filter-input" placeholder="如：3-5个工作日" style={{ width: '100%' }} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">结算方式</label><select className="filter-select" style={{ width: '100%' }} value={addDraft.settlementMethod} onChange={e => setAdd({ settlementMethod: e.target.value as SupplierItem['settlementMethod'] })}><option value="period">周期结</option><option value="prepaid">先款结</option><option value="invoice">见票结</option><option value="monthly">月结</option><option value="quarterly">季结</option></select></div>
+              <div className="drawer-form-field"><label className="drawer-label">付款条件</label><input className="filter-input" placeholder="如：月结30天" style={{ width: '100%' }} value={addDraft.paymentTerms} onChange={e => setAdd({ paymentTerms: e.target.value })} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">交货周期</label><input className="filter-input" placeholder="如：3-5个工作日" style={{ width: '100%' }} value={addDraft.deliveryCycle} onChange={e => setAdd({ deliveryCycle: e.target.value })} /></div>
             </div>
             <div className="drawer-form-row">
-              <div className="drawer-form-field"><label className="drawer-label">最低起订额(元)</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} type="number" /></div>
-              <div className="drawer-form-field"><label className="drawer-label">一件代发</label><select className="filter-select" style={{ width: '100%' }}><option value="no">否</option><option value="yes">是</option></select></div>
-              <div className="drawer-form-field"><label className="drawer-label">快递费结算</label><select className="filter-select" style={{ width: '100%' }}><option value="free">包邮</option><option value="not_free_fixed">不包邮(固定运费)</option><option value="not_free_ratio">不包邮(按比例)</option><option value="not_free_bear">不包邮(到付)</option></select></div>
+              <div className="drawer-form-field"><label className="drawer-label">最低起订额(元)</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} type="number" value={addDraft.minOrderAmount || ''} onChange={e => setAdd({ minOrderAmount: Number(e.target.value) || 0 })} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">一件代发</label><select className="filter-select" style={{ width: '100%' }} value={addDraft.supportDropship ? 'yes' : 'no'} onChange={e => setAdd({ supportDropship: e.target.value === 'yes' })}><option value="no">否</option><option value="yes">是</option></select></div>
+              <div className="drawer-form-field"><label className="drawer-label">快递费结算</label><select className="filter-select" style={{ width: '100%' }} value={addDraft.shippingSettlement} onChange={e => setAdd({ shippingSettlement: e.target.value as SupplierItem['shippingSettlement'] })}><option value="free">包邮</option><option value="not_free_fixed">不包邮(固定运费)</option><option value="not_free_ratio">不包邮(按比例)</option><option value="not_free_bear">不包邮(到付)</option></select></div>
             </div>
             <div className="drawer-form-row">
-              <div className="drawer-form-field"><label className="drawer-label">退货政策</label><input className="filter-input" placeholder="如：质量问题7天内可退换" style={{ width: '100%' }} /></div>
-              <div className="drawer-form-field"><label className="drawer-label">质量保证</label><input className="filter-input" placeholder="如：符合GB/T标准" style={{ width: '100%' }} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">退货政策</label><input className="filter-input" placeholder="如：质量问题7天内可退换" style={{ width: '100%' }} value={addDraft.returnPolicy} onChange={e => setAdd({ returnPolicy: e.target.value })} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">质量保证</label><input className="filter-input" placeholder="如：符合GB/T标准" style={{ width: '100%' }} value={addDraft.qualityGuarantee} onChange={e => setAdd({ qualityGuarantee: e.target.value })} /></div>
             </div>
 
             {/* 结算信息 */}
             <div className="drawer-section-title">结算信息</div>
             <div className="drawer-form-row">
-              <div className="drawer-form-field"><label className="drawer-label">税务类型</label><select className="filter-select" style={{ width: '100%' }}><option value="small">小规模</option><option value="general">一般纳税人</option></select></div>
-              <div className="drawer-form-field"><label className="drawer-label">开票抬头<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginLeft: 4 }}>（与户名保持一致）</span></label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
-              <div className="drawer-form-field"><label className="drawer-label">税号</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">税务类型</label><select className="filter-select" style={{ width: '100%' }} value={addDraft.taxType} onChange={e => setAdd({ taxType: e.target.value as SupplierItem['taxType'] })}><option value="small">小规模</option><option value="general">一般纳税人</option></select></div>
+              <div className="drawer-form-field"><label className="drawer-label">开票抬头<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginLeft: 4 }}>（与户名保持一致）</span></label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} value={addDraft.invoiceInfo.title} onChange={e => setAdd({ invoiceInfo: { ...addDraft.invoiceInfo, title: e.target.value }, bankAccount: { ...addDraft.bankAccount, accountName: e.target.value } })} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">税号</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} value={addDraft.invoiceInfo.taxNo} onChange={e => setAdd({ invoiceInfo: { ...addDraft.invoiceInfo, taxNo: e.target.value } })} /></div>
             </div>
             <div className="drawer-form-row">
-              <div className="drawer-form-field"><label className="drawer-label">税率(%)</label><input className="filter-input" placeholder="如：13" style={{ width: '100%' }} type="number" /></div>
-              <div className="drawer-form-field"><label className="drawer-label">户名<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginLeft: 4 }}>（与开票抬头保持一致）</span></label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
-              <div className="drawer-form-field"><label className="drawer-label">账号</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">税率(%)</label><input className="filter-input" placeholder="如：13" style={{ width: '100%' }} type="number" value={addDraft.invoiceInfo.taxRate ?? ''} onChange={e => setAdd({ invoiceInfo: { ...addDraft.invoiceInfo, taxRate: Number(e.target.value) || 0 } })} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">户名<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginLeft: 4 }}>（与开票抬头保持一致）</span></label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} value={addDraft.bankAccount.accountName} onChange={e => setAdd({ bankAccount: { ...addDraft.bankAccount, accountName: e.target.value }, invoiceInfo: { ...addDraft.invoiceInfo, title: e.target.value } })} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">账号</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} value={addDraft.bankAccount.accountNo} onChange={e => setAdd({ bankAccount: { ...addDraft.bankAccount, accountNo: e.target.value } })} /></div>
             </div>
             <div className="drawer-form-row">
-              <div className="drawer-form-field"><label className="drawer-label">开户行</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
-              <div className="drawer-form-field"><label className="drawer-label">行号</label><input className="filter-input" placeholder="请输入联行号" style={{ width: '100%' }} /></div>
-              <div className="drawer-form-field"><label className="drawer-label">结算要求备注</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">开户行</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} value={addDraft.bankAccount.bankName} onChange={e => setAdd({ bankAccount: { ...addDraft.bankAccount, bankName: e.target.value } })} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">行号</label><input className="filter-input" placeholder="请输入联行号" style={{ width: '100%' }} value={addDraft.bankAccount.bankNo} onChange={e => setAdd({ bankAccount: { ...addDraft.bankAccount, bankNo: e.target.value } })} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">结算要求备注</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} value={addDraft.bankAccount.remark} onChange={e => setAdd({ bankAccount: { ...addDraft.bankAccount, remark: e.target.value } })} /></div>
             </div>
 
             {/* 仓库地址 */}
-            <div className="drawer-section-title">仓库地址（最多9个）</div>
+            <div className="drawer-section-title">仓库地址（选填）</div>
             <div style={{ background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
               <div className="drawer-form-row" style={{ marginBottom: 'var(--space-2)' }}>
-                <div className="drawer-form-field"><label className="drawer-label" style={{ fontSize: 'var(--text-xs)' }}>仓库名称</label><input className="filter-input" placeholder="如：杭州仓" style={{ width: '100%' }} /></div>
-                <div className="drawer-form-field" style={{ flex: 2 }}><label className="drawer-label" style={{ fontSize: 'var(--text-xs)' }}>仓库地址</label><input className="filter-input" placeholder="请输入详细地址" style={{ width: '100%' }} /></div>
-                <div className="drawer-form-field"><label className="drawer-label" style={{ fontSize: 'var(--text-xs)' }}>联系人</label><input className="filter-input" placeholder="姓名" style={{ width: '100%' }} /></div>
-                <div className="drawer-form-field"><label className="drawer-label" style={{ fontSize: 'var(--text-xs)' }}>电话</label><input className="filter-input" placeholder="电话" style={{ width: '100%' }} /></div>
-                <Button size="sm">添加</Button>
+                <div className="drawer-form-field"><label className="drawer-label" style={{ fontSize: 'var(--text-xs)' }}>仓库名称</label><input className="filter-input" placeholder="如：杭州仓" style={{ width: '100%' }} value={addWh.name} onChange={e => setAddWh(w => ({ ...w, name: e.target.value }))} /></div>
+                <div className="drawer-form-field" style={{ flex: 2 }}><label className="drawer-label" style={{ fontSize: 'var(--text-xs)' }}>仓库地址</label><input className="filter-input" placeholder="请输入详细地址" style={{ width: '100%' }} value={addWh.address} onChange={e => setAddWh(w => ({ ...w, address: e.target.value }))} /></div>
+                <div className="drawer-form-field"><label className="drawer-label" style={{ fontSize: 'var(--text-xs)' }}>联系人</label><input className="filter-input" placeholder="姓名" style={{ width: '100%' }} value={addWh.contactPerson} onChange={e => setAddWh(w => ({ ...w, contactPerson: e.target.value }))} /></div>
+                <div className="drawer-form-field"><label className="drawer-label" style={{ fontSize: 'var(--text-xs)' }}>电话</label><input className="filter-input" placeholder="电话" style={{ width: '100%' }} value={addWh.contactPhone} onChange={e => setAddWh(w => ({ ...w, contactPhone: e.target.value }))} /></div>
               </div>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>合作商仓库将同步至"仓储 &gt; 仓库设置"，作为合作仓库管理</div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>填写仓库名称后随档案保存；合作商仓库将同步至"仓储 &gt; 仓库设置"，作为合作仓库管理</div>
             </div>
 
             {/* 门店信息 */}
@@ -1374,7 +1470,7 @@ export default function PurchaseSuppliers() {
             </div>
             <div className="drawer-footer">
               <Button variant="ghost" onClick={() => setShowAddDrawer(false)}>取消</Button>
-              <Button onClick={() => setShowAddDrawer(false)}>保存</Button>
+              <Button onClick={handleAddSave}>保存</Button>
             </div>
           </div>
         </div>

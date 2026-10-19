@@ -238,8 +238,20 @@ export const useSupplierStore = create<SupplierStoreState>((set, get) => ({
         // 注册通过 → 新供应商入库（渠道来源：终端注册）
         nextSuppliers = [...suppliers, target.payload];
       } else if (target.supplierId) {
-        // 修改通过 → 更新对应供应商档案
-        nextSuppliers = suppliers.map(s => s.id === target.supplierId ? target.payload : s);
+        // 修改通过 → 更新对应合作商档案；
+        // 联系信息与仓库信息为终端免审直改分区，保留档案中的最新值，避免申请提交后终端的直改被申请时的旧快照覆盖
+        nextSuppliers = suppliers.map(s => s.id === target.supplierId ? {
+          ...target.payload,
+          contactPerson: s.contactPerson,
+          contactPosition: s.contactPosition,
+          contactPhone: s.contactPhone,
+          contactEmail: s.contactEmail,
+          contactProvince: s.contactProvince,
+          contactCity: s.contactCity,
+          contactDistrict: s.contactDistrict,
+          contactAddress: s.contactAddress,
+          warehouses: s.warehouses,
+        } : s);
       }
     }
     set({
