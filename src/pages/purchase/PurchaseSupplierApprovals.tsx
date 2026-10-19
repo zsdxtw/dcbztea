@@ -5,7 +5,7 @@ import Button from '../../components/common/Button';
 import DetailDrawer, { InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { useSupplierStore } from '../../stores/supplierStore';
 import type { SupplierApproval } from '../../types';
-import { SUPPLIER_TYPE_LABELS, TAX_TYPE_LABELS, SETTLEMENT_METHOD_LABELS } from '../../data/suppliers';
+import { SUPPLIER_TYPE_LABELS, SUPPLIER_TYPE_COLORS, TAX_TYPE_LABELS, SETTLEMENT_METHOD_LABELS } from '../../data/suppliers';
 
 const STATUS_LABELS: Record<string, string> = { pending: '待审批', approved: '已通过', rejected: '已驳回' };
 const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
@@ -185,7 +185,7 @@ export default function PurchaseSupplierApprovals() {
                 <InfoItem label="合作商类型">
                   <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
                     {(selected.payload.types ?? []).map(t => (
-                      <span key={t} style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: 'var(--color-module-current-lightest)', color: 'var(--color-module-current-base)', border: '1px solid var(--color-module-current-base)30' }}>{SUPPLIER_TYPE_LABELS[t] ?? t}</span>
+                      <span key={t} style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: `${SUPPLIER_TYPE_COLORS[t]}15`, color: SUPPLIER_TYPE_COLORS[t], border: `1px solid ${SUPPLIER_TYPE_COLORS[t]}30`, whiteSpace: 'nowrap' }}>{SUPPLIER_TYPE_LABELS[t] ?? t}</span>
                     ))}
                   </span>
                 </InfoItem>

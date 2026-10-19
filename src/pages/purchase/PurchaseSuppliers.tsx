@@ -24,7 +24,7 @@ import { useSupplierStore, getTerminalAccounts } from '../../stores/supplierStor
 /* ── 合作商类型筛选配置 ── */
 const TYPE_FILTER: { key: SupplierType | 'all'; label: string; color: string; desc: string }[] = [
   { key: 'all', label: '全部合作商', color: 'var(--color-module-current-base)', desc: '所有合作商' },
-  { key: 'brand', label: '品牌商', color: 'var(--color-module-current-base)', desc: '品牌拥有方，平台直接合作' },
+  { key: 'brand', label: '品牌商', color: '#CB405D', desc: '品牌拥有方，平台直接合作' },
   { key: 'supplier', label: '供应商', color: '#0DAFC6', desc: '差价模式：平台按价格采购，背对背销售' },
   { key: 'service', label: '服务商', color: '#9D73BD', desc: '扣点模式：按售价收取服务费，差价归服务商' },
 ];

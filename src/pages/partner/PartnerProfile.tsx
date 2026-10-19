@@ -5,7 +5,7 @@ import { getPartnerAuth } from './PartnerLayout';
 import { useSupplierStore } from '../../stores/supplierStore';
 import { BrandMultiSelect, BrandAuthUploader } from '../../components/common/BrandPicker';
 import { StorePhotoPicker, StorePhotoGallery } from '../../components/common/StorePhotoPicker';
-import { SUPPLIER_TYPE_LABELS, TAX_TYPE_LABELS, SETTLEMENT_METHOD_LABELS } from '../../data/suppliers';
+import { SUPPLIER_TYPE_LABELS, SUPPLIER_TYPE_COLORS, TAX_TYPE_LABELS, SETTLEMENT_METHOD_LABELS } from '../../data/suppliers';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
 import type { SupplierItem, SupplierStore, SupplierWarehouse, BrandAuthFiles } from '../../types';
 import './partner.css';
@@ -153,7 +153,7 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
         <InfoItem label="合作商类型">
           <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
             {supplier.types.map(t => (
-              <span key={t} style={{ padding: '1px 8px', borderRadius: 4, fontSize: 12, fontWeight: 500, background: '#E6F2ED', color: '#01795D', border: '1px solid rgba(1,121,93,0.3)' }}>{SUPPLIER_TYPE_LABELS[t] ?? t}</span>
+              <span key={t} style={{ padding: '1px 8px', borderRadius: 4, fontSize: 12, fontWeight: 500, background: `${SUPPLIER_TYPE_COLORS[t]}15`, color: SUPPLIER_TYPE_COLORS[t], border: `1px solid ${SUPPLIER_TYPE_COLORS[t]}30`, whiteSpace: 'nowrap' }}>{SUPPLIER_TYPE_LABELS[t] ?? t}</span>
             ))}
           </span>
         </InfoItem>

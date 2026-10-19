@@ -677,9 +677,9 @@ export const SUPPLIER_TYPE_LABELS: Record<string, string> = {
   service: '服务商',
 };
 
-/** 合作商类型颜色 */
+/** 合作商类型颜色（品牌商=红色；需用具体色值以支持 15/30 透明度拼接） */
 export const SUPPLIER_TYPE_COLORS: Record<string, string> = {
-  brand: 'var(--color-module-current-base)',
+  brand: '#CB405D',
   supplier: '#0DAFC6',
   service: '#9D73BD',
 };
