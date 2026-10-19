@@ -863,6 +863,8 @@ export interface SupplierItem {
   /** 合作商类型（可多选：品牌商与供应商/服务商互斥，供应商与服务商可同时选择） */
   types: SupplierType[];
   name: string;
+  /** 合作商简称（3-4 字，用于生成管理员登录账号） */
+  shortName?: string;
   unifiedCreditCode: string;
   cooperationAgreements: string[];
   brandAuthAgreements: string[];

@@ -182,6 +182,7 @@ export default function PurchaseSupplierApprovals() {
             {hasPayload(selected) && approvalTab === 'basic' && (
               <InfoGrid>
                 <InfoItem label="合作商名称" emph>{selected.payload.name}</InfoItem>
+                <InfoItem label="合作商简称" emph>{selected.payload.shortName || '—'}</InfoItem>
                 <InfoItem label="合作商类型">
                   <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
                     {(selected.payload.types ?? []).map(t => (
