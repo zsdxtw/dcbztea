@@ -20,7 +20,7 @@ const QUALIFICATION_OPTIONS = ['营业执照.pdf', '食品生产许可证.pdf', 
 const SECTIONS: Record<ProfileSectionKey, { title: string; desc: string; direct: boolean }> = {
   basic: {
     title: '基本信息',
-    desc: '本页信息与淡茶半盏后台「采购 > 合作商管理」中的合作商档案保持一致。修改主营品牌、品牌授权资质、经营范围、合作商简介需提交申请，经平台注册审批通过后生效。',
+    desc: '本页信息与淡茶半盏后台「采购 > 合作商管理」中的合作商档案保持一致。修改主营品牌、经营范围需提交申请，经平台注册审批通过后生效。',
     direct: false,
   },
   contact: {
@@ -40,12 +40,12 @@ const SECTIONS: Record<ProfileSectionKey, { title: string; desc: string; direct:
   },
   qualification: {
     title: '资质文件',
-    desc: '维护营业执照、生产许可等资质文件（最多 5 个）。修改需提交申请，经平台注册审批通过后生效。',
+    desc: '维护营业执照、生产许可等资质文件（最多 5 个）及各主营品牌的授权资质。修改需提交申请，经平台注册审批通过后生效。',
     direct: false,
   },
   finance: {
-    title: '财务信息',
-    desc: '维护开票税号与结算银行账号。修改需提交申请，经平台注册审批通过后生效。',
+    title: '结算信息',
+    desc: '维护税务类型、开票信息与结算银行账号（户名与开票抬头保持一致）。修改需提交申请，经平台注册审批通过后生效。',
     direct: false,
   },
 };
@@ -164,7 +164,6 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
         <InfoItem label="注册资本">{supplier.registeredCapital || '—'}</InfoItem>
         <InfoItem label="渠道来源"><Pill tone="green">终端注册</Pill></InfoItem>
         <InfoItem label="合作时间">{supplier.cooperationDate}</InfoItem>
-        <InfoItem label="税务类型">{TAX_TYPE_LABELS[supplier.taxType] ?? supplier.taxType}</InfoItem>
         <InfoItem label="公司主营品牌" span={3}>
           {(supplier.mainBrands?.length ?? 0) > 0 ? (
             <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 6 }}>
@@ -174,30 +173,9 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
             </span>
           ) : '—'}
         </InfoItem>
-        <InfoItem label="品牌授权资质" span={3}>
-          {(Object.keys(supplier.brandAuthFiles ?? {}).length) > 0 ? (
-            <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4 }}>
-              {Object.entries(supplier.brandAuthFiles!).map(([brand, files]) => (
-                <span key={brand} style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-                  <span style={{ padding: '1px 8px', borderRadius: 4, fontSize: 12, fontWeight: 500, background: '#E6F2ED', color: '#01795D' }}>{brand}</span>
-                  {(files.length ? files : ['未上传']).map(f => (
-                    <span key={f} style={{ padding: '1px 8px', borderRadius: 4, fontSize: 12, background: '#F4F7F6', border: '1px solid var(--pk-line2, #E4EAE8)', color: 'var(--pk-ink2)' }}>{f}</span>
-                  ))}
-                </span>
-              ))}
-            </span>
-          ) : '—'}
-        </InfoItem>
         <InfoItem label="注册地址" span={3}>{[supplier.registeredProvince, supplier.registeredCity, supplier.registeredDistrict, supplier.registeredAddress].filter(Boolean).join(' ')}</InfoItem>
         <InfoItem label="经营范围" span={3}>{supplier.businessScope || '—'}</InfoItem>
       </InfoGrid>
-      {/* 合作商简介（归属基本信息菜单） */}
-      <div className="pk-section" style={{ marginTop: 4 }}>
-        <h3 className="pk-section-title">合作商简介</h3>
-        <div style={{ fontSize: 13.5, color: 'var(--pk-ink2)', lineHeight: 1.9 }}>
-          {supplier.introduction || '—'}
-        </div>
-      </div>
     </>
   );
 
@@ -255,6 +233,24 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
 
   const qualificationView = (
     <>
+      {/* 品牌授权资质（按品牌展示，与主营品牌联动） */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--pk-ink)', marginBottom: 8 }}>品牌授权资质</div>
+        {(Object.keys(supplier.brandAuthFiles ?? {}).length) > 0 ? (
+          <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4 }}>
+            {Object.entries(supplier.brandAuthFiles!).map(([brand, files]) => (
+              <span key={brand} style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                <span style={{ padding: '1px 8px', borderRadius: 4, fontSize: 12, fontWeight: 500, background: '#E6F2ED', color: '#01795D' }}>{brand}</span>
+                {(files.length ? files : ['未上传']).map(f => (
+                  <span key={f} style={{ padding: '1px 8px', borderRadius: 4, fontSize: 12, background: '#F4F7F6', border: '1px solid var(--pk-line2, #E4EAE8)', color: 'var(--pk-ink2)' }}>{f}</span>
+                ))}
+              </span>
+            ))}
+          </span>
+        ) : (
+          <div style={{ fontSize: 13, color: '#99A29D' }}>暂无品牌授权资质</div>
+        )}
+      </div>
       {supplier.qualificationFiles.length === 0 && <div style={{ fontSize: 13, color: '#99A29D' }}>暂无资质文件，点击「申请修改信息」补充维护</div>}
       {supplier.qualificationFiles.map((f, i) => (
         <div key={`${f}-${i}`} className="pk-item-row">
@@ -269,6 +265,7 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
 
   const financeView = (
     <InfoGrid>
+      <InfoItem label="税务类型">{TAX_TYPE_LABELS[supplier.taxType] ?? supplier.taxType}</InfoItem>
       <InfoItem label="结算方式">{SETTLEMENT_METHOD_LABELS[supplier.settlementMethod] ?? supplier.settlementMethod}</InfoItem>
       <InfoItem label="开票抬头">{supplier.invoiceInfo.title}</InfoItem>
       <InfoItem label="税号" mono>{supplier.invoiceInfo.taxNo || '—'}</InfoItem>
@@ -284,32 +281,22 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
   /* ── 编辑态表单（按分区） ── */
 
   const basicEdit = form && (
-    <>
-      <div className="pk-section">
-        <h3 className="pk-section-title">主营品牌与品牌授权</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label className="pk-reg-label">公司主营品牌（品牌列表来源于平台「商品 &gt; 品牌管理」）</label>
-            <BrandMultiSelect value={form.mainBrands ?? []} onChange={handleMainBrandsChange} accent="#01795D" />
-            <div style={{ fontSize: 12, color: '#99A29D', marginTop: 6 }}>
-              修改主营品牌需经平台审批生效；移除品牌将同步清理该品牌的授权文件与门店主营品牌
-            </div>
-          </div>
-          <div>
-            <label className="pk-reg-label">品牌授权资质</label>
-            <BrandAuthUploader brands={form.mainBrands ?? []} files={form.brandAuthFiles ?? {}} onChange={next => patch({ brandAuthFiles: next })} accent="#01795D" />
-          </div>
-          <div>
-            <label className="pk-reg-label">经营范围</label>
-            <textarea className="pk-reg-textarea" value={form.businessScope} onChange={e => patch({ businessScope: e.target.value })} />
+    <div className="pk-section">
+      <h3 className="pk-section-title">主营品牌</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div>
+          <label className="pk-reg-label">公司主营品牌（品牌列表来源于平台「商品 &gt; 品牌管理」）</label>
+          <BrandMultiSelect value={form.mainBrands ?? []} onChange={handleMainBrandsChange} accent="#01795D" />
+          <div style={{ fontSize: 12, color: '#99A29D', marginTop: 6 }}>
+            修改主营品牌需经平台审批生效；移除品牌将同步清理「资质文件」中该品牌的授权文件与门店主营品牌
           </div>
         </div>
+        <div>
+          <label className="pk-reg-label">经营范围</label>
+          <textarea className="pk-reg-textarea" value={form.businessScope} onChange={e => patch({ businessScope: e.target.value })} />
+        </div>
       </div>
-      <div className="pk-section">
-        <h3 className="pk-section-title">合作商简介</h3>
-        <textarea className="pk-reg-textarea" style={{ minHeight: 90 }} placeholder="介绍企业情况、主营业务与合作模式" value={form.introduction} onChange={e => patch({ introduction: e.target.value })} />
-      </div>
-    </>
+    </div>
   );
 
   const contactEdit = form && (
@@ -471,7 +458,7 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
   const qualificationEdit = form && (
     <div className="pk-section">
       <h3 className="pk-section-title">资质文件（{form.qualificationFiles.length}/5）</h3>
-      <div className="pk-reg-grid" style={{ marginBottom: 12 }}>
+      <div className="pk-reg-grid" style={{ marginBottom: 14 }}>
         {QUALIFICATION_OPTIONS.map(f => (
           <button key={f} type="button" className="pk-reg-add" style={{ textAlign: 'left' }}
             onClick={() => patch({ qualificationFiles: form.qualificationFiles.includes(f) ? form.qualificationFiles.filter(x => x !== f) : [...form.qualificationFiles, f] })}>
@@ -479,13 +466,34 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
           </button>
         ))}
       </div>
+      <div>
+        <label className="pk-reg-label">品牌授权资质</label>
+        <BrandAuthUploader brands={form.mainBrands ?? []} files={form.brandAuthFiles ?? {}} onChange={next => patch({ brandAuthFiles: next })} accent="#01795D" />
+        <div style={{ fontSize: 12, color: '#99A29D', marginTop: 6 }}>
+          品牌授权资质随「基本信息」中的主营品牌联动，需为每个主营品牌上传对应授权文件
+        </div>
+      </div>
     </div>
   );
 
   const financeEdit = form && (
     <div className="pk-section">
-      <h3 className="pk-section-title">财务信息</h3>
+      <h3 className="pk-section-title">结算信息</h3>
       <div className="pk-reg-grid">
+        <div>
+          <label className="pk-reg-label">税务类型</label>
+          <select className="pk-reg-select" value={form.taxType} onChange={e => patch({ taxType: e.target.value as SupplierItem['taxType'] })}>
+            {Object.entries(TAX_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="pk-reg-label">开票抬头（与户名保持一致）</label>
+          <input className="pk-reg-input" value={form.invoiceInfo.title} onChange={e => patch({ invoiceInfo: { ...form.invoiceInfo, title: e.target.value }, bankAccount: { ...form.bankAccount, accountName: e.target.value } })} />
+        </div>
+        <div>
+          <label className="pk-reg-label">税号</label>
+          <input className="pk-reg-input" value={form.invoiceInfo.taxNo} onChange={e => patch({ invoiceInfo: { ...form.invoiceInfo, taxNo: e.target.value } })} />
+        </div>
         <div>
           <label className="pk-reg-label">开户银行</label>
           <input className="pk-reg-input" value={form.bankAccount.bankName} onChange={e => patch({ bankAccount: { ...form.bankAccount, bankName: e.target.value } })} />
@@ -495,16 +503,12 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
           <input className="pk-reg-input" value={form.bankAccount.accountNo} onChange={e => patch({ bankAccount: { ...form.bankAccount, accountNo: e.target.value } })} />
         </div>
         <div>
-          <label className="pk-reg-label">户名</label>
-          <input className="pk-reg-input" value={form.bankAccount.accountName} onChange={e => patch({ bankAccount: { ...form.bankAccount, accountName: e.target.value } })} />
+          <label className="pk-reg-label">户名（与开票抬头保持一致）</label>
+          <input className="pk-reg-input" value={form.bankAccount.accountName} onChange={e => patch({ bankAccount: { ...form.bankAccount, accountName: e.target.value }, invoiceInfo: { ...form.invoiceInfo, title: e.target.value } })} />
         </div>
         <div>
           <label className="pk-reg-label">行号</label>
           <input className="pk-reg-input" value={form.bankAccount.bankNo} onChange={e => patch({ bankAccount: { ...form.bankAccount, bankNo: e.target.value } })} />
-        </div>
-        <div>
-          <label className="pk-reg-label">税号</label>
-          <input className="pk-reg-input" value={form.invoiceInfo.taxNo} onChange={e => patch({ invoiceInfo: { ...form.invoiceInfo, taxNo: e.target.value } })} />
         </div>
         <div>
           <label className="pk-reg-label">结算备注</label>

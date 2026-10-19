@@ -69,7 +69,7 @@ const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode
       { label: '仓库信息', path: '/partner/profile/warehouse' },
       { label: '门店信息', path: '/partner/profile/store' },
       { label: '资质文件', path: '/partner/profile/qualification' },
-      { label: '财务信息', path: '/partner/profile/finance' },
+      { label: '结算信息', path: '/partner/profile/finance' },
     ],
   },
 ];

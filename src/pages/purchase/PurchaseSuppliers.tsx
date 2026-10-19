@@ -389,7 +389,7 @@ export default function PurchaseSuppliers() {
             <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: selectedSupplier.status === 'active' ? '#E8F5E9' : '#FFF3E0', color: selectedSupplier.status === 'active' ? '#2E7D32' : '#E65100' }}>{selectedSupplier.status === 'active' ? '在册' : '停用'}</span>
           </>
         )}
-        subtitle={selectedSupplier?.introduction}
+        subtitle={selectedSupplier && [selectedSupplier.contactProvince, selectedSupplier.contactCity, selectedSupplier.contactDistrict].filter(Boolean).join(' / ')}
         mode={editing ? 'edit' : 'view'}
         onEdit={handleStartEdit}
         onCancelEdit={handleCancelEdit}
@@ -405,7 +405,7 @@ export default function PurchaseSuppliers() {
                 ['operation', '经营信息'],
                 ['warehouse', '仓库信息'],
                 ['store', '门店信息'],
-                ['finance', '财务信息'],
+                ['finance', '结算信息'],
                 ['terminal', '终端管理'],
               ] as [DrawerTabKey, string][]).map(([key, label]) => (
                 <button key={key} type="button" className={`drawer-tab${activeTab === key ? ' active' : ''}`} onClick={() => setActiveTab(key)}>
@@ -540,13 +540,8 @@ export default function PurchaseSuppliers() {
                 <label className="drawer-label">公司主营品牌 *</label>
                 <BrandMultiSelect value={editForm.mainBrands ?? []} onChange={updateMainBrands} />
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-                  品牌列表来源于「商品 &gt; 品牌管理」，选择后需在下方上传对应品牌的授权资质文件
+                  品牌列表来源于「商品 &gt; 品牌管理」，选择后需在「资质文件」中上传对应品牌的授权资质文件
                 </div>
-              </div>
-              {/* 品牌授权资质（按品牌上传） */}
-              <div style={{ marginTop: 'var(--space-3)' }}>
-                <label className="drawer-label">品牌授权资质</label>
-                <BrandAuthUploader brands={editForm.mainBrands ?? []} files={editForm.brandAuthFiles ?? {}} onChange={updateBrandAuthFiles} />
               </div>
               {/* 渠道来源（编辑态只读：由创建方式决定） */}
               <div style={{ marginTop: 'var(--space-3)' }}>
@@ -563,6 +558,14 @@ export default function PurchaseSuppliers() {
 
             {activeTab === 'qualification' && (
               <div>
+              {/* 品牌授权资质（按品牌上传，与主营品牌联动） */}
+              <div style={{ marginBottom: 'var(--space-4)' }}>
+                <label className="drawer-label">品牌授权资质</label>
+                <BrandAuthUploader brands={editForm.mainBrands ?? []} files={editForm.brandAuthFiles ?? {}} onChange={updateBrandAuthFiles} />
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+                  品牌授权资质随基本信息中的主营品牌联动，需为每个主营品牌上传对应授权文件
+                </div>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
                 {(editForm?.qualificationFiles ?? []).map((f, i) => (
                   <div key={`${f}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
@@ -600,7 +603,6 @@ export default function PurchaseSuppliers() {
                   ['运费', 'shippingFee', 'text'],
                   ['运费备注', 'shippingRemark', 'text'],
                   ['一件代发', 'supportDropship', 'text'],
-                  ['税务类型', 'taxType', 'select', Object.entries(TAX_TYPE_LABELS)],
                   ['备注', 'remark', 'textarea'],
                 ] as [string, string, string, [string, string][]?][]).map(([label, field, type, options]) => {
                   const rawValue = (selectedSupplier as unknown as Record<string, unknown>)[field];
@@ -741,6 +743,12 @@ export default function PurchaseSuppliers() {
               <div>
                 <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)', color: 'var(--color-text-secondary)' }}>开票信息</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+                  <div>
+                    <label className="drawer-label">税务类型</label>
+                    <select className="filter-select" style={{ width: '100%' }} value={editForm.taxType} onChange={e => setEditForm(prev => prev ? { ...prev, taxType: e.target.value as SupplierItem['taxType'] } : prev)}>
+                      {Object.entries(TAX_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                  </div>
                   {([
                     ['抬头', 'invoiceInfo.title'],
                     ['税号', 'invoiceInfo.taxNo'],
@@ -754,7 +762,7 @@ export default function PurchaseSuppliers() {
                     const displayValue = path.includes('taxRate') ? `${val}%` : String(val ?? '—');
                     return (
                       <div key={path}>
-                        <label className="drawer-label">{label}</label>
+                        <label className="drawer-label">{label}{path === 'invoiceInfo.title' && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginLeft: 4 }}>（与户名保持一致）</span>}</label>
                         {editing ? (
                           <input className="filter-input" style={{ width: '100%' }} value={String(path.split('.').reduce((obj: unknown, key) => (obj as Record<string, unknown>)?.[key], editForm) ?? '')} onChange={e => {
                             const keys = path.split('.');
@@ -767,6 +775,10 @@ export default function PurchaseSuppliers() {
                                 target = target[keys[i]] as Record<string, unknown>;
                               }
                               target[keys[keys.length - 1]] = e.target.value;
+                              // 户名与开票抬头保持一致
+                              if (path === 'invoiceInfo.title') {
+                                updated.bankAccount = { ...updated.bankAccount, accountName: e.target.value };
+                              }
                               return updated;
                             });
                           }} />
@@ -789,7 +801,7 @@ export default function PurchaseSuppliers() {
                     const val = path.split('.').reduce((obj: unknown, key) => (obj as Record<string, unknown>)?.[key], selectedSupplier);
                     return (
                       <div key={path} style={{ gridColumn: path === 'bankAccount.remark' ? '1 / -1' : undefined }}>
-                        <label className="drawer-label">{label}</label>
+                        <label className="drawer-label">{label}{path === 'bankAccount.accountName' && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginLeft: 4 }}>（与开票抬头保持一致）</span>}</label>
                         {editing ? (
                           <input className="filter-input" style={{ width: '100%' }} value={String(path.split('.').reduce((obj: unknown, key) => (obj as Record<string, unknown>)?.[key], editForm) ?? '')} onChange={e => {
                             const keys = path.split('.');
@@ -802,6 +814,10 @@ export default function PurchaseSuppliers() {
                                 target = target[keys[i]] as Record<string, unknown>;
                               }
                               target[keys[keys.length - 1]] = e.target.value;
+                              // 户名与开票抬头保持一致
+                              if (path === 'bankAccount.accountName') {
+                                updated.invoiceInfo = { ...updated.invoiceInfo, title: e.target.value };
+                              }
                               return updated;
                             });
                           }} />
@@ -924,20 +940,6 @@ export default function PurchaseSuppliers() {
                     </span>
                   ) : '—'}
                 </InfoItem>
-                <InfoItem label="品牌授权资质" span={3}>
-                  {(Object.keys(selectedSupplier.brandAuthFiles ?? {}).length ?? 0) > 0 ? (
-                    <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4 }}>
-                      {Object.entries(selectedSupplier.brandAuthFiles!).map(([brand, files]) => (
-                        <span key={brand} style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-                          <span style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: 'var(--color-module-current-lightest)', color: 'var(--color-module-current-base)' }}>{brand}</span>
-                          {(files.length ? files : ['未上传']).map(f => (
-                            <span key={f} style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-primary)', color: 'var(--color-text-secondary)' }}>{f}</span>
-                          ))}
-                        </span>
-                      ))}
-                    </span>
-                  ) : '—'}
-                </InfoItem>
                 <InfoItem label="渠道来源">
                   <span style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: selectedSupplier.channelSource === 'terminal' ? '#E8F5E9' : 'var(--color-neutral-100)', color: selectedSupplier.channelSource === 'terminal' ? '#01795D' : 'var(--color-neutral-600)' }}>
                     {selectedSupplier.channelSource === 'terminal' ? '终端注册' : '手动创建'}
@@ -952,6 +954,24 @@ export default function PurchaseSuppliers() {
 
             {activeTab === 'qualification' && (
               <div>
+              {/* 品牌授权资质（按品牌展示，与主营品牌联动） */}
+              <div style={{ marginBottom: 'var(--space-4)' }}>
+                <label className="drawer-label" style={{ display: 'block', marginBottom: 'var(--space-2)' }}>品牌授权资质</label>
+                {(Object.keys(selectedSupplier.brandAuthFiles ?? {}).length) > 0 ? (
+                  <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4 }}>
+                    {Object.entries(selectedSupplier.brandAuthFiles!).map(([brand, files]) => (
+                      <span key={brand} style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                        <span style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: 'var(--color-module-current-lightest)', color: 'var(--color-module-current-base)' }}>{brand}</span>
+                        {(files.length ? files : ['未上传']).map(f => (
+                          <span key={f} style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-primary)', color: 'var(--color-text-secondary)' }}>{f}</span>
+                        ))}
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>暂无品牌授权资质</div>
+                )}
+              </div>
               {selectedSupplier.qualificationFiles.length === 0 ? (
                 <p style={{ color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-4)' }}>暂无资质文件</p>
               ) : (
@@ -980,7 +1000,6 @@ export default function PurchaseSuppliers() {
                 <InfoItem label="运费" mono>{selectedSupplier.shippingFee != null ? String(selectedSupplier.shippingFee) : '—'}</InfoItem>
                 <InfoItem label="运费备注">{selectedSupplier.shippingRemark || '—'}</InfoItem>
                 <InfoItem label="一件代发">{selectedSupplier.supportDropship ? '支持' : '不支持'}</InfoItem>
-                <InfoItem label="税务类型">{TAX_TYPE_LABELS[selectedSupplier.taxType] ?? '—'}</InfoItem>
                 <InfoItem label="备注" span={3}>{selectedSupplier.remark || '—'}</InfoItem>
               </InfoGrid>
               </div>
@@ -1053,6 +1072,7 @@ export default function PurchaseSuppliers() {
             {activeTab === 'finance' && (
               <div>
               <InfoGrid cols={3}>
+                <InfoItem label="税务类型">{TAX_TYPE_LABELS[selectedSupplier.taxType] ?? '—'}</InfoItem>
                 <InfoItem label="开票抬头">{selectedSupplier.invoiceInfo.title || '—'}</InfoItem>
                 <InfoItem label="税号" mono>{selectedSupplier.invoiceInfo.taxNo || '—'}</InfoItem>
                 <InfoItem label="税率" mono>{selectedSupplier.invoiceInfo.taxRate != null ? `${selectedSupplier.invoiceInfo.taxRate}%` : '—'}</InfoItem>
@@ -1233,14 +1253,8 @@ export default function PurchaseSuppliers() {
                 <label className="drawer-label">公司主营品牌 *</label>
                 <BrandMultiSelect value={addMainBrands} onChange={handleAddMainBrandsChange} />
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-                  品牌列表来源于「商品 &gt; 品牌管理」，选择后需为每个品牌上传对应的授权资质文件
+                  品牌列表来源于「商品 &gt; 品牌管理」，选择后需在「资质文件」中上传对应品牌的授权资质文件
                 </div>
-              </div>
-            </div>
-            <div className="drawer-form-row">
-              <div className="drawer-form-field" style={{ flex: 1 }}>
-                <label className="drawer-label">品牌授权资质</label>
-                <BrandAuthUploader brands={addMainBrands} files={addBrandAuthFiles} onChange={setAddBrandAuthFiles} />
               </div>
             </div>
 
@@ -1278,27 +1292,22 @@ export default function PurchaseSuppliers() {
               <div className="drawer-form-field"><label className="drawer-label">质量保证</label><input className="filter-input" placeholder="如：符合GB/T标准" style={{ width: '100%' }} /></div>
             </div>
 
-            {/* 税务与开票 */}
-            <div className="drawer-section-title">税务与开票</div>
+            {/* 结算信息 */}
+            <div className="drawer-section-title">结算信息</div>
             <div className="drawer-form-row">
               <div className="drawer-form-field"><label className="drawer-label">税务类型</label><select className="filter-select" style={{ width: '100%' }}><option value="small">小规模</option><option value="general">一般纳税人</option></select></div>
-              <div className="drawer-form-field"><label className="drawer-label">开票抬头</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">开票抬头<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginLeft: 4 }}>（与户名保持一致）</span></label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
               <div className="drawer-form-field"><label className="drawer-label">税号</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
             </div>
             <div className="drawer-form-row">
               <div className="drawer-form-field"><label className="drawer-label">税率(%)</label><input className="filter-input" placeholder="如：13" style={{ width: '100%' }} type="number" /></div>
-            </div>
-
-            {/* 结算银行账号 */}
-            <div className="drawer-section-title">结算银行账号</div>
-            <div className="drawer-form-row">
-              <div className="drawer-form-field"><label className="drawer-label">户名</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">户名<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginLeft: 4 }}>（与开票抬头保持一致）</span></label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
               <div className="drawer-form-field"><label className="drawer-label">账号</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
-              <div className="drawer-form-field"><label className="drawer-label">开户行</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
             </div>
             <div className="drawer-form-row">
+              <div className="drawer-form-field"><label className="drawer-label">开户行</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
               <div className="drawer-form-field"><label className="drawer-label">行号</label><input className="filter-input" placeholder="请输入联行号" style={{ width: '100%' }} /></div>
-              <div className="drawer-form-field" style={{ flex: 2 }}><label className="drawer-label">结算要求备注</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
+              <div className="drawer-form-field"><label className="drawer-label">结算要求备注</label><input className="filter-input" placeholder="请输入" style={{ width: '100%' }} /></div>
             </div>
 
             {/* 仓库地址 */}
@@ -1344,9 +1353,9 @@ export default function PurchaseSuppliers() {
               </div>
             </div>
 
-            {/* 文件上传 */}
-            <div className="drawer-section-title">协议文件</div>
-            <div className="drawer-form-row">
+            {/* 资质文件 */}
+            <div className="drawer-section-title">资质文件</div>
+            <div className="drawer-form-row" style={{ marginBottom: 'var(--space-3)' }}>
               <div style={{ flex: 1, border: '2px dashed var(--color-border-primary)', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)', textAlign: 'center' }}>
                 <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 4 }}>合作协议</div>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>点击或拖拽上传，支持多份</div>
@@ -1356,11 +1365,11 @@ export default function PurchaseSuppliers() {
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>点击或拖拽上传，支持多份</div>
               </div>
             </div>
-
-            {/* 简介 */}
-            <div style={{ marginBottom: 'var(--space-4)' }}>
-              <label className="drawer-label">合作商简介</label>
-              <textarea className="filter-input" placeholder="请输入合作商简介" style={{ width: '100%', minHeight: 80, resize: 'vertical' }} />
+            <div className="drawer-form-row">
+              <div className="drawer-form-field" style={{ flex: 1 }}>
+                <label className="drawer-label">品牌授权资质</label>
+                <BrandAuthUploader brands={addMainBrands} files={addBrandAuthFiles} onChange={setAddBrandAuthFiles} />
+              </div>
             </div>
             </div>
             <div className="drawer-footer">

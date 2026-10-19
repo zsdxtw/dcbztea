@@ -145,7 +145,7 @@ export default function PurchaseSupplierApprovals() {
               ['qualification', '资质文件'],
               ['warehouse', '仓库信息'],
               ['store', '门店信息'],
-              ['finance', '财务信息'],
+              ['finance', '结算信息'],
               ['terminal', '终端账号'],
             ] as [ApprovalTabKey, string][]).map(([key, label]) => (
               <button key={key} type="button" className={`drawer-tab${approvalTab === key ? ' active' : ''}`} onClick={() => setApprovalTab(key)}>
@@ -245,7 +245,7 @@ export default function PurchaseSupplierApprovals() {
                   <InfoItem label="税务类型">{TAX_TYPE_LABELS[selected.payload.taxType] ?? selected.payload.taxType}</InfoItem>
                   <InfoItem label="税号" mono>{selected.payload.invoiceInfo?.taxNo || '—'}</InfoItem>
                 </InfoGrid>
-              ) : emptySection('未提交财务信息')
+              ) : emptySection('未提交结算信息')
             )}
             {hasPayload(selected) && approvalTab === 'terminal' && (
               <InfoGrid>
