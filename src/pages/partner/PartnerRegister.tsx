@@ -294,9 +294,18 @@ export default function PartnerRegister() {
                   );
                 })}
               </div>
-              <div style={{ fontSize: 12, color: '#99A29D', marginTop: 7, lineHeight: 1.7 }}>
-                品牌商：品牌拥有方，平台直接合作；供应商：差价模式，平台按价格采购、背对背销售；服务商：扣点模式，在售价基础上收取服务费，差价由服务商获得。
+              {/* 互斥规则提示（紧跟类型选项后方） */}
+              <div style={{ fontSize: 12, color: '#99A29D', marginTop: 7 }}>
                 品牌商与供应商/服务商互斥，供应商与服务商可同时选择。
+              </div>
+              {/* 类型说明：价格机制以括号作为备注；已选类型对应的说明整句标红显示 */}
+              <div style={{ fontSize: 12, lineHeight: 1.7, marginTop: 4 }}>
+                <span style={{ color: types.includes('brand') ? '#C13A54' : '#99A29D', fontWeight: types.includes('brand') ? 600 : 400 }}>品牌商：品牌拥有方，平台直接合作</span>
+                <span style={{ color: '#99A29D' }}>；</span>
+                <span style={{ color: types.includes('supplier') ? '#C13A54' : '#99A29D', fontWeight: types.includes('supplier') ? 600 : 400 }}>供应商：差价模式（平台按价格采购、背对背销售）</span>
+                <span style={{ color: '#99A29D' }}>；</span>
+                <span style={{ color: types.includes('service') ? '#C13A54' : '#99A29D', fontWeight: types.includes('service') ? 600 : 400 }}>服务商：扣点模式（在售价基础上收取服务费，差价由服务商获得）</span>
+                <span style={{ color: '#99A29D' }}>。</span>
               </div>
             </div>
             {/* 第二行：合作商名称 / 合作商简称 / 统一社会信用代码 */}
