@@ -143,7 +143,7 @@ export default function PartnerQuotes() {
         {/* 左侧品牌栏 */}
         <div className="pk-panel" style={{ width: 232, flexShrink: 0 }}>
           <div className="pk-panel-head" style={{ paddingBottom: 12 }}>
-            <div className="pk-panel-title" style={{ fontSize: 13 }}>主营品牌</div>
+            <div className="pk-panel-title" style={{ fontSize: 13 }}>公司主营品牌</div>
           </div>
           <div className="pk-panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <button

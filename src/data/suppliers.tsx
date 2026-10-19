@@ -595,13 +595,18 @@ const BRAND_AUTH_FILES_MAP: Record<string, Record<string, string[]>> = {
 const STORES_MAP: Record<string, SupplierStore[]> = {
   '1': [
     { id: 'st1-1', name: '西湖品牌馆', province: '浙江', city: '杭州市', district: '西湖区', address: '龙井路88号', area: 320, manager: '陈店长', phone: '0571-8766***1', mainBrands: ['西湖牌'], status: 'active' },
-    { id: 'st1-2', name: '龙井茶体验店', province: '浙江', city: '杭州市', district: '上城区', address: '南山路101号', area: 180, manager: '周店长', phone: '0571-8766***2', mainBrands: ['西湖牌'], status: 'active' },
+    { id: 'st1-2', name: '龙井茶体验店', province: '浙江', city: '杭州市', district: '上城区', address: '南山路101号', area: 180, manager: '周店长', phone: '0571-8766***2', mainBrands: ['西湖牌'], photos: [
+      'https://trae-api-cn.mchost.guru/api/ide/v1/tool_text_to_image?prompt=%E8%8C%B6%E5%8F%B6%E5%93%81%E7%89%8C%E4%BD%93%E9%AA%8C%E5%BA%97%E9%97%A8%E5%A4%B4%E6%8B%9B%E7%89%8C%EF%BC%8C%E6%9C%A8%E8%B4%A8%E6%A0%BC%E6%A0%85%E8%AE%BE%E8%AE%A1%EF%BC%8C%E6%9A%96%E5%85%89%E7%85%A7%E6%98%8E%EF%BC%8C%E8%A1%97%E6%99%AF%E8%A7%86%E8%A7%92%EF%BC%8C%E9%AB%98%E6%B8%85%E6%91%84%E5%BD%B1&image_size=square_hd',
+      'https://trae-api-cn.mchost.guru/api/ide/v1/tool_text_to_image?prompt=%E8%8C%B6%E5%8F%B6%E9%97%A8%E5%BA%97%E5%AE%A4%E5%86%85%E5%93%81%E8%8C%B6%E5%8C%BA%EF%BC%8C%E5%AE%9E%E6%9C%A8%E8%8C%B6%E6%A1%8C%E8%8C%B6%E6%A4%85%EF%BC%8C%E4%B8%AD%E5%BC%8F%E8%8C%B6%E6%96%87%E5%8C%96%E8%A3%85%E9%A5%B0%EF%BC%8C%E9%AB%98%E6%B8%85%E6%91%84%E5%BD%B1&image_size=square_hd',
+    ], status: 'active' },
   ],
   '2': [
     { id: 'st2-1', name: '正山堂武夷山旗舰店', province: '福建', city: '南平市', district: '武夷山市', address: '大王峰北路12号', area: 260, manager: '吴店长', phone: '0599-510***1', mainBrands: ['正山堂'], status: 'active' },
   ],
   '3': [
-    { id: 'st3-1', name: '八马茶业杭州大厦店', province: '浙江', city: '杭州市', district: '下城区', address: '武林广场1号', area: 150, manager: '林店长', phone: '0571-8888***1', mainBrands: ['八马'], status: 'active' },
+    { id: 'st3-1', name: '八马茶业杭州大厦店', province: '浙江', city: '杭州市', district: '下城区', address: '武林广场1号', area: 150, manager: '林店长', phone: '0571-8888***1', mainBrands: ['八马'], photos: [
+      'https://trae-api-cn.mchost.guru/api/ide/v1/tool_text_to_image?prompt=%E8%8C%B6%E5%8F%B6%E4%B8%93%E5%8D%96%E5%BA%97%E6%A9%B1%E7%AA%97%E9%99%88%E5%88%97%EF%BC%8C%E7%A4%BC%E7%9B%92%E8%A3%85%E8%8C%B6%E5%8F%B6%E5%B1%95%E7%A4%BA%EF%BC%8C%E5%B0%84%E7%81%AF%E6%89%93%E5%85%89%EF%BC%8C%E9%AB%98%E6%B8%85%E6%91%84%E5%BD%B1&image_size=square_hd',
+    ], status: 'active' },
     { id: 'st3-2', name: '八马茶业西湖店', province: '浙江', city: '杭州市', district: '西湖区', address: '杨公堤23号', area: 210, manager: '郑店长', phone: '0571-8888***2', mainBrands: ['八马'], status: 'active' },
     { id: 'st3-3', name: '八马茶业滨江店', province: '浙江', city: '杭州市', district: '滨江区', address: '江南大道588号', area: 130, manager: '冯店长', phone: '0571-8888***3', mainBrands: ['八马'], status: 'inactive' },
   ],

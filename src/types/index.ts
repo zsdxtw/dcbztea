@@ -534,6 +534,8 @@ export interface SupplierStore {
   phone?: string;
   /** 主营品牌 */
   mainBrands: string[];
+  /** 门店照片（最多 5 张） */
+  photos?: string[];
   /** 营业状态 */
   status: 'active' | 'inactive';
 }

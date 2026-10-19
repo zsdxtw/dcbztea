@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { TeaLeafMark } from './PartnerLayout';
 import { useSupplierStore } from '../../stores/supplierStore';
 import { BrandMultiSelect, BrandAuthUploader } from '../../components/common/BrandPicker';
+import { StorePhotoPicker } from '../../components/common/StorePhotoPicker';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
 import type { SupplierItem, SupplierWarehouse, SupplierStore, BrandAuthFiles } from '../../types';
 import './partner.css';
@@ -11,10 +12,10 @@ import './partner.css';
 const QUALIFICATION_OPTIONS = ['营业执照.pdf', '食品生产许可证.pdf', '食品经营许可证.pdf', 'SC认证证书.pdf', '质量管理体系认证.pdf', '品牌授权书.pdf'];
 
 interface RegWarehouseDraft { id: string; name: string; address: string; contactPerson: string; contactPhone: string; }
-interface RegStoreDraft { id: string; name: string; province: string; city: string; district: string; address: string; area: number; mainBrands: string[]; }
+interface RegStoreDraft { id: string; name: string; province: string; city: string; district: string; address: string; area: number; mainBrands: string[]; photos: string[]; }
 
 const EMPTY_WAREHOUSE: RegWarehouseDraft = { id: '', name: '', address: '', contactPerson: '', contactPhone: '' };
-const EMPTY_STORE: RegStoreDraft = { id: '', name: '', province: '', city: '', district: '', address: '', area: 0, mainBrands: [] };
+const EMPTY_STORE: RegStoreDraft = { id: '', name: '', province: '', city: '', district: '', address: '', area: 0, mainBrands: [], photos: [] };
 
 const newWarehouse = (): RegWarehouseDraft => ({ ...EMPTY_WAREHOUSE, id: `w${Date.now()}` });
 const newStore = (): RegStoreDraft => ({ ...EMPTY_STORE, id: `st${Date.now()}` });
@@ -97,7 +98,7 @@ export default function PartnerRegister() {
     if (!contactPerson.trim()) return showError('请填写联系人');
     if (!contactPhone.trim()) return showError('请填写联系电话');
     if (!registeredAddress.trim()) return showError('请填写注册地址');
-    if (mainBrands.length === 0) return showError('请选择主营品牌（来源于平台品牌管理）');
+    if (mainBrands.length === 0) return showError('请选择公司主营品牌（来源于平台品牌管理）');
     if (mainBrands.some(b => !(brandAuthFiles[b]?.length))) return showError('每个主营品牌均需上传对应的授权资质文件');
     if (qualificationFiles.length === 0) return showError('请至少上传 1 份资质文件（如营业执照）');
     if (!username.trim()) return showError('请设置终端登录账号');
@@ -139,6 +140,7 @@ export default function PartnerRegister() {
         id: st.id, name: st.name.trim(), province: st.province, city: st.city, district: st.district,
         address: st.address.trim(), area: st.area || 0,
         mainBrands: st.mainBrands.filter(b => mainBrands.includes(b)),
+        photos: st.photos,
         status: 'active',
       })),
       mainBrands,
@@ -303,7 +305,7 @@ export default function PartnerRegister() {
               <textarea className="pk-reg-textarea" placeholder="如：茶叶种植、加工、销售" value={businessScope} onChange={e => setBusinessScope(e.target.value)} />
             </div>
             <div className="span-3">
-              <label className="pk-reg-label">主营品牌<span className="pk-reg-star">*</span></label>
+              <label className="pk-reg-label">公司主营品牌<span className="pk-reg-star">*</span></label>
               <BrandMultiSelect value={mainBrands} onChange={handleMainBrandsChange} accent="#01795D" />
               <div style={{ fontSize: 12, color: '#99A29D', marginTop: 6 }}>
                 品牌列表来源于平台「商品 &gt; 品牌管理」，支持多选；选择后需为每个品牌上传对应的授权资质文件
@@ -435,12 +437,16 @@ export default function PartnerRegister() {
                     <input className="pk-reg-input" type="number" placeholder="如：200" value={st.area || ''} onChange={e => updateStoreRow(i, { area: Number(e.target.value) || 0 })} />
                   </div>
                   <div className="span-3">
-                    <label className="pk-reg-label">主营品牌（可选范围不超过基本信息主营品牌）</label>
+                    <label className="pk-reg-label">门店主营品牌（可选范围不超过基本信息主营品牌）</label>
                     {mainBrands.length > 0 ? (
                       <BrandMultiSelect value={st.mainBrands} options={mainBrands} onChange={v => updateStoreRow(i, { mainBrands: v })} accent="#01795D" />
                     ) : (
-                      <div style={{ fontSize: 12.5, color: '#99A29D' }}>请先在上方「基本信息」中选择主营品牌</div>
+                      <div style={{ fontSize: 12.5, color: '#99A29D' }}>请先在上方「基本信息」中选择公司主营品牌</div>
                     )}
+                  </div>
+                  <div className="span-3">
+                    <label className="pk-reg-label">门店照片（最多 5 张，选填）</label>
+                    <StorePhotoPicker photos={st.photos} onChange={v => updateStoreRow(i, { photos: v })} accent="#01795D" />
                   </div>
                 </div>
               </div>

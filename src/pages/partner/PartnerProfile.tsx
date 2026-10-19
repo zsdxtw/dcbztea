@@ -4,6 +4,7 @@ import { PageHead, Pill } from './PartnerUI';
 import { getPartnerAuth } from './PartnerLayout';
 import { useSupplierStore } from '../../stores/supplierStore';
 import { BrandMultiSelect, BrandAuthUploader } from '../../components/common/BrandPicker';
+import { StorePhotoPicker, StorePhotoGallery } from '../../components/common/StorePhotoPicker';
 import { SUPPLIER_TYPE_LABELS, TAX_TYPE_LABELS, SETTLEMENT_METHOD_LABELS } from '../../data/suppliers';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
 import type { SupplierItem, SupplierStore, SupplierWarehouse, BrandAuthFiles } from '../../types';
@@ -13,7 +14,7 @@ import './partner.css';
 const QUALIFICATION_OPTIONS = ['营业执照.pdf', '食品生产许可证.pdf', '食品经营许可证.pdf', 'SC认证证书.pdf', '质量管理体系认证.pdf', '仓储服务资质.pdf'];
 
 const newWarehouse = (): SupplierWarehouse => ({ id: `w${Date.now()}`, name: '', address: '', contactPerson: '', contactPhone: '', isDefault: false });
-const newStore = (): SupplierStore => ({ id: `st${Date.now()}`, name: '', province: '', city: '', district: '', address: '', area: 0, mainBrands: [], status: 'active' });
+const newStore = (): SupplierStore => ({ id: `st${Date.now()}`, name: '', province: '', city: '', district: '', address: '', area: 0, mainBrands: [], photos: [], status: 'active' });
 
 /** 合作商系统-合作商信息：读取供应商档案，支持提交信息修改申请（经平台注册审批生效） */
 export default function PartnerProfile() {
@@ -164,7 +165,7 @@ export default function PartnerProfile() {
             <h3 className="pk-section-title">主营品牌与品牌授权</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label className="pk-reg-label">主营品牌（品牌列表来源于平台「商品 &gt; 品牌管理」）</label>
+                <label className="pk-reg-label">公司主营品牌（品牌列表来源于平台「商品 &gt; 品牌管理」）</label>
                 <BrandMultiSelect value={form.mainBrands ?? []} onChange={handleMainBrandsChange} accent="#01795D" />
                 <div style={{ fontSize: 12, color: '#99A29D', marginTop: 6 }}>
                   修改主营品牌需经平台审批生效；移除品牌将同步清理该品牌的授权文件与门店主营品牌
@@ -269,11 +270,11 @@ export default function PartnerProfile() {
                       <input className="pk-reg-input" type="number" value={st.area || ''} onChange={e => updateStoreRow(i, { area: Number(e.target.value) || 0 })} />
                     </div>
                     <div className="span-2">
-                      <label className="pk-reg-label">主营品牌（可选范围不超过基本信息主营品牌）</label>
+                      <label className="pk-reg-label">门店主营品牌（可选范围不超过基本信息主营品牌）</label>
                       {(form.mainBrands?.length ?? 0) > 0 ? (
                         <BrandMultiSelect value={st.mainBrands} options={form.mainBrands!} onChange={v => updateStoreRow(i, { mainBrands: v })} accent="#01795D" />
                       ) : (
-                        <div style={{ fontSize: 12.5, color: '#99A29D' }}>请先在上方「主营品牌与品牌授权」中选择主营品牌</div>
+                        <div style={{ fontSize: 12.5, color: '#99A29D' }}>请先在上方「主营品牌与品牌授权」中选择公司主营品牌</div>
                       )}
                     </div>
                     <div>
@@ -282,6 +283,10 @@ export default function PartnerProfile() {
                         <option value="active">营业中</option>
                         <option value="inactive">已停业</option>
                       </select>
+                    </div>
+                    <div className="span-3">
+                      <label className="pk-reg-label">门店照片（最多 5 张）</label>
+                      <StorePhotoPicker photos={st.photos ?? []} onChange={v => updateStoreRow(i, { photos: v })} accent="#01795D" />
                     </div>
                   </div>
                 </div>
@@ -370,7 +375,7 @@ export default function PartnerProfile() {
             <InfoItem label="渠道来源"><Pill tone="green">终端注册</Pill></InfoItem>
             <InfoItem label="合作时间">{supplier.cooperationDate}</InfoItem>
             <InfoItem label="税务类型">{TAX_TYPE_LABELS[supplier.taxType] ?? supplier.taxType}</InfoItem>
-            <InfoItem label="主营品牌" span={3}>
+            <InfoItem label="公司主营品牌" span={3}>
               {(supplier.mainBrands?.length ?? 0) > 0 ? (
                 <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 6 }}>
                   {supplier.mainBrands!.map(b => (
@@ -443,9 +448,10 @@ export default function PartnerProfile() {
                   <span className="mono" style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>{st.area}㎡</span>
                   {st.status === 'active' ? <Pill tone="green">营业中</Pill> : <Pill tone="amber">已停业</Pill>}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>
+                <div style={{ fontSize: 12, color: 'var(--pk-ink3)', marginBottom: (st.photos?.length ?? 0) > 0 ? 8 : 0 }}>
                   {[st.province, st.city, st.district].filter(Boolean).join(' / ')} {st.address}{st.mainBrands.length > 0 && `　·　主营：${st.mainBrands.join('、')}`}
                 </div>
+                {(st.photos?.length ?? 0) > 0 && <StorePhotoGallery photos={st.photos} />}
               </div>
             </div>
           ))}

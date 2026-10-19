@@ -6,6 +6,7 @@ import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import DetailDrawer, { InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { BrandMultiSelect, BrandAuthUploader } from '../../components/common/BrandPicker';
+import { StorePhotoPicker, StorePhotoGallery } from '../../components/common/StorePhotoPicker';
 import {
   SUPPLIER_TYPE_LABELS,
   SUPPLIER_TYPE_COLORS,
@@ -42,7 +43,7 @@ export default function PurchaseSuppliers() {
   /** 新增供应商抽屉：主营品牌 / 品牌授权资质 / 门店草稿（其余字段为演示占位） */
   const [addMainBrands, setAddMainBrands] = useState<string[]>([]);
   const [addBrandAuthFiles, setAddBrandAuthFiles] = useState<BrandAuthFiles>({});
-  const [addStores, setAddStores] = useState<{ id: string; name: string; address: string; mainBrands: string[] }[]>([]);
+  const [addStores, setAddStores] = useState<{ id: string; name: string; address: string; mainBrands: string[]; photos: string[] }[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierItem | null>(null);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<SupplierItem | null>(null);
@@ -149,7 +150,7 @@ export default function PurchaseSuppliers() {
     setEditForm(prev => prev ? { ...prev, stores: prev.stores.map((st, i) => i === idx ? { ...st, ...patch } : st) } : prev);
   };
   const addStore = () => {
-    setEditForm(prev => prev ? { ...prev, stores: [...prev.stores, { id: `st${Date.now()}`, name: '', address: '', area: 0, mainBrands: [], status: 'active' }] } : prev);
+    setEditForm(prev => prev ? { ...prev, stores: [...prev.stores, { id: `st${Date.now()}`, name: '', address: '', area: 0, mainBrands: [], photos: [], status: 'active' }] } : prev);
   };
   const removeStore = (idx: number) => {
     setEditForm(prev => prev ? { ...prev, stores: prev.stores.filter((_, i) => i !== idx) } : prev);
@@ -490,7 +491,7 @@ export default function PurchaseSuppliers() {
               </div>
               {/* 主营品牌（多选，来源于商品-品牌管理） */}
               <div style={{ marginTop: 'var(--space-3)' }}>
-                <label className="drawer-label">主营品牌 *</label>
+                <label className="drawer-label">公司主营品牌 *</label>
                 <BrandMultiSelect value={editForm.mainBrands ?? []} onChange={updateMainBrands} />
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>
                   品牌列表来源于「商品 &gt; 品牌管理」，选择后需在下方上传对应品牌的授权资质文件
@@ -667,12 +668,16 @@ export default function PurchaseSuppliers() {
                         </div>
                       </div>
                       <div style={{ marginBottom: 'var(--space-2)' }}>
-                        <label className="drawer-label">主营品牌（可选范围不超过基本信息主营品牌）</label>
+                        <label className="drawer-label">门店主营品牌（可选范围不超过基本信息主营品牌）</label>
                         {(editForm.mainBrands?.length ?? 0) > 0 ? (
                           <BrandMultiSelect value={st.mainBrands} options={editForm.mainBrands} onChange={v => updateStore(i, { mainBrands: v })} />
                         ) : (
-                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', padding: 'var(--space-1) 0' }}>请先在「基本信息」中选择主营品牌</div>
+                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', padding: 'var(--space-1) 0' }}>请先在「基本信息」中选择公司主营品牌</div>
                         )}
+                      </div>
+                      <div style={{ marginBottom: 'var(--space-2)' }}>
+                        <label className="drawer-label">门店照片（最多 5 张）</label>
+                        <StorePhotoPicker photos={st.photos ?? []} onChange={v => updateStore(i, { photos: v })} />
                       </div>
                       <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                         <input className="filter-input" placeholder="负责人" style={{ flex: 1, height: 30, fontSize: 'var(--text-sm)' }} value={st.manager ?? ''} onChange={e => updateStore(i, { manager: e.target.value })} />
@@ -857,7 +862,7 @@ export default function PurchaseSuppliers() {
                 <InfoItem label="联系邮箱">{selectedSupplier.contactEmail || '—'}</InfoItem>
                 <InfoItem label="主营品类">{selectedSupplier.mainCategories.join('、') || '—'}</InfoItem>
                 <InfoItem label="资质状态">{String(selectedSupplier.qualificationStatus ?? '—')}</InfoItem>
-                <InfoItem label="主营品牌" span={3}>
+                <InfoItem label="公司主营品牌" span={3}>
                   {(selectedSupplier.mainBrands?.length ?? 0) > 0 ? (
                     <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 6 }}>
                       {selectedSupplier.mainBrands!.map(b => (
@@ -974,11 +979,17 @@ export default function PurchaseSuppliers() {
                           {[st.province, st.city, st.district].filter(Boolean).join(' / ')} {st.address}{(st.manager || st.phone) ? ` | ${st.manager ?? ''} ${st.phone ?? ''}` : ''}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>主营品牌</span>
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>门店主营品牌</span>
                           {(st.mainBrands.length ? st.mainBrands : ['—']).map(b => (
                             <span key={b} style={{ padding: '0 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: 'var(--color-bg-primary)', border: '1px solid var(--color-border-primary)', color: 'var(--color-text-secondary)' }}>{b}</span>
                           ))}
                         </div>
+                        {(st.photos?.length ?? 0) > 0 && (
+                          <div style={{ marginTop: 'var(--space-2)' }}>
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>门店照片（{st.photos!.length} 张）</span>
+                            <StorePhotoGallery photos={st.photos} />
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1145,7 +1156,7 @@ export default function PurchaseSuppliers() {
             </div>
             <div className="drawer-form-row">
               <div className="drawer-form-field" style={{ flex: 1 }}>
-                <label className="drawer-label">主营品牌 *</label>
+                <label className="drawer-label">公司主营品牌 *</label>
                 <BrandMultiSelect value={addMainBrands} onChange={handleAddMainBrandsChange} />
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>
                   品牌列表来源于「商品 &gt; 品牌管理」，选择后需为每个品牌上传对应的授权资质文件
@@ -1241,17 +1252,21 @@ export default function PurchaseSuppliers() {
                     <Button size="sm" variant="ghost" style={{ color: 'var(--color-semantic-error)', flexShrink: 0 }} onClick={() => setAddStores(prev => prev.filter((_, xi) => xi !== i))}>删除</Button>
                   </div>
                   <div>
-                    <label className="drawer-label">主营品牌（可选范围不超过基本信息主营品牌）</label>
+                    <label className="drawer-label">门店主营品牌（可选范围不超过基本信息主营品牌）</label>
                     {addMainBrands.length > 0 ? (
                       <BrandMultiSelect value={st.mainBrands} options={addMainBrands} onChange={v => setAddStores(prev => prev.map((x, xi) => xi === i ? { ...x, mainBrands: v } : x))} />
                     ) : (
-                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', padding: 'var(--space-1) 0' }}>请先在上方「基本信息」中选择主营品牌</div>
+                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', padding: 'var(--space-1) 0' }}>请先在上方「基本信息」中选择公司主营品牌</div>
                     )}
+                  </div>
+                  <div style={{ marginTop: 'var(--space-2)' }}>
+                    <label className="drawer-label">门店照片（最多 5 张）</label>
+                    <StorePhotoPicker photos={st.photos} onChange={v => setAddStores(prev => prev.map((x, xi) => xi === i ? { ...x, photos: v } : x))} />
                   </div>
                 </div>
               ))}
               <div>
-                <Button size="sm" variant="ghost" onClick={() => setAddStores(prev => [...prev, { id: `st${Date.now()}`, name: '', address: '', mainBrands: [] }])}>+ 新增门店</Button>
+                <Button size="sm" variant="ghost" onClick={() => setAddStores(prev => [...prev, { id: `st${Date.now()}`, name: '', address: '', mainBrands: [], photos: [] }])}>+ 新增门店</Button>
               </div>
             </div>
 
