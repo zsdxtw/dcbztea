@@ -256,6 +256,7 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
       { key: 'purchase-suppliers', label: '合作商管理', icon: <SuppliersIcon />, children: [
         { key: 'purchase-supplier-approvals', label: '注册审批', icon: <SupplierApprovalIcon /> },
         { key: 'purchase-supplier-list', label: '合作商列表', icon: <SupplierListIcon /> },
+        { key: 'purchase-store-overview', label: '门店总览', icon: <StoreIcon /> },
       ] },
       { key: 'purchase-reconciliation', label: '供应商对账', icon: <ReconciliationIcon /> },
       { key: 'purchase-return', label: '采购退货', icon: <ReturnIcon /> },
