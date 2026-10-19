@@ -952,7 +952,7 @@ export interface SupplierApproval {
 /** 新品提醒处理状态：pending=待处理 / listed=已上架 / dismissed=已忽略 */
 export type NewArrivalStatus = 'pending' | 'listed' | 'dismissed';
 
-/** 新品提醒：合作商提报品牌方已上市、平台未上架的商品 */
+/** 新品提醒：合作商提报品牌商已上市、平台未上架的商品 */
 export interface NewArrivalReminder {
   id: string;
   /** 提醒编号（XPTX-0001） */
@@ -963,7 +963,7 @@ export interface NewArrivalReminder {
   supplierName: string;
   /** 品牌（来源于商品-品牌管理） */
   brand: string;
-  /** 商品名称（品牌方已上市商品） */
+  /** 商品名称（品牌商已上市商品） */
   productName: string;
   /** 商品电商平台链接 */
   productUrl: string;

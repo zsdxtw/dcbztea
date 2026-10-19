@@ -26,10 +26,10 @@ const FILTERS = [
   { key: 'rejected', label: '已驳回' },
 ] as const;
 
-/** 审批详情抽屉 Tab 键（与供应商详情抽屉 Tab 化保持一致） */
+/** 审批详情抽屉 Tab 键（与合作商详情抽屉 Tab 化保持一致） */
 type ApprovalTabKey = 'approval' | 'basic' | 'qualification' | 'warehouse' | 'store' | 'finance' | 'terminal';
 
-/** 管理台-采购-供应商管理-注册审批：审批合作商终端提交的注册与信息修改申请 */
+/** 管理台-采购-合作商管理-注册审批：审批合作商终端提交的注册与信息修改申请 */
 export default function PurchaseSupplierApprovals() {
   const approvals = useSupplierStore(s => s.approvals);
   const reviewApproval = useSupplierStore(s => s.reviewApproval);
@@ -69,7 +69,7 @@ export default function PurchaseSupplierApprovals() {
   const emptySection = (title: string) => (
     <div style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-4)', border: '2px dashed var(--color-border-primary)', borderRadius: 'var(--radius-lg)' }}>
       <div style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)', marginBottom: 'var(--space-1)' }}>{title}</div>
-      <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', lineHeight: 1.7 }}>该部分为选填内容，未随本申请提交；<br />审批通过后合作商可登录终端在「合作商信息」中维护更新。</div>
+      <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', lineHeight: 1.7 }}>该部分为选填内容，未随本申请提交；<br />审批通过后合作商可登录终端在「设置」菜单中维护更新。</div>
     </div>
   );
 
@@ -78,10 +78,10 @@ export default function PurchaseSupplierApprovals() {
 
   return (
     <>
-      <ContentHeader title="注册审批" breadcrumbs={['采购', '供应商管理', '注册审批']} />
+      <ContentHeader title="注册审批" breadcrumbs={['采购', '合作商管理', '注册审批']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-          审批合作商终端提交的申请。<strong>注册申请</strong>：通过后自动创建供应商档案（渠道来源=终端注册）并开通终端账号；<strong>信息修改申请</strong>：通过后覆盖对应供应商档案。当前待审批 <strong style={{ color: 'var(--color-module-current-base)' }}>{pendingCount}</strong> 条。
+          审批合作商终端提交的申请。<strong>注册申请</strong>：通过后自动创建合作商档案（渠道来源=终端注册）并开通终端账号；<strong>信息修改申请</strong>：通过后覆盖对应合作商档案。当前待审批 <strong style={{ color: 'var(--color-module-current-base)' }}>{pendingCount}</strong> 条。
         </div>
 
         {/* 状态筛选 */}
@@ -96,11 +96,11 @@ export default function PurchaseSupplierApprovals() {
               );
             })}
           </div>
-          <input className="filter-input" placeholder="搜索审批编号 / 供应商 / 申请人" value={keyword} onChange={e => setKeyword(e.target.value)} />
+          <input className="filter-input" placeholder="搜索审批编号 / 合作商 / 申请人" value={keyword} onChange={e => setKeyword(e.target.value)} />
         </div>
 
         <Table
-          headers={['审批编号', '类型', '供应商名称', '申请人', '申请说明', '提交时间', '状态', '操作']}
+          headers={['审批编号', '类型', '合作商名称', '申请人', '申请说明', '提交时间', '状态', '操作']}
           rows={filtered.map(a => [
             <span key="code" className="cell-mono-emph">{a.code}</span>,
             <span key="type">{pill(a.type === 'register' ? '#E3F2FD' : '#F3E5F5', a.type === 'register' ? '#0F64B5' : '#7B1FA2', TYPE_LABELS[a.type])}</span>,
@@ -174,15 +174,21 @@ export default function PurchaseSupplierApprovals() {
                 </InfoGrid>
                 {selected.type === 'modify' && (
                   <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-3)', lineHeight: 1.7 }}>
-                    以上为该合作商提交的修改后完整档案，审批通过后将覆盖对应供应商的现有档案；档案详情可在上方标签页中查看。
+                    以上为该合作商提交的修改后完整档案，审批通过后将覆盖对应合作商的现有档案；档案详情可在上方标签页中查看。
                   </div>
                 )}
               </>
             )}
             {hasPayload(selected) && approvalTab === 'basic' && (
               <InfoGrid>
-                <InfoItem label="供应商名称" emph>{selected.payload.name}</InfoItem>
-                <InfoItem label="供应商类型">{SUPPLIER_TYPE_LABELS[selected.payload.type] ?? selected.payload.type}</InfoItem>
+                <InfoItem label="合作商名称" emph>{selected.payload.name}</InfoItem>
+                <InfoItem label="合作商类型">
+                  <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
+                    {(selected.payload.types ?? []).map(t => (
+                      <span key={t} style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: 'var(--color-module-current-lightest)', color: 'var(--color-module-current-base)', border: '1px solid var(--color-module-current-base)30' }}>{SUPPLIER_TYPE_LABELS[t] ?? t}</span>
+                    ))}
+                  </span>
+                </InfoItem>
                 <InfoItem label="统一社会信用代码" mono>{selected.payload.unifiedCreditCode}</InfoItem>
                 <InfoItem label="法定代表人">{selected.payload.legalRepresentative}</InfoItem>
                 <InfoItem label="联系人">{selected.payload.contactPerson}</InfoItem>
@@ -261,7 +267,7 @@ export default function PurchaseSupplierApprovals() {
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
               {reviewing.approval.code} · {reviewing.approval.payload.name || '注册申请'}
               {reviewing.action === 'approved'
-                ? (reviewing.approval.type === 'register' ? '，确认通过？通过后将自动创建供应商档案并开通终端账号。' : '，确认通过？通过后将覆盖该供应商的现有档案。')
+                ? (reviewing.approval.type === 'register' ? '，确认通过？通过后将自动创建合作商档案并开通终端账号。' : '，确认通过？通过后将覆盖该合作商的现有档案。')
                 : '，确认驳回？驳回后该申请不生效，合作商可在终端重新提交。'}
             </div>
             <div style={{ marginBottom: 'var(--space-4)' }}>

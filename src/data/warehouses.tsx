@@ -1,7 +1,7 @@
 /** 仓库设置共享数据源
  * - 独立仓库：自有的纯仓库，本模块维护，可在仓库设置中增删改查
  * - 门店仓库：由「销售 > 门店管理」中的门店数据派生（联动门店地址），在仓库设置中只读展示
- * - 合作仓库：由供应商管理中的仓库数据派生（联动），在仓库设置中只读展示
+ * - 合作仓库：由合作商管理中的仓库数据派生（联动），在仓库设置中只读展示
  */
 import type { Warehouse } from '../types';
 import { supplierItems } from './suppliers';
@@ -37,7 +37,7 @@ export function getStoreWarehouses(): Warehouse[] {
   }));
 }
 
-/** 从供应商数据派生合作仓库列表（联动供应商管理） */
+/** 从供应商数据派生合作仓库列表（联合作商管理） */
 export function getPartnerWarehouses(): Warehouse[] {
   return supplierItems.flatMap(s =>
     s.warehouses.map((w, idx) => ({

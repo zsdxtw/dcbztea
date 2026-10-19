@@ -41,7 +41,8 @@ export default function PurchaseSuppliers() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [showAddDrawer, setShowAddDrawer] = useState(false);
-  /** 新增供应商抽屉：主营品牌 / 品牌授权资质 / 门店草稿（其余字段为演示占位） */
+  /** 新增合作商抽屉：合作商类型 / 主营品牌 / 品牌授权资质 / 门店草稿（其余字段为演示占位） */
+  const [addTypes, setAddTypes] = useState<SupplierType[]>(['supplier']);
   const [addMainBrands, setAddMainBrands] = useState<string[]>([]);
   const [addBrandAuthFiles, setAddBrandAuthFiles] = useState<BrandAuthFiles>({});
   const [addStores, setAddStores] = useState<{ id: string; name: string; address: string; mainBrands: string[]; photos: string[] }[]>([]);
@@ -67,23 +68,24 @@ export default function PurchaseSuppliers() {
 
   // 统计
   const stats: StatCardData[] = useMemo(() => {
-    const brandCount = list.filter(s => s.type === 'brand').length;
-    const partnerCount = list.filter(s => s.type === 'partner').length;
+    const brandCount = list.filter(s => s.types.includes('brand')).length;
+    const supplierCount = list.filter(s => s.types.includes('supplier')).length;
+    const serviceCount = list.filter(s => s.types.includes('service')).length;
     const activeCount = list.filter(s => s.status === 'active').length;
     const gradeA = list.filter(s => s.grade === 'A' || s.grade === 'S').length;
     return [
       {
-        label: '品牌方', value: String(brandCount), unit: '家',
-        trend: { direction: 'up', value: `在册 ${list.filter(s => s.type === 'brand' && s.status === 'active').length} 家` },
+        label: '品牌商', value: String(brandCount), unit: '家',
+        trend: { direction: 'up', value: `在册 ${list.filter(s => s.types.includes('brand') && s.status === 'active').length} 家` },
         icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2L3 5v5c0 5 3.5 7.5 7 9 3.5-1.5 7-4 7-9V5L9 2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
       },
       {
-        label: '合作方', value: String(partnerCount), unit: '家',
-        trend: { direction: 'up', value: `在册 ${list.filter(s => s.type === 'partner' && s.status === 'active').length} 家` },
+        label: '供应商', value: String(supplierCount), unit: '家',
+        trend: { direction: 'up', value: `服务商 ${serviceCount} 家` },
         icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="14" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.2"/></svg>,
       },
       {
-        label: '在册供应商', value: String(activeCount), unit: '家',
+        label: '在册合作商', value: String(activeCount), unit: '家',
         trend: { direction: 'up', value: `总计 ${list.length} 家` },
         icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M3 9h12M7 5V3h4v2" stroke="currentColor" strokeWidth="1.3"/></svg>,
       },
@@ -174,7 +176,7 @@ export default function PurchaseSuppliers() {
   const updateBrandAuthFiles = (next: BrandAuthFiles) => {
     setEditForm(prev => prev ? { ...prev, brandAuthFiles: next } : prev);
   };
-  /** 新增供应商：主营品牌变更（同步裁剪授权文件与门店品牌，保持 ⊆ 主营品牌） */
+  /** 新增合作商：主营品牌变更（同步裁剪授权文件与门店品牌，保持 ⊆ 主营品牌） */
   const handleAddMainBrandsChange = (next: string[]) => {
     setAddMainBrands(next);
     setAddBrandAuthFiles(prev => {
@@ -273,7 +275,7 @@ export default function PurchaseSuppliers() {
 
   return (
     <>
-      <ContentHeader title="供应商列表" breadcrumbs={['采购', '供应商管理', '供应商列表']} />
+      <ContentHeader title="合作商列表" breadcrumbs={['采购', '合作商管理', '合作商列表']} />
 
       <div className="content-body">
       {/* 统计卡片 */}
@@ -282,9 +284,9 @@ export default function PurchaseSuppliers() {
       </div>
 
       {/* 类型筛选卡片 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
         {TYPE_FILTER.map(tf => {
-          const count = tf.key === 'all' ? list.length : list.filter(s => s.type === tf.key).length;
+          const count = tf.key === 'all' ? list.length : list.filter(s => s.types.includes(tf.key as SupplierType)).length;
           const isActive = activeType === tf.key;
           return (
             <div key={tf.key} style={{ cursor: 'pointer', border: isActive ? `2px solid ${tf.color}` : '1px solid var(--color-border-primary)', background: isActive ? `${tf.color}08` : 'var(--color-bg-primary)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)', boxShadow: 'var(--shadow-sm)' }} onClick={() => setActiveType(isActive ? 'all' : tf.key)}>
@@ -323,7 +325,7 @@ export default function PurchaseSuppliers() {
             删除
           </Button>
         )}
-        <span style={{ marginLeft: 'auto', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>共 {filtered.length} 家供应商</span>
+        <span style={{ marginLeft: 'auto', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>共 {filtered.length} 家合作商</span>
       </div>
 
       {/* 列表 */}
@@ -331,12 +333,16 @@ export default function PurchaseSuppliers() {
         <Table
           headers={[
             ...(deleteMode ? [<input key="chk" type="checkbox" checked={selectedForDelete.size === filtered.length && filtered.length > 0} onChange={e => { if (e.target.checked) setSelectedForDelete(new Set(filtered.map(s => s.id))); else setSelectedForDelete(new Set()); }} />] : []),
-            '供应商名称', '类型', '渠道来源', '评价等级', '主营品类', '联系人', '联系电话', '仓库', '门店', '一件代发', '状态', '操作',
+            '合作商名称', '类型', '渠道来源', '评价等级', '主营品类', '联系人', '联系电话', '仓库', '门店', '一件代发', '状态', '操作',
           ]}
           rows={filtered.map(s => [
             ...(deleteMode ? [<input key="chk" type="checkbox" checked={selectedForDelete.has(s.id)} onChange={() => handleToggleSelect(s.id)} />] : []),
             <span key="name" className="cell-emph">{s.name}</span>,
-            <span key="type" style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: `${SUPPLIER_TYPE_COLORS[s.type]}15`, color: SUPPLIER_TYPE_COLORS[s.type], border: `1px solid ${SUPPLIER_TYPE_COLORS[s.type]}30` }}>{SUPPLIER_TYPE_LABELS[s.type]}</span>,
+            <span key="type" style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
+              {s.types.map(t => (
+                <span key={t} style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: `${SUPPLIER_TYPE_COLORS[t]}15`, color: SUPPLIER_TYPE_COLORS[t], border: `1px solid ${SUPPLIER_TYPE_COLORS[t]}30`, whiteSpace: 'nowrap' }}>{SUPPLIER_TYPE_LABELS[t]}</span>
+              ))}
+            </span>,
             <span key="src" style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: s.channelSource === 'terminal' ? '#E8F5E9' : 'var(--color-neutral-100)', color: s.channelSource === 'terminal' ? '#01795D' : 'var(--color-neutral-600)' }}>{s.channelSource === 'terminal' ? '终端注册' : '手动创建'}</span>,
             <span key="grade" style={{ fontWeight: 'var(--font-bold)', color: GRADE_COLORS[s.grade] || GRADE_COLORS['C'] }}>{s.grade}级</span>,
             <span key="cat" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{s.mainCategories.join('、')}</span>,
@@ -359,7 +365,7 @@ export default function PurchaseSuppliers() {
         <div className="category-dialog-overlay" onClick={() => setShowDeleteConfirm(false)}>
           <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
             <h3 style={{ marginBottom: 'var(--space-3)' }}>确认删除</h3>
-            <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)' }}>确定要删除选中的 {selectedForDelete.size} 家供应商吗？此操作不可撤销。</p>
+            <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)' }}>确定要删除选中的 {selectedForDelete.size} 家合作商吗？此操作不可撤销。</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
               <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>取消</Button>
               <Button style={{ background: '#0F64B5', borderColor: '#0F64B5' }} onClick={handleCancelDeleteMode}>确认删除</Button>
@@ -376,7 +382,9 @@ export default function PurchaseSuppliers() {
         title={selectedSupplier?.name}
         statusTag={selectedSupplier && (
           <>
-            <span style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: `${SUPPLIER_TYPE_COLORS[selectedSupplier.type]}15`, color: SUPPLIER_TYPE_COLORS[selectedSupplier.type], border: `1px solid ${SUPPLIER_TYPE_COLORS[selectedSupplier.type]}30` }}>{SUPPLIER_TYPE_LABELS[selectedSupplier.type]}</span>
+            {selectedSupplier.types.map(t => (
+              <span key={t} style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: `${SUPPLIER_TYPE_COLORS[t]}15`, color: SUPPLIER_TYPE_COLORS[t], border: `1px solid ${SUPPLIER_TYPE_COLORS[t]}30` }}>{SUPPLIER_TYPE_LABELS[t]}</span>
+            ))}
             <span style={{ fontWeight: 'var(--font-bold)', color: GRADE_COLORS[selectedSupplier.grade] || GRADE_COLORS['C'], fontSize: 'var(--text-sm)' }}>{selectedSupplier.grade}级</span>
             <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: selectedSupplier.status === 'active' ? '#E8F5E9' : '#FFF3E0', color: selectedSupplier.status === 'active' ? '#2E7D32' : '#E65100' }}>{selectedSupplier.status === 'active' ? '在册' : '停用'}</span>
           </>
@@ -489,6 +497,43 @@ export default function PurchaseSuppliers() {
                     </div>
                   );
                 })}
+              </div>
+              {/* 合作商类型（多选：品牌商与供应商/服务商互斥） */}
+              <div style={{ marginTop: 'var(--space-3)' }}>
+                <label className="drawer-label">合作商类型 *</label>
+                <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+                  {(['brand', 'supplier', 'service'] as SupplierType[]).map(t => {
+                    const checked = (editForm.types ?? []).includes(t);
+                    const disabled = !checked && (editForm.types ?? []).includes('brand') && t !== 'brand';
+                    return (
+                      <label key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1 }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={disabled}
+                          onChange={e => setEditForm(prev => {
+                            if (!prev) return prev;
+                            let next: SupplierType[];
+                            if (e.target.checked) {
+                              if (t === 'brand') next = ['brand'];
+                              else next = [...(prev.types ?? []).filter(x => x !== 'brand'), t];
+                            } else {
+                              next = (prev.types ?? []).filter(x => x !== t);
+                            }
+                            return { ...prev, types: next };
+                          })}
+                        />
+                        <span style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: `${SUPPLIER_TYPE_COLORS[t]}15`, color: SUPPLIER_TYPE_COLORS[t], border: `1px solid ${SUPPLIER_TYPE_COLORS[t]}30` }}>{SUPPLIER_TYPE_LABELS[t]}</span>
+                        {t === 'brand' && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>品牌拥有方，平台直接合作</span>}
+                        {t === 'supplier' && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>差价模式，按价格采购、背对背销售</span>}
+                        {t === 'service' && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>扣点模式，按售价收服务费</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+                  可同时是供应商与服务商；品牌商为品牌拥有方，与供应商/服务商互斥
+                </div>
               </div>
               {/* 主营品牌（多选，来源于商品-品牌管理） */}
               <div style={{ marginTop: 'var(--space-3)' }}>
@@ -624,7 +669,7 @@ export default function PurchaseSuppliers() {
                       ))}
                     </div>
                     <Button size="sm" variant="ghost" style={{ marginTop: 'var(--space-2)' }} onClick={addWarehouse}>+ 添加仓库</Button>
-                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)' }}>供应商仓库将同步至「仓储 &gt; 仓库设置」，作为合作仓库管理</div>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)' }}>合作商仓库将同步至「仓储 &gt; 仓库设置」，作为合作仓库管理</div>
                   </>
                 ) : (
                   <p style={{ color: 'var(--color-text-tertiary)' }}>—</p>
@@ -830,18 +875,18 @@ export default function PurchaseSuppliers() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', margin: 'var(--space-2) 0 var(--space-3)' }}>
                       <Button size="sm" variant="ghost" onClick={addOperatorAccount}>+ 新增操作员账号</Button>
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>删除管理员账号将同时关闭该供应商终端</span>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>删除管理员账号将同时关闭该合作商终端</span>
                     </div>
                     <div>
                       <label className="drawer-label">备注</label>
                       <input className="filter-input" style={{ width: '100%' }} value={editForm.terminal.remark ?? ''} onChange={e => updateTerminal({ remark: e.target.value })} />
                     </div>
                     <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', lineHeight: 1.7 }}>
-                      账号列表与合作商终端「系统 &gt; 账号管理」实时联动。此处可修改管理员与操作员账号、密码、姓名、手机号码；合作商终端仅支持管理员维护操作员账号及本人的姓名、手机号码、密码。
+                      账号列表与合作商终端「设置 &gt; 账号管理」实时联动。此处可修改管理员与操作员账号、密码、姓名、手机号码；合作商终端仅支持管理员维护操作员账号及本人的姓名、手机号码、密码。
                     </div>
                   </>
                 ) : (
-                  <div style={{ fontSize: 'var(--text-xs)', color: '#E65100', background: '#FFF3E0', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)' }}>保存后该供应商的终端将被关闭，终端账号将无法登录</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: '#E65100', background: '#FFF3E0', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)' }}>保存后该合作商的终端将被关闭，终端账号将无法登录</div>
                 )}
               </div>
             )}
@@ -851,6 +896,13 @@ export default function PurchaseSuppliers() {
             {activeTab === 'basic' && (
               <div>
               <InfoGrid cols={3}>
+                <InfoItem label="合作商类型" span={3}>
+                  <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+                    {selectedSupplier.types.map(t => (
+                      <span key={t} style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: `${SUPPLIER_TYPE_COLORS[t]}15`, color: SUPPLIER_TYPE_COLORS[t], border: `1px solid ${SUPPLIER_TYPE_COLORS[t]}30` }}>{SUPPLIER_TYPE_LABELS[t]}</span>
+                    ))}
+                  </span>
+                </InfoItem>
                 <InfoItem label="统一社会信用代码" mono>{selectedSupplier.unifiedCreditCode || '—'}</InfoItem>
                 <InfoItem label="公司类型">{selectedSupplier.companyType || '—'}</InfoItem>
                 <InfoItem label="法定代表人">{selectedSupplier.legalRepresentative || '—'}</InfoItem>
@@ -954,7 +1006,7 @@ export default function PurchaseSuppliers() {
                       </div>
                     </div>
                   ))}
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>供应商仓库已同步至「仓储 &gt; 仓库设置」，作为合作仓库管理</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>合作商仓库已同步至「仓储 &gt; 仓库设置」，作为合作仓库管理</div>
                 </div>
               )}
               </div>
@@ -1053,7 +1105,7 @@ export default function PurchaseSuppliers() {
                     </table>
                   </div>
                   <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', lineHeight: 1.7 }}>
-                    账号列表与合作商终端「系统 &gt; 账号管理」实时联动。管理员账号名与删除仅支持在管理后台操作；如需调整账号、密码、姓名、手机号码，点击「编辑」。
+                    账号列表与合作商终端「设置 &gt; 账号管理」实时联动。管理员账号名与删除仅支持在管理后台操作；如需调整账号、密码、姓名、手机号码，点击「编辑」。
                   </div>
                 </div>
               ) : (
@@ -1061,7 +1113,7 @@ export default function PurchaseSuppliers() {
                   <div style={{ width: 48, height: 48, margin: '0 auto var(--space-3)', borderRadius: 'var(--radius-lg)', background: 'var(--color-module-current-lightest)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-module-current-base)' }}>
                     <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><rect x="3" y="4" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                   </div>
-                  <div style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)', marginBottom: 'var(--space-1)' }}>该供应商尚未开通终端</div>
+                  <div style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)', marginBottom: 'var(--space-1)' }}>该合作商尚未开通终端</div>
                   <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>开通后自动创建管理员账号，合作商凭账号登录合作商终端，<br />并可自主维护操作员账号</div>
                   <Button onClick={handleEnableTerminal}>开通终端</Button>
                 </div>
@@ -1074,12 +1126,12 @@ export default function PurchaseSuppliers() {
         )}
       </DetailDrawer>
 
-      {/* 新增供应商抽屉 */}
+      {/* 新增合作商抽屉 */}
       {showAddDrawer && (
         <div className="drawer-overlay" onClick={() => setShowAddDrawer(false)}>
           <div className="drawer-panel" onClick={e => e.stopPropagation()}>
             <div className="drawer-header">
-              <span className="drawer-title">新增供应商</span>
+              <span className="drawer-title">新增合作商</span>
               <button className="drawer-close" onClick={() => setShowAddDrawer(false)}>
                 <svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
               </button>
@@ -1109,16 +1161,37 @@ export default function PurchaseSuppliers() {
             <div className="drawer-section-title">基本信息</div>
             <div className="drawer-form-row">
               <div className="drawer-form-field">
-                <label className="drawer-label">供应商类型 *</label>
-                <select className="filter-select" style={{ width: '100%' }}>
-                  <option value="">请选择</option>
-                  <option value="brand">品牌方</option>
-                  <option value="partner">合作方</option>
-                </select>
+                <label className="drawer-label">合作商类型 *</label>
+                <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+                  {(['brand', 'supplier', 'service'] as SupplierType[]).map(t => {
+                    const checked = addTypes.includes(t);
+                    const disabled = !checked && addTypes.includes('brand') && t !== 'brand';
+                    return (
+                      <label key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1 }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={disabled}
+                          onChange={e => setAddTypes(prev => {
+                            if (e.target.checked) {
+                              if (t === 'brand') return ['brand'];
+                              return [...prev.filter(x => x !== 'brand'), t];
+                            }
+                            return prev.filter(x => x !== t);
+                          })}
+                        />
+                        <span style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: `${SUPPLIER_TYPE_COLORS[t]}15`, color: SUPPLIER_TYPE_COLORS[t], border: `1px solid ${SUPPLIER_TYPE_COLORS[t]}30` }}>{SUPPLIER_TYPE_LABELS[t]}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+                  品牌商为品牌拥有方，与供应商/服务商互斥；供应商与服务商可同时选择
+                </div>
               </div>
               <div className="drawer-form-field">
                 <label className="drawer-label">名称 *</label>
-                <input className="filter-input" placeholder="请输入供应商名称" style={{ width: '100%' }} />
+                <input className="filter-input" placeholder="请输入合作商名称" style={{ width: '100%' }} />
               </div>
               <div className="drawer-form-field">
                 <label className="drawer-label">统一社会信用代码 *</label>
@@ -1238,7 +1311,7 @@ export default function PurchaseSuppliers() {
                 <div className="drawer-form-field"><label className="drawer-label" style={{ fontSize: 'var(--text-xs)' }}>电话</label><input className="filter-input" placeholder="电话" style={{ width: '100%' }} /></div>
                 <Button size="sm">添加</Button>
               </div>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>供应商仓库将同步至"仓储 &gt; 仓库设置"，作为合作仓库管理</div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>合作商仓库将同步至"仓储 &gt; 仓库设置"，作为合作仓库管理</div>
             </div>
 
             {/* 门店信息 */}
@@ -1286,8 +1359,8 @@ export default function PurchaseSuppliers() {
 
             {/* 简介 */}
             <div style={{ marginBottom: 'var(--space-4)' }}>
-              <label className="drawer-label">供应商简介</label>
-              <textarea className="filter-input" placeholder="请输入供应商简介" style={{ width: '100%', minHeight: 80, resize: 'vertical' }} />
+              <label className="drawer-label">合作商简介</label>
+              <textarea className="filter-input" placeholder="请输入合作商简介" style={{ width: '100%', minHeight: 80, resize: 'vertical' }} />
             </div>
             </div>
             <div className="drawer-footer">
@@ -1304,7 +1377,7 @@ export default function PurchaseSuppliers() {
           <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 420 }}>
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>删除管理员账号</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
-              删除管理员账号将同时关闭该供应商的终端，所有终端账号（含操作员）将无法登录合作商终端。确认删除？
+              删除管理员账号将同时关闭该合作商的终端，所有终端账号（含操作员）将无法登录合作商终端。确认删除？
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
               <Button variant="ghost" onClick={() => setShowAdminDeleteConfirm(false)}>取消</Button>

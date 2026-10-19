@@ -218,11 +218,11 @@ export default function InventorySettings() {
         {tab === 'partner' && (
           <Card title="合作仓库" headerRight={
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>
-              数据联动自「采购 &gt; 供应商管理」，请在供应商详情中维护
+              数据联动自「采购 &gt; 合作商管理」，请在合作商详情中维护
             </span>
           }>
             <Table
-              headers={['仓库名称', '仓库编码', '地址', '联系人', '电话', '来源供应商', '默认', '状态']}
+              headers={['仓库名称', '仓库编码', '地址', '联系人', '电话', '来源合作商', '默认', '状态']}
               rows={partnerList.map(w => [
                 <span className="cell-emph">{w.name}</span>,
                 <span className="mono">{w.code}</span>,

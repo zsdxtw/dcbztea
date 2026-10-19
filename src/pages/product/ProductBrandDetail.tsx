@@ -47,7 +47,7 @@ const brandItems: BrandItem[] = [
   },
   {
     id: '3', code: '003', name: '张一元', logo: '', owner: '北京张一元茶叶有限责任公司',
-    introduction: '百年老字号，始创于1900年，茉莉花茶制作技艺入选国家级非遗', requirements: '需通过品牌方资质审核，具备冷链仓储条件', policy: '年度返利4%，季度结算，提供品牌宣传支持', series: ['茉莉龙毫', '茉莉毛尖', '茉莉云雾'],
+    introduction: '百年老字号，始创于1900年，茉莉花茶制作技艺入选国家级非遗', requirements: '需通过品牌商资质审核，具备冷链仓储条件', policy: '年度返利4%，季度结算，提供品牌宣传支持', series: ['茉莉龙毫', '茉莉毛尖', '茉莉云雾'],
     trademarkCert: ['张一元商标注册证.pdf'], jdStoreUrl: 'https://zhangyiyuan.jd.com', tmallStoreUrl: 'https://zhangyiyuan.tmall.com',
     contactPerson: '赵国强', contactPhone: '010-6303****', province: '北京', city: '北京市', district: '西城区', address: '大栅栏街22号',
     mainCategories: ['绿茶', '花草茶'], productCount: 6, supplierCount: 2,

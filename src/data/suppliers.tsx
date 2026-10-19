@@ -1,4 +1,4 @@
-/** 供应商管理共享数据源 */
+/** 合作商管理共享数据源 */
 import type { SupplierItem, SupplierStore, SupplierTerminal, SupplierTerminalAccount } from '../types';
 
 /** 原始数据（资质文件、渠道来源、门店与终端由导出层统一注入） */

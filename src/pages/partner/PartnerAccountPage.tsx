@@ -124,7 +124,7 @@ export default function PartnerAccountPage() {
   if (!supplier || !supplier.terminal.enabled) {
     return (
       <div className="pk-page">
-        <PageHead eyebrow="合作商终端 · 系统" title="账号管理" desc="管理合作商终端的登录账号。" />
+        <PageHead eyebrow="合作商终端 · 设置" title="账号管理" desc="管理合作商终端的登录账号。" />
         <div style={{ textAlign: 'center', padding: 'var(--space-10) var(--space-4)', color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', lineHeight: 1.8 }}>
           终端未开通或登录态已失效，<br />请重新登录后再试。
         </div>
@@ -135,7 +135,7 @@ export default function PartnerAccountPage() {
   return (
     <div className="pk-page">
       <PageHead
-        eyebrow="合作商终端 · 系统"
+        eyebrow="合作商终端 · 设置"
         title="账号管理"
         desc={isAdmin
           ? '管理员可自主新增、修改、删除操作员账号；本人姓名、手机号码、密码可在此修改，账号名与删除仅支持在管理后台操作。'

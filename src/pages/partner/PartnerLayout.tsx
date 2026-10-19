@@ -60,11 +60,16 @@ const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode
     icon: <svg viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="16" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 9h2M5 12h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><circle cx="14" cy="10" r="2" stroke="currentColor" strokeWidth="1.2"/></svg>,
   },
   {
-    key: 'system', label: '系统', path: '/partner/account',
+    key: 'system', label: '设置', path: '/partner/account',
     icon: <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.3"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
     children: [
       { label: '账号管理', path: '/partner/account' },
-      { label: '合作商信息', path: '/partner/profile' },
+      { label: '基本信息', path: '/partner/profile/basic' },
+      { label: '联系信息', path: '/partner/profile/contact' },
+      { label: '仓库信息', path: '/partner/profile/warehouse' },
+      { label: '门店信息', path: '/partner/profile/store' },
+      { label: '资质文件', path: '/partner/profile/qualification' },
+      { label: '财务信息', path: '/partner/profile/finance' },
     ],
   },
 ];

@@ -119,7 +119,7 @@ export default function PartnerQuotes() {
   if (!supplier) {
     return (
       <div className="pk-page">
-        <PageHead eyebrow="合作商终端 · 报价" title="报价管理" desc="未找到关联的供应商档案，请联系平台运营。" />
+        <PageHead eyebrow="合作商终端 · 报价" title="报价管理" desc="未找到关联的合作商档案，请联系平台运营。" />
       </div>
     );
   }
@@ -131,7 +131,7 @@ export default function PartnerQuotes() {
       <PageHead
         eyebrow="合作商终端 · 报价"
         title="报价管理"
-        desc="左侧为贵司的主营品牌，右侧为平台在售商品（数据来源于管理后台商品菜单）。展示每个商品的市场价、中位数报价（去除品牌方报价外合作商报价的平均数）与中位数售价（所有客户售价的平均数）。支持按品牌整体设置报价折扣，并可对单个商品设置单独折扣或单独价格。"
+        desc="左侧为贵司的主营品牌，右侧为平台在售商品（数据来源于管理后台商品菜单）。展示每个商品的市场价、中位数报价（去除品牌商报价外合作商报价的平均数）与中位数售价（所有客户售价的平均数）。支持按品牌整体设置报价折扣，并可对单个商品设置单独折扣或单独价格。"
         actions={
           <button className="pk-reg-submit" style={{ height: 38, padding: '0 22px', fontSize: 13, letterSpacing: 'normal', textIndent: 0 }} onClick={() => { setReminderOpen(true); setReminderMsg(''); }}>
             + 新品提醒
@@ -277,7 +277,7 @@ export default function PartnerQuotes() {
               </table>
             </div>
             <div style={{ fontSize: 12, color: 'var(--pk-ink3)', marginTop: 10, lineHeight: 1.7 }}>
-              中位数报价：去除品牌方报价外，其余合作商报价的平均数；中位数售价：所有客户售价的平均数。两项数据均来源于管理后台价格体系。我的报价优先级：单品单独价格 / 单独折扣 &gt; 品牌整体折扣 &gt; 市场价。
+              中位数报价：去除品牌商报价外，其余合作商报价的平均数；中位数售价：所有客户售价的平均数。两项数据均来源于管理后台价格体系。我的报价优先级：单品单独价格 / 单独折扣 &gt; 品牌整体折扣 &gt; 市场价。
             </div>
           </div>
         </div>
@@ -291,7 +291,7 @@ export default function PartnerQuotes() {
         </div>
         <div className="pk-panel-body">
           {myReminders.length === 0 ? (
-            <div style={{ fontSize: 13, color: 'var(--pk-ink3)', padding: '8px 0' }}>暂无提报记录，点击右上角「新品提醒」提报品牌方已上市、平台未上架的商品</div>
+            <div style={{ fontSize: 13, color: 'var(--pk-ink3)', padding: '8px 0' }}>暂无提报记录，点击右上角「新品提醒」提报品牌商已上市、平台未上架的商品</div>
           ) : (
             <div className="pk-table-panel" style={{ margin: 0 }}>
               <table>
@@ -373,7 +373,7 @@ export default function PartnerQuotes() {
           <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 460 }}>
             <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 4 }}>新品提醒</h3>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
-              提报品牌方已经上市、但淡茶半盏平台未上架的商品，平台将尽快跟进上架。
+              提报品牌商已经上市、但淡茶半盏平台未上架的商品，平台将尽快跟进上架。
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               <div>

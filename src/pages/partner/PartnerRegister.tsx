@@ -5,7 +5,8 @@ import { useSupplierStore } from '../../stores/supplierStore';
 import { BrandMultiSelect, BrandAuthUploader } from '../../components/common/BrandPicker';
 import { StorePhotoPicker } from '../../components/common/StorePhotoPicker';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
-import type { SupplierItem, SupplierWarehouse, SupplierStore, BrandAuthFiles } from '../../types';
+import { SUPPLIER_TYPE_LABELS, SUPPLIER_TYPE_COLORS } from '../../data/suppliers';
+import type { SupplierItem, SupplierType, SupplierWarehouse, SupplierStore, BrandAuthFiles } from '../../types';
 import './partner.css';
 
 /** 可选资质文件（演示 mock 上传） */
@@ -33,7 +34,8 @@ export default function PartnerRegister() {
 
   // 基本信息（必填）
   const [name, setName] = useState('');
-  const [type, setType] = useState<'brand' | 'partner'>('brand');
+  /** 合作商类型（可多选：品牌商与供应商/服务商互斥） */
+  const [types, setTypes] = useState<SupplierType[]>(['supplier']);
   const [unifiedCreditCode, setUnifiedCreditCode] = useState('');
   const [legalRepresentative, setLegalRepresentative] = useState('');
   const [contactPerson, setContactPerson] = useState('');
@@ -92,7 +94,8 @@ export default function PartnerRegister() {
 
   /** 校验必填项并提交注册审批 */
   const handleSubmit = () => {
-    if (!name.trim()) return showError('请填写供应商名称');
+    if (types.length === 0) return showError('请选择合作商类型（品牌商 / 供应商 / 服务商）');
+    if (!name.trim()) return showError('请填写合作商名称');
     if (!unifiedCreditCode.trim()) return showError('请填写统一社会信用代码');
     if (!legalRepresentative.trim()) return showError('请填写法定代表人');
     if (!contactPerson.trim()) return showError('请填写联系人');
@@ -107,7 +110,7 @@ export default function PartnerRegister() {
     const today = new Date().toISOString().slice(0, 10);
     const draft: SupplierItem = {
       id: `sup_${Date.now()}`,
-      type,
+      types,
       name: name.trim(),
       unifiedCreditCode: unifiedCreditCode.trim(),
       cooperationAgreements: [],
@@ -202,7 +205,7 @@ export default function PartnerRegister() {
             <div className="pk-reg-success-t">注册申请已提交</div>
             <div className="pk-reg-success-d">
               审批编号 <b className="mono">{success.code}</b> 已进入平台「注册审批」流程，
-              审批通过后您的供应商档案将自动创建，<br />
+              审批通过后您的合作商档案将自动创建，<br />
               即可使用账号 <b className="mono">{success.username}</b> 登录合作商终端，
               维护仓库、门店与财务等补充信息。
             </div>
@@ -239,7 +242,8 @@ export default function PartnerRegister() {
         </p>
         <div className="pk-register-tip">
           带 * 的基本信息与资质文件为必填内容；仓库、门店、财务信息可先不填写，
-          待注册审批通过后，登录合作商终端在「合作商信息」中继续维护，维护结果同样需平台审批生效。
+          待注册审批通过后，登录合作商终端在「设置」菜单中继续维护。其中联系信息、仓库信息可直接修改，
+          其余分区维护后需平台审批生效。
         </div>
 
         {error && <div className="pk-reg-error">{error}</div>}
@@ -249,15 +253,40 @@ export default function PartnerRegister() {
           {sectionTitle('基本信息', true)}
           <div className="pk-reg-grid">
             <div>
-              <label className="pk-reg-label">供应商名称<span className="pk-reg-star">*</span></label>
+              <label className="pk-reg-label">合作商名称<span className="pk-reg-star">*</span></label>
               <input className="pk-reg-input" placeholder="企业全称" value={name} onChange={e => { setName(e.target.value); setError(''); }} />
             </div>
             <div>
-              <label className="pk-reg-label">供应商类型<span className="pk-reg-star">*</span></label>
-              <select className="pk-reg-select" value={type} onChange={e => setType(e.target.value as 'brand' | 'partner')}>
-                <option value="brand">品牌方</option>
-                <option value="partner">合作方</option>
-              </select>
+              <label className="pk-reg-label">合作商类型<span className="pk-reg-star">*</span></label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {(['brand', 'supplier', 'service'] as SupplierType[]).map(t => {
+                  const checked = types.includes(t);
+                  const disabled = !checked && types.includes('brand') && t !== 'brand';
+                  return (
+                    <label key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#57625C', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1 }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={disabled}
+                        onChange={e => setTypes(prev => {
+                          if (e.target.checked) {
+                            if (t === 'brand') return ['brand'];
+                            return [...prev.filter(x => x !== 'brand'), t];
+                          }
+                          return prev.filter(x => x !== t);
+                        })}
+                      />
+                      <span style={{ padding: '1px 8px', borderRadius: 4, fontSize: 12, fontWeight: 500, background: `${SUPPLIER_TYPE_COLORS[t]}15`, color: SUPPLIER_TYPE_COLORS[t], border: `1px solid ${SUPPLIER_TYPE_COLORS[t]}30`, whiteSpace: 'nowrap' }}>{SUPPLIER_TYPE_LABELS[t]}</span>
+                      <span style={{ fontSize: 12, color: '#99A29D' }}>
+                        {t === 'brand' ? '品牌拥有方，平台直接合作' : t === 'supplier' ? '差价模式：平台按价格采购，背对背销售' : '扣点模式：在售价基础上收取服务费，差价由服务商获得'}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <div style={{ fontSize: 12, color: '#99A29D', marginTop: 6 }}>
+                可同时是供应商与服务商；品牌商为品牌拥有方，与供应商/服务商互斥
+              </div>
             </div>
             <div>
               <label className="pk-reg-label">统一社会信用代码<span className="pk-reg-star">*</span></label>

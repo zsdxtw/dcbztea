@@ -161,7 +161,7 @@ export default function ProductNewArrivals() {
         </Card>
 
         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 'var(--space-3)', lineHeight: 1.7 }}>
-          新品提醒由合作商在合作商终端「报价」菜单中提报：品牌方已经上市、但淡茶半盏平台未上架的商品。处理「标记上架」后请在商品管理中同步建档。
+          新品提醒由合作商在合作商终端「报价」菜单中提报：品牌商已经上市、但淡茶半盏平台未上架的商品。处理「标记上架」后请在商品管理中同步建档。
           品牌列表来源于品牌管理（共 {brandItems.length} 个品牌）。
         </div>
 

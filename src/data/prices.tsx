@@ -7,7 +7,7 @@
 import type { PurchasePriceRule, VipPriceRule } from '../types';
 import { teaProducts } from './teaProducts';
 
-/* ── 供应商列表（与 ProductPrice.tsx 保持一致；type 用于区分品牌方/合作商报价） ── */
+/* ── 供应商列表（与 ProductPrice.tsx 保持一致；type 用于区分品牌商/合作商报价） ── */
 export const PRICE_SUPPLIERS = [
   { id: 's1', name: '西湖龙井合作社', type: 'brand' as const },
   { id: 's2', name: '武夷山茶业', type: 'partner' as const },
@@ -151,7 +151,7 @@ export function getPurchaseDefaultPrice(productId: string, supplierId: string): 
 const average = (nums: number[]) => (nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null);
 
 /**
- * 中位数报价：去除品牌方报价外，其余合作商（合作方）报价的平均数
+ * 中位数报价：去除品牌商报价外，其余合作商（供应商/服务商）报价的平均数
  * 数据源：采购价规则（商品 + 供应商）
  */
 export function getMedianQuote(productId: string): number | null {

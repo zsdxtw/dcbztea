@@ -222,7 +222,14 @@ export const router = createBrowserRouter([
       { path: 'customers', element: <PartnerCustomers /> },
       { path: 'settlement', element: <PartnerSettlement /> },
       { path: 'account', element: <PartnerAccountPage /> },
-      { path: 'profile', element: <PartnerProfile /> },
+      /* 设置菜单：合作商信息分区子页（联系信息/仓库信息免审批直接保存） */
+      { path: 'profile', element: <Navigate to="/partner/profile/basic" replace /> },
+      { path: 'profile/basic', element: <PartnerProfile section="basic" /> },
+      { path: 'profile/contact', element: <PartnerProfile section="contact" /> },
+      { path: 'profile/warehouse', element: <PartnerProfile section="warehouse" /> },
+      { path: 'profile/store', element: <PartnerProfile section="store" /> },
+      { path: 'profile/qualification', element: <PartnerProfile section="qualification" /> },
+      { path: 'profile/finance', element: <PartnerProfile section="finance" /> },
     ],
   },
   /* ── 客户终端（独立布局：登录页 + 工作台/商品/购物车/订单/账号） ── */
