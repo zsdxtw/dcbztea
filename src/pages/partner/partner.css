@@ -377,8 +377,10 @@
 .pk-login-back:hover { color: #01795D; }
 
 /* ── 合作商注册页（分节长表单） ── */
+/* body 全局 overflow:hidden（管理端固定布局），注册页需自带滚动容器 */
 .pk-register {
-  min-height: 100vh; background: linear-gradient(180deg, #F4F7F4 0%, #EEF2EE 100%);
+  height: 100vh; overflow-y: auto;
+  background: linear-gradient(180deg, #F4F7F4 0%, #EEF2EE 100%);
   padding: 40px 16px 64px;
 }
 .pk-register-inner { max-width: 960px; margin: 0 auto; }

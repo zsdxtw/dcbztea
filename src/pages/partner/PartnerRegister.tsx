@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TeaLeafMark } from './PartnerLayout';
 import { useSupplierStore } from '../../stores/supplierStore';
@@ -23,6 +23,9 @@ const newStore = (): RegStoreDraft => ({ ...EMPTY_STORE, id: `st${Date.now()}` }
 export default function PartnerRegister() {
   const navigate = useNavigate();
   const submitRegistration = useSupplierStore(s => s.submitRegistration);
+  /** 注册页滚动容器（body 全局 overflow:hidden，滚动发生在本容器上） */
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollTop = (smooth = true) => scrollRef.current?.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' });
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<{ code: string; username: string } | null>(null);
@@ -83,7 +86,7 @@ export default function PartnerRegister() {
   /** 校验失败：显示顶部错误横幅并滚动到可视区 */
   const showError = (msg: string) => {
     setError(msg);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollTop();
   };
 
   /** 校验必填项并提交注册审批 */
@@ -174,7 +177,7 @@ export default function PartnerRegister() {
 
     const approval = submitRegistration(draft, username.trim(), applyNote.trim() || undefined);
     setSuccess({ code: approval.code, username: username.trim() });
-    window.scrollTo({ top: 0 });
+    scrollTop(false);
   };
 
   const sectionTitle = (text: string, required: boolean) => (
@@ -188,7 +191,7 @@ export default function PartnerRegister() {
 
   if (success) {
     return (
-      <div className="pk-register">
+      <div className="pk-register" ref={scrollRef}>
         <div className="pk-register-inner">
           <div className="pk-reg-success">
             <div className="pk-reg-success-icon">
@@ -211,7 +214,7 @@ export default function PartnerRegister() {
   }
 
   return (
-    <div className="pk-register">
+    <div className="pk-register" ref={scrollRef}>
       <div className="pk-register-inner">
         {/* 头部品牌 + 返回 */}
         <div className="pk-register-head">
