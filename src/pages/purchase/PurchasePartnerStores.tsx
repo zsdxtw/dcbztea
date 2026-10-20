@@ -1,15 +1,13 @@
 import { useMemo, useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { StorePhotoGallery } from '../../components/common/StorePhotoPicker';
 import { useSupplierStore } from '../../stores/supplierStore';
-import type { SupplierStore, StatCardData } from '../../types';
-
-const SECONDARY = '#CB405D';
+import StoreMapPanel from './StoreMapPanel';
+import type { SupplierStore } from '../../types';
 
 /** 门店行（含归属合作商，随合作商档案实时更新） */
 interface PartnerStoreRow extends SupplierStore {
@@ -43,11 +41,28 @@ export default function PurchasePartnerStores() {
 
   const [keyword, setKeyword] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
+  const [filterProvince, setFilterProvince] = useState('');
+  const [filterBrand, setFilterBrand] = useState('');
   const [detailStore, setDetailStore] = useState<PartnerStoreRow | null>(null);
+  const [showMap, setShowMap] = useState(false);
+
+  /** 地区（省份）筛选选项：现有门店涉及的省份 */
+  const provinceOptions = useMemo(
+    () => Array.from(new Set(rows.map(st => st.province).filter((p): p is string => Boolean(p)))).sort((a, b) => a.localeCompare(b, 'zh')),
+    [rows],
+  );
+
+  /** 主营品牌筛选选项：现有门店涉及的品牌 */
+  const brandOptions = useMemo(
+    () => Array.from(new Set(rows.flatMap(st => st.mainBrands))).sort((a, b) => a.localeCompare(b, 'zh')),
+    [rows],
+  );
 
   const filtered = useMemo(() => {
     return rows.filter(st => {
       if (filterSupplier && st.supplierId !== filterSupplier) return false;
+      if (filterProvince && st.province !== filterProvince) return false;
+      if (filterBrand && !st.mainBrands.includes(filterBrand)) return false;
       if (keyword) {
         const kw = keyword;
         const hit = st.name.includes(kw) || st.supplierName.includes(kw)
@@ -58,55 +73,33 @@ export default function PurchasePartnerStores() {
       }
       return true;
     });
-  }, [rows, keyword, filterSupplier]);
-
-  /** 统计卡 */
-  const stats: StatCardData[] = useMemo(() => {
-    const active = filtered.filter(st => st.status === 'active');
-    const totalArea = filtered.reduce((sum, st) => sum + st.area, 0);
-    const supplierCount = new Set(filtered.map(st => st.supplierId)).size;
-    return [
-      {
-        label: '门店总数', value: String(filtered.length), unit: '家',
-        trend: { direction: 'up', value: `营业中 ${active.length} 家` },
-        icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 7l1.5-3h9L15 7M3 7v8h12V7M3 7h12M7 15v-4h4v4" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
-      },
-      {
-        label: '营业中', value: String(active.length), unit: '家',
-        trend: { direction: 'up', value: `占比 ${filtered.length ? Math.round(active.length / filtered.length * 100) : 0}%` },
-        icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M7 10l2 2 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-      },
-      {
-        label: '已停业', value: String(filtered.length - active.length), unit: '家',
-        trend: { direction: 'down', value: '暂停营业' },
-        icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M6 6l6 6M12 6l-6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
-      },
-      {
-        label: '门店总面积', value: String(totalArea), unit: '㎡',
-        trend: { direction: 'up', value: `均值 ${filtered.length ? Math.round(totalArea / filtered.length) : 0}㎡ · ${supplierCount} 家合作商` },
-        icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="3" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M3 9h12M9 3v12" stroke="currentColor" strokeWidth="1.2"/></svg>,
-      },
-    ];
-  }, [filtered]);
+  }, [rows, keyword, filterSupplier, filterProvince, filterBrand]);
 
   return (
     <>
       <ContentHeader title="合作商门店" breadcrumbs={['采购', '合作商管理', '合作商门店']} />
 
       <div className="content-body">
-        {/* 统计卡片 */}
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
-
-        {/* 工具栏 */}
+        {/* 工具栏：搜索 + 合作商/地区/主营品牌筛选 + 地图总览 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-5)' }}>
-          <input className="filter-input" placeholder="搜索门店名称、合作商、地区、品牌、负责人..." value={keyword} onChange={e => setKeyword(e.target.value)} style={{ width: 300 }} />
+          <input className="filter-input" placeholder="搜索门店名称、合作商、地区、品牌、负责人..." value={keyword} onChange={e => setKeyword(e.target.value)} style={{ width: 260 }} />
           <select className="filter-select" value={filterSupplier} onChange={e => setFilterSupplier(e.target.value)}>
             <option value="">全部合作商</option>
             {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
+          <select className="filter-select" value={filterProvince} onChange={e => setFilterProvince(e.target.value)}>
+            <option value="">全部地区</option>
+            {provinceOptions.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <select className="filter-select" value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
+            <option value="">全部品牌</option>
+            {brandOptions.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
           <span style={{ marginLeft: 'auto', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>共 {filtered.length} 家门店</span>
+          <Button onClick={() => setShowMap(true)}>
+            <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14 }}><path d="M2 4.5l5-2.5 2 1.2 5-2.5v11l-5 2.5-2-1.2-5 2.5v-11zM9 3.2v11M7 13.7v-11" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
+            地图总览
+          </Button>
         </div>
 
         {/* 列表 */}
@@ -200,6 +193,21 @@ export default function PurchasePartnerStores() {
           </>
         )}
       </DetailDrawer>
+
+      {/* 地图总览抽屉：与「门店总览」页面共用的全国门店分布地图 + 品牌 TOP10 */}
+      {showMap && (
+        <div className="drawer-overlay" onClick={() => setShowMap(false)}>
+          <div className="drawer-panel" onClick={e => e.stopPropagation()}>
+            <div className="drawer-header">
+              <span className="drawer-title">地图总览</span>
+              <button className="drawer-close" onClick={() => setShowMap(false)}>×</button>
+            </div>
+            <div className="drawer-body">
+              <StoreMapPanel stores={rows} />
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
