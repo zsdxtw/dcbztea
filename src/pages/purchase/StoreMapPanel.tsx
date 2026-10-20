@@ -155,8 +155,8 @@ export default function StoreMapPanel({ stores, mapHeight = DEFAULT_MAP_HEIGHT }
   const maxBrandCount = brandRows[0]?.count ?? 1;
 
   return (
-    <>
-      {/* 中国地图：各省门店分布 */}
+    <div style={{ display: 'flex', gap: 'var(--space-5)', alignItems: 'stretch' }}>
+      {/* 中国地图：各省门店分布（左侧宽栏） */}
       <Card
         title="全国门店分布"
         headerRight={
@@ -164,7 +164,7 @@ export default function StoreMapPanel({ stores, mapHeight = DEFAULT_MAP_HEIGHT }
             数据实时来源于合作商档案门店，点击省份查看该省品牌门店分布
           </span>
         }
-        style={{ marginBottom: 'var(--space-6)' }}
+        style={{ flex: 1, minWidth: 0 }}
       >
         {!geoReady ? (
           <div style={{ height: mapHeight, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
@@ -175,36 +175,38 @@ export default function StoreMapPanel({ stores, mapHeight = DEFAULT_MAP_HEIGHT }
         )}
       </Card>
 
-      {/* 品牌 TOP10：随选中省份联动 */}
+      {/* 品牌 TOP10：随选中省份联动（右侧窄栏，宽度按内容所需） */}
       <Card
         title={`${selectedShort ?? '全国'}门店数 TOP10 品牌`}
         headerRight={selectedFull ? (
           <Button size="sm" variant="ghost" onClick={() => setSelectedFull(null)}>查看全国</Button>
-        ) : (
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
-            按门店主营品牌统计，同一门店经营多品牌分别计数
-          </span>
-        )}
+        ) : undefined}
+        style={{ width: 360, flexShrink: 0 }}
       >
         {brandRows.length === 0 ? (
           <div style={{ padding: 'var(--space-8) 0', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
             {selectedShort ? `${selectedShort}省暂无合作门店` : '暂无合作门店数据'}
           </div>
         ) : (
-          <div className="pso-brand-list">
-            {brandRows.map((row, i) => (
-              <div key={row.brand} className="pso-brand-row">
-                <span className={`pso-brand-rank${i < 3 ? ' top' : ''}`}>{i + 1}</span>
-                <span className="pso-brand-name">{row.brand}</span>
-                <div className="pso-brand-track">
-                  <div className="pso-brand-bar" style={{ width: `${(row.count / maxBrandCount) * 100}%` }} />
+          <>
+            <div className="pso-brand-list">
+              {brandRows.map((row, i) => (
+                <div key={row.brand} className="pso-brand-row">
+                  <span className={`pso-brand-rank${i < 3 ? ' top' : ''}`}>{i + 1}</span>
+                  <span className="pso-brand-name">{row.brand}</span>
+                  <div className="pso-brand-track">
+                    <div className="pso-brand-bar" style={{ width: `${(row.count / maxBrandCount) * 100}%` }} />
+                  </div>
+                  <span className="pso-brand-count mono">{row.count} 家</span>
                 </div>
-                <span className="pso-brand-count mono">{row.count} 家</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', padding: '0 var(--space-2)' }}>
+              按门店主营品牌统计，同一门店经营多品牌分别计数
+            </div>
+          </>
         )}
       </Card>
-    </>
+    </div>
   );
 }
