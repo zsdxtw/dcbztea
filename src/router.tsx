@@ -15,6 +15,7 @@ import PurchaseInbound from './pages/purchase/PurchaseInbound';
 import PurchaseSuppliers from './pages/purchase/PurchaseSuppliers';
 import PurchaseSupplierApprovals from './pages/purchase/PurchaseSupplierApprovals';
 import PurchaseStoreOverview from './pages/purchase/PurchaseStoreOverview';
+import PurchasePartnerStores from './pages/purchase/PurchasePartnerStores';
 import PurchaseReconciliation from './pages/purchase/PurchaseReconciliation';
 import PurchaseReturn from './pages/purchase/PurchaseReturn';
 
@@ -128,6 +129,7 @@ export const router = createBrowserRouter([
       { path: 'purchase/purchase-suppliers', element: <Navigate to="/purchase/purchase-supplier-list" replace /> },
       { path: 'purchase/purchase-supplier-approvals', element: <PurchaseSupplierApprovals /> },
       { path: 'purchase/purchase-supplier-list', element: <PurchaseSuppliers /> },
+      { path: 'purchase/purchase-partner-stores', element: <PurchasePartnerStores /> },
       { path: 'purchase/purchase-store-overview', element: <PurchaseStoreOverview /> },
       { path: 'purchase/purchase-reconciliation', element: <PurchaseReconciliation /> },
       { path: 'purchase/purchase-return', element: <PurchaseReturn /> },
