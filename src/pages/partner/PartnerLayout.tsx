@@ -57,6 +57,10 @@ const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode
     icon: <svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="15" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.2"/></svg>,
   },
   {
+    key: 'store', label: '门店信息', path: '/partner/profile/store',
+    icon: <svg viewBox="0 0 20 20" fill="none"><path d="M3 8l1.5-4h11L17 8M3 8v9h14V8M3 8h14M8 17v-5h4v5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
+  },
+  {
     key: 'settlement', label: '结算', path: '/partner/settlement',
     icon: <svg viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="16" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 9h2M5 12h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><circle cx="14" cy="10" r="2" stroke="currentColor" strokeWidth="1.2"/></svg>,
   },
@@ -66,9 +70,7 @@ const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode
     children: [
       { label: '账号管理', path: '/partner/account' },
       { label: '基本信息', path: '/partner/profile/basic' },
-      { label: '联系信息', path: '/partner/profile/contact' },
       { label: '仓库信息', path: '/partner/profile/warehouse' },
-      { label: '门店信息', path: '/partner/profile/store' },
       { label: '资质文件', path: '/partner/profile/qualification' },
       { label: '结算信息', path: '/partner/profile/finance' },
     ],

@@ -224,10 +224,11 @@ export const router = createBrowserRouter([
       { path: 'customers', element: <PartnerCustomers /> },
       { path: 'settlement', element: <PartnerSettlement /> },
       { path: 'account', element: <PartnerAccountPage /> },
-      /* 设置菜单：合作商信息分区子页（联系信息/仓库信息免审批直接保存） */
+      /* 设置菜单：合作商信息分区子页（仓库信息免审批直接保存）；门店信息为一级菜单 */
       { path: 'profile', element: <Navigate to="/partner/profile/basic" replace /> },
       { path: 'profile/basic', element: <PartnerProfile section="basic" /> },
-      { path: 'profile/contact', element: <PartnerProfile section="contact" /> },
+      /* 联系信息已并入基本信息 */
+      { path: 'profile/contact', element: <Navigate to="/partner/profile/basic" replace /> },
       { path: 'profile/warehouse', element: <PartnerProfile section="warehouse" /> },
       { path: 'profile/store', element: <PartnerProfile section="store" /> },
       { path: 'profile/qualification', element: <PartnerProfile section="qualification" /> },
