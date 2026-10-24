@@ -53,6 +53,10 @@ const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode
     icon: <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v10M10 13l4-4M10 13l-4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16.5h14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M13 3.5h4v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   },
   {
+    key: 'grab', label: '抢单大厅', path: '/partner/grab',
+    icon: <svg viewBox="0 0 20 20" fill="none"><path d="M11 2.5L5 11h4l-1 6.5L14 9h-4l1-6.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
+  },
+  {
     key: 'customers', label: '客户', path: '/partner/customers',
     icon: <svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="15" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.2"/></svg>,
   },

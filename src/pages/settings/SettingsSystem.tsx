@@ -4,8 +4,12 @@ import SettingsSection from '../../components/settings/SettingsSection';
 import SettingsRow from '../../components/settings/SettingsRow';
 import Toggle from '../../components/common/Toggle';
 import Button from '../../components/common/Button';
+import { useOrderFlowStore } from '../../stores/orderFlowStore';
 
 export default function SettingsSystem() {
+  const settings = useOrderFlowStore((s) => s.settings);
+  const updateSettings = useOrderFlowStore((s) => s.updateSettings);
+
   return (
     <>
       <ContentHeader title="系统设置" breadcrumbs={['系统', '系统设置']} />
@@ -15,6 +19,51 @@ export default function SettingsSystem() {
             <SettingsRow label="企业名称" description="淡茶半盏茶业有限公司" action={<Button variant="ghost" size="sm">修改</Button>} />
             <SettingsRow label="默认仓库" description="杭州总仓" action={<Button variant="ghost" size="sm">修改</Button>} />
             <SettingsRow label="货币单位" description="人民币 (CNY)" action={<Button variant="ghost" size="sm">修改</Button>} />
+          </SettingsSection>
+          <SettingsSection title="订单流转设置（外部订单）">
+            <SettingsRow
+              label="报备命中自动转单"
+              description="开启后外部订单录入命中已审批报备即自动转出合作商，无需人工确认"
+              action={<Toggle active={settings.autoTransfer} onChange={(v) => updateSettings({ autoTransfer: v })} />}
+            />
+            <SettingsRow
+              label="抢单时长"
+              description={`发布抢单后合作商可抢的时间窗口（当前 ${settings.grabMinutes} 分钟），超时无人抢自动退回待处理`}
+              action={
+                <input
+                  className="filter-input mono" type="number" min={1} style={{ width: 90 }}
+                  value={settings.grabMinutes}
+                  onChange={(e) => updateSettings({ grabMinutes: Math.max(1, Number(e.target.value) || 30) })}
+                />
+              }
+            />
+            <SettingsRow
+              label="比单报价时长"
+              description={`发起比单后候选合作商的报价窗口（当前 ${settings.compareMinutes} 分钟）`}
+              action={
+                <input
+                  className="filter-input mono" type="number" min={1} style={{ width: 90 }}
+                  value={settings.compareMinutes}
+                  onChange={(e) => updateSettings({ compareMinutes: Math.max(1, Number(e.target.value) || 30) })}
+                />
+              }
+            />
+            <SettingsRow
+              label="比单评分权重"
+              description={`报价 ${settings.compareWeights.quote} : 积分 ${settings.compareWeights.score} : 履约 ${settings.compareWeights.ontime}（综合得分 = 加权平均）`}
+              action={
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(['quote', 'score', 'ontime'] as const).map((k) => (
+                    <input
+                      key={k} className="filter-input mono" type="number" min={0} max={10} style={{ width: 72 }}
+                      title={k === 'quote' ? '报价权重' : k === 'score' ? '积分权重' : '履约权重'}
+                      value={settings.compareWeights[k]}
+                      onChange={(e) => updateSettings({ compareWeights: { ...settings.compareWeights, [k]: Math.max(0, Number(e.target.value) || 0) } })}
+                    />
+                  ))}
+                </div>
+              }
+            />
           </SettingsSection>
           <SettingsSection title="通知设置">
             <SettingsRow label="库存预警通知" description="当库存低于预警线时发送通知" action={<Toggle active />} />

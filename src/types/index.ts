@@ -1312,8 +1312,8 @@ export interface PartnerOrder {
   remark?: string;
   /** 报备转入来源（报备编号），由平台报备规则自动转入的订单才有 */
   sourceReport?: string;
-  /** 报备转入类型：order-self=自营订单报备 / order-opportunity=商机订单报备（平台履约）/ product=商品报备 / customer=客户报备 */
-  transferKind?: 'order-self' | 'order-opportunity' | 'product' | 'customer';
+  /** 报备转入类型：order-self=自营订单报备 / order-opportunity=商机订单报备（平台履约）/ product=商品报备 / customer=客户报备 / assign=指定分发 / grab=抢单中单 / compare=比单中单 */
+  transferKind?: 'order-self' | 'order-opportunity' | 'product' | 'customer' | 'assign' | 'grab' | 'compare';
 }
 
 /** 合作商报备类型：order=订单报备 / product=商品报备 / customer=客户报备 */
@@ -1501,4 +1501,194 @@ export interface CartItem {
   spec: string;
   price: number;
   quantity: number;
+}
+
+/* ════════════════════════════════════════
+ * 外部平台订单分流（订单流转中心）
+ * ════════════════════════════════════════ */
+
+/** 外部订单来源平台 */
+export type ExternalPlatform = 'tmall' | 'jd' | 'douyin' | 'pdd' | 'other';
+
+/** 分发方式：指定 / 抢单（时间优先） / 比单（综合评分） */
+export type DistributeMode = 'assign' | 'grab' | 'compare';
+
+/**
+ * 外部订单处理状态（状态机）
+ * pending 待处理 → report_matched 报备命中待确认 / self_* 自营链 / grabbing 抢单中 / comparing 比单中
+ * → transferred 已转合作商 → completed 已完成
+ */
+export type ExternalProcessStatus =
+  | 'pending'
+  | 'report_matched'
+  | 'self_purchasing'
+  | 'self_inbound'
+  | 'self_outbound'
+  | 'grabbing'
+  | 'comparing'
+  | 'transferred'
+  | 'completed';
+
+/** 转出来源：报备命中 / 指定 / 抢单 / 比单 */
+export type TransferSource = 'report' | DistributeMode;
+
+/** 报备命中信息（录入时自动匹配审批通过的报备） */
+export interface ReportMatchInfo {
+  reportCode: string;
+  reportType: PartnerReportType;
+  partnerId?: string;
+  partnerName: string;
+}
+
+/** 外部订单商品行 */
+export interface ExternalOrderItem {
+  productId: string;
+  productName: string;
+  spec: string;
+  quantity: number;
+  price: number;
+}
+
+/** 自营背对背链路（以销定采：采购单 → 入库 → 出库） */
+export interface SelfChain {
+  purchaseOrderCode: string;
+  supplierId: string;
+  supplierName: string;
+  purchaseAmount: number;
+  purchaseDate: string;
+  inboundCode?: string;
+  inboundDate?: string;
+  outboundCode?: string;
+  outboundDate?: string;
+}
+
+/** 比单报价 */
+export interface CompareQuote {
+  supplierId: string;
+  supplierName: string;
+  amount: number;
+  quoteTime: string;
+}
+
+/** 比单评分明细 */
+export interface CompareScoreBreakdown {
+  quoteScore: number;
+  scoreScore: number;
+  ontimeScore: number;
+  total: number;
+}
+
+/** 比单会话（候选合作商 + 报价 + 评分结果） */
+export interface CompareSession {
+  candidates: { supplierId: string; supplierName: string }[];
+  deadline: number;
+  quotes: CompareQuote[];
+  scored: boolean;
+  scores?: Record<string, CompareScoreBreakdown>;
+  winnerId?: string;
+}
+
+/** 抢单记录 */
+export interface GrabRecord {
+  supplierId: string;
+  supplierName: string;
+  grabTime: string;
+  ts: number;
+}
+
+/** 外部订单（运营手工录入，分流处理） */
+export interface ExternalOrder {
+  id: string;
+  /** 订单编号（WB + 日期 + 3 位序号） */
+  code: string;
+  platform: ExternalPlatform;
+  /** 平台原始单号 */
+  externalOrderNo: string;
+  customerName: string;
+  customerType: string;
+  customerRegion: string;
+  items: ExternalOrderItem[];
+  totalAmount: number;
+  receiver: string;
+  receiverPhone: string;
+  receiverAddress: string;
+  remark?: string;
+  entryTime: string;
+  operator: string;
+  processStatus: ExternalProcessStatus;
+  /** 报备命中列表（可能多条交叉命中） */
+  reportMatches?: ReportMatchInfo[];
+  /** 忽略报备命中，继续自选路径 */
+  reportIgnored?: boolean;
+  path?: 'self' | 'distribute';
+  distributeMode?: DistributeMode;
+  partnerId?: string;
+  partnerName?: string;
+  transferSource?: TransferSource;
+  transferTime?: string;
+  /** 转出后履约状态（合作商订单链） */
+  partnerStatus?: PartnerOrderStatus;
+  /** 结算是否按时（超时扣积分） */
+  settleOnTime?: boolean;
+  selfChain?: SelfChain;
+  /** 抢单截止时间戳（毫秒） */
+  grabDeadline?: number;
+  grabRecords?: GrabRecord[];
+  compare?: CompareSession;
+  /** 处理轨迹 */
+  history: { time: string; action: string; detail?: string }[];
+}
+
+/** 订单流转设置 */
+export interface FlowSettings {
+  /** 报备命中后自动转单（关闭则需人工确认） */
+  autoTransfer: boolean;
+  /** 抢单时长（分钟） */
+  grabMinutes: number;
+  /** 比单报价时长（分钟） */
+  compareMinutes: number;
+  /** 比单评分权重（报价 / 积分 / 履约） */
+  compareWeights: { quote: number; score: number; ontime: number };
+}
+
+/* ════════════════════════════════════════
+ * 合作商积分体系
+ * ════════════════════════════════════════ */
+
+/** 积分维度：客户拜访 / 报备情况 / 履约情况 / 处罚情况 */
+export type ScoreDimension = 'visit' | 'report' | 'fulfillment' | 'penalty';
+
+/** 积分台账流水 */
+export interface PartnerScoreEntry {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  dimension: ScoreDimension;
+  /** 加分为正、扣分为负 */
+  delta: number;
+  reason: string;
+  time: string;
+  /** 关联订单 / 报备 / 比单编号 */
+  refCode?: string;
+  operator?: string;
+}
+
+/** 积分档位（期初分 + 履约率，比单评分用） */
+export interface PartnerScoreBase {
+  /** 期初分（历史累计快照） */
+  base: number;
+  /** 履约率（0-100，按期发货占比） */
+  ontimeRate: number;
+}
+
+/** 积分汇总（四维明细 + 总分） */
+export interface PartnerScoreSummary {
+  supplierId: string;
+  supplierName: string;
+  visit: number;
+  report: number;
+  fulfillment: number;
+  penalty: number;
+  total: number;
+  ontimeRate: number;
 }

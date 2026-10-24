@@ -3,7 +3,10 @@ import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { PageHead, Pill, ORDER_STATUS_TONE } from './PartnerUI';
+import { getPartnerAuth } from './PartnerLayout';
 import { useReportStore, getTransferredOrders } from '../../stores/reportStore';
+import { useOrderFlowStore, getPartnerFlowOrders } from '../../stores/orderFlowStore';
+import { useSupplierStore } from '../../stores/supplierStore';
 import type { PartnerOrder, PartnerOrderStatus } from '../../types';
 import {
   partnerOrders as initialOrders,
@@ -14,11 +17,14 @@ import {
 } from '../../data/partner';
 
 /** 转入类型 → 药丸色调 */
-const TRANSFER_TONE: Record<string, 'green' | 'gray' | 'purple' | 'amber'> = {
+const TRANSFER_TONE: Record<string, 'green' | 'gray' | 'purple' | 'amber' | 'blue'> = {
   'order-self': 'green',
   'order-opportunity': 'gray',
   product: 'purple',
   customer: 'amber',
+  assign: 'blue',
+  grab: 'green',
+  compare: 'purple',
 };
 
 /** 订单状态 Tab（原状态下拉框改为列表上方标签页） */
@@ -32,11 +38,19 @@ const STATUS_TABS: { key: PartnerOrderStatus | ''; label: string; icon: ReactNod
   { key: 'rejected', label: '已驳回', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 7.5l5 5M12.5 7.5l-5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
 ];
 
-/** 合作商订单管理：平台分发订单 + 报备审批通过后自动转入的订单（直送/入库 × 供应商/服务商模式） */
+/** 合作商订单管理：平台分发订单 + 报备审批通过后自动转入的订单 + 外部订单流转转入（报备/指定/抢单/比单） */
 export default function PartnerOrders() {
   const reports = useReportStore((s) => s.reports);
   /** 报备规则自动转入的订单（商机订单由平台履约） */
   const transferred = useMemo(() => getTransferredOrders(reports), [reports]);
+  /** 外部订单流转中心转入的订单（按当前登录合作商过滤） */
+  const flowOrdersVersion = useOrderFlowStore((s) => s.orders);
+  const suppliers = useSupplierStore((s) => s.suppliers);
+  const flowOrders = useMemo(() => {
+    const auth = getPartnerAuth();
+    const myId = auth?.supplierId ?? suppliers.find((s) => s.terminal.enabled && s.terminal.username === auth?.username)?.id;
+    return myId ? getPartnerFlowOrders(myId) : [];
+  }, [flowOrdersVersion, suppliers]);
   /** 平台分发的手动订单 */
   const [manualOrders, setManualOrders] = useState<PartnerOrder[]>(initialOrders);
   /** 转入订单的状态覆盖（接单/发货等操作仅存于本次会话） */
@@ -48,9 +62,10 @@ export default function PartnerOrders() {
   const [selected, setSelected] = useState<PartnerOrder | null>(null);
 
   const allOrders = useMemo(() => [
+    ...flowOrders,
     ...transferred.map((t) => (transferOverrides[t.id] ? { ...t, status: transferOverrides[t.id]! } : t)),
     ...manualOrders,
-  ], [transferred, transferOverrides, manualOrders]);
+  ], [flowOrders, transferred, transferOverrides, manualOrders]);
 
   /** 应用搜索/配送/合作模式筛选（不含状态）后的订单：供状态 Tab 计数与状态过滤复用 */
   const baseOrders = useMemo(() => allOrders.filter(o => {
@@ -75,7 +90,10 @@ export default function PartnerOrders() {
   const transferCount = transferred.length;
 
   const updateStatus = (id: string, status: PartnerOrderStatus) => {
-    if (id.startsWith('transfer_')) {
+    if (id.startsWith('ext_')) {
+      // 外部订单流转中心转入的订单：状态回写 orderFlowStore（结算自动写积分台账）
+      useOrderFlowStore.getState().advancePartner(id.replace('ext_', ''), status, { onTime: true });
+    } else if (id.startsWith('transfer_')) {
       setTransferOverrides((prev) => ({ ...prev, [id]: status }));
     } else {
       setManualOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));

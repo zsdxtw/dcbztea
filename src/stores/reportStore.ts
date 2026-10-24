@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { PartnerOrder, PartnerReport, PlatformOrder } from '../types';
 import { partnerReports, platformOrders } from '../data/partner';
+import { useScoreStore } from './scoreStore';
 
 /* ── 报备匹配逻辑 ──────────────────────────────────────────────
  * 订单报备：按关联订单编号命中
@@ -9,7 +10,7 @@ import { partnerReports, platformOrders } from '../data/partner';
  * ──────────────────────────────────────────────────────────── */
 
 /** 判断平台订单是否命中报备规则 */
-function matchesReport(order: PlatformOrder, report: PartnerReport): boolean {
+export function matchesReport(order: PlatformOrder, report: PartnerReport): boolean {
   if (report.type === 'order') {
     return order.code === report.relatedOrderCode;
   }
@@ -84,10 +85,26 @@ export const useReportStore = create<ReportState>((set) => ({
   submitReport: (report) =>
     set((s) => ({ reports: [report, ...s.reports] })),
 
-  reviewReport: (id, status, note) =>
+  reviewReport: (id, status, note) => {
+    // 报备审批通过 → 合作商积分台账「报备情况」+5
+    if (status === 'approved') {
+      const target = partnerReports.find((r) => r.id === id);
+      if (target) {
+        useScoreStore.getState().addEntry({
+          supplierId: '11',
+          supplierName: target.partnerName,
+          dimension: 'report',
+          delta: 5,
+          reason: `报备审批通过（${target.code}）`,
+          refCode: target.code,
+          operator: '管理员',
+        });
+      }
+    }
     set((s) => ({
       reports: s.reports.map((r) =>
         r.id === id ? { ...r, status, reviewNote: note, reviewTime: formatNow() } : r,
       ),
-    })),
+    }));
+  },
 }));

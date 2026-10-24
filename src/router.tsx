@@ -16,12 +16,15 @@ import PurchaseSuppliers from './pages/purchase/PurchaseSuppliers';
 import PurchaseSupplierApprovals from './pages/purchase/PurchaseSupplierApprovals';
 import PurchaseStoreOverview from './pages/purchase/PurchaseStoreOverview';
 import PurchasePartnerStores from './pages/purchase/PurchasePartnerStores';
+import PartnerScores from './pages/purchase/PartnerScores';
 import PurchaseReconciliation from './pages/purchase/PurchaseReconciliation';
 import PurchaseReturn from './pages/purchase/PurchaseReturn';
 
 import SalesOverview from './pages/sales/SalesOverview';
 import SalesOrderCreate from './pages/sales/SalesOrderCreate';
 import SalesOrders from './pages/sales/SalesOrders';
+import ExternalOrders from './pages/sales/ExternalOrders';
+import CompareManage from './pages/sales/CompareManage';
 import SalesPricing from './pages/sales/SalesPricing';
 import SalesReconciliation from './pages/sales/SalesReconciliation';
 import SalesCustomers from './pages/sales/SalesCustomers';
@@ -92,6 +95,7 @@ import PartnerLayout from './pages/partner/PartnerLayout';
 import PartnerDashboard from './pages/partner/PartnerDashboard';
 import PartnerOrders from './pages/partner/PartnerOrders';
 import PartnerQuotes from './pages/partner/PartnerQuotes';
+import PartnerGrab from './pages/partner/PartnerGrab';
 import PartnerReports from './pages/partner/PartnerReports';
 import PartnerCustomers from './pages/partner/PartnerCustomers';
 import PartnerSettlement from './pages/partner/PartnerSettlement';
@@ -130,6 +134,7 @@ export const router = createBrowserRouter([
       { path: 'purchase/purchase-supplier-approvals', element: <PurchaseSupplierApprovals /> },
       { path: 'purchase/purchase-supplier-list', element: <PurchaseSuppliers /> },
       { path: 'purchase/purchase-partner-stores', element: <PurchasePartnerStores /> },
+      { path: 'purchase/purchase-partner-scores', element: <PartnerScores /> },
       { path: 'purchase/purchase-store-overview', element: <PurchaseStoreOverview /> },
       { path: 'purchase/purchase-reconciliation', element: <PurchaseReconciliation /> },
       { path: 'purchase/purchase-return', element: <PurchaseReturn /> },
@@ -138,6 +143,8 @@ export const router = createBrowserRouter([
       { path: 'sales/sales-overview', element: <SalesOverview /> },
       { path: 'sales/sales-order-create', element: <SalesOrderCreate /> },
       { path: 'sales/sales-orders', element: <SalesOrders /> },
+      { path: 'sales/external-orders', element: <ExternalOrders /> },
+      { path: 'sales/compare-manage', element: <CompareManage /> },
       { path: 'sales/sales-reports', element: <SalesReports /> },
       { path: 'sales/sales-pricing', element: <SalesPricing /> },
       { path: 'sales/sales-customers', element: <SalesCustomers /> },
@@ -222,6 +229,7 @@ export const router = createBrowserRouter([
       { path: 'dashboard', element: <PartnerDashboard /> },
       { path: 'orders', element: <PartnerOrders /> },
       { path: 'quotes', element: <PartnerQuotes /> },
+      { path: 'grab', element: <PartnerGrab /> },
       { path: 'reports', element: <PartnerReports /> },
       { path: 'customers', element: <PartnerCustomers /> },
       { path: 'settlement', element: <PartnerSettlement /> },
