@@ -1,12 +1,16 @@
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHead, Pill, ORDER_STATUS_TONE } from './PartnerUI';
 import { getPartnerAuth } from './PartnerLayout';
 import { useReportStore, getTransferredOrders } from '../../stores/reportStore';
+import { useOrderFlowStore, getPartnerFlowOrders } from '../../stores/orderFlowStore';
+import { useSupplierStore } from '../../stores/supplierStore';
+import { useScoreStore, getScoreSummary } from '../../stores/scoreStore';
 import { partnerOrders, partnerCustomers, partnerSettlements, PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
-/** 合作商工作台：统计带 + 待办事项 + 快捷入口 + 最新订单 */
+/** 合作商工作台：统计带（含订单处理流转/积分实时数据）+ 待办事项 + 快捷入口 + 最新订单 */
 export default function PartnerDashboard() {
   const navigate = useNavigate();
   const auth = getPartnerAuth();
@@ -14,10 +18,35 @@ export default function PartnerDashboard() {
   /** 报备审批通过后自动转入的订单 */
   const transferred = getTransferredOrders(reports);
 
-  const pendingCount = transferred.filter(o => o.status === 'pending').length + partnerOrders.filter(o => o.status === 'pending').length;
-  const shippingCount = transferred.filter(o => o.status === 'accepted' || o.status === 'shipping').length
+  /** 订单处理流转中心：我的流转订单 + 商机大厅（抢单/比单） */
+  const suppliers = useSupplierStore((s) => s.suppliers);
+  const flowVersion = useOrderFlowStore((s) => s.orders);
+  const compareWeight = useOrderFlowStore((s) => s.settings.compareWeights.score);
+  const scoreEntries = useScoreStore((s) => s.entries);
+
+  const myId = auth?.supplierId ?? suppliers.find((s) => s.terminal.enabled && s.terminal.username === auth?.username)?.id;
+  const myName = suppliers.find((s) => s.id === myId)?.name ?? auth?.name ?? '';
+  const flowOrders = useMemo(
+    () => (myId ? getPartnerFlowOrders(myId) : []),
+    [flowVersion, myId],
+  );
+  /** 商机大厅：全部进行中的抢单与比单（公开报名制，所有人可参与） */
+  const hallGrabbing = useMemo(() => flowVersion.filter((o) => o.processStatus === 'grabbing'), [flowVersion]);
+  const hallComparing = useMemo(() => flowVersion.filter((o) => o.processStatus === 'comparing'), [flowVersion]);
+  const myScore = getScoreSummary(scoreEntries, myId ?? '', myName);
+
+  const flowPending = flowOrders.filter((o) => o.status === 'pending').length;
+  const flowDoing = flowOrders.filter((o) => o.status === 'accepted' || o.status === 'shipping').length;
+  const flowDelivered = flowOrders.filter((o) => o.status === 'delivered');
+
+  const pendingCount = flowPending + transferred.filter(o => o.status === 'pending').length + partnerOrders.filter(o => o.status === 'pending').length;
+  const shippingCount = flowDoing
+    + transferred.filter(o => o.status === 'accepted' || o.status === 'shipping').length
     + partnerOrders.filter(o => o.status === 'accepted' || o.status === 'shipping').length;
+  const hallCount = hallGrabbing.length + hallComparing.length;
   const unsettled = partnerSettlements.find(s => s.status === 'unsettled');
+  const waitSettleAmount = (unsettled?.settleAmount ?? 0) + flowDelivered.reduce((sum, o) => sum + o.totalAmount, 0);
+  const waitSettleCount = (unsettled?.orderCount ?? 0) + flowDelivered.length;
   const customerCount = partnerCustomers.filter(c => c.status === 'cooperating').length;
   const reportPending = reports.filter(r => r.status === 'pending').length;
 
@@ -27,22 +56,33 @@ export default function PartnerDashboard() {
   const stats = [
     { label: '待接单', value: String(pendingCount), unit: '单', sub: '需尽快确认接单', accent: false },
     { label: '履约中', value: String(shippingCount), unit: '单', sub: '接单 / 发货进行中', accent: false },
-    { label: '本月待结算', value: (unsettled?.settleAmount ?? 0).toLocaleString(), unit: '元', sub: `${unsettled?.orderCount ?? 0} 笔订单待结算`, accent: true },
+    { label: '商机大厅', value: String(hallCount), unit: '单', sub: `可抢 ${hallGrabbing.length} · 比单 ${hallComparing.length}`, accent: false },
+    { label: '我的积分', value: String(myScore.total), unit: '分', sub: `比单评分权重 ${compareWeight}0%`, accent: false },
+    { label: '本月待结算', value: waitSettleAmount.toLocaleString(), unit: '元', sub: `${waitSettleCount} 笔订单待结算`, accent: true },
     { label: '合作客户', value: String(customerCount), unit: '家', sub: '本地营销进行中', accent: false },
   ];
 
   const todos = [
     { label: '待接单订单', count: pendingCount, path: '/partner/orders', desc: '请尽快确认接单并安排发货' },
     { label: '履约中订单', count: shippingCount, path: '/partner/orders', desc: '跟进物流并确认客户签收' },
+    { label: '可抢订单', count: hallGrabbing.length, path: '/partner/grab', desc: '抢单大厅 · 先到先得' },
+    { label: '比单报名中', count: hallComparing.length, path: '/partner/grab', desc: '按「报价 + 积分」综合评分定标' },
     { label: '审核中报备', count: reportPending, path: '/partner/reports', desc: '报备审核中，请留意审核结果' },
   ];
 
   const shortcuts = [
+    { label: '抢单大厅', path: '/partner/grab', desc: '抢单 / 比单报价 / 客户拜访' },
     { label: '订单管理', path: '/partner/orders', desc: '处理平台分发的订单' },
     { label: '新增报备', path: '/partner/reports', desc: '报备订单 / 商品 / 客户' },
     { label: '合作客户', path: '/partner/customers', desc: '查看客户与可下单商品' },
     { label: '结算中心', path: '/partner/settlement', desc: '发货订单结算进度' },
   ];
+
+  /** 最新分发订单：流转订单（实时）在前，平台手动分发订单在后 */
+  const latest = useMemo(() => [
+    ...[...flowOrders].sort((a, b) => b.orderDate.localeCompare(a.orderDate)),
+    ...partnerOrders,
+  ].slice(0, 5), [flowOrders]);
 
   return (
     <div className="pk-page">
@@ -116,7 +156,7 @@ export default function PartnerDashboard() {
           </button>
         </div>
         <div className="pk-rows">
-          {partnerOrders.slice(0, 5).map(o => (
+          {latest.map(o => (
             <div key={o.id} className="pk-row" onClick={() => navigate('/partner/orders')}>
               <span className="mono" style={{ fontSize: 13, color: 'var(--pk-ink2)' }}>{o.code}</span>
               <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--pk-ink)', flex: 1 }}>{o.customerName}</span>

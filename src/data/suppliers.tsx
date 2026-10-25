@@ -630,6 +630,15 @@ const STORES_MAP: Record<string, SupplierStore[]> = {
   '10': [
     { id: 'st10-1', name: '张一元大栅栏总店', province: '北京', city: '北京市', district: '西城区', address: '大栅栏街22号', area: 300, manager: '赵店长', phone: '010-6301***1', mainBrands: ['张一元'], status: 'active' },
   ],
+  '11': [
+    { id: 'st11-1', name: '云茶·西湖茶文化馆', province: '浙江', city: '杭州市', district: '西湖区', address: '虎跑路46号', area: 280, manager: '沈店长', phone: '0571-8790***1', mainBrands: ['西湖牌', '八马'], photos: [
+      'https://trae-api-cn.mchost.guru/api/ide/v1/tool_text_to_image?prompt=%E6%9D%AD%E5%B7%9E%E8%A5%BF%E6%B9%96%E8%8C%B6%E6%96%87%E5%8C%96%E5%93%81%E7%89%8C%E9%97%A8%E5%BA%97%E5%A4%96%E8%A7%82%EF%BC%8C%E4%B8%AD%E5%BC%8F%E6%9C%A8%E8%B4%A8%E9%97%A8%E5%A4%B4%E4%B8%8E%E8%8C%B6%E5%8C%BE%EF%BC%8C%E9%9D%92%E7%93%A6%E9%A3%9E%E6%AA%90%EF%BC%8C%E8%A1%97%E6%99%AF%E8%A7%86%E8%A7%92%EF%BC%8C%E9%AB%98%E6%B8%85%E6%91%84%E5%BD%B1&image_size=square_hd',
+      'https://trae-api-cn.mchost.guru/api/ide/v1/tool_text_to_image?prompt=%E8%8C%B6%E6%96%87%E5%8C%96%E9%97%A8%E5%BA%97%E5%AE%A4%E5%86%85%E5%93%81%E8%8C%B6%E5%8C%BA%EF%BC%8C%E5%8E%9F%E6%9C%A8%E8%8C%B6%E6%A1%8C%E8%8C%B6%E6%A4%85%E4%B8%8E%E5%8D%9A%E5%8F%A4%E6%9E%B6%E9%99%88%E8%AE%BE%EF%BC%8C%E6%9A%96%E8%89%B2%E7%81%AF%E5%85%89%EF%BC%8C%E9%AB%98%E6%B8%85%E6%91%84%E5%BD%B1&image_size=square_hd',
+    ], status: 'active' },
+    { id: 'st11-2', name: '云茶·滨江茶品专营店', province: '浙江', city: '杭州市', district: '滨江区', address: '江南大道300号', area: 160, manager: '顾店长', phone: '0571-8790***2', mainBrands: ['大益', '品品香'], photos: [
+      'https://trae-api-cn.mchost.guru/api/ide/v1/tool_text_to_image?prompt=%E7%8E%B0%E4%BB%A3%E8%8C%B6%E5%8F%B6%E4%B8%93%E8%90%A5%E5%BA%97%E5%AE%A4%E5%86%85%EF%BC%8C%E7%A4%BC%E7%9B%92%E8%8C%B6%E5%93%81%E5%B1%95%E6%9F%9C%E4%B8%8E%E5%93%81%E9%89%B4%E5%90%A7%E5%8F%B0%EF%BC%8C%E6%98%8E%E4%BA%AE%E9%80%9A%E9%80%8F%EF%BC%8C%E9%AB%98%E6%B8%85%E6%91%84%E5%BD%B1&image_size=square_hd',
+    ], status: 'active' },
+  ],
 };
 
 /** 终端账号列表（管理员 + 操作员，与终端「账号管理」联动） */

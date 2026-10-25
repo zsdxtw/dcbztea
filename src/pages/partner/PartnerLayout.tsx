@@ -61,7 +61,7 @@ const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode
     icon: <svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="15" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.2"/></svg>,
   },
   {
-    key: 'store', label: '门店信息', path: '/partner/profile/store',
+    key: 'store', label: '门店', path: '/partner/profile/store',
     icon: <svg viewBox="0 0 20 20" fill="none"><path d="M3 8l1.5-4h11L17 8M3 8v9h14V8M3 8h14M8 17v-5h4v5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
   },
   {
