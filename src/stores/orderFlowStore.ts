@@ -246,7 +246,9 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         grabDeadline: undefined,
         grabRecords: undefined,
         compare: undefined,
-      }, { action: '重新流转', detail: note || '订单进入待处理状态，重新选择路径' });
+        // 报备匹配信息一并清除：重新流转后不再按报备自动分发，由运营手动选择路径
+        reportMatches: undefined,
+      }, { action: '重新流转', detail: note || '订单进入待处理状态重新选择路径（已清除报备匹配，不再自动按报备分发）' });
     },
 
     /* ── 自营执行 ── */

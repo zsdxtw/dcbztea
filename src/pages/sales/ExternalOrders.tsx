@@ -24,9 +24,14 @@ const pill = (bg: string, color: string, text: string) => (
 );
 
 const statusPill = (status: string) => {
-  const c = EXTERNAL_STATUS_COLORS[status] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
-  return pill(c.bg, c.color, EXTERNAL_STATUS_LABELS[status] ?? status);
+  // 已完成归并展示为已处理（子状态由调用方补充）
+  const key = status === 'completed' ? 'processed' : status;
+  const c = EXTERNAL_STATUS_COLORS[key] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
+  return pill(c.bg, c.color, EXTERNAL_STATUS_LABELS[key] ?? status);
 };
+
+/** 状态归并：已完成并入已处理（列表筛选/计数/展示统一） */
+const mergedStatus = (s: string) => (s === 'completed' ? 'processed' : s);
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -48,8 +53,8 @@ function selfStage(o: ExternalOrder): { key: string; label: string; idx: number 
 function pathLabel(o: ExternalOrder): string {
   if (o.path === 'self') return '自营';
   if (o.transferSource) return TRANSFER_SOURCE_LABELS[o.transferSource];
-  if (o.distributeMode === 'grab') return '抢单';
-  if (o.distributeMode === 'compare') return '比单';
+  if (o.distributeMode === 'grab') return '分发-抢单';
+  if (o.distributeMode === 'compare') return '分发-比单';
   return '—';
 }
 
@@ -155,21 +160,11 @@ export default function ExternalOrders() {
 
   const filtered = useMemo(() => orders.filter((o) => {
     if (keyword && !o.code.includes(keyword) && !o.customerName.includes(keyword) && !o.externalOrderNo.includes(keyword)) return false;
-    return filterStatus === '' ? true : o.processStatus === filterStatus;
+    if (filterStatus === '') return true;
+    return mergedStatus(o.processStatus) === filterStatus;
   }), [orders, keyword, filterStatus]);
 
-  const countOf = (key: string) => (key === '' ? orders.length : orders.filter((o) => o.processStatus === key).length);
-
-  const STATUS_TABS = [
-    { key: '', label: '全部' },
-    { key: 'pending', label: '待处理' },
-    { key: 'self_pending', label: '自营待接单' },
-    { key: 'grabbing', label: '抢单中' },
-    { key: 'comparing', label: '比单中' },
-    { key: 'distribute_pending', label: '分发待接单' },
-    { key: 'processed', label: '已处理' },
-    { key: 'completed', label: '已完成' },
-  ];
+  const countOf = (key: string) => (key === '' ? orders.length : orders.filter((o) => mergedStatus(o.processStatus) === key).length);
 
   /* ── 录入 ── */
   const addItemRow = () => {
@@ -263,16 +258,17 @@ export default function ExternalOrders() {
   const openDetail = (id: string) => setSelectedId(id);
 
   /* ── 编辑保存 ── */
-  const startEdit = () => {
-    if (!current) return;
+  const startEdit = (order?: ExternalOrder) => {
+    const target = order ?? current;
+    if (!target) return;
     setEditForm({
-      externalOrderNo: current.externalOrderNo,
-      customerName: current.customerName,
-      customerRegion: current.customerRegion,
-      receiver: current.receiver,
-      receiverPhone: current.receiverPhone,
-      receiverAddress: current.receiverAddress,
-      remark: current.remark ?? '',
+      externalOrderNo: target.externalOrderNo,
+      customerName: target.customerName,
+      customerRegion: target.customerRegion,
+      receiver: target.receiver,
+      receiverPhone: target.receiverPhone,
+      receiverAddress: target.receiverAddress,
+      remark: target.remark ?? '',
     });
   };
   const saveEdit = () => {
@@ -307,14 +303,109 @@ export default function ExternalOrders() {
           待接单订单可「重新流转」回待处理重新选择路径；已接单的重新流转需二次确认。
         </div>
 
-        {/* 状态 Tab + 工具栏 */}
-        <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-4)' }}>
-          {STATUS_TABS.map((t) => (
-            <button key={t.key || 'all'} className={`tab-card-simple${filterStatus === t.key ? ' active' : ''}`} onClick={() => setFilterStatus(t.key)}>
-              {t.label}
-              <span className="tab-card-simple-count">{countOf(t.key)}</span>
-            </button>
-          ))}
+        {/* 状态栏流程图：待处理(左中) ─ 顶中出线→[自营]→[自营待接单]→已处理顶中 / 底中出线→[2×2虚线框]→[分发待接单]→已处理底中，两个待接单右缘对齐 */}
+        <style>{`
+          .eop-flowbar { display: flex; align-items: center; gap: 14px; margin-bottom: var(--space-4); flex-wrap: nowrap; overflow-x: auto; padding: 6px 0; }
+          .eop-flow { display: flex; align-items: center; gap: 20px; }
+          .eop-nodebox { position: relative; display: flex; flex: none; }
+          .eop-nodebox > .tab-card-simple { position: relative; z-index: 1; }
+          /* 上路线：从按钮顶中向上 39px，再向右横接分支区左缘 */
+          .eop-nodebox .up-v { position: absolute; left: 50%; transform: translateX(-1px); bottom: 100%; height: 39px; width: 2px; background: var(--color-neutral-300); }
+          .eop-nodebox .up-h { position: absolute; top: -39px; left: 50%; width: calc(50% + 20px); height: 2px; background: var(--color-neutral-300); }
+          .eop-nodebox.right .up-h { left: auto; right: 50%; }
+          /* 下路线：从按钮底中向下 29px，再向右横接分支区左缘 */
+          .eop-nodebox .dn-v { position: absolute; left: 50%; transform: translateX(-1px); top: 100%; height: 29px; width: 2px; background: var(--color-neutral-300); }
+          .eop-nodebox .dn-h { position: absolute; top: calc(100% + 29px); left: 50%; width: calc(50% + 20px); height: 2px; background: var(--color-neutral-300); }
+          .eop-nodebox.right .dn-h { left: auto; right: 50%; }
+          /* 路线标签（嵌在待处理出线的横线上） */
+          .eop-lbl { position: absolute; font-size: var(--text-xs); color: var(--color-neutral-500); background: var(--color-neutral-0); padding: 0 4px; line-height: 14px; z-index: 1; }
+          .eop-lbl.up { top: -39px; left: calc(50% + 8px); transform: translateY(-50%); }
+          .eop-lbl.dn { top: calc(100% + 29px); left: calc(50% + 8px); transform: translateY(-50%); }
+          /* 箭头：→ 进入节点 / ↓ 进入已处理顶中 / ↑ 进入已处理底中 */
+          .eop-arr-r::after { content: ''; position: absolute; right: -1px; top: 50%; transform: translateY(-50%); border-left: 5px solid var(--color-neutral-300); border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+          .eop-arr-d::after { content: ''; position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%); border-top: 5px solid var(--color-neutral-300); border-left: 4px solid transparent; border-right: 4px solid transparent; }
+          .eop-arr-u::after { content: ''; position: absolute; top: -1px; left: 50%; transform: translateX(-50%); border-bottom: 5px solid var(--color-neutral-300); border-left: 4px solid transparent; border-right: 4px solid transparent; }
+          .eop-nodebox.right .up-v { bottom: auto; top: -39px; height: 39px; }  /* 已处理侧竖线向下到顶中 */
+          .eop-nodebox.right .dn-v { top: auto; bottom: -29px; height: 29px; }  /* 已处理侧竖线向上到底中 */
+          /* 分支区：固定行高保证连线锚点稳定（上行64 + 中缝44 + 下行84 = 192） */
+          .eop-branches { display: flex; flex-direction: column; flex: none; }
+          .eop-toprow { height: 64px; display: flex; align-items: center; }
+          .eop-midgap { height: 44px; }
+          .eop-botrow { height: 84px; display: flex; align-items: center; }
+          .eop-grow { flex: 1; min-width: 12px; height: 2px; background: var(--color-neutral-300); }
+          .eop-hln { position: relative; width: 18px; height: 2px; background: var(--color-neutral-300); flex: none; }
+          /* 虚线框：报备·指定·抢单中·比单中 一行并列 */
+          .eop-box { display: flex; gap: 12px; padding: 9px 12px; align-items: center; border: 1.5px dashed var(--color-neutral-300); border-radius: 12px; flex: none; }
+          .eop-box .tab-card-simple { justify-content: center; }
+          .eop-dim { opacity: .45; cursor: not-allowed; }
+        `}</style>
+        <div className="eop-flowbar">
+          <button className={`tab-card-simple${filterStatus === '' ? ' active' : ''}`} onClick={() => setFilterStatus('')}>
+            全部
+            <span className="tab-card-simple-count">{orders.length}</span>
+          </button>
+
+          <div className="eop-flow">
+            {/* 待处理：顶中出上线(自营) / 底中出下线(分发) */}
+            <div className="eop-nodebox">
+              <i className="up-v" aria-hidden="true" />
+              <i className="up-h eop-arr-r" aria-hidden="true" />
+              <span className="eop-lbl up" aria-hidden="true">自营</span>
+              <i className="dn-v" aria-hidden="true" />
+              <i className="dn-h eop-arr-r" aria-hidden="true" />
+              <span className="eop-lbl dn" aria-hidden="true">分发</span>
+              <button className={`tab-card-simple${filterStatus === 'pending' ? ' active' : ''}`} onClick={() => setFilterStatus('pending')}>
+                待处理
+                <span className="tab-card-simple-count">{countOf('pending')}</span>
+              </button>
+            </div>
+
+            <div className="eop-branches">
+              {/* 上路：自营(路径，置灰) → 自营待接单（右缘与分发待接单对齐） */}
+              <div className="eop-toprow">
+                <button className="tab-card-simple eop-dim" disabled title="选择自营路径即时进入自营待接单，无中间状态">自营</button>
+                <i className="eop-hln eop-arr-r" aria-hidden="true" />
+                <button className={`tab-card-simple${filterStatus === 'self_pending' ? ' active' : ''}`} onClick={() => setFilterStatus('self_pending')}>
+                  自营待接单
+                  <span className="tab-card-simple-count">{countOf('self_pending')}</span>
+                </button>
+                <i className="eop-grow" aria-hidden="true" />
+              </div>
+              <div className="eop-midgap" />
+              {/* 下路：4 个分发方式 2×2（整体虚线框）→ 分发待接单 */}
+              <div className="eop-botrow">
+                <div className="eop-box">
+                  <button className="tab-card-simple eop-dim" disabled title="报备命中即时转出，无中间状态">报备</button>
+                  <button className="tab-card-simple eop-dim" disabled title="指定分发即时转出，无中间状态">指定</button>
+                  <button className={`tab-card-simple${filterStatus === 'grabbing' ? ' active' : ''}`} onClick={() => setFilterStatus('grabbing')}>
+                    抢单中
+                    <span className="tab-card-simple-count">{countOf('grabbing')}</span>
+                  </button>
+                  <button className={`tab-card-simple${filterStatus === 'comparing' ? ' active' : ''}`} onClick={() => setFilterStatus('comparing')}>
+                    比单中
+                    <span className="tab-card-simple-count">{countOf('comparing')}</span>
+                  </button>
+                </div>
+                <i className="eop-hln eop-arr-r" aria-hidden="true" />
+                <button className={`tab-card-simple${filterStatus === 'distribute_pending' ? ' active' : ''}`} onClick={() => setFilterStatus('distribute_pending')}>
+                  分发待接单
+                  <span className="tab-card-simple-count">{countOf('distribute_pending')}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 已处理：顶中入上线(↓) / 底中入下线(↑) */}
+            <div className="eop-nodebox right">
+              <i className="up-v eop-arr-d" aria-hidden="true" />
+              <i className="up-h" aria-hidden="true" />
+              <i className="dn-v eop-arr-u" aria-hidden="true" />
+              <i className="dn-h" aria-hidden="true" />
+              <button className={`tab-card-simple${filterStatus === 'processed' ? ' active' : ''}`} onClick={() => setFilterStatus('processed')}>
+                已处理
+                <span className="tab-card-simple-count">{countOf('processed')}</span>
+              </button>
+            </div>
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
           <input className="filter-input" placeholder="搜索订单编号、客户、平台单号..." value={keyword} onChange={(e) => setKeyword(e.target.value)} />
@@ -326,30 +417,44 @@ export default function ExternalOrders() {
 
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['订单编号 / 来源', '客户', '商品', '金额', '状态 / 路径', '合作商', '录入时间', '操作']}
+            headers={['订单编号', '来源', '客户', '商品', '金额', '状态', '路径', '合作商', '录入时间', '操作']}
             rows={filtered.map((o) => [
-              <span key="c" className="cell-mono-emph">{o.code}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{EXTERNAL_PLATFORM_LABELS[o.platform]}·{o.externalOrderNo}·{EXTERNAL_CHANNEL_LABELS[o.sourceChannel]}</span></span>,
+              <span key="c" className="cell-mono-emph">{o.code}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.externalOrderNo}</span></span>,
+              <span key="src">
+                {EXTERNAL_PLATFORM_LABELS[o.platform]}
+                <span style={{ display: 'block' }}>{pill(
+                  o.sourceChannel === 'push' ? '#F3E5F5' : '#E3F2FD',
+                  o.sourceChannel === 'push' ? '#7B1FA2' : '#0F64B5',
+                  EXTERNAL_CHANNEL_LABELS[o.sourceChannel],
+                )}</span>
+              </span>,
               <span key="cu" className="cell-emph">{o.customerName}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.customerRegion}</span></span>,
               <span key="i" style={{ whiteSpace: 'nowrap' }}>{o.items[0].productName}{o.items.length > 1 ? ` 等${o.items.length}种` : ''}</span>,
               <span key="a" className="mono" style={{ fontWeight: 'var(--font-semibold)' }}>{money(o.totalAmount)}</span>,
               <span key="s">
                 {statusPill(o.processStatus)}
-                <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>{pathLabel(o)}</span>
+                {['processed', 'completed'].includes(o.processStatus) && o.path === 'self' && (
+                  <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>{selfStage(o).label}</span>
+                )}
+                {['processed', 'completed'].includes(o.processStatus) && o.path === 'distribute' && o.partnerStatus && (
+                  <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>{PARTNER_ORDER_STATUS_LABELS[o.partnerStatus]}</span>
+                )}
               </span>,
+              <span key="pa" style={{ fontSize: 'var(--text-sm)' }}>{pathLabel(o)}</span>,
               <span key="pt" style={{ fontSize: 'var(--text-sm)' }}>{o.partnerName ?? '—'}</span>,
               <span key="t" className="cell-muted" style={{ whiteSpace: 'nowrap' }}>{o.entryTime}</span>,
               <div key="act" className="row-actions" style={{ whiteSpace: 'nowrap' }}>
                 {o.processStatus === 'pending' && (
                   <>
                     <Button size="sm" onClick={() => setSelectedId(o.id)}>处理</Button>
-                    {o.sourceChannel === 'manual' && <Button size="sm" variant="ghost" onClick={() => { setSelectedId(o.id); startEdit(); }}>修改</Button>}
+                    {o.sourceChannel === 'manual' && <Button size="sm" variant="ghost" onClick={() => { setSelectedId(o.id); startEdit(o); }}>修改</Button>}
                     {o.sourceChannel === 'manual' && <Button size="sm" variant="ghost" onClick={() => setDeleting(o)}>删除</Button>}
                   </>
                 )}
                 {(o.processStatus === 'self_pending' || o.processStatus === 'distribute_pending') && (
                   <>
                     <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
-                    <Button size="sm" variant="ghost" onClick={() => startReflow(o)}>重新流转</Button>
+                    <Button size="sm" variant="secondary" onClick={() => startReflow(o)}>重新流转</Button>
                   </>
                 )}
                 {o.processStatus === 'grabbing' && (
@@ -364,7 +469,7 @@ export default function ExternalOrders() {
                 {(o.processStatus === 'processed' || o.processStatus === 'completed') && (
                   <>
                     <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
-                    <Button size="sm" variant="ghost" onClick={() => startReflow(o)}>重新流转</Button>
+                    <Button size="sm" variant="secondary" onClick={() => startReflow(o)}>重新流转</Button>
                   </>
                 )}
               </div>,
@@ -380,27 +485,31 @@ export default function ExternalOrders() {
         badge="WB"
         title={current?.code ?? ''}
         statusTag={current ? statusPill(current.processStatus) : null}
-        subtitle={current ? `${EXTERNAL_PLATFORM_LABELS[current.platform]} · ${current.externalOrderNo} · ${EXTERNAL_CHANNEL_LABELS[current.sourceChannel] === '手工' ? '手工录入' : '直连推送'} · ${current.customerName}` : ''}
-        hideFooter
+        subtitle={current ? `${EXTERNAL_PLATFORM_LABELS[current.platform]} · ${current.externalOrderNo} · ${EXTERNAL_CHANNEL_LABELS[current.sourceChannel]} · ${current.customerName}` : ''}
         footer={
-          <>
-            <Button variant="ghost" onClick={() => setSelectedId(null)}>关闭</Button>
-            {current && current.processStatus !== 'pending' && current.processStatus !== 'processed' && current.processStatus !== 'completed' && (
-              <Button variant="ghost" onClick={() => startReflow(current)}>重新流转</Button>
-            )}
-          </>
+          Object.keys(editForm).length > 0 ? (
+            <>
+              <Button variant="ghost" onClick={() => setEditForm({})}>取消</Button>
+              <Button onClick={saveEdit}>保存修改</Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={() => setSelectedId(null)}>关闭</Button>
+              {current && current.processStatus !== 'pending' && current.processStatus !== 'processed' && current.processStatus !== 'completed' && (
+                <Button variant="secondary" onClick={() => startReflow(current)}>重新流转</Button>
+              )}
+              {current && current.sourceChannel === 'manual' && !['processed', 'completed'].includes(current.processStatus) && (
+                <Button onClick={() => startEdit()}>修改</Button>
+              )}
+            </>
+          )
         }
       >
         {current && (
           <>
             {/* ── 查看态：订单信息 ── */}
             {!editForm.externalOrderNo && Object.keys(editForm).length === 0 && (
-              <DrawerSection
-                title="订单信息"
-                extra={current.processStatus !== 'processed' && current.processStatus !== 'completed' && current.sourceChannel === 'manual' && current.processStatus !== 'pending' ? (
-                  <Button size="sm" variant="ghost" onClick={startEdit}>修改</Button>
-                ) : undefined}
-              >
+              <DrawerSection title="订单信息">
                 <InfoGrid>
                   <InfoItem label="订单编号" mono emph>{current.code}</InfoItem>
                   <InfoItem label="来源平台">{EXTERNAL_PLATFORM_LABELS[current.platform]}</InfoItem>
@@ -724,6 +833,7 @@ export default function ExternalOrders() {
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
               确认后订单 <strong className="mono">{reflowing.code}</strong> 将<strong>进入待处理状态重新选择路径</strong>
               {['processed', 'completed'].includes(reflowing.processStatus) ? `，原有执行信息（${reflowing.path === 'self' ? '采购/出入库单据' : '合作商关联、履约进度'}）全部作废。` : '，可重新选择自营或分发路径。'}
+              {reflowing.transferSource === 'report' && ' 该订单原为报备分发，重新流转后报备匹配信息已清除，不会再自动按报备分发。'}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
               <Button variant="ghost" onClick={() => setReflowing(null)}>取消</Button>

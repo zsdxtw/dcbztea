@@ -245,8 +245,8 @@ export const EXTERNAL_PLATFORM_LABELS: Record<ExternalPlatform, string> = {
 };
 
 export const EXTERNAL_CHANNEL_LABELS: Record<string, string> = {
-  manual: '手工',
-  push: '直连',
+  manual: '手工录入',
+  push: '直连推送',
 };
 
 export const EXTERNAL_STATUS_LABELS: Record<string, string> = {
@@ -271,10 +271,10 @@ export const EXTERNAL_STATUS_COLORS: Record<string, { bg: string; color: string 
 
 /** 分发路径标签（分发待接单/已处理展示） */
 export const TRANSFER_SOURCE_LABELS: Record<string, string> = {
-  report: '报备分发',
-  assign: '指定分发',
-  grab: '抢单分发',
-  compare: '比单分发',
+  report: '分发-报备',
+  grab: '分发-抢单',
+  assign: '分发-指定',
+  compare: '分发-比单',
 };
 
 /** 计算比单底价金额（元） */

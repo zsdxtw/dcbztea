@@ -349,13 +349,12 @@ export default function SalesOrders() {
     if (o.processStatus === 'distribute_pending') {
       return <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: EXTERNAL_STATUS_COLORS.distribute_pending.bg, color: EXTERNAL_STATUS_COLORS.distribute_pending.color }}>待接单（合作商）</span>;
     }
-    if (o.processStatus === 'completed') {
-      return <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: EXTERNAL_STATUS_COLORS.completed.bg, color: EXTERNAL_STATUS_COLORS.completed.color }}>已完成</span>;
-    }
-    // 已处理：显示执行进度子状态
-    const sub = o.path === 'self'
-      ? (o.selfChain?.outboundCode ? '已发货' : o.selfChain?.inboundCode ? '已入库' : '采购中')
-      : (o.partnerStatus ? PARTNER_ORDER_STATUS_LABELS[o.partnerStatus] : '执行中');
+    // 已处理 / 已完成统一展示为已处理（子状态区分执行进度）
+    const sub = o.processStatus === 'completed'
+      ? (o.path === 'self' ? '已完成' : '已结算')
+      : o.path === 'self'
+        ? (o.selfChain?.outboundCode ? '已发货' : o.selfChain?.inboundCode ? '已入库' : '采购中')
+        : (o.partnerStatus ? PARTNER_ORDER_STATUS_LABELS[o.partnerStatus] : '执行中');
     return (
       <span>
         <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: EXTERNAL_STATUS_COLORS.processed.bg, color: EXTERNAL_STATUS_COLORS.processed.color }}>已处理</span>
@@ -441,7 +440,7 @@ export default function SalesOrders() {
                 <span key="c" className="cell-mono-emph">{o.code}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{EXTERNAL_PLATFORM_LABELS[o.platform]} · {EXTERNAL_CHANNEL_LABELS[o.sourceChannel]}</span></span>,
                 o.path === 'self'
                   ? <span key="t" style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5' }}>自营</span>
-                  : <span key="t" style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E0F2F1', color: '#00695C' }}>分发{o.transferSource ? ` · ${TRANSFER_SOURCE_LABELS[o.transferSource]}` : ''}</span>,
+                  : <span key="t" style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E0F2F1', color: '#00695C' }}>{o.transferSource ? TRANSFER_SOURCE_LABELS[o.transferSource] : '分发'}</span>,
                 <span key="cu" className="cell-emph">{o.customerName}</span>,
                 <span key="i" style={{ whiteSpace: 'nowrap' }}>{o.items[0].productName}{o.items.length > 1 ? ` 等${o.items.length}种` : ''}</span>,
                 <span key="a" className="mono" style={{ fontWeight: 'var(--font-semibold)' }}>{formatMoney(o.totalAmount)}</span>,
