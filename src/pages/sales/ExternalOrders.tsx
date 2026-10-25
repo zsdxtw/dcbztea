@@ -5,19 +5,22 @@ import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import Toggle from '../../components/common/Toggle';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
-import { useOrderFlowStore, getSelfPurchaseEstimate } from '../../stores/orderFlowStore';
+import { useOrderFlowStore, getSelfPurchaseEstimate, reportMatchesOrder } from '../../stores/orderFlowStore';
 import { useSupplierStore } from '../../stores/supplierStore';
 import { usePriceStore } from '../../stores/priceStore';
 import { useScoreStore, getScoreSummary } from '../../stores/scoreStore';
+import { useReportStore } from '../../stores/reportStore';
 import {
   EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS,
-  TRANSFER_SOURCE_LABELS, compareFloorAmount,
+  TRANSFER_SOURCE_LABELS, SOURCE_TAG_LABELS, compareFloorAmount,
 } from '../../data/externalOrders';
-import { PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
+import { PARTNER_ORDER_STATUS_LABELS, PARTNER_REPORT_TYPE_LABELS } from '../../data/partner';
 import { getSalesDefaultPrice, getPersonalMinPrice } from '../../data/prices';
 import { customerItems, CUSTOMER_TYPE_LABELS } from '../../data/customers';
 import { platformItems } from '../../data/platforms';
-import type { ExternalOrder, ExternalOrderItem, ExternalPlatform } from '../../types';
+import { REGIONS, getCities, getDistricts } from '../../data/regions';
+import { partnerInRegion } from '../../types';
+import type { ExternalOrder, ExternalOrderItem, ExternalPlatform, RegionScope } from '../../types';
 
 const pill = (bg: string, color: string, text: string) => (
   <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: bg, color, whiteSpace: 'nowrap' }}>{text}</span>
@@ -40,6 +43,9 @@ const PLATFORM_OPTIONS: { value: ExternalPlatform; label: string }[] = [
   { value: 'pdd', label: '拼多多' }, { value: 'other', label: '其他平台' },
 ];
 
+/** 省份选项（地区筛选/范围共用） */
+const PROVINCE_OPTS = REGIONS.map((r) => r.name);
+
 /** 自营执行进度（由 selfChain 推导） */
 function selfStage(o: ExternalOrder): { key: string; label: string; idx: number } {
   if (!o.selfChain) return { key: 'none', label: '未开始', idx: -1 };
@@ -49,13 +55,42 @@ function selfStage(o: ExternalOrder): { key: string; label: string; idx: number 
   return { key: 'purchasing', label: '采购中', idx: 0 };
 }
 
-/** 路径标签（分发待接单显示来源路径） */
+/** 路径标签（分发待接单显示来源路径；报备-匹配待确认属分发-报备） */
 function pathLabel(o: ExternalOrder): string {
+  if (o.processStatus === 'report_match_pending') return '分发-报备';
   if (o.path === 'self') return '自营';
   if (o.transferSource) return TRANSFER_SOURCE_LABELS[o.transferSource];
   if (o.distributeMode === 'grab') return '分发-抢单';
   if (o.distributeMode === 'compare') return '分发-比单';
   return '—';
+}
+
+/** 路径筛选键（列表流转路径筛选用） */
+function pathKey(o: ExternalOrder): string {
+  if (o.processStatus === 'report_match_pending') return 'report';
+  if (o.path === 'self') return 'self';
+  if (o.transferSource) return o.transferSource;
+  if (o.distributeMode === 'grab') return 'grab';
+  if (o.distributeMode === 'compare') return 'compare';
+  return 'none';
+}
+
+/** 地区列展示：省 / 市 / 区（与人员-茶人管理同格式；区从收货地址解析，解析不到降级为省市） */
+function regionText(o: ExternalOrder): string {
+  const region = o.customerRegion ?? '';
+  const addr = o.receiverAddress ?? '';
+  const prov = REGIONS.find((p) => region.startsWith(p.name) || addr.startsWith(p.name));
+  if (!prov) return region;
+  const shortNames = (c: string) => c.replace(/市$/, '');
+  const city = prov.cities.find((c) => region.includes(c.name) || addr.includes(c.name))
+    ?? prov.cities.find((c) => region.includes(shortNames(c.name)) || addr.includes(shortNames(c.name)));
+  const parts: string[] = [prov.name];
+  if (city) {
+    parts.push(city.name);
+    const district = city.districts.find((d) => addr.includes(d));
+    if (district) parts.push(district);
+  }
+  return parts.join(' / ');
 }
 
 /** 已接单订单重新流转的风险措辞 */
@@ -86,6 +121,20 @@ export default function ExternalOrders() {
   const [keyword, setKeyword] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  /** 列表筛选（仅「全部」时展示）：地区省市县联动 + 流转路径 */
+  const [listProv, setListProv] = useState('');
+  const [listCity, setListCity] = useState('');
+  const [listDist, setListDist] = useState('');
+  const [listPath, setListPath] = useState('');
+
+  /** 拆单弹窗（流转-待处理按商品+数量拆出子订单） */
+  const [splitting, setSplitting] = useState<ExternalOrder | null>(null);
+  const [splitQty, setSplitQty] = useState<Record<string, string>>({});
+
+  /** 列表分页：每页条数（10/20/50，右下角下拉）与当前页 */
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
+
   /** 录入弹窗 */
   const [entering, setEntering] = useState(false);
   const [platform, setPlatform] = useState<ExternalPlatform>('tmall');
@@ -110,15 +159,32 @@ export default function ExternalOrders() {
   /** 直接选定弹窗 */
   const [awarding, setAwarding] = useState<{ orderId: string; supplierId: string; supplierName: string } | null>(null);
   const [awardReason, setAwardReason] = useState('');
-  /** 流转设置弹窗 */
-  const [showSettings, setShowSettings] = useState(false);
-
-  /** 处理向导局部状态 */
-  const [showDistribute, setShowDistribute] = useState(false);
-  const [distributeMode, setDistributeMode] = useState<'assign' | 'grab' | 'compare'>('assign');
-  const [assignSupplier, setAssignSupplier] = useState('');
+  /** 流转弹窗（待处理订单独立处理页：直接进入分发方式选择，含转自营） */
+  const [flowingId, setFlowingId] = useState<string | null>(null);
+  const [flowMode, setFlowMode] = useState<'self' | 'assign' | 'report' | 'grab' | 'compare'>('assign');
+  /** 分发-指定：合作商选择 + 省市县筛选 + 搜索 + 分页 */
+  const [flowSupplier, setFlowSupplier] = useState('');
+  const [supplierProv, setSupplierProv] = useState('');
+  const [supplierCity, setSupplierCity] = useState('');
+  const [supplierDist, setSupplierDist] = useState('');
+  const [supplierKw, setSupplierKw] = useState('');
+  const [supplierPage, setSupplierPage] = useState(1);
+  /** 分发-报备：地区筛选 + 分页 */
+  const [reportProv, setReportProv] = useState('');
+  const [reportCity, setReportCity] = useState('');
+  const [reportDist, setReportDist] = useState('');
+  const [reportPage, setReportPage] = useState(1);
+  /** 分发-报备：选中的报备编号（多选，一笔订单可对应多条报备） */
+  const [pickReportCodes, setPickReportCodes] = useState<string[]>([]);
+  /** 抢单/比单地区范围（省市县，可选） */
+  const [scopeProv, setScopeProv] = useState('');
+  const [scopeCity, setScopeCity] = useState('');
+  const [scopeDist, setScopeDist] = useState('');
+  /** 比单底价 */
   const [floorType, setFloorType] = useState<'discount' | 'price'>('discount');
   const [floorValue, setFloorValue] = useState('88');
+  /** 确认报备匹配弹窗（报备-匹配待确认状态订单） */
+  const [matchConfirming, setMatchConfirming] = useState<ExternalOrder | null>(null);
 
   /** 修改抽屉编辑态 */
   const [editForm, setEditForm] = useState<Record<string, string>>({});
@@ -134,6 +200,98 @@ export default function ExternalOrders() {
 
   const activeSuppliers = useMemo(() => suppliers.filter((s) => s.status === 'active'), [suppliers]);
   const scoreOf = (id: string, name: string) => getScoreSummary(scoreEntries, id, name);
+
+  /** 审批通过的报备记录（流转弹窗·报备匹配选择用） */
+  const approvedReports = useReportStore((s) => s.reports.filter((r) => r.status === 'approved'));
+
+  const flowing = flowingId ? orders.find((o) => o.id === flowingId) ?? null : null;
+
+  /** 指定分发候选合作商：省市县筛选 + 名称搜索 */
+  const flowSuppliers = useMemo(() => activeSuppliers.filter((s) => {
+    if (supplierProv && s.registeredProvince !== supplierProv && s.contactProvince !== supplierProv) return false;
+    if (supplierCity && s.registeredCity !== supplierCity && s.contactCity !== supplierCity) return false;
+    if (supplierDist && s.registeredDistrict !== supplierDist && s.contactDistrict !== supplierDist) return false;
+    if (supplierKw && !s.name.includes(supplierKw)) return false;
+    return true;
+  }), [activeSuppliers, supplierProv, supplierCity, supplierDist, supplierKw]);
+
+  const supplierCityOpts = supplierProv ? getCities(supplierProv).map((c) => c.name) : [];
+  const supplierDistOpts = supplierProv && supplierCity ? getDistricts(supplierProv, supplierCity) : [];
+  const scopeCityOpts = scopeProv ? getCities(scopeProv).map((c) => c.name) : [];
+  const scopeDistOpts = scopeProv && scopeCity ? getDistricts(scopeProv, scopeCity) : [];
+  const reportCityOpts = reportProv ? getCities(reportProv).map((c) => c.name) : [];
+  const reportDistOpts = reportProv && reportCity ? getDistricts(reportProv, reportCity) : [];
+
+  /** 抢单/比单地区范围（未选则为全部地区） */
+  const flowScope: RegionScope | undefined = scopeProv || scopeCity || scopeDist
+    ? { province: scopeProv || undefined, city: scopeCity || undefined, district: scopeDist || undefined }
+    : undefined;
+
+  /** 分发-报备：按报备合作商地区筛选后的报备记录 */
+  const flowReports = useMemo(() => approvedReports.filter((r) => {
+    const s = suppliers.find((x) => x.name === r.partnerName);
+    return partnerInRegion(s, { province: reportProv || undefined, city: reportCity || undefined, district: reportDist || undefined });
+  }), [approvedReports, suppliers, reportProv, reportCity, reportDist]);
+
+  /** 列表分页（每页 10 条，超过 10 条分页展示） */
+  const PAGE_SIZE = 10;
+  const supplierPages = Math.max(1, Math.ceil(flowSuppliers.length / PAGE_SIZE));
+  const reportPages = Math.max(1, Math.ceil(flowReports.length / PAGE_SIZE));
+  const pagedSuppliers = flowSuppliers.slice((supplierPage - 1) * PAGE_SIZE, supplierPage * PAGE_SIZE);
+  const pagedReports = flowReports.slice((reportPage - 1) * PAGE_SIZE, reportPage * PAGE_SIZE);
+  useEffect(() => { setSupplierPage(1); }, [supplierProv, supplierCity, supplierDist, supplierKw]);
+  useEffect(() => { setReportPage(1); }, [reportProv, reportCity, reportDist]);
+
+  /** 分页条（总数 >10 时展示） */
+  const pager = (page: number, pages: number, total: number, set: (n: number) => void) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginTop: 'var(--space-2)' }}>
+      共 {total} 条
+      <Button size="sm" variant="ghost" disabled={page <= 1} onClick={() => set(page - 1)}>上一页</Button>
+      <span className="mono">{page} / {pages}</span>
+      <Button size="sm" variant="ghost" disabled={page >= pages} onClick={() => set(page + 1)}>下一页</Button>
+    </div>
+  );
+
+  const openFlow = (o: ExternalOrder) => {
+    setFlowingId(o.id);
+    setFlowMode('assign');
+    setFlowSupplier('');
+    setSupplierProv(''); setSupplierCity(''); setSupplierDist(''); setSupplierKw(''); setSupplierPage(1);
+    setReportProv(''); setReportCity(''); setReportDist(''); setReportPage(1);
+    setPickReportCodes([]);
+    setScopeProv(''); setScopeCity(''); setScopeDist('');
+    setFloorType('discount'); setFloorValue('88');
+  };
+
+  /** 流转弹窗确认按钮（文案随动作变化，右下角取消 + 确认） */
+  const flowConfirmLabel =
+    flowMode === 'self' ? '确认'
+      : flowMode === 'assign' ? '指定并转出'
+        : flowMode === 'report' ? '匹配并转出'
+          : flowMode === 'grab' ? '发起抢单'
+            : '发起比单';
+  const flowConfirmDisabled =
+    (flowMode === 'assign' && !flowSupplier)
+    || (flowMode === 'report' && pickReportCodes.length === 0)
+    || (flowMode === 'compare' && !(Number(floorValue) > 0));
+
+  const doFlowConfirm = () => {
+    if (!flowing) return;
+    if (flowMode === 'self') {
+      store.getState().chooseSelfPath(flowing.id);
+    } else if (flowMode === 'assign') {
+      const s = activeSuppliers.find((x) => x.id === flowSupplier);
+      if (s) store.getState().assignPartner(flowing.id, s.id, s.name);
+    } else if (flowMode === 'report') {
+      if (pickReportCodes.length > 0) store.getState().matchReportManual(flowing.id, pickReportCodes);
+    } else if (flowMode === 'grab') {
+      store.getState().publishGrab(flowing.id, flowScope);
+    } else {
+      const v = Number(floorValue);
+      if (v > 0) store.getState().startCompare(flowing.id, { type: floorType, value: v }, flowScope);
+    }
+    setFlowingId(null);
+  };
 
   const customerOptions: CustomerOption[] = useMemo(() => [
     ...customerItems.map((c) => ({ id: c.id, name: c.name, typeLabel: CUSTOMER_TYPE_LABELS[c.type], level: c.level || '—', contactPerson: c.contactPerson, contactPhone: c.contactPhone, contactAddress: c.contactAddress || c.region })),
@@ -151,20 +309,51 @@ export default function ExternalOrders() {
 
   useEffect(() => {
     if (current) {
-      setShowDistribute(false);
-      setDistributeMode('assign');
-      setAssignSupplier('');
       setEditForm({});
     }
   }, [selectedId]);
 
   const filtered = useMemo(() => orders.filter((o) => {
     if (keyword && !o.code.includes(keyword) && !o.customerName.includes(keyword) && !o.externalOrderNo.includes(keyword)) return false;
-    if (filterStatus === '') return true;
-    return mergedStatus(o.processStatus) === filterStatus;
-  }), [orders, keyword, filterStatus]);
+    if (filterStatus !== '') return mergedStatus(o.processStatus) === filterStatus;
+    // 「全部」模式下应用地区 + 流转路径筛选
+    if (listPath && pathKey(o) !== listPath) return false;
+    if (listProv || listCity || listDist) {
+      const [p, c, d] = regionText(o).split(' / ');
+      if (listProv && p !== listProv) return false;
+      if (listCity && c !== listCity) return false;
+      if (listDist && d !== listDist) return false;
+    }
+    return true;
+  }), [orders, keyword, filterStatus, listProv, listCity, listDist, listPath]);
+
+  const listCityOpts = listProv ? getCities(listProv).map((c) => c.name) : [];
+  const listDistOpts = listProv && listCity ? getDistricts(listProv, listCity) : [];
 
   const countOf = (key: string) => (key === '' ? orders.length : orders.filter((o) => mergedStatus(o.processStatus) === key).length);
+
+  /** 列表分页：筛选/搜索/页大小变化回第 1 页，越界自动收敛 */
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pagedOrders = filtered.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => { setPage(1); }, [keyword, filterStatus, listProv, listCity, listDist, listPath, pageSize]);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
+
+  /** 页码按钮（列表下方分页数字，当前页模块主色） */
+  const pageBtn = (n: number) => (
+    <button
+      key={n}
+      onClick={() => setPage(n)}
+      style={{
+        minWidth: 28, height: 28, padding: '0 6px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+        border: `1px solid ${page === n ? 'var(--color-module-current-base)' : 'var(--color-neutral-200)'}`,
+        background: page === n ? 'var(--color-module-current-base)' : 'var(--color-neutral-0)',
+        color: page === n ? 'var(--color-neutral-0)' : 'var(--color-neutral-600)',
+        fontSize: 'var(--text-sm)', fontWeight: 500, fontFamily: 'var(--font-family-mono)',
+      }}
+    >
+      {n}
+    </button>
+  );
 
   /* ── 录入 ── */
   const addItemRow = () => {
@@ -240,8 +429,8 @@ export default function ExternalOrders() {
     setExternalOrderNo(''); setCustomerSearch(''); setMatchedCustomerId(''); setCustomerRegion('');
     setReceiver(''); setReceiverPhone(''); setReceiverAddress(''); setRemark(''); setItems([]);
     setEntryError('');
-    // 命中报备的订单已直接进入分发待接单，打开详情展示去向
-    if (order.processStatus === 'distribute_pending') setSelectedId(order.id);
+    // 命中报备的订单进入报备-匹配待确认，打开详情展示匹配信息供确认
+    if (order.processStatus === 'report_match_pending') setSelectedId(order.id);
   };
 
   /* ── 重新流转 ── */
@@ -295,11 +484,11 @@ export default function ExternalOrders() {
   /* ── 渲染 ── */
   return (
     <>
-      <ContentHeader title="订单处理" breadcrumbs={['销售', '订单处理']} />
+      <ContentHeader title="订单生成&流转" breadcrumbs={['销售', '订单生成&流转']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-          订单处理是<strong>销售订单的入口</strong>：处理订单生成到分发合作商或自营，明确订单由谁来接单。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>。
-          命中报备的订单自动进入<strong>分发待接单</strong>（报备分发）；其余订单选自营（管理后台在销售订单接单，接单时填跟单人）或分发（指定 / 抢单 / 比单报名制）。
+          订单生成&流转是<strong>销售订单的入口</strong>：处理订单生成到分发合作商或自营，明确订单由谁来接单。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>，保存后均自动与审批通过的报备比对。
+          命中报备的订单先进入<strong>报备-匹配待确认</strong>，人工确认匹配后分发给报备合作商；其余订单点击「流转」在弹窗中选择：转自营（管理后台在销售订单接单，接单时填跟单人）、分发-指定、分发-报备、分发-抢单（时间有限）、分发-比单（积分优先）；抢单与比单可限定合作商地区。
           待接单订单可「重新流转」回待处理重新选择路径；已接单的重新流转需二次确认。
         </div>
 
@@ -338,6 +527,10 @@ export default function ExternalOrders() {
           .eop-box { display: flex; gap: 12px; padding: 9px 12px; align-items: center; border: 1.5px dashed var(--color-neutral-300); border-radius: 12px; flex: none; }
           .eop-box .tab-card-simple { justify-content: center; }
           .eop-dim { opacity: .45; cursor: not-allowed; }
+          /* 流转弹窗 · 流转方式卡片（两行：名称 + 说明小字，文字居中；激活态用内联样式实现，禁用过渡避免干扰） */
+          .eop-mode-card { flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: var(--space-2) var(--space-3); transition: none; text-align: center; }
+          .eop-mode-card strong { font-size: var(--text-sm); }
+          .eop-mode-card .eop-mode-sub { font-size: var(--text-xs); font-weight: 400; color: var(--color-neutral-400); line-height: 1.2; white-space: nowrap; }
         `}</style>
         <div className="eop-flowbar">
           <button className={`tab-card-simple${filterStatus === '' ? ' active' : ''}`} onClick={() => setFilterStatus('')}>
@@ -355,27 +548,33 @@ export default function ExternalOrders() {
               <i className="dn-h eop-arr-r" aria-hidden="true" />
               <span className="eop-lbl dn" aria-hidden="true">分发</span>
               <button className={`tab-card-simple${filterStatus === 'pending' ? ' active' : ''}`} onClick={() => setFilterStatus('pending')}>
-                待处理
+                流转-待处理
                 <span className="tab-card-simple-count">{countOf('pending')}</span>
               </button>
             </div>
 
             <div className="eop-branches">
-              {/* 上路：自营(路径，置灰) → 自营待接单（右缘与分发待接单对齐） */}
+              {/* 上路：自营(路径，置灰) ─ 弹性连线 ─ 自营待接单（推至右缘，与分发待接单横向对齐） */}
               <div className="eop-toprow">
                 <button className="tab-card-simple eop-dim" disabled title="选择自营路径即时进入自营待接单，无中间状态">自营</button>
-                <i className="eop-hln eop-arr-r" aria-hidden="true" />
+                <i className="eop-grow eop-arr-r" aria-hidden="true" />
                 <button className={`tab-card-simple${filterStatus === 'self_pending' ? ' active' : ''}`} onClick={() => setFilterStatus('self_pending')}>
                   自营待接单
                   <span className="tab-card-simple-count">{countOf('self_pending')}</span>
                 </button>
-                <i className="eop-grow" aria-hidden="true" />
               </div>
               <div className="eop-midgap" />
-              {/* 下路：4 个分发方式 2×2（整体虚线框）→ 分发待接单 */}
+              {/* 下路：分发方式（报备-匹配待确认 / 指定 / 抢单中 / 比单中）→ 分发待接单 */}
               <div className="eop-botrow">
                 <div className="eop-box">
-                  <button className="tab-card-simple eop-dim" disabled title="报备命中即时转出，无中间状态">报备</button>
+                  <button
+                    className={`tab-card-simple${filterStatus === 'report_match_pending' ? ' active' : ''}`}
+                    title="录入/直连推送时自动匹配报备，命中即进入此状态，人工确认后分发"
+                    onClick={() => setFilterStatus('report_match_pending')}
+                  >
+                    报备-匹配待确认
+                    <span className="tab-card-simple-count">{countOf('report_match_pending')}</span>
+                  </button>
                   <button className="tab-card-simple eop-dim" disabled title="指定分发即时转出，无中间状态">指定</button>
                   <button className={`tab-card-simple${filterStatus === 'grabbing' ? ' active' : ''}`} onClick={() => setFilterStatus('grabbing')}>
                     抢单中
@@ -401,24 +600,48 @@ export default function ExternalOrders() {
               <i className="dn-v eop-arr-u" aria-hidden="true" />
               <i className="dn-h" aria-hidden="true" />
               <button className={`tab-card-simple${filterStatus === 'processed' ? ' active' : ''}`} onClick={() => setFilterStatus('processed')}>
-                已处理
+                流转-已完成
                 <span className="tab-card-simple-count">{countOf('processed')}</span>
               </button>
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
-          <input className="filter-input" placeholder="搜索订单编号、客户、平台单号..." value={keyword} onChange={(e) => setKeyword(e.target.value)} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
+          <input className="filter-input" placeholder="搜索订单编号、客户、平台单号..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 240 }} />
+          {filterStatus === '' && (
+            <>
+              <select className="filter-select" value={listProv} onChange={(e) => { setListProv(e.target.value); setListCity(''); setListDist(''); }}>
+                <option value="">全部地区（省）</option>
+                {PROVINCE_OPTS.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+              <select className="filter-select" disabled={!listProv} value={listCity} onChange={(e) => { setListCity(e.target.value); setListDist(''); }}>
+                <option value="">全部市</option>
+                {listCityOpts.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select className="filter-select" disabled={!listCity} value={listDist} onChange={(e) => setListDist(e.target.value)}>
+                <option value="">全部区县</option>
+                {listDistOpts.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <select className="filter-select" value={listPath} onChange={(e) => setListPath(e.target.value)}>
+                <option value="">全部流转路径</option>
+                <option value="self">自营</option>
+                <option value="report">分发-报备</option>
+                <option value="assign">分发-指定</option>
+                <option value="grab">分发-抢单</option>
+                <option value="compare">分发-比单</option>
+                <option value="none">未选择</option>
+              </select>
+            </>
+          )}
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)' }}>
-            <Button variant="ghost" onClick={() => setShowSettings(true)}>流转设置</Button>
             <Button onClick={() => setEntering(true)}>+ 录入订单</Button>
           </span>
         </div>
 
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['订单编号', '来源', '客户', '商品', '金额', '状态', '路径', '合作商', '录入时间', '操作']}
-            rows={filtered.map((o) => [
+            headers={['订单编号', '来源', '客户', '地区', '收件人', '收件地址', '金额', '状态', '流转路径', '合作商', '录入时间', '操作']}
+            rows={pagedOrders.map((o) => [
               <span key="c" className="cell-mono-emph">{o.code}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.externalOrderNo}</span></span>,
               <span key="src">
                 {EXTERNAL_PLATFORM_LABELS[o.platform]}
@@ -427,9 +650,18 @@ export default function ExternalOrders() {
                   o.sourceChannel === 'push' ? '#7B1FA2' : '#0F64B5',
                   EXTERNAL_CHANNEL_LABELS[o.sourceChannel],
                 )}</span>
+                {o.sourceTag && (
+                  <span style={{ display: 'block', marginTop: 2 }}>{pill(
+                    SOURCE_TAG_LABELS[o.sourceTag].bg,
+                    SOURCE_TAG_LABELS[o.sourceTag].color,
+                    SOURCE_TAG_LABELS[o.sourceTag].label,
+                  )}</span>
+                )}
               </span>,
-              <span key="cu" className="cell-emph">{o.customerName}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.customerRegion}</span></span>,
-              <span key="i" style={{ whiteSpace: 'nowrap' }}>{o.items[0].productName}{o.items.length > 1 ? ` 等${o.items.length}种` : ''}</span>,
+              <span key="cu" className="cell-emph">{o.customerName}</span>,
+              <span key="rg" style={{ whiteSpace: 'nowrap', fontSize: 'var(--text-sm)' }}>{regionText(o)}</span>,
+              <span key="rcv" className="cell-emph">{o.receiver}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.receiverPhone}</span></span>,
+              <span key="addr" className="cell-muted" style={{ fontSize: 'var(--text-sm)', minWidth: 160 }}>{o.receiverAddress}</span>,
               <span key="a" className="mono" style={{ fontWeight: 'var(--font-semibold)' }}>{money(o.totalAmount)}</span>,
               <span key="s">
                 {statusPill(o.processStatus)}
@@ -446,15 +678,22 @@ export default function ExternalOrders() {
               <div key="act" className="row-actions" style={{ whiteSpace: 'nowrap' }}>
                 {o.processStatus === 'pending' && (
                   <>
-                    <Button size="sm" onClick={() => setSelectedId(o.id)}>处理</Button>
+                    <Button size="sm" onClick={() => openFlow(o)}>流转</Button>
+                    {o.items.length >= 1 && <Button size="sm" variant="ghost" onClick={() => { setSplitting(o); setSplitQty({}); }}>拆单</Button>}
                     {o.sourceChannel === 'manual' && <Button size="sm" variant="ghost" onClick={() => { setSelectedId(o.id); startEdit(o); }}>修改</Button>}
                     {o.sourceChannel === 'manual' && <Button size="sm" variant="ghost" onClick={() => setDeleting(o)}>删除</Button>}
+                  </>
+                )}
+                {o.processStatus === 'report_match_pending' && (
+                  <>
+                    <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
+                    <Button size="sm" onClick={() => setMatchConfirming(o)}>确认匹配</Button>
                   </>
                 )}
                 {(o.processStatus === 'self_pending' || o.processStatus === 'distribute_pending') && (
                   <>
                     <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
-                    <Button size="sm" variant="secondary" onClick={() => startReflow(o)}>重新流转</Button>
+                    <Button size="sm" variant="danger" onClick={() => startReflow(o)}>重新流转</Button>
                   </>
                 )}
                 {o.processStatus === 'grabbing' && (
@@ -469,13 +708,34 @@ export default function ExternalOrders() {
                 {(o.processStatus === 'processed' || o.processStatus === 'completed') && (
                   <>
                     <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
-                    <Button size="sm" variant="secondary" onClick={() => startReflow(o)}>重新流转</Button>
+                    <Button size="sm" variant="danger" onClick={() => startReflow(o)}>重新流转</Button>
                   </>
                 )}
               </div>,
             ])}
           />
         </Card>
+
+        {/* 列表分页：下方页码数字 + 右下角每页条数下拉（10/20/50 条/页） */}
+        {filtered.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginRight: 'auto' }}>
+              共 {filtered.length} 条 · 第 {page} / {totalPages} 页
+            </span>
+            <Button size="sm" variant="ghost" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => pageBtn(n))}
+            <Button size="sm" variant="ghost" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>下一页</Button>
+            <select
+              className="filter-select"
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+            >
+              <option value={10}>10 条/页</option>
+              <option value={20}>20 条/页</option>
+              <option value={50}>50 条/页</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {/* ── 详情 / 处理抽屉 ── */}
@@ -496,7 +756,7 @@ export default function ExternalOrders() {
             <>
               <Button variant="ghost" onClick={() => setSelectedId(null)}>关闭</Button>
               {current && current.processStatus !== 'pending' && current.processStatus !== 'processed' && current.processStatus !== 'completed' && (
-                <Button variant="secondary" onClick={() => startReflow(current)}>重新流转</Button>
+                <Button variant="danger" onClick={() => startReflow(current)}>重新流转</Button>
               )}
               {current && current.sourceChannel === 'manual' && !['processed', 'completed'].includes(current.processStatus) && (
                 <Button onClick={() => startEdit()}>修改</Button>
@@ -507,6 +767,35 @@ export default function ExternalOrders() {
       >
         {current && (
           <>
+            {/* ── 母子订单标签页（拆单家族：母订单 + 子订单1..N） ── */}
+            {(() => {
+              const rootCode = current.parentCode ?? current.code;
+              const mother = orders.find((o) => o.code === rootCode && !o.parentCode);
+              const children = orders.filter((o) => o.parentCode === rootCode);
+              if (children.length === 0 && !current.parentCode) return null;
+              const tab = (code: string, label: string) => (
+                <button
+                  key={code}
+                  onClick={() => { const t = orders.find((o) => o.code === code); if (t) setSelectedId(t.id); }}
+                  style={{
+                    padding: '6px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                    border: `1px solid ${current.code === code ? 'var(--color-module-current-base)' : 'var(--color-neutral-200)'}`,
+                    background: current.code === code ? 'var(--color-module-current-lightest)' : 'var(--color-neutral-0)',
+                    color: current.code === code ? 'var(--color-module-current-base)' : 'var(--color-neutral-600)',
+                    fontSize: 'var(--text-sm)', fontWeight: 500,
+                  }}
+                >
+                  {label}
+                </button>
+              );
+              return (
+                <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
+                  {mother ? tab(mother.code, `母订单 ${mother.code}`) : null}
+                  {children.map((c, i) => tab(c.code, `子订单${i + 1} ${c.code}`))}
+                </div>
+              );
+            })()}
+
             {/* ── 查看态：订单信息 ── */}
             {!editForm.externalOrderNo && Object.keys(editForm).length === 0 && (
               <DrawerSection title="订单信息">
@@ -516,11 +805,12 @@ export default function ExternalOrders() {
                   <InfoItem label="平台原始单号" mono>{current.externalOrderNo}</InfoItem>
                   <InfoItem label="来源渠道">{current.sourceChannel === 'manual' ? '手工录入' : '直连推送'}</InfoItem>
                   <InfoItem label="客户">{current.customerName}（{current.customerType}）</InfoItem>
-                  <InfoItem label="客户区域">{current.customerRegion}</InfoItem>
+                  <InfoItem label="客户区域">{regionText(current)}</InfoItem>
                   <InfoItem label="订单金额" mono emph valueStyle={{ color: 'var(--color-module-current-base)' }}>{money(current.totalAmount)}</InfoItem>
                   <InfoItem label="录入时间">{current.entryTime}</InfoItem>
                   <InfoItem label="录入人">{current.operator}</InfoItem>
                   <InfoItem label="当前路径">{pathLabel(current)}</InfoItem>
+                  {current.parentCode && <InfoItem label="母订单编号" mono>{current.parentCode}</InfoItem>}
                 </InfoGrid>
               </DrawerSection>
             )}
@@ -561,106 +851,31 @@ export default function ExternalOrders() {
               </table>
             </DrawerSection>
 
-            {/* ── 待处理：路径选择 ── */}
+            {/* ── 待处理：提示前往流转弹窗处理 ── */}
             {current.processStatus === 'pending' && (
-              <DrawerSection title="分流处理">
-                {!showDistribute ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-                    <button className="tab-card-simple" style={{ padding: 'var(--space-4)', flexDirection: 'column', alignItems: 'flex-start', gap: 4, textAlign: 'left' }} onClick={() => store.getState().chooseSelfPath(current.id)}>
-                      <strong style={{ fontSize: 'var(--text-md)' }}>自营 · 背对背</strong>
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>进入自营待接单，管理后台在销售订单接单后以销定采</span>
-                    </button>
-                    <button className="tab-card-simple" style={{ padding: 'var(--space-4)', flexDirection: 'column', alignItems: 'flex-start', gap: 4, textAlign: 'left' }} onClick={() => setShowDistribute(true)}>
-                      <strong style={{ fontSize: 'var(--text-md)' }}>分发 · 合作商</strong>
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>指定 / 抢单（时间优先）/ 比单（公开报名制）</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
-                      <button className={`tab-card-simple${distributeMode === 'assign' ? ' active' : ''}`} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4, textAlign: 'left', padding: 'var(--space-3)' }} onClick={() => setDistributeMode('assign')}>
-                        <strong>指定</strong>
-                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>直接指定合作商</span>
-                      </button>
-                      <button className={`tab-card-simple${distributeMode === 'grab' ? ' active' : ''}`} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4, textAlign: 'left', padding: 'var(--space-3)' }} onClick={() => setDistributeMode('grab')}>
-                        <strong>抢单</strong>
-                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{settings.grabMinutes} 分钟先到先得</span>
-                      </button>
-                      <button className={`tab-card-simple${distributeMode === 'compare' ? ' active' : ''}`} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4, textAlign: 'left', padding: 'var(--space-3)' }} onClick={() => setDistributeMode('compare')}>
-                        <strong>比单</strong>
-                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>公开报名 · 报价+积分评分</span>
-                      </button>
-                    </div>
+              <DrawerSection title="流转处理">
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
+                  订单待流转：请点击列表行操作「<strong>流转</strong>」按钮，在<strong>流转弹窗</strong>中选择自营或分发（指定 / 报备匹配 / 抢单 / 比单）路径完成流转。
+                  本抽屉用于查看订单信息与流转轨迹，不做流转操作。
+                </div>
+              </DrawerSection>
+            )}
 
-                    {distributeMode === 'assign' && (
-                      <div>
-                        <table className="detail-inline-table">
-                          <thead><tr><th></th><th>合作商</th><th>积分</th><th>履约率</th></tr></thead>
-                          <tbody>
-                            {activeSuppliers.map((s) => {
-                              const sc = scoreOf(s.id, s.name);
-                              return (
-                                <tr key={s.id}>
-                                  <td><input type="radio" name="assign-supplier" checked={assignSupplier === s.id} onChange={() => setAssignSupplier(s.id)} /></td>
-                                  <td style={{ fontWeight: 'var(--font-medium)' }}>{s.name}</td>
-                                  <td className="mono">{sc.total}</td>
-                                  <td className="mono">{sc.ontimeRate}%</td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                        <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
-                          <Button disabled={!assignSupplier} onClick={() => {
-                            const s = activeSuppliers.find((x) => x.id === assignSupplier)!;
-                            store.getState().assignPartner(current.id, s.id, s.name);
-                          }}>指定并转出</Button>
-                        </div>
-                      </div>
-                    )}
-
-                    {distributeMode === 'grab' && (
-                      <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
-                        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>发布后合作商在终端「抢单大厅」抢单，{settings.grabMinutes} 分钟内先到先得，超时自动退回待处理。</span>
-                        <Button onClick={() => store.getState().publishGrab(current.id)}>发布抢单</Button>
-                      </div>
-                    )}
-
-                    {distributeMode === 'compare' && (
-                      <div>
-                        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)' }}>
-                          公开报名制：全部合作商可在 {settings.compareMinutes} 分钟内报名（报价默认带出其系统报价，可调但不低于底价），截止后按「报价 {settings.compareWeights.quote}0% + 积分 {settings.compareWeights.score}0%」评分定标。
-                        </div>
-                        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end', marginBottom: 'var(--space-3)' }}>
-                          <div>
-                            <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>底价方式</label>
-                            <select className="filter-input" value={floorType} onChange={(e) => setFloorType(e.target.value as 'discount' | 'price')} style={{ width: 140 }}>
-                              <option value="discount">按折扣</option>
-                              <option value="price">按具体价格</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>
-                              {floorType === 'discount' ? '最低折扣（%）' : '最低价格（元）'}
-                            </label>
-                            <input className="filter-input mono" type="number" min={1} value={floorValue} onChange={(e) => setFloorValue(e.target.value)} style={{ width: 140 }} />
-                          </div>
-                          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', flex: 1 }}>
-                            {floorType === 'discount'
-                              ? `报名价不得低于订单金额 ${floorValue} 折（${money(compareFloorAmount(current.totalAmount, { type: 'discount', value: Number(floorValue) || 0 }))}）`
-                              : `报名价不得低于 ${money(Number(floorValue) || 0)}`}
-                          </div>
-                        </div>
-                        <Button onClick={() => {
-                          const v = Number(floorValue);
-                          if (!v || v <= 0) return;
-                          store.getState().startCompare(current.id, { type: floorType, value: v });
-                        }}>发起比单</Button>
-                      </div>
-                    )}
-                    <Button variant="ghost" style={{ marginTop: 'var(--space-3)' }} onClick={() => { setShowDistribute(false); setAssignSupplier(''); }}>返回路径选择</Button>
-                  </div>
-                )}
+            {/* ── 报备-匹配待确认 ── */}
+            {current.processStatus === 'report_match_pending' && (
+              <DrawerSection title="报备匹配（待确认）">
+                <InfoGrid>
+                  {current.reportMatches?.map((m) => (
+                    <InfoItem key={m.reportCode} label={`命中报备（${PARTNER_REPORT_TYPE_LABELS[m.reportType]}）`} mono>{m.reportCode}</InfoItem>
+                  ))}
+                  {current.reportMatches?.[0] && <InfoItem label="拟分发合作商">{current.reportMatches[0].partnerName}</InfoItem>}
+                </InfoGrid>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginTop: 'var(--space-2)', lineHeight: 1.7 }}>
+                  系统在订单保存（手工录入 / 直连推送）时自动与审批通过的报备规则比对，命中即进入本状态。请人工<strong>确认匹配</strong>后分发给报备合作商，进入分发待接单等待接单。
+                </div>
+                <div style={{ marginTop: 'var(--space-3)' }}>
+                  <Button onClick={() => setMatchConfirming(current)}>确认匹配并转出</Button>
+                </div>
               </DrawerSection>
             )}
 
@@ -918,41 +1133,352 @@ export default function ExternalOrders() {
         </div>
       )}
 
-      {/* ── 流转设置弹窗 ── */}
-      {showSettings && (
-        <div className="category-dialog-overlay" onClick={() => setShowSettings(false)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 480 }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-4)' }}>订单流转设置</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--color-neutral-150)' }}>
-              <div>
-                <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>抢单时长（分钟）</div>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>发布抢单后合作商可抢的时间窗口</div>
-              </div>
-              <input className="filter-input mono" type="number" min={5} value={settings.grabMinutes} onChange={(e) => store.getState().updateSettings({ grabMinutes: Math.max(1, Number(e.target.value) || 30) })} style={{ width: 90 }} />
+      {/* ── 流转弹窗（待处理订单独立处理页：直接选择流转方式，含转自营） ── */}
+      {flowing && (
+        <div className="category-dialog-overlay" onClick={() => setFlowingId(null)}>
+          <div
+            className="category-dialog"
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: 720, maxWidth: '94vw', height: 'min(80vh, 720px)', display: 'flex', flexDirection: 'column' }}
+          >
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>订单流转 · {flowing.code}</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7, flexShrink: 0 }}>
+              {flowing.customerName} · {regionText(flowing)} · 订单金额 {money(flowing.totalAmount)} · 当前状态：待处理。选择流转方式后点击右下角确认完成流转。
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--color-neutral-150)' }}>
-              <div>
-                <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>比单报名时长（分钟）</div>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>发起比单后合作商报名窗口</div>
+
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
+              {/* 流转方式：转自营（辅色调，内联实现激活态） + 分发-指定 / 分发-报备 / 分发-抢单（时间有限） / 分发-比单（积分优先） */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+                <button
+                  className="tab-card-simple eop-mode-card"
+                  style={flowMode === 'self'
+                    ? { borderColor: 'var(--color-module-current-secondary)', background: 'rgba(203, 64, 93, 0.06)' }
+                    : undefined}
+                  onClick={() => setFlowMode('self')}
+                >
+                  <strong style={flowMode === 'self' ? { color: 'var(--color-module-current-secondary)' } : undefined}>转自营</strong>
+                </button>
+                <button
+                  className="tab-card-simple eop-mode-card"
+                  style={flowMode === 'assign' ? { borderColor: 'var(--color-module-current-base)', background: 'var(--color-module-current-lightest)' } : undefined}
+                  onClick={() => setFlowMode('assign')}
+                >
+                  <strong style={flowMode === 'assign' ? { color: 'var(--color-module-current-base)' } : undefined}>分发-指定</strong>
+                </button>
+                <button
+                  className="tab-card-simple eop-mode-card"
+                  style={flowMode === 'report' ? { borderColor: 'var(--color-module-current-base)', background: 'var(--color-module-current-lightest)' } : undefined}
+                  onClick={() => setFlowMode('report')}
+                >
+                  <strong style={flowMode === 'report' ? { color: 'var(--color-module-current-base)' } : undefined}>分发-报备</strong>
+                </button>
+                <button
+                  className="tab-card-simple eop-mode-card"
+                  style={flowMode === 'grab' ? { borderColor: 'var(--color-module-current-base)', background: 'var(--color-module-current-lightest)' } : undefined}
+                  onClick={() => setFlowMode('grab')}
+                >
+                  <strong style={flowMode === 'grab' ? { color: 'var(--color-module-current-base)' } : undefined}>分发-抢单</strong>
+                  <span className="eop-mode-sub">（时间优先）</span>
+                </button>
+                <button
+                  className="tab-card-simple eop-mode-card"
+                  style={flowMode === 'compare' ? { borderColor: 'var(--color-module-current-base)', background: 'var(--color-module-current-lightest)' } : undefined}
+                  onClick={() => setFlowMode('compare')}
+                >
+                  <strong style={flowMode === 'compare' ? { color: 'var(--color-module-current-base)' } : undefined}>分发-比单</strong>
+                  <span className="eop-mode-sub">（积分优先）</span>
+                </button>
               </div>
-              <input className="filter-input mono" type="number" min={5} value={settings.compareMinutes} onChange={(e) => store.getState().updateSettings({ compareMinutes: Math.max(1, Number(e.target.value) || 30) })} style={{ width: 90 }} />
-            </div>
-            <div style={{ padding: 'var(--space-3) 0' }}>
-              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>比单评分权重（报价 / 积分）</div>
-              <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                {(['quote', 'score'] as const).map((k) => (
-                  <div key={k} style={{ flex: 1 }}>
-                    <label style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{k === 'quote' ? '报价' : '积分'}</label>
-                    <input className="filter-input mono" type="number" min={0} max={10} value={settings.compareWeights[k]}
-                      onChange={(e) => store.getState().updateSettings({ compareWeights: { ...settings.compareWeights, [k]: Math.max(0, Number(e.target.value) || 0) } })}
-                      style={{ width: '100%' }} />
+
+              {/* 转自营 */}
+              {flowMode === 'self' && (
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7, padding: 'var(--space-2) 0' }}>
+                  转自营路径：订单进入<strong>自营待接单</strong>，请在「销售订单 → 流转订单」点击「接单」，接单时填写跟单人并选择采购供应商，进入自营执行（以销定采）。
+                </div>
+              )}
+
+              {/* 分发-指定：合作商列表 + 省市县筛选 + 搜索 + 分页 */}
+              {flowMode === 'assign' && (
+                <div>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
+                    <select className="filter-select" value={supplierProv} onChange={(e) => { setSupplierProv(e.target.value); setSupplierCity(''); setSupplierDist(''); }}>
+                      <option value="">全部省份</option>
+                      {PROVINCE_OPTS.map((p) => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <select className="filter-select" disabled={!supplierProv} value={supplierCity} onChange={(e) => { setSupplierCity(e.target.value); setSupplierDist(''); }}>
+                      <option value="">全部城市</option>
+                      {supplierCityOpts.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select className="filter-select" disabled={!supplierCity} value={supplierDist} onChange={(e) => setSupplierDist(e.target.value)}>
+                      <option value="">全部区县</option>
+                      {supplierDistOpts.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <input className="filter-input" placeholder="搜索合作商名称..." value={supplierKw} onChange={(e) => setSupplierKw(e.target.value)} style={{ width: 160 }} />
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', alignSelf: 'center' }}>共 {flowSuppliers.length} 家</span>
                   </div>
+                  <table className="detail-inline-table">
+                    <thead><tr><th></th><th>合作商</th><th>积分</th><th>履约率</th><th>地区</th></tr></thead>
+                    <tbody>
+                      {pagedSuppliers.length === 0 && (
+                        <tr><td colSpan={5} style={{ color: 'var(--color-neutral-400)', textAlign: 'center', padding: 'var(--space-3)' }}>当前筛选条件下暂无合作商</td></tr>
+                      )}
+                      {pagedSuppliers.map((s) => {
+                        const sc = scoreOf(s.id, s.name);
+                        return (
+                          <tr key={s.id}>
+                            <td><input type="radio" name="flow-supplier" checked={flowSupplier === s.id} onChange={() => setFlowSupplier(s.id)} /></td>
+                            <td style={{ fontWeight: 'var(--font-medium)' }}>{s.name}</td>
+                            <td className="mono">{sc.total}</td>
+                            <td className="mono">{sc.ontimeRate}%</td>
+                            <td style={{ fontSize: 'var(--text-sm)' }}>{[s.registeredProvince, s.registeredCity, s.registeredDistrict].filter(Boolean).join(' / ') || '—'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {flowSuppliers.length > 10 && pager(supplierPage, supplierPages, flowSuppliers.length, setSupplierPage)}
+                </div>
+              )}
+
+              {/* 分发-报备：地区筛选 + 报备列表 + 分页 */}
+              {flowMode === 'report' && (
+                <div>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)', lineHeight: 1.7 }}>
+                    展示审批通过的报备记录供选择（可勾选多条，一笔订单可对应多条报备，转出给首家勾选报备的合作商）；与当前订单自动匹配的报备标注「匹配」。可按报备合作商地区筛选。
+                  </div>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
+                    <select className="filter-select" value={reportProv} onChange={(e) => { setReportProv(e.target.value); setReportCity(''); setReportDist(''); }}>
+                      <option value="">全部省份</option>
+                      {PROVINCE_OPTS.map((p) => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <select className="filter-select" disabled={!reportProv} value={reportCity} onChange={(e) => { setReportCity(e.target.value); setReportDist(''); }}>
+                      <option value="">全部城市</option>
+                      {reportCityOpts.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select className="filter-select" disabled={!reportCity} value={reportDist} onChange={(e) => setReportDist(e.target.value)}>
+                      <option value="">全部区县</option>
+                      {reportDistOpts.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', alignSelf: 'center' }}>共 {flowReports.length} 条</span>
+                  </div>
+                  <table className="detail-inline-table">
+                    <thead><tr><th></th><th>报备编号</th><th>类型</th><th>报备标题</th><th>报备合作商</th><th>地区</th><th>匹配</th></tr></thead>
+                    <tbody>
+                      {pagedReports.length === 0 && (
+                        <tr><td colSpan={7} style={{ color: 'var(--color-neutral-400)', textAlign: 'center', padding: 'var(--space-3)' }}>当前筛选条件下暂无报备记录</td></tr>
+                      )}
+                      {pagedReports.map((r) => {
+                        const matched = reportMatchesOrder(flowing, r);
+                        const rs = suppliers.find((x) => x.name === r.partnerName);
+                        return (
+                          <tr key={r.id} style={matched ? { background: 'var(--color-module-current-lightest)' } : undefined}>
+                            <td><input type="checkbox" checked={pickReportCodes.includes(r.code)} onChange={() => setPickReportCodes((prev) => prev.includes(r.code) ? prev.filter((c) => c !== r.code) : [...prev, r.code])} /></td>
+                            <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{r.code}</td>
+                            <td>{PARTNER_REPORT_TYPE_LABELS[r.type]}</td>
+                            <td style={{ fontSize: 'var(--text-sm)' }}>{r.title}</td>
+                            <td style={{ fontSize: 'var(--text-sm)' }}>{r.partnerName}</td>
+                            <td style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{[rs?.registeredProvince, rs?.registeredCity, rs?.registeredDistrict].filter(Boolean).join(' / ') || '—'}</td>
+                            <td>{matched ? pill('#E8F5E9', '#01795D', '匹配') : <span style={{ color: 'var(--color-neutral-400)' }}>—</span>}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {flowReports.length > 10 && pager(reportPage, reportPages, flowReports.length, setReportPage)}
+                </div>
+              )}
+
+              {/* 分发-抢单：说明 + 地区范围 + 抢单时长设置 */}
+              {flowMode === 'grab' && (
+                <div>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)', lineHeight: 1.7 }}>
+                    发布后推送合作商终端「抢单大厅」，{settings.grabMinutes} 分钟内<strong>先到先得</strong>，超时自动退回待处理。可选择限定参与合作商的地区范围（不选则全部地区）。
+                  </div>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>参与地区：</span>
+                    <select className="filter-select" value={scopeProv} onChange={(e) => { setScopeProv(e.target.value); setScopeCity(''); setScopeDist(''); }}>
+                      <option value="">全部省份</option>
+                      {PROVINCE_OPTS.map((p) => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <select className="filter-select" disabled={!scopeProv} value={scopeCity} onChange={(e) => { setScopeCity(e.target.value); setScopeDist(''); }}>
+                      <option value="">全部城市</option>
+                      {scopeCityOpts.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select className="filter-select" disabled={!scopeCity} value={scopeDist} onChange={(e) => setScopeDist(e.target.value)}>
+                      <option value="">全部区县</option>
+                      {scopeDistOpts.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>抢单时长（分钟）</label>
+                      <input
+                        className="filter-input mono" type="number" min={1} value={settings.grabMinutes}
+                        onChange={(e) => store.getState().updateSettings({ grabMinutes: Math.max(1, Number(e.target.value) || 30) })}
+                        style={{ width: 120 }}
+                      />
+                    </div>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', paddingBottom: 10 }}>发布后合作商可抢的时间窗口，调整后立即生效</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 分发-比单：底价 + 地区范围 */}
+              {flowMode === 'compare' && (
+                <div>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)', lineHeight: 1.7 }}>
+                    公开报名制：合作商可在 {settings.compareMinutes} 分钟内报名（报价默认带出其系统报价，可调但不低于底价），截止后按「报价 {settings.compareWeights.quote}0% + 积分 {settings.compareWeights.score}0%」评分定标。
+                  </div>
+                  <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>底价方式</label>
+                      <select className="filter-input" value={floorType} onChange={(e) => setFloorType(e.target.value as 'discount' | 'price')} style={{ width: 140 }}>
+                        <option value="discount">按折扣</option>
+                        <option value="price">按具体价格</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>
+                        {floorType === 'discount' ? '最低折扣（%）' : '最低价格（元）'}
+                      </label>
+                      <input className="filter-input mono" type="number" min={1} value={floorValue} onChange={(e) => setFloorValue(e.target.value)} style={{ width: 140 }} />
+                    </div>
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', flex: 1, minWidth: 200 }}>
+                      {floorType === 'discount'
+                        ? `报名价不得低于订单金额 ${floorValue} 折（${money(compareFloorAmount(flowing.totalAmount, { type: 'discount', value: Number(floorValue) || 0 }))}）`
+                        : `报名价不得低于 ${money(Number(floorValue) || 0)}`}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>报名时长（分钟）</label>
+                      <input
+                        className="filter-input mono" type="number" min={1} value={settings.compareMinutes}
+                        onChange={(e) => store.getState().updateSettings({ compareMinutes: Math.max(1, Number(e.target.value) || 30) })}
+                        style={{ width: 120 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>评分权重（报价 / 积分）</label>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                        <input
+                          className="filter-input mono" type="number" min={0} max={10} value={settings.compareWeights.quote}
+                          onChange={(e) => store.getState().updateSettings({ compareWeights: { ...settings.compareWeights, quote: Math.max(0, Number(e.target.value) || 0) } })}
+                          style={{ width: 80 }}
+                        />
+                        <input
+                          className="filter-input mono" type="number" min={0} max={10} value={settings.compareWeights.score}
+                          onChange={(e) => store.getState().updateSettings({ compareWeights: { ...settings.compareWeights, score: Math.max(0, Number(e.target.value) || 0) } })}
+                          style={{ width: 80 }}
+                        />
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', paddingBottom: 10 }}>报名窗口与评分权重，调整后立即生效</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>参与地区：</span>
+                    <select className="filter-select" value={scopeProv} onChange={(e) => { setScopeProv(e.target.value); setScopeCity(''); setScopeDist(''); }}>
+                      <option value="">全部省份</option>
+                      {PROVINCE_OPTS.map((p) => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <select className="filter-select" disabled={!scopeProv} value={scopeCity} onChange={(e) => { setScopeCity(e.target.value); setScopeDist(''); }}>
+                      <option value="">全部城市</option>
+                      {scopeCityOpts.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select className="filter-select" disabled={!scopeCity} value={scopeDist} onChange={(e) => setScopeDist(e.target.value)}>
+                      <option value="">全部区县</option>
+                      {scopeDistOpts.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 右下角：取消 + 确认（确认文案随流转方式变化；转自营用辅色调） */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-3)', flexShrink: 0 }}>
+              <Button variant="ghost" onClick={() => setFlowingId(null)}>取消</Button>
+              <Button variant={flowMode === 'self' ? 'danger' : undefined} style={flowMode === 'self' ? { transition: 'none' } : undefined} disabled={flowConfirmDisabled} onClick={doFlowConfirm}>{flowConfirmLabel}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 拆单弹窗（流转-待处理按商品+数量拆出子订单） ── */}
+      {splitting && (
+        <div className="category-dialog-overlay" onClick={() => setSplitting(null)}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 560, maxWidth: '94vw' }}>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>拆单 · {splitting.code}</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
+              按<strong>商品 + 数量</strong>拆出子订单：子订单编号为母订单编号追加 <strong className="mono">-1 / -2…</strong>（按已拆次数递增），
+              拆出后作为独立订单流转，母订单保留剩余商品；详情页按「母订单 / 子订单」标签页展示。
+            </div>
+            <table className="detail-inline-table">
+              <thead><tr><th>商品名称</th><th>规格</th><th>订单数量</th><th>拆出数量</th></tr></thead>
+              <tbody>
+                {splitting.items.map((it) => (
+                  <tr key={it.productName}>
+                    <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
+                    <td>{it.spec}</td>
+                    <td className="mono">{it.quantity}</td>
+                    <td>
+                      <input
+                        className="filter-input mono" type="number" min={0} max={it.quantity}
+                        placeholder="0" value={splitQty[it.productName] ?? ''}
+                        onChange={(e) => setSplitQty((f) => ({ ...f, [it.productName]: e.target.value }))}
+                        style={{ width: 90 }}
+                      />
+                    </td>
+                  </tr>
                 ))}
-              </div>
+              </tbody>
+            </table>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 'var(--space-2)' }}>
+              提示：留空或 0 表示不拆出该商品；不能拆出全部商品（母订单至少保留一件）。
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
-              <Button onClick={() => setShowSettings(false)}>完成</Button>
+              <Button variant="ghost" onClick={() => setSplitting(null)}>取消</Button>
+              <Button
+                disabled={!splitting.items.some((it) => Number(splitQty[it.productName] ?? 0) > 0)}
+                onClick={() => {
+                  const parts = splitting.items
+                    .map((it) => ({ productName: it.productName, quantity: Number(splitQty[it.productName] ?? 0) }))
+                    .filter((x) => x.quantity > 0);
+                  store.getState().splitOrder(splitting.id, parts);
+                  setSplitting(null);
+                }}
+              >
+                确认拆单
+              </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 确认报备匹配弹窗（报备-匹配待确认） ── */}
+      {matchConfirming && (
+        <div className="category-dialog-overlay" onClick={() => setMatchConfirming(null)}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 480 }}>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>确认报备匹配</div>
+            {matchConfirming.reportMatches?.[0] ? (
+              <>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
+                  订单 <strong className="mono">{matchConfirming.code}</strong>（{matchConfirming.customerName} · {money(matchConfirming.totalAmount)}）命中报备
+                  <strong className="mono"> {matchConfirming.reportMatches[0].reportCode} </strong>
+                  （{PARTNER_REPORT_TYPE_LABELS[matchConfirming.reportMatches[0].reportType]}），拟分发合作商：<strong>{matchConfirming.reportMatches[0].partnerName}</strong>。
+                  确认后订单进入<strong>分发待接单</strong>，等待合作商接单。
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
+                  <Button variant="ghost" onClick={() => setMatchConfirming(null)}>取消</Button>
+                  <Button onClick={() => {
+                    store.getState().confirmReportMatch(matchConfirming.id);
+                    setMatchConfirming(null);
+                    setSelectedId(null);
+                  }}>匹配并转出</Button>
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>未找到报备匹配信息</div>
+            )}
           </div>
         </div>
       )}
@@ -964,7 +1490,7 @@ export default function ExternalOrders() {
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>录入订单</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
               手工录入外部平台订单。客户名称支持从<strong>客户管理</strong>匹配（带出类型/联系人并按客户报价带出默认价）。
-              保存后自动报备匹配，命中即自动转出合作商。
+              保存时自动与审批通过的报备比对，命中则进入「报备-匹配待确认」，人工确认后分发合作商。
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
@@ -1071,7 +1597,7 @@ export default function ExternalOrders() {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
               <Button variant="ghost" onClick={() => setEntering(false)}>取消</Button>
-              <Button onClick={confirmEntry}>保存订单</Button>
+              <Button onClick={confirmEntry}>保存订单并匹配报备</Button>
             </div>
           </div>
         </div>

@@ -138,6 +138,7 @@ export default function CompareManage() {
                 <thead>
                   <tr>
                     <th>合作商</th>
+                    <th>报名商品</th>
                     <th>报名报价</th>
                     <th>报名时间</th>
                     <th>积分总分</th>
@@ -157,6 +158,7 @@ export default function CompareManage() {
                           {q.supplierName}
                           {isWinner && <span style={{ marginLeft: 6, color: '#01795D', fontSize: 'var(--text-xs)', fontWeight: 600 }}>中单</span>}
                         </td>
+                        <td style={{ fontSize: 'var(--text-sm)' }}>{(q.items ?? ['整单']).join('、')}</td>
                         <td className="mono">{money(q.amount)}</td>
                         <td className="mono">{q.quoteTime}</td>
                         <td className="mono">{summary.total}</td>
@@ -167,10 +169,26 @@ export default function CompareManage() {
                     );
                   })}
                   {current.compare.quotes.length === 0 && (
-                    <tr><td colSpan={7} style={{ color: 'var(--color-neutral-400)', textAlign: 'center', padding: 'var(--space-3)' }}>暂无合作商报名</td></tr>
+                    <tr><td colSpan={8} style={{ color: 'var(--color-neutral-400)', textAlign: 'center', padding: 'var(--space-3)' }}>暂无合作商报名</td></tr>
                   )}
                 </tbody>
               </table>
+              {current.compare.scored && current.compare.itemAwards && Object.keys(current.compare.itemAwards).length > 0 && (
+                <div style={{ marginTop: 'var(--space-3)' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>按商品定标结果（积分排名第一中单）</div>
+                  <table className="detail-inline-table">
+                    <thead><tr><th>商品</th><th>中单合作商</th></tr></thead>
+                    <tbody>
+                      {Object.entries(current.compare.itemAwards).map(([item, partner]) => (
+                        <tr key={item}>
+                          <td style={{ fontWeight: 'var(--font-medium)' }}>{item}</td>
+                          <td>{partner}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </DrawerSection>
 
             <DrawerSection title="商品明细">

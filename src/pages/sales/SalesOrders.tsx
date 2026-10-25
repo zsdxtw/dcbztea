@@ -431,7 +431,7 @@ export default function SalesOrders() {
         {tab === 'flow' && (
           <Card style={{ padding: 0 }}>
             <div style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
-              来自<strong>订单处理</strong>分流：自营待接单订单点击「接单」进入自营执行（接单时填写跟单人并生成采购订单）；
+              来自<strong>订单生成&流转</strong>分流：自营待接单订单点击「接单」进入自营执行（接单时填写跟单人并生成采购订单）；
               分发类订单由合作商终端接单履约，此处仅<strong>跟踪进度</strong>，管理后台不做操作。
             </div>
             <Table

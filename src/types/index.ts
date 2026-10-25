@@ -1515,13 +1515,16 @@ export type DistributeMode = 'assign' | 'grab' | 'compare';
 
 /**
  * 订单处理状态（状态机）
- * pending 待处理（手工录入/直连推送，选路径）─ 命中报备直接转出 → distribute_pending
+ * pending 待处理（手工录入/直连推送，流转弹窗选路径）
  *   ├ 自营：self_pending 自营待接单（管理后台在销售订单接单）→ processed → completed
- *   └ 分发：报备/指定 → distribute_pending；抢单 grabbing / 比单 comparing 结束 → distribute_pending
+ *   └ 分发：
+ *       报备命中（录入/直连推送自动匹配）→ report_match_pending 报备-匹配待确认（人工确认）→ distribute_pending
+ *       指定 / 报备匹配（人工选择）→ distribute_pending；抢单 grabbing / 比单 comparing 结束 → distribute_pending
  * distribute_pending 分发待接单（合作商终端接单）→ processed → completed
  */
 export type ExternalProcessStatus =
   | 'pending'
+  | 'report_match_pending'
   | 'self_pending'
   | 'grabbing'
   | 'comparing'
@@ -1571,6 +1574,8 @@ export interface CompareQuote {
   supplierName: string;
   amount: number;
   quoteTime: string;
+  /** 按商品报名：本次报价覆盖的商品名称（缺省视为整单） */
+  items?: string[];
 }
 
 /** 比单评分明细（报价分 + 积分分） */
@@ -1601,14 +1606,41 @@ export interface CompareSession {
   scored: boolean;
   scores?: Record<string, CompareScoreBreakdown>;
   winnerId?: string;
+  /** 定标结果：商品名称 → 中单合作商名称（按商品维度按积分排序定标） */
+  itemAwards?: Record<string, string>;
+  /** 报名合作商地区范围（可选，限定省市县内合作商可见可报名） */
+  region?: RegionScope;
 }
 
-/** 抢单记录 */
+/** 地区范围（省/市/县三级，均可选；用于抢单/比单限定合作商地区） */
+export interface RegionScope {
+  province?: string;
+  city?: string;
+  district?: string;
+}
+
+/** 判断合作商是否落在地区范围内（注册地优先，联系地兜底；未设置范围或合作商缺失则全部通过） */
+export function partnerInRegion(
+  supplier: { registeredProvince?: string; registeredCity?: string; registeredDistrict?: string; contactProvince?: string; contactCity?: string; contactDistrict?: string } | undefined,
+  scope?: RegionScope,
+): boolean {
+  if (!scope || (!scope.province && !scope.city && !scope.district)) return true;
+  if (!supplier) return false;
+  return (
+    (!scope.province || supplier.registeredProvince === scope.province || supplier.contactProvince === scope.province) &&
+    (!scope.city || supplier.registeredCity === scope.city || supplier.contactCity === scope.city) &&
+    (!scope.district || supplier.registeredDistrict === scope.district || supplier.contactDistrict === scope.district)
+  );
+}
+
+/** 抢单记录（按商品维度：一次可抢订单内 1 个或多个商品） */
 export interface GrabRecord {
   supplierId: string;
   supplierName: string;
   grabTime: string;
   ts: number;
+  /** 本次抢到的商品名称 */
+  items?: string[];
 }
 
 /** 外部订单（运营手工录入，分流处理） */
@@ -1633,6 +1665,10 @@ export interface ExternalOrder {
   /** 来源渠道：manual=手工录入 / push=平台直连推送 */
   sourceChannel: ExternalChannel;
   processStatus: ExternalProcessStatus;
+  /** 来源附加标签：抢单未成 / 比单未成（分拆后未成交商品形成的子订单） */
+  sourceTag?: 'grab_failed' | 'compare_failed';
+  /** 母订单编号（拆单生成的子订单指向母订单；详情页按母子 Tab 展示） */
+  parentCode?: string;
   /** 报备命中列表（命中即自动转出，列表用于展示「报备分发」来源） */
   reportMatches?: ReportMatchInfo[];
   path?: 'self' | 'distribute';
@@ -1650,6 +1686,8 @@ export interface ExternalOrder {
   selfChain?: SelfChain;
   /** 抢单截止时间戳（毫秒） */
   grabDeadline?: number;
+  /** 抢单合作商地区范围（可选，省市县） */
+  grabRegion?: RegionScope;
   grabRecords?: GrabRecord[];
   compare?: CompareSession;
   /** 处理轨迹 */

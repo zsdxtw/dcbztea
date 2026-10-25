@@ -265,7 +265,7 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
     label: '销售',
     menus: [
       { key: 'sales-overview', label: '销售概览', icon: <OverviewIcon /> },
-      { key: 'order-processing', label: '订单处理', icon: <OrdersIcon /> },
+      { key: 'order-processing', label: '订单生成&流转', icon: <OrdersIcon /> },
       { key: 'sales-orders', label: '销售订单', icon: <OrdersIcon /> },
       { key: 'compare-manage', label: '比单管理', icon: <ReportMgmtIcon /> },
       { key: 'sales-reports', label: '报备管理', icon: <ReportMgmtIcon /> },
