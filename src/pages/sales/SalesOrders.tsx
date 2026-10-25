@@ -18,6 +18,12 @@ import { customerItems, CUSTOMER_TYPE_LABELS as GLOBAL_CUSTOMER_LABELS, CUSTOMER
 import { platformItems } from '../../data/platforms';
 import { streamers } from '../../data/streamers';
 import { generateCustomerCode } from '../../utils/customerCode';
+import { useOrderFlowStore, getSelfPurchaseEstimate } from '../../stores/orderFlowStore';
+import {
+  EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS, TRANSFER_SOURCE_LABELS,
+} from '../../data/externalOrders';
+import { PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
+import type { ExternalOrder } from '../../types';
 
 /* ── 工具函数 ── */
 function categoryToTeaCategory(category: string): TeaCategory {
@@ -314,6 +320,77 @@ export default function SalesOrders() {
   const [showCreate, setShowCreate] = useState(false);
   const [codeSeq, setCodeSeq] = useState(243);
 
+  /* ── 流转订单 Tab（订单处理分流出的自营/分发订单） ── */
+  const [tab, setTab] = useState<'sales' | 'flow'>('sales');
+  const flowOrders = useOrderFlowStore((s) => s.orders);
+  const flowStore = useOrderFlowStore;
+  const selfPendingCount = flowOrders.filter((o) => o.processStatus === 'self_pending').length;
+
+  /** 自营接单弹窗（填跟单人 + 选采购供应商） */
+  const [accepting, setAccepting] = useState<ExternalOrder | null>(null);
+  const [acceptFollower, setAcceptFollower] = useState('');
+  const [acceptSupplier, setAcceptSupplier] = useState('');
+  const [acceptError, setAcceptError] = useState('');
+  const acceptEstimates = useMemo(
+    () => (accepting ? getSelfPurchaseEstimate(accepting.items) : []),
+    [accepting],
+  );
+
+  /** 流转订单：待接单（自营/分发）+ 执行中/已完成 */
+  const visibleFlowOrders = useMemo(
+    () => flowOrders.filter((o) => ['self_pending', 'distribute_pending', 'processed', 'completed'].includes(o.processStatus)),
+    [flowOrders],
+  );
+
+  const flowStatusPill = (o: ExternalOrder) => {
+    if (o.processStatus === 'self_pending') {
+      return <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: EXTERNAL_STATUS_COLORS.self_pending.bg, color: EXTERNAL_STATUS_COLORS.self_pending.color }}>待接单（自营）</span>;
+    }
+    if (o.processStatus === 'distribute_pending') {
+      return <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: EXTERNAL_STATUS_COLORS.distribute_pending.bg, color: EXTERNAL_STATUS_COLORS.distribute_pending.color }}>待接单（合作商）</span>;
+    }
+    if (o.processStatus === 'completed') {
+      return <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: EXTERNAL_STATUS_COLORS.completed.bg, color: EXTERNAL_STATUS_COLORS.completed.color }}>已完成</span>;
+    }
+    // 已处理：显示执行进度子状态
+    const sub = o.path === 'self'
+      ? (o.selfChain?.outboundCode ? '已发货' : o.selfChain?.inboundCode ? '已入库' : '采购中')
+      : (o.partnerStatus ? PARTNER_ORDER_STATUS_LABELS[o.partnerStatus] : '执行中');
+    return (
+      <span>
+        <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: EXTERNAL_STATUS_COLORS.processed.bg, color: EXTERNAL_STATUS_COLORS.processed.color }}>已处理</span>
+        <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>{sub}</span>
+      </span>
+    );
+  };
+
+  const confirmAcceptSelf = () => {
+    if (!accepting) return;
+    if (!acceptFollower) {
+      setAcceptError('请选择跟单人');
+      return;
+    }
+    if (!acceptSupplier) {
+      setAcceptError('请选择采购供应商');
+      return;
+    }
+    const est = acceptEstimates.find((e) => e.supplierId === acceptSupplier)!;
+    const followerName = getEmployeeName(acceptFollower);
+    const res = flowStore.getState().acceptSelfOrder(accepting.id, {
+      supplierId: est.supplierId,
+      supplierName: est.supplierName,
+      follower: followerName,
+    });
+    if (res.ok) {
+      setAccepting(null);
+      setAcceptFollower('');
+      setAcceptSupplier('');
+      setAcceptError('');
+    } else {
+      setAcceptError(res.msg);
+    }
+  };
+
   const handleView = (order: SalesOrderRecord) => {
     setSelectedOrder(order);
     setShowDetail(true);
@@ -339,6 +416,52 @@ export default function SalesOrders() {
         actions={<Button onClick={() => setShowCreate(true)}><PlusIcon />新建销售单</Button>}
       />
       <div className="content-body">
+        {/* Tab：销售订单 / 流转订单（订单处理分流出的自营/分发订单） */}
+        <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+          <button className={`tab-card-simple${tab === 'sales' ? ' active' : ''}`} onClick={() => setTab('sales')}>
+            销售订单
+            <span className="tab-card-simple-count">{orders.length} 单</span>
+          </button>
+          <button className={`tab-card-simple${tab === 'flow' ? ' active' : ''}`} onClick={() => setTab('flow')}>
+            流转订单
+            <span className="tab-card-simple-count">自营待接单 {selfPendingCount} / 共 {visibleFlowOrders.length} 单</span>
+          </button>
+        </div>
+
+        {/* ── 流转订单 Tab ── */}
+        {tab === 'flow' && (
+          <Card style={{ padding: 0 }}>
+            <div style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
+              来自<strong>订单处理</strong>分流：自营待接单订单点击「接单」进入自营执行（接单时填写跟单人并生成采购订单）；
+              分发类订单由合作商终端接单履约，此处仅<strong>跟踪进度</strong>，管理后台不做操作。
+            </div>
+            <Table
+              headers={['订单编号', '订单类型', '客户', '商品', '订单金额', '状态', '跟单人 / 合作商', '录入时间', '操作']}
+              rows={visibleFlowOrders.map((o) => [
+                <span key="c" className="cell-mono-emph">{o.code}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{EXTERNAL_PLATFORM_LABELS[o.platform]} · {EXTERNAL_CHANNEL_LABELS[o.sourceChannel]}</span></span>,
+                o.path === 'self'
+                  ? <span key="t" style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5' }}>自营</span>
+                  : <span key="t" style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E0F2F1', color: '#00695C' }}>分发{o.transferSource ? ` · ${TRANSFER_SOURCE_LABELS[o.transferSource]}` : ''}</span>,
+                <span key="cu" className="cell-emph">{o.customerName}</span>,
+                <span key="i" style={{ whiteSpace: 'nowrap' }}>{o.items[0].productName}{o.items.length > 1 ? ` 等${o.items.length}种` : ''}</span>,
+                <span key="a" className="mono" style={{ fontWeight: 'var(--font-semibold)' }}>{formatMoney(o.totalAmount)}</span>,
+                flowStatusPill(o),
+                <span key="w" style={{ fontSize: 'var(--text-sm)' }}>{o.path === 'self' ? (o.follower ?? '—') : (o.partnerName ?? '—')}</span>,
+                <span key="d" className="cell-muted">{o.entryTime}</span>,
+                <div key="act" className="row-actions">
+                  {o.processStatus === 'self_pending' && (
+                    <Button size="sm" onClick={() => { setAccepting(o); setAcceptFollower(''); setAcceptSupplier(''); setAcceptError(''); }}>接单</Button>
+                  )}
+                  {o.processStatus === 'distribute_pending' && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>等合作商接单</span>}
+                  {(o.processStatus === 'processed' || o.processStatus === 'completed') && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.path === 'self' ? '自营执行中' : '合作商履约中'}</span>}
+                </div>,
+              ])}
+            />
+          </Card>
+        )}
+
+        {/* ── 销售订单 Tab（原有） ── */}
+        {tab === 'sales' && (<>
         <div className="stat-cards">
           {stats.map((s, i) => <StatCard key={i} data={s} />)}
         </div>
@@ -380,7 +503,44 @@ export default function SalesOrders() {
             ];})}
           />
         </Card>
+        </>)}
       </div>
+
+      {/* 自营接单弹窗（流转订单：填跟单人 + 选采购供应商，生成采购订单） */}
+      {accepting && (
+        <div className="category-dialog-overlay" onClick={() => setAccepting(null)}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 560, maxWidth: '94vw' }}>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>接单（自营）</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
+              接单后订单 <strong className="mono">{accepting.code}</strong>（{accepting.customerName} · {formatMoney(accepting.totalAmount)}）进入<strong>已处理</strong>，
+              按「以销定采」生成采购订单并开始自营执行流程。
+            </div>
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>跟单人 *</label>
+              <DeptEmployeeSelect value={acceptFollower} onChange={(v: string) => { setAcceptFollower(v); setAcceptError(''); }} placeholder="选择员工" style={{ width: '100%' }} />
+            </div>
+            <div style={{ marginBottom: 'var(--space-3)' }}>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>采购供应商 *（按采购价预估，低价在前）</label>
+              <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--color-border-primary)', borderRadius: 'var(--radius-md)' }}>
+                {acceptEstimates.slice(0, 6).map((e) => (
+                  <label key={e.supplierId} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '8px 12px', borderBottom: '1px solid var(--color-neutral-100)', cursor: 'pointer', background: acceptSupplier === e.supplierId ? 'var(--color-module-current-lightest)' : undefined }}>
+                    <input type="radio" name="accept-supplier" checked={acceptSupplier === e.supplierId} onChange={() => { setAcceptSupplier(e.supplierId); setAcceptError(''); }} />
+                    <span style={{ flex: 1, fontWeight: 'var(--font-medium)' }}>{e.supplierName}</span>
+                    <span className="mono" style={{ color: 'var(--color-module-current-base)', fontWeight: 'var(--font-semibold)' }}>{formatMoney(e.amount)}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            {acceptError && (
+              <div style={{ padding: '8px 12px', background: '#FFEBEE', color: '#C62828', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>{acceptError}</div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
+              <Button variant="ghost" onClick={() => setAccepting(null)}>取消</Button>
+              <Button onClick={confirmAcceptSelf}>确认接单</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 新建销售单抽屉 */}
       {showCreate && (

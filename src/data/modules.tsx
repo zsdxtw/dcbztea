@@ -41,9 +41,6 @@ const ShortcutsIcon = () => (
 const OrdersIcon = () => (
   <svg viewBox="0 0 20 20" fill="none"><rect x="4" y="2" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h6M7 9h6M7 12h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
 );
-const CreateOrderIcon = () => (
-  <svg viewBox="0 0 20 20" fill="none"><rect x="4" y="2" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h4M7 9h4M7 12h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><path d="M13 11v4M11 13h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
-);
 const InboundIcon = () => (
   <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="6" width="14" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M10 3v5M7 6l3-3 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
 );
@@ -268,9 +265,8 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
     label: '销售',
     menus: [
       { key: 'sales-overview', label: '销售概览', icon: <OverviewIcon /> },
-      { key: 'sales-order-create', label: '销售下单', icon: <CreateOrderIcon /> },
+      { key: 'order-processing', label: '订单处理', icon: <OrdersIcon /> },
       { key: 'sales-orders', label: '销售订单', icon: <OrdersIcon /> },
-      { key: 'external-orders', label: '外部订单', icon: <OrdersIcon /> },
       { key: 'compare-manage', label: '比单管理', icon: <ReportMgmtIcon /> },
       { key: 'sales-reports', label: '报备管理', icon: <ReportMgmtIcon /> },
       { key: 'sales-pricing', label: '销售报（调）价', icon: <QuotationIcon /> },

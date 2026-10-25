@@ -1514,20 +1514,23 @@ export type ExternalPlatform = 'tmall' | 'jd' | 'douyin' | 'pdd' | 'other';
 export type DistributeMode = 'assign' | 'grab' | 'compare';
 
 /**
- * 外部订单处理状态（状态机）
- * pending 待处理 → report_matched 报备命中待确认 / self_* 自营链 / grabbing 抢单中 / comparing 比单中
- * → transferred 已转合作商 → completed 已完成
+ * 订单处理状态（状态机）
+ * pending 待处理（手工录入/直连推送，选路径）─ 命中报备直接转出 → distribute_pending
+ *   ├ 自营：self_pending 自营待接单（管理后台在销售订单接单）→ processed → completed
+ *   └ 分发：报备/指定 → distribute_pending；抢单 grabbing / 比单 comparing 结束 → distribute_pending
+ * distribute_pending 分发待接单（合作商终端接单）→ processed → completed
  */
 export type ExternalProcessStatus =
   | 'pending'
-  | 'report_matched'
-  | 'self_purchasing'
-  | 'self_inbound'
-  | 'self_outbound'
+  | 'self_pending'
   | 'grabbing'
   | 'comparing'
-  | 'transferred'
+  | 'distribute_pending'
+  | 'processed'
   | 'completed';
+
+/** 外部订单来源渠道：手工录入 / 平台直连推送 */
+export type ExternalChannel = 'manual' | 'push';
 
 /** 转出来源：报备命中 / 指定 / 抢单 / 比单 */
 export type TransferSource = 'report' | DistributeMode;
@@ -1562,7 +1565,7 @@ export interface SelfChain {
   outboundDate?: string;
 }
 
-/** 比单报价 */
+/** 比单报名（合作商在规定时间内报名，报价默认带出系统报价） */
 export interface CompareQuote {
   supplierId: string;
   supplierName: string;
@@ -1570,18 +1573,30 @@ export interface CompareQuote {
   quoteTime: string;
 }
 
-/** 比单评分明细 */
+/** 比单评分明细（报价分 + 积分分） */
 export interface CompareScoreBreakdown {
   quoteScore: number;
   scoreScore: number;
-  ontimeScore: number;
   total: number;
 }
 
-/** 比单会话（候选合作商 + 报价 + 评分结果） */
+/** 比单底价规则：折扣（订单金额的百分比）/ 具体价格（元），报名报价不得低于底价 */
+export interface CompareFloorRule {
+  type: 'discount' | 'price';
+  /** type=discount 时为折扣百分比（如 85 = 订单金额 85 折）；type=price 时为整单最低价（元） */
+  value: number;
+}
+
+/**
+ * 比单会话（公开报名制：全部合作商可在期限内报名，报价带出系统报价可调但不低于底价，
+ * 截止后按「报价 + 积分」评分排名定标，也支持管理台直接选定合作商）
+ */
 export interface CompareSession {
-  candidates: { supplierId: string; supplierName: string }[];
   deadline: number;
+  /** 底价规则（发起时设定） */
+  floorRule: CompareFloorRule;
+  /** 底价说明（弹窗/列表展示） */
+  floorNote: string;
   quotes: CompareQuote[];
   scored: boolean;
   scores?: Record<string, CompareScoreBreakdown>;
@@ -1615,11 +1630,11 @@ export interface ExternalOrder {
   remark?: string;
   entryTime: string;
   operator: string;
+  /** 来源渠道：manual=手工录入 / push=平台直连推送 */
+  sourceChannel: ExternalChannel;
   processStatus: ExternalProcessStatus;
-  /** 报备命中列表（可能多条交叉命中） */
+  /** 报备命中列表（命中即自动转出，列表用于展示「报备分发」来源） */
   reportMatches?: ReportMatchInfo[];
-  /** 忽略报备命中，继续自选路径 */
-  reportIgnored?: boolean;
   path?: 'self' | 'distribute';
   distributeMode?: DistributeMode;
   partnerId?: string;
@@ -1630,6 +1645,8 @@ export interface ExternalOrder {
   partnerStatus?: PartnerOrderStatus;
   /** 结算是否按时（超时扣积分） */
   settleOnTime?: boolean;
+  /** 自营跟单人（管理后台接单时填写） */
+  follower?: string;
   selfChain?: SelfChain;
   /** 抢单截止时间戳（毫秒） */
   grabDeadline?: number;
@@ -1641,14 +1658,12 @@ export interface ExternalOrder {
 
 /** 订单流转设置 */
 export interface FlowSettings {
-  /** 报备命中后自动转单（关闭则需人工确认） */
-  autoTransfer: boolean;
   /** 抢单时长（分钟） */
   grabMinutes: number;
-  /** 比单报价时长（分钟） */
+  /** 比单报名时长（分钟） */
   compareMinutes: number;
-  /** 比单评分权重（报价 / 积分 / 履约） */
-  compareWeights: { quote: number; score: number; ontime: number };
+  /** 比单评分权重（报价 / 积分） */
+  compareWeights: { quote: number; score: number };
 }
 
 /* ════════════════════════════════════════

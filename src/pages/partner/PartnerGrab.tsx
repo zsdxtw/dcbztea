@@ -3,7 +3,7 @@ import { PageHead, Pill } from './PartnerUI';
 import { getPartnerAuth } from './PartnerLayout';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
-import { useOrderFlowStore } from '../../stores/orderFlowStore';
+import { useOrderFlowStore, getPartnerSystemQuote } from '../../stores/orderFlowStore';
 import { useSupplierStore } from '../../stores/supplierStore';
 import { useScoreStore } from '../../stores/scoreStore';
 import { EXTERNAL_PLATFORM_LABELS } from '../../data/externalOrders';
@@ -52,9 +52,10 @@ export default function PartnerGrab() {
     [orders],
   );
 
+  /** 比单：公开报名制，全部进行中的比单均可报名 */
   const myCompares = useMemo(
-    () => orders.filter((o) => o.processStatus === 'comparing' && o.compare?.candidates.some((c) => c.supplierId === myId)),
-    [orders, myId],
+    () => orders.filter((o) => o.processStatus === 'comparing'),
+    [orders],
   );
 
   const myGrabs = useMemo(
@@ -89,10 +90,10 @@ export default function PartnerGrab() {
     if (!quoteOf) return;
     const amount = Number(quoteAmount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      flash(false, '请输入有效的报价金额');
+      flash(false, '请输入有效的报名报价');
       return;
     }
-    const res = store.getState().submitQuote(quoteOf, myId, myName, amount);
+    const res = store.getState().signUpCompare(quoteOf, myId, myName, amount);
     flash(res.ok, res.msg);
     if (res.ok) setQuoteOf(null);
   };
@@ -217,7 +218,7 @@ export default function PartnerGrab() {
         <>
           {myCompares.length === 0 && (
             <div style={{ padding: '40px 20px', textAlign: 'center', color: '#9E9E9E', fontSize: 13, background: '#fff', borderRadius: 12 }}>
-              暂无邀请您比单的订单。平台发起比单后会出现在这里。
+              暂无进行中的比单。平台发起比单后可在限期内报名。
             </div>
           )}
           {myCompares.map((o) => {
@@ -230,12 +231,13 @@ export default function PartnerGrab() {
                   <div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <span className="mono" style={{ fontWeight: 700, fontSize: 14 }}>{o.code}</span>
-                      <Pill tone="purple">比单 · {cmp.candidates.length} 家竞争</Pill>
+                      <Pill tone="purple">比单 · 公开报名</Pill>
                     </div>
                     <div style={{ fontSize: 13, color: '#6f6f6f', marginTop: 6, lineHeight: 1.8 }}>
                       客户：{o.customerName}（{o.customerRegion}）<br />
                       商品：{o.items.map((it) => `${it.productName} × ${it.quantity}`).join('、')}<br />
-                      评分规则：报价 40% + 积分 40% + 履约 20%（报价越低得分越高）
+                      评分规则：报价 50% + 积分 50%（报价越低得分越高）<br />
+                      <span style={{ color: '#B26A00' }}>{cmp.floorNote}</span>
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -244,23 +246,23 @@ export default function PartnerGrab() {
                       {countdown(cmp.deadline)}
                     </div>
                     {myQuote ? (
-                      <div style={{ fontSize: 13, color: '#01795D', fontWeight: 600 }}>已报价 {money(myQuote.amount)}</div>
+                      <div style={{ fontSize: 13, color: '#01795D', fontWeight: 600 }}>已报名 · 报价 {money(myQuote.amount)}</div>
                     ) : quoteOf === o.id ? (
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <input
                           className="filter-input mono"
-                          style={{ width: 120 }}
+                          style={{ width: 130 }}
                           type="number"
                           min={0}
-                          placeholder="报价金额"
+                          placeholder="报名报价"
                           value={quoteAmount}
                           onChange={(e) => setQuoteAmount(e.target.value)}
                         />
-                        <Button size="sm" disabled={remain <= 0} onClick={submitMyQuote}>提交</Button>
+                        <Button size="sm" disabled={remain <= 0} onClick={submitMyQuote}>提交报名</Button>
                       </div>
                     ) : (
-                      <Button size="sm" disabled={remain <= 0} onClick={() => { setQuoteOf(o.id); setQuoteAmount(String(Math.round(o.totalAmount * 0.92))); }}>
-                        我要报价
+                      <Button size="sm" disabled={remain <= 0} onClick={() => { setQuoteOf(o.id); setQuoteAmount(String(getPartnerSystemQuote(myId, o.items))); }}>
+                        我要报名
                       </Button>
                     )}
                   </div>
