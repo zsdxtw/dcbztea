@@ -1,5 +1,5 @@
 /**
- * 订单处理（销售订单入口）Mock 数据源
+ * 订单分发（销售订单入口）Mock 数据源
  * 来源渠道：手工录入（manual）/ 平台直连推送（push）
  * 基础种子覆盖全部状态 + 程序化生成的 48 条随机状态演示订单（buildDemoOrders）
  */
@@ -37,7 +37,7 @@ const baseSeeds: ExternalOrder[] = [
     history: [{ time: '2026-10-25', action: '直连推送订单', detail: '抖音商城 API 自动同步' }],
   },
 
-  /* ── 自营待接单（等管理后台在销售订单-流转订单接单） ── */
+  /* ── 自营待接单（等管理后台在销售订单-分发订单接单） ── */
   {
     id: 'eo9', code: 'WB20261024004', platform: 'tmall', externalOrderNo: 'TM-88012554-3',
     customerName: '浦发银行', customerType: '平台客户', customerRegion: '上海浦东',
@@ -50,7 +50,7 @@ const baseSeeds: ExternalOrder[] = [
     path: 'self',
     history: [
       { time: '2026-10-24', action: '手工录入订单', detail: '天猫平台' },
-      { time: '2026-10-24', action: '选择自营路径', detail: '背对背采购 · 等待管理后台接单（销售订单 → 流转订单）' },
+      { time: '2026-10-24', action: '选择自营路径', detail: '背对背采购 · 等待管理后台接单（销售订单 → 分发订单）' },
     ],
   },
 
@@ -121,7 +121,7 @@ const baseSeeds: ExternalOrder[] = [
     ],
   },
 
-  /* ── 分发待接单（报备分发：命中云茶商品报备自动转出） ── */
+  /* ── 转派待接单（报备转派：命中云茶商品报备自动转出） ── */
   {
     id: 'eo2', code: 'WB20261024003', platform: 'jd', externalOrderNo: 'JD-20581773',
     customerName: '苏州吴门茶事', customerType: '个人客户', customerRegion: '江苏苏州',
@@ -140,7 +140,7 @@ const baseSeeds: ExternalOrder[] = [
     ],
   },
 
-  /* ── 分发待接单（指定分发 → 云茶，等合作商终端接单） ── */
+  /* ── 转派待接单（指定转派 → 云茶，等合作商终端接单） ── */
   {
     id: 'eo10', code: 'WB20261024007', platform: 'other', externalOrderNo: 'WX-20261024-66',
     customerName: '华茗堂茶庄', customerType: '直营客户', customerRegion: '江苏南京',
@@ -154,11 +154,11 @@ const baseSeeds: ExternalOrder[] = [
     transferSource: 'assign', transferTime: '2026-10-24',
     history: [
       { time: '2026-10-24', action: '手工录入订单', detail: '微信小店' },
-      { time: '2026-10-24', action: '指定分发', detail: '指定杭州云茶供应链管理有限公司（积分 61）→ 等待合作商接单' },
+      { time: '2026-10-24', action: '指定转派', detail: '指定杭州云茶供应链管理有限公司（积分 61）→ 等待合作商接单' },
     ],
   },
 
-  /* ── 已处理（报备分发 + 合作商已接单 + 发货中） ── */
+  /* ── 已处理（报备转派 + 合作商已接单 + 发货中） ── */
   {
     id: 'eo3', code: 'WB20261021008', platform: 'douyin', externalOrderNo: 'DY-7361902',
     customerName: '南京翠竹茶行', customerType: '渠道客户', customerRegion: '江苏南京',
@@ -228,7 +228,7 @@ const baseSeeds: ExternalOrder[] = [
     ],
   },
 
-  /* ── 已完成（比单分发已结算） ── */
+  /* ── 已完成（比单转派已结算） ── */
   {
     id: 'eo7', code: 'WB20261012011', platform: 'other', externalOrderNo: 'WX-20261012-88',
     customerName: '华茗堂茶庄', customerType: '直营客户', customerRegion: '江苏南京',
@@ -376,7 +376,7 @@ function buildDemoOrders(): ExternalOrder[] {
   const next = () => seq++;
   const D = (s: number) => `2026-10-${String(11 + (s % 15)).padStart(2, '0')}`;
 
-  /* ── 流转-待处理 ×8（含手动拆单家族 B：母 + 子1 + 子2） ── */
+  /* ── 分发-待处理 ×8（含手动拆单家族 B：母 + 子1 + 子2） ── */
   for (let i = 0; i < 8; i++) {
     const s = next();
     const isFamilyB = i < 3;
@@ -427,7 +427,7 @@ function buildDemoOrders(): ExternalOrder[] {
     orders.push(buildOne(s, {
       items: pickItems(s),
       processStatus: 'self_pending',
-      history: [{ time: D(s), action: '选择自营路径', detail: '背对背采购 · 等待管理后台接单（销售订单 → 流转订单）' }],
+      history: [{ time: D(s), action: '选择自营路径', detail: '背对背采购 · 等待管理后台接单（销售订单 → 分发订单）' }],
       extra: { path: 'self' },
     }));
   }
@@ -483,7 +483,7 @@ function buildDemoOrders(): ExternalOrder[] {
     }));
   }
 
-  /* ── 分发待接单 ×8（来源循环；含比单分拆家族 C：-1 积分中单子单 + -2 比单未成） ── */
+  /* ── 转派待接单 ×8（来源循环；含比单分拆家族 C：-1 积分中单子单 + -2 比单未成） ── */
   const sources = ['report', 'assign', 'grab', 'compare'] as const;
   for (let i = 0; i < 8; i++) {
     const s = next();
@@ -492,7 +492,7 @@ function buildDemoOrders(): ExternalOrder[] {
     orders.push(buildOne(s, {
       items: pickItems(s),
       processStatus: 'distribute_pending',
-      history: [{ time: D(s), action: { report: '报备匹配确认转出', assign: '指定分发', grab: '抢单分发（按商品）', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name} · 等待合作商接单` }],
+      history: [{ time: D(s), action: { report: '报备匹配确认转出', assign: '指定转派', grab: '抢单转派（按商品）', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name} · 等待合作商接单` }],
       extra: {
         path: 'distribute', distributeMode: 'assign',
         partnerId: p.id, partnerName: p.name,
@@ -514,17 +514,17 @@ function buildDemoOrders(): ExternalOrder[] {
   famC2.partnerId = undefined; famC2.partnerName = undefined;
   famC2.transferSource = undefined; famC2.transferTime = undefined;
   famC2.sourceTag = 'compare_failed';
-  famC2.history = [{ time: D(20), action: '拆单生成子订单', detail: '比单定标分拆' }, { time: D(20), action: '比单未成退回', detail: '无报名商品形成子订单，重新进入流转-待处理' }];
+  famC2.history = [{ time: D(20), action: '拆单生成子订单', detail: '比单定标分拆' }, { time: D(20), action: '比单未成退回', detail: '无报名商品形成子订单，重新进入分发-待处理' }];
 
-  // 抢单未成孤儿子单（挂于不存在的母编号，演示「抢单未成」标签）：取流转-待处理组第 5 笔改造
+  // 抢单未成孤儿子单（挂于不存在的母编号，演示「抢单未成」标签）：取分发-待处理组第 5 笔改造
   const orphan = orders[7];
   const orphanMother = orphan.code.replace(/9\d$/, '60');
   orphan.parentCode = orphanMother;
   orphan.code = `${orphanMother}-1`;
   orphan.sourceTag = 'grab_failed';
-  orphan.history = [{ time: D(9), action: '拆单生成子订单', detail: '抢单分拆定案' }, { time: D(9), action: '抢单未成退回', detail: '未被抢购商品形成子订单，重新进入流转-待处理' }];
+  orphan.history = [{ time: D(9), action: '拆单生成子订单', detail: '抢单分拆定案' }, { time: D(9), action: '抢单未成退回', detail: '未被抢购商品形成子订单，重新进入分发-待处理' }];
 
-  /* ── 流转-已完成（处理中）×10：自营链 4 + 合作商履约 6 ── */
+  /* ── 分发-已完成（处理中）×10：自营链 4 + 合作商履约 6 ── */
   for (let i = 0; i < 4; i++) {
     const s = next();
     const sup = DEMO_PARTNERS[(i + 3) % DEMO_PARTNERS.length];
@@ -562,8 +562,8 @@ function buildDemoOrders(): ExternalOrder[] {
       items: pickItems(s),
       processStatus: 'processed',
       history: [
-        { time: D(s), action: { report: '报备匹配确认转出', assign: '指定分发', grab: '抢单分发（按商品）', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name}` },
-        { time: D(s), action: psLabel[ps], detail: ps === 'accepted' ? '合作商终端接单 → 流转-已完成' : undefined },
+        { time: D(s), action: { report: '报备匹配确认转出', assign: '指定转派', grab: '抢单转派（按商品）', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name}` },
+        { time: D(s), action: psLabel[ps], detail: ps === 'accepted' ? '合作商终端接单 → 分发-已完成' : undefined },
       ],
       extra: {
         path: 'distribute', distributeMode: 'assign',
@@ -584,7 +584,7 @@ function buildDemoOrders(): ExternalOrder[] {
       items: pickItems(s),
       processStatus: 'completed',
       history: [
-        { time: D(s), action: { report: '报备匹配确认转出', assign: '指定分发', grab: '抢单分发（按商品）', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name}` },
+        { time: D(s), action: { report: '报备匹配确认转出', assign: '指定转派', grab: '抢单转派（按商品）', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name}` },
         { time: D(s), action: '结算完成', detail: onTime ? '按时履约 · 积分 +5' : '超时发货 · 积分 -5' },
       ],
       extra: {
@@ -615,13 +615,13 @@ export const EXTERNAL_CHANNEL_LABELS: Record<string, string> = {
 };
 
 export const EXTERNAL_STATUS_LABELS: Record<string, string> = {
-  pending: '流转-待处理',
+  pending: '分发-待处理',
   report_match_pending: '报备-匹配待确认',
   self_pending: '自营待接单',
   grabbing: '抢单中',
   comparing: '比单中',
-  distribute_pending: '分发待接单',
-  processed: '流转-已完成',
+  distribute_pending: '转派待接单',
+  processed: '分发-已完成',
   completed: '已完成',
 };
 
@@ -642,12 +642,12 @@ export const EXTERNAL_STATUS_COLORS: Record<string, { bg: string; color: string 
   completed: { bg: '#ECEFF1', color: '#455A64' },
 };
 
-/** 分发路径标签（分发待接单/已处理展示） */
+/** 分发路径标签（转派待接单/已处理展示） */
 export const TRANSFER_SOURCE_LABELS: Record<string, string> = {
-  report: '分发-报备',
-  grab: '分发-抢单',
-  assign: '分发-指定',
-  compare: '分发-比单',
+  report: '转派-报备',
+  grab: '转派-抢单',
+  assign: '转派-指定',
+  compare: '转派-比单',
 };
 
 /** 计算比单底价金额（元） */

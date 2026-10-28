@@ -1,16 +1,16 @@
 /**
- * 订单处理（销售订单入口）流转 Store（管理端 ↔ 合作商终端共享）
+ * 订单分发（销售订单入口）Store（管理端 ↔ 合作商终端共享）
  *
  * 状态机：
- * pending 流转-待处理（手工录入 / 直连推送，流转弹窗选路径；支持按商品+数量拆单，子订单编号=母编号-1/-2…）
+ * pending 分发-待处理（手工录入 / 直连推送，订单分发弹窗选路径；支持按商品+数量拆单，子订单编号=母编号-1/-2…）
  *   ├ 命中审批通过的报备（保存即自动匹配）→ report_match_pending 报备-匹配待确认
- *   │    └ 人工「确认匹配」→ distribute_pending（报备分发；一笔订单可匹配多条报备，一条报备可服务多笔订单）
- *   ├ 自营：self_pending 自营待接单（管理后台在销售订单-流转订单接单，填跟单人）→ processed → completed
+ *   │    └ 人工「确认匹配」→ distribute_pending（报备转派；一笔订单可匹配多条报备，一条报备可服务多笔订单）
+ *   ├ 自营：self_pending 自营待接单（管理后台在销售订单-分发订单接单，填跟单人）→ processed → completed
  *   └ 分发：指定 / 报备匹配（人工选报备，可多选）→ distribute_pending
  *       抢单 grabbing（按商品抢、时间优先、可限地区）：商品全部被抢即分拆定案；超时部分被抢→分拆；全未抢→退回+「抢单未成」标签
  *       比单 comparing（按商品报名、底价限制、可限地区）：截止后按商品维度积分排名定标；
- *            同一合作商多商品合并生成一个子订单，未报名商品合并子订单退回流转-待处理+「比单未成」标签
- * distribute_pending 分发待接单（合作商终端接单）→ processed 流转-已完成（accepted/shipping/delivered）→ settled → completed
+ *            同一合作商多商品合并生成一个子订单，未报名商品合并子订单退回分发-待处理+「比单未成」标签
+ * distribute_pending 转派待接单（合作商终端接单）→ processed 分发-已完成（accepted/shipping/delivered）→ settled → completed
  * 拆单家族：子订单 parentCode 指向母订单编号，列表独立展示，详情按「母订单/子订单N」Tab 切换
  */
 import { create } from 'zustand';
@@ -68,7 +68,7 @@ export function matchExternalOrder(order: ExternalOrder): ReportMatchInfo[] {
     }));
 }
 
-/** 报备记录是否命中该订单（流转弹窗·报备匹配列表标记「匹配」用） */
+/** 报备记录是否命中该订单（订单分发弹窗·报备匹配列表标记「匹配」用） */
 export function reportMatchesOrder(order: ExternalOrder, report: PartnerReport): boolean {
   return matchesReport(toPlatformOrder(order), report);
 }
@@ -103,16 +103,16 @@ interface OrderFlowState {
   /** 修改订单信息（待处理/待接单/抢单中/比单中可改） */
   updateOrder: (id: string, patch: Partial<Pick<ExternalOrder, 'externalOrderNo' | 'customerName' | 'customerType' | 'customerRegion' | 'receiver' | 'receiverPhone' | 'receiverAddress' | 'remark' | 'items'>>) => { ok: boolean; msg: string };
 
-  /* ── 路径选择与流转 ── */
+  /* ── 路径选择与分发 ── */
   chooseSelfPath: (id: string) => void;
   assignPartner: (id: string, supplierId: string, supplierName: string) => void;
   /** 报备-匹配待确认：人工确认命中报备，分发给报备合作商 */
   confirmReportMatch: (id: string) => { ok: boolean; msg: string };
-  /** 待处理订单人工匹配报备（流转弹窗·报备匹配），转出报备合作商 */
+  /** 待处理订单人工匹配报备（订单分发弹窗·报备匹配），转出报备合作商 */
   matchReportManual: (id: string, reportCodes: string[]) => { ok: boolean; msg: string };
-  /** 流转-待处理订单按商品+数量拆单：拆出子订单（母编号-1/-2…），母子在列表独立展示 */
+  /** 分发-待处理订单按商品+数量拆单：拆出子订单（母编号-1/-2…），母子在列表独立展示 */
   splitOrder: (id: string, parts: { productName: string; quantity: number }[]) => { ok: boolean; msg: string };
-  /** 重新流转：退回待处理重新选择路径 */
+  /** 重新分发：退回待处理重新选择路径 */
   resetToPending: (id: string, note?: string) => void;
 
   /* ── 自营执行 ── */
@@ -136,7 +136,7 @@ interface OrderFlowState {
   extendCompare: (id: string, minutes: number) => void;
   /** 评分定标（截止后按报价+积分排名） */
   finalizeCompare: (id: string, force?: boolean) => { ok: boolean; msg: string };
-  /** 直接选定合作商（填理由，转为指定分发） */
+  /** 直接选定合作商（填理由，转为指定转派） */
   awardCompare: (id: string, supplierId: string, reason: string) => { ok: boolean; msg: string };
 
   /* ── 履约与结算 ── */
@@ -158,7 +158,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
     }));
   };
 
-  /** 内部：转出合作商（报备/指定/抢单/比单共用）→ 分发待接单 */
+  /** 内部：转出合作商（报备/指定/抢单/比单共用）→ 转派待接单 */
   const transfer = (id: string, supplierId: string, supplierName: string, source: TransferSource, detail: string) => {
     patchOrder(id, {
       processStatus: 'distribute_pending',
@@ -168,7 +168,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       transferSource: source,
       transferTime: now(),
       partnerStatus: undefined,
-    }, { action: source === 'report' ? '报备命中自动转出' : source === 'assign' ? '指定分发' : source === 'grab' ? '抢单分发' : '比单分发', detail: `${detail} → ${supplierName} · 等待合作商接单` });
+    }, { action: source === 'report' ? '报备命中自动转出' : source === 'assign' ? '指定转派' : source === 'grab' ? '抢单转派' : '比单转派', detail: `${detail} → ${supplierName} · 等待合作商接单` });
   };
 
   /** 内部：由母订单构造子订单（抢单/比单按商品分拆定案共用；seq 为子序号） */
@@ -192,7 +192,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
     history: [...mother.history, { time: now(), action: lastAction, detail: lastDetail }],
   });
 
-  /** 内部：抢单定案分拆——按中单合作商分组生成子订单（分发待接单），未抢商品合并为子订单退回流转-待处理（抢单未成） */
+  /** 内部：抢单定案分拆——按中单合作商分组生成子订单（转派待接单），未抢商品合并为子订单退回分发-待处理（抢单未成） */
   const finalizeGrabSplit = (id: string) => {
     const order = get().orders.find((o) => o.id === id);
     if (!order || !order.grabRecords?.length) return;
@@ -214,14 +214,14 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         processStatus: 'distribute_pending', path: 'distribute', distributeMode: 'grab',
         partnerId: grp.supplierId, partnerName: grp.supplierName,
         transferSource: 'grab', transferTime: now(),
-      }, '抢单分发（按商品）', `${grp.items.map((i) => `${i.productName}×${i.quantity}`).join('、')} → ${grp.supplierName} · 等待合作商接单`));
+      }, '抢单转派（按商品）', `${grp.items.map((i) => `${i.productName}×${i.quantity}`).join('、')} → ${grp.supplierName} · 等待合作商接单`));
     }
     const remain = order.items.filter((i) => !taken.has(i.productName));
     if (remain.length > 0) {
       seq += 1;
       children.push(makeSplitChild(order, rootCode, seq, remain, {
         processStatus: 'pending', sourceTag: 'grab_failed',
-      }, '抢单未成退回', `未被抢购商品（${remain.map((i) => i.productName).join('、')}）形成子订单，重新进入流转-待处理`));
+      }, '抢单未成退回', `未被抢购商品（${remain.map((i) => i.productName).join('、')}）形成子订单，重新进入分发-待处理`));
     }
     set((s) => ({ orders: [...children, ...s.orders.filter((o) => o.id !== id)] }));
   };
@@ -285,16 +285,16 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       return { ok: true, msg: '订单已修改' };
     },
 
-    /* ── 路径选择与流转 ── */
+    /* ── 路径选择与分发 ── */
     chooseSelfPath: (id) => {
       patchOrder(id, {
         path: 'self',
         processStatus: 'self_pending',
-      }, { action: '选择自营路径', detail: '背对背采购 · 等待管理后台接单（销售订单 → 流转订单）' });
+      }, { action: '选择自营路径', detail: '背对背采购 · 等待管理后台接单（销售订单 → 分发订单）' });
     },
 
     assignPartner: (id, supplierId, supplierName) => {
-      transfer(id, supplierId, supplierName, 'assign', '运营指定分发');
+      transfer(id, supplierId, supplierName, 'assign', '运营指定转派');
     },
 
     confirmReportMatch: (id) => {
@@ -310,7 +310,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
     matchReportManual: (id, reportCodes) => {
       const order = get().orders.find((o) => o.id === id);
       if (!order) return { ok: false, msg: '订单不存在' };
-      if (order.processStatus !== 'pending') return { ok: false, msg: '仅流转-待处理订单可匹配报备' };
+      if (order.processStatus !== 'pending') return { ok: false, msg: '仅分发-待处理订单可匹配报备' };
       const codes = [...new Set(reportCodes)].filter(Boolean);
       if (codes.length === 0) return { ok: false, msg: '请至少选择一条报备记录' };
       const reports = useReportStore.getState().reports.filter((r) => codes.includes(r.code) && r.status === 'approved');
@@ -332,7 +332,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
     splitOrder: (id, parts) => {
       const order = get().orders.find((o) => o.id === id);
       if (!order) return { ok: false, msg: '订单不存在' };
-      if (order.processStatus !== 'pending') return { ok: false, msg: '仅流转-待处理订单可拆单' };
+      if (order.processStatus !== 'pending') return { ok: false, msg: '仅分发-待处理订单可拆单' };
       const valid = parts.filter((p) => p.quantity > 0);
       if (valid.length === 0) return { ok: false, msg: '请填写要拆出的商品数量' };
       for (const p of valid) {
@@ -385,9 +385,9 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         grabRegion: undefined,
         grabRecords: undefined,
         compare: undefined,
-        // 报备匹配信息一并清除：重新流转后不再按报备自动分发，由运营手动选择路径
+        // 报备匹配信息一并清除：重新分发后不再按报备自动分发，由运营手动选择路径
         reportMatches: undefined,
-      }, { action: '重新流转', detail: note || '订单进入待处理状态重新选择路径（已清除报备匹配，不再自动按报备分发）' });
+      }, { action: '重新分发', detail: note || '订单进入待处理状态重新选择路径（已清除报备匹配，不再自动按报备转派）' });
     },
 
     /* ── 自营执行 ── */
@@ -456,7 +456,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       const order = get().orders.find((o) => o.id === id);
       if (!order || order.processStatus !== 'grabbing') return { ok: false, msg: '该订单抢单已结束' };
       if (order.grabDeadline && nowTs() > order.grabDeadline) {
-        patchOrder(id, { processStatus: 'pending', distributeMode: undefined, sourceTag: 'grab_failed' }, { action: '抢单超时（抢单未成）', detail: '无人抢购，退回流转-待处理' });
+        patchOrder(id, { processStatus: 'pending', distributeMode: undefined, sourceTag: 'grab_failed' }, { action: '抢单超时（抢单未成）', detail: '无人抢购，退回分发-待处理' });
         return { ok: false, msg: '抢单已超时结束' };
       }
       const taken = new Set(order.grabRecords?.flatMap((g) => g.items ?? []) ?? []);
@@ -488,13 +488,13 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       if (expired.length === 0) return;
       for (const o of expired) {
         if ((o.grabRecords?.length ?? 0) > 0) {
-          // 部分商品已被抢：按合作商分拆定案，剩余商品子订单退回流转-待处理（抢单未成）
+          // 部分商品已被抢：按合作商分拆定案，剩余商品子订单退回分发-待处理（抢单未成）
           finalizeGrabSplit(o.id);
         } else {
           patchOrder(o.id, {
             processStatus: 'pending', distributeMode: undefined, sourceTag: 'grab_failed',
             grabDeadline: undefined, grabRecords: undefined, grabRegion: undefined,
-          }, { action: '抢单超时（抢单未成）', detail: '无人抢购，退回流转-待处理' });
+          }, { action: '抢单超时（抢单未成）', detail: '无人抢购，退回分发-待处理' });
         }
       }
     },
@@ -604,7 +604,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         byPartner.set(winner.supplierId, grp);
       }
 
-      // 按中单合作商分拆子订单；未报名商品合并子订单退回流转-待处理（比单未成）
+      // 按中单合作商分拆子订单；未报名商品合并子订单退回分发-待处理（比单未成）
       const rootCode = order.parentCode ?? order.code;
       let seq = get().orders.filter((o) => o.parentCode === rootCode).length;
       const children: ExternalOrder[] = [];
@@ -622,7 +622,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         seq += 1;
         children.push(makeSplitChild(order, rootCode, seq, remain, {
           processStatus: 'pending', sourceTag: 'compare_failed',
-        }, '比单未成退回', `无报名商品（${remain.map((i) => i.productName).join('、')}）形成子订单，重新进入流转-待处理`));
+        }, '比单未成退回', `无报名商品（${remain.map((i) => i.productName).join('、')}）形成子订单，重新进入分发-待处理`));
       }
       set((s) => ({ orders: [...children, ...s.orders.filter((o) => o.id !== id)] }));
       const winnerNames = [...new Set(Object.values(itemAwards))];
@@ -635,7 +635,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       const target = order.compare.quotes.find((q) => q.supplierId === supplierId);
       if (!target) return { ok: false, msg: '该合作商尚未报名' };
       transfer(id, supplierId, target.supplierName, 'assign', `比单直接选定（${reason.trim() || '管理后台综合判断'}）`);
-      return { ok: true, msg: `已选定 ${target.supplierName}，转为指定分发` };
+      return { ok: true, msg: `已选定 ${target.supplierName}，转为指定转派` };
     },
 
     /* ── 履约与结算（合作商接单 → 已处理；结算写积分台账） ── */
@@ -684,7 +684,7 @@ const TRANSFER_KIND_MAP: Record<string, 'order-self' | 'product' | 'customer' | 
   compare: 'compare',
 };
 
-/** 某合作商名下的订单处理流转订单（映射为合作商订单结构，合作商终端展示/接单） */
+/** 某合作商名下的订单分发分发订单（映射为合作商订单结构，合作商终端展示/接单） */
 export function getPartnerFlowOrders(supplierId: string): PartnerOrder[] {
   return useOrderFlowStore
     .getState()

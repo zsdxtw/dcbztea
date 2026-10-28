@@ -253,7 +253,7 @@ export default function PartnerReports() {
               </InfoGrid>
             </DrawerSection>
 
-            <DrawerSection title="流转说明">
+            <DrawerSection title="转派说明">
               <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-600)', lineHeight: 1.8 }}>
                 {selected.status !== 'approved' && '报备提交后由淡茶半盏管理台（销售 > 报备管理）审批，审批结果将同步显示在此。'}
                 {selected.status === 'approved' && selected.type === 'order' && selected.orderKind === 'self' && '已通过：关联订单已自动转入「订单管理」，由我方履约。'}

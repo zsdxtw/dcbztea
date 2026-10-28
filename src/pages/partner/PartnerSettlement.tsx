@@ -12,13 +12,13 @@ import { partnerSettlements, PARTNER_ORDER_STATUS_LABELS } from '../../data/part
 
 const STATUS_LABELS: Record<string, string> = { unsettled: '待结算', pending: '结算中', settled: '已结算' };
 
-/** 合作商结算页：发货订单的结算单管理 + 订单处理流转订单结算进度 */
+/** 合作商结算页：发货订单的结算单管理 + 订单分发分发订单结算进度 */
 export default function PartnerSettlement() {
   const [settlements] = useState<PartnerSettlement[]>(partnerSettlements);
   const [filterStatus, setFilterStatus] = useState('');
   const [selected, setSelected] = useState<PartnerSettlement | null>(null);
 
-  /** 订单处理流转中心转入我名下的订单（报备 / 指定 / 抢单 / 比单） */
+  /** 订单分发流转中心转入我名下的订单（报备 / 指定 / 抢单 / 比单） */
   const auth = getPartnerAuth();
   const suppliers = useSupplierStore((s) => s.suppliers);
   const flowVersion = useOrderFlowStore((s) => s.orders);
@@ -37,7 +37,7 @@ export default function PartnerSettlement() {
     return true;
   }), [settlements, filterStatus]);
 
-  // 汇总（结算单 + 流转订单实时数据）
+  // 汇总（结算单 + 分发订单实时数据）
   const totalSettle = settlements.filter(s => s.status !== 'settled').reduce((sum, s) => sum + s.settleAmount, 0)
     + flowUnsettled.reduce((sum, o) => sum + o.totalAmount, 0);
   const settledAmount = settlements.filter(s => s.status === 'settled').reduce((sum, s) => sum + s.settleAmount, 0)
@@ -60,12 +60,12 @@ export default function PartnerSettlement() {
         <div className="pk-stat accent">
           <div className="pk-stat-label">待结算金额</div>
           <div className="pk-stat-value">{totalSettle.toLocaleString()}<small>元</small></div>
-          <div className="pk-stat-sub">含结算单与流转订单（已签收 {flowUnsettled.length} 单）</div>
+          <div className="pk-stat-sub">含结算单与分发订单（已签收 {flowUnsettled.length} 单）</div>
         </div>
         <div className="pk-stat">
           <div className="pk-stat-label">已结算金额</div>
           <div className="pk-stat-value">{settledAmount.toLocaleString()}<small>元</small></div>
-          <div className="pk-stat-sub">历史累计到账 · 含流转订单 {flowSettled.length} 单</div>
+          <div className="pk-stat-sub">历史累计到账 · 含分发订单 {flowSettled.length} 单</div>
         </div>
         <div className="pk-stat">
           <div className="pk-stat-label">结算单数</div>
@@ -104,10 +104,10 @@ export default function PartnerSettlement() {
         />
       </div>
 
-      {/* 订单处理 · 流转订单结算进度（实时数据） */}
+      {/* 订单分发 · 分发订单结算进度（实时数据） */}
       <div className="pk-panel">
         <div className="pk-panel-head">
-          <span className="pk-panel-title">订单处理 · 流转订单结算</span>
+          <span className="pk-panel-title">订单分发 · 分发订单结算</span>
           <span style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>报备 / 指定 / 抢单 / 比单中单的订单，履约签收后进入结算</span>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', padding: '0 22px 14px' }}>
@@ -141,7 +141,7 @@ export default function PartnerSettlement() {
           </div>
         ) : (
           <div style={{ padding: '6px 22px 20px', fontSize: 13, color: 'var(--pk-ink3)' }}>
-            暂无流转订单。在抢单大厅抢单、比单报名中单或收到平台指定分发后，订单履约与结算进度会显示在这里。
+            暂无分发订单。在抢单大厅抢单、比单报名中单或收到平台指定转派后，订单履约与结算进度会显示在这里。
           </div>
         )}
       </div>

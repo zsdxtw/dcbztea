@@ -55,17 +55,17 @@ function selfStage(o: ExternalOrder): { key: string; label: string; idx: number 
   return { key: 'purchasing', label: '采购中', idx: 0 };
 }
 
-/** 路径标签（分发待接单显示来源路径；报备-匹配待确认属分发-报备） */
+/** 路径标签（转派待接单显示来源路径；报备-匹配待确认属转派-报备） */
 function pathLabel(o: ExternalOrder): string {
-  if (o.processStatus === 'report_match_pending') return '分发-报备';
+  if (o.processStatus === 'report_match_pending') return '转派-报备';
   if (o.path === 'self') return '自营';
   if (o.transferSource) return TRANSFER_SOURCE_LABELS[o.transferSource];
-  if (o.distributeMode === 'grab') return '分发-抢单';
-  if (o.distributeMode === 'compare') return '分发-比单';
+  if (o.distributeMode === 'grab') return '转派-抢单';
+  if (o.distributeMode === 'compare') return '转派-比单';
   return '—';
 }
 
-/** 路径筛选键（列表流转路径筛选用） */
+/** 路径筛选键（列表分发路径筛选用） */
 function pathKey(o: ExternalOrder): string {
   if (o.processStatus === 'report_match_pending') return 'report';
   if (o.path === 'self') return 'self';
@@ -93,18 +93,18 @@ function regionText(o: ExternalOrder): string {
   return parts.join(' / ');
 }
 
-/** 已接单订单重新流转的风险措辞 */
+/** 已接单订单重新分发的风险措辞 */
 function processedWarnText(o: ExternalOrder): string {
   if (o.path === 'self') {
     const st = selfStage(o);
-    if (st.key === 'outbound') return `该订单已接单且【已发货】（出库单 ${o.selfChain?.outboundCode}），重新流转将作废已有采购/出库单据，请谨慎确认！`;
-    if (st.key === 'inbound') return `该订单已接单且【已到货入库】（入库单 ${o.selfChain?.inboundCode}），重新流转需先处理在库商品，请谨慎确认！`;
-    return '该订单已被管理后台接单（采购中），重新流转将作废采购订单，请确认。';
+    if (st.key === 'outbound') return `该订单已接单且【已发货】（出库单 ${o.selfChain?.outboundCode}），重新分发将作废已有采购/出库单据，请谨慎确认！`;
+    if (st.key === 'inbound') return `该订单已接单且【已到货入库】（入库单 ${o.selfChain?.inboundCode}），重新分发需先处理在库商品，请谨慎确认！`;
+    return '该订单已被管理后台接单（采购中），重新分发将作废采购订单，请确认。';
   }
   const ps = o.partnerStatus;
-  if (ps === 'shipping') return `该订单合作商【已发货】，重新流转将中断合作商履约并可能产生违约责任，请谨慎确认！`;
-  if (ps === 'delivered' || ps === 'settled') return `该订单合作商【已签收/已结算】，重新流转将产生结算与积分回滚，请谨慎确认！`;
-  return '该订单已被合作商接单，重新流转将收回订单并通知合作商，请确认。';
+  if (ps === 'shipping') return `该订单合作商【已发货】，重新分发将中断合作商履约并可能产生违约责任，请谨慎确认！`;
+  if (ps === 'delivered' || ps === 'settled') return `该订单合作商【已签收/已结算】，重新分发将产生结算与积分回滚，请谨慎确认！`;
+  return '该订单已被合作商接单，重新分发将收回订单并通知合作商，请确认。';
 }
 
 interface CustomerOption { id: string; name: string; typeLabel: string; level: string; contactPerson: string; contactPhone: string; contactAddress: string }
@@ -121,13 +121,13 @@ export default function ExternalOrders() {
   const [keyword, setKeyword] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  /** 列表筛选（仅「全部」时展示）：地区省市县联动 + 流转路径 */
+  /** 列表筛选（仅「全部」时展示）：地区省市县联动 + 分发路径 */
   const [listProv, setListProv] = useState('');
   const [listCity, setListCity] = useState('');
   const [listDist, setListDist] = useState('');
   const [listPath, setListPath] = useState('');
 
-  /** 拆单弹窗（流转-待处理按商品+数量拆出子订单） */
+  /** 拆单弹窗（分发-待处理按商品+数量拆出子订单） */
   const [splitting, setSplitting] = useState<ExternalOrder | null>(null);
   const [splitQty, setSplitQty] = useState<Record<string, string>>({});
 
@@ -150,7 +150,7 @@ export default function ExternalOrders() {
   const [items, setItems] = useState<ExternalOrderItem[]>([]);
   const [entryError, setEntryError] = useState('');
 
-  /** 重新流转确认弹窗 */
+  /** 重新分发确认弹窗 */
   const [reflowing, setReflowing] = useState<ExternalOrder | null>(null);
   /** 删除确认弹窗 */
   const [deleting, setDeleting] = useState<ExternalOrder | null>(null);
@@ -159,22 +159,22 @@ export default function ExternalOrders() {
   /** 直接选定弹窗 */
   const [awarding, setAwarding] = useState<{ orderId: string; supplierId: string; supplierName: string } | null>(null);
   const [awardReason, setAwardReason] = useState('');
-  /** 流转弹窗（待处理订单独立处理页：直接进入分发方式选择，含转自营） */
+  /** 订单分发弹窗（待处理订单独立处理页：直接进入分发方式选择，含转自营） */
   const [flowingId, setFlowingId] = useState<string | null>(null);
   const [flowMode, setFlowMode] = useState<'self' | 'assign' | 'report' | 'grab' | 'compare'>('assign');
-  /** 分发-指定：合作商选择 + 省市县筛选 + 搜索 + 分页 */
+  /** 转派-指定：合作商选择 + 省市县筛选 + 搜索 + 分页 */
   const [flowSupplier, setFlowSupplier] = useState('');
   const [supplierProv, setSupplierProv] = useState('');
   const [supplierCity, setSupplierCity] = useState('');
   const [supplierDist, setSupplierDist] = useState('');
   const [supplierKw, setSupplierKw] = useState('');
   const [supplierPage, setSupplierPage] = useState(1);
-  /** 分发-报备：地区筛选 + 分页 */
+  /** 转派-报备：地区筛选 + 分页 */
   const [reportProv, setReportProv] = useState('');
   const [reportCity, setReportCity] = useState('');
   const [reportDist, setReportDist] = useState('');
   const [reportPage, setReportPage] = useState(1);
-  /** 分发-报备：选中的报备编号（多选，一笔订单可对应多条报备） */
+  /** 转派-报备：选中的报备编号（多选，一笔订单可对应多条报备） */
   const [pickReportCodes, setPickReportCodes] = useState<string[]>([]);
   /** 抢单/比单地区范围（省市县，可选） */
   const [scopeProv, setScopeProv] = useState('');
@@ -201,12 +201,12 @@ export default function ExternalOrders() {
   const activeSuppliers = useMemo(() => suppliers.filter((s) => s.status === 'active'), [suppliers]);
   const scoreOf = (id: string, name: string) => getScoreSummary(scoreEntries, id, name);
 
-  /** 审批通过的报备记录（流转弹窗·报备匹配选择用） */
+  /** 审批通过的报备记录（订单分发弹窗·报备匹配选择用） */
   const approvedReports = useReportStore((s) => s.reports.filter((r) => r.status === 'approved'));
 
   const flowing = flowingId ? orders.find((o) => o.id === flowingId) ?? null : null;
 
-  /** 指定分发候选合作商：省市县筛选 + 名称搜索 */
+  /** 指定转派候选合作商：省市县筛选 + 名称搜索 */
   const flowSuppliers = useMemo(() => activeSuppliers.filter((s) => {
     if (supplierProv && s.registeredProvince !== supplierProv && s.contactProvince !== supplierProv) return false;
     if (supplierCity && s.registeredCity !== supplierCity && s.contactCity !== supplierCity) return false;
@@ -227,7 +227,7 @@ export default function ExternalOrders() {
     ? { province: scopeProv || undefined, city: scopeCity || undefined, district: scopeDist || undefined }
     : undefined;
 
-  /** 分发-报备：按报备合作商地区筛选后的报备记录 */
+  /** 转派-报备：按报备合作商地区筛选后的报备记录 */
   const flowReports = useMemo(() => approvedReports.filter((r) => {
     const s = suppliers.find((x) => x.name === r.partnerName);
     return partnerInRegion(s, { province: reportProv || undefined, city: reportCity || undefined, district: reportDist || undefined });
@@ -263,7 +263,7 @@ export default function ExternalOrders() {
     setFloorType('discount'); setFloorValue('88');
   };
 
-  /** 流转弹窗确认按钮（文案随动作变化，右下角取消 + 确认） */
+  /** 订单分发弹窗确认按钮（文案随动作变化，右下角取消 + 确认） */
   const flowConfirmLabel =
     flowMode === 'self' ? '确认'
       : flowMode === 'assign' ? '指定并转出'
@@ -316,7 +316,7 @@ export default function ExternalOrders() {
   const filtered = useMemo(() => orders.filter((o) => {
     if (keyword && !o.code.includes(keyword) && !o.customerName.includes(keyword) && !o.externalOrderNo.includes(keyword)) return false;
     if (filterStatus !== '') return mergedStatus(o.processStatus) === filterStatus;
-    // 「全部」模式下应用地区 + 流转路径筛选
+    // 「全部」模式下应用地区 + 分发路径筛选
     if (listPath && pathKey(o) !== listPath) return false;
     if (listProv || listCity || listDist) {
       const [p, c, d] = regionText(o).split(' / ');
@@ -433,12 +433,12 @@ export default function ExternalOrders() {
     if (order.processStatus === 'report_match_pending') setSelectedId(order.id);
   };
 
-  /* ── 重新流转 ── */
+  /* ── 重新分发 ── */
   const startReflow = (o: ExternalOrder) => setReflowing(o);
   const confirmReflow = () => {
     if (!reflowing) return;
     const o = reflowing;
-    store.getState().resetToPending(o.id, ['processed', 'completed'].includes(o.processStatus) ? '管理后台重新流转（原执行信息作废）' : undefined);
+    store.getState().resetToPending(o.id, ['processed', 'completed'].includes(o.processStatus) ? '管理后台重新分发（原执行信息作废）' : undefined);
     setReflowing(null);
     setSelectedId(null);
   };
@@ -484,15 +484,15 @@ export default function ExternalOrders() {
   /* ── 渲染 ── */
   return (
     <>
-      <ContentHeader title="订单生成&流转" breadcrumbs={['销售', '订单生成&流转']} />
+      <ContentHeader title="订单分发" breadcrumbs={['销售', '订单分发']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-          订单生成&流转是<strong>销售订单的入口</strong>：处理订单生成到分发合作商或自营，明确订单由谁来接单。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>，保存后均自动与审批通过的报备比对。
-          命中报备的订单先进入<strong>报备-匹配待确认</strong>，人工确认匹配后分发给报备合作商；其余订单点击「流转」在弹窗中选择：转自营（管理后台在销售订单接单，接单时填跟单人）、分发-指定、分发-报备、分发-抢单（时间有限）、分发-比单（积分优先）；抢单与比单可限定合作商地区。
-          待接单订单可「重新流转」回待处理重新选择路径；已接单的重新流转需二次确认。
+          订单分发是<strong>销售订单的入口</strong>：处理订单生成到分发合作商或自营，明确订单由谁来接单。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>，保存后均自动与审批通过的报备比对。
+          命中报备的订单先进入<strong>报备-匹配待确认</strong>，人工确认匹配后分发给报备合作商；其余订单点击「分发」在弹窗中选择：转自营（管理后台在销售订单接单，接单时填跟单人）、转派-指定、转派-报备、转派-抢单（时间有限）、转派-比单（积分优先）；抢单与比单可限定合作商地区。
+          待接单订单可「重新分发」回待处理重新选择路径；已接单的重新分发需二次确认。
         </div>
 
-        {/* 状态栏流程图：待处理(左中) ─ 顶中出线→[自营]→[自营待接单]→已处理顶中 / 底中出线→[2×2虚线框]→[分发待接单]→已处理底中，两个待接单右缘对齐 */}
+        {/* 状态栏流程图：待处理(左中) ─ 顶中出线→[自营]→[自营待接单]→已处理顶中 / 底中出线→[2×2虚线框]→[转派待接单]→已处理底中，两个待接单右缘对齐 */}
         <style>{`
           .eop-flowbar { display: flex; align-items: center; gap: 14px; margin-bottom: var(--space-4); flex-wrap: nowrap; overflow-x: auto; padding: 6px 0; }
           .eop-flow { display: flex; align-items: center; gap: 20px; }
@@ -527,7 +527,7 @@ export default function ExternalOrders() {
           .eop-box { display: flex; gap: 12px; padding: 9px 12px; align-items: center; border: 1.5px dashed var(--color-neutral-300); border-radius: 12px; flex: none; }
           .eop-box .tab-card-simple { justify-content: center; }
           .eop-dim { opacity: .45; cursor: not-allowed; }
-          /* 流转弹窗 · 流转方式卡片（两行：名称 + 说明小字，文字居中；激活态用内联样式实现，禁用过渡避免干扰） */
+          /* 订单分发弹窗 · 分发方式卡片（两行：名称 + 说明小字，文字居中；激活态用内联样式实现，禁用过渡避免干扰） */
           .eop-mode-card { flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: var(--space-2) var(--space-3); transition: none; text-align: center; }
           .eop-mode-card strong { font-size: var(--text-sm); }
           .eop-mode-card .eop-mode-sub { font-size: var(--text-xs); font-weight: 400; color: var(--color-neutral-400); line-height: 1.2; white-space: nowrap; }
@@ -546,15 +546,15 @@ export default function ExternalOrders() {
               <span className="eop-lbl up" aria-hidden="true">自营</span>
               <i className="dn-v" aria-hidden="true" />
               <i className="dn-h eop-arr-r" aria-hidden="true" />
-              <span className="eop-lbl dn" aria-hidden="true">分发</span>
+              <span className="eop-lbl dn" aria-hidden="true">转派</span>
               <button className={`tab-card-simple${filterStatus === 'pending' ? ' active' : ''}`} onClick={() => setFilterStatus('pending')}>
-                流转-待处理
+                分发-待处理
                 <span className="tab-card-simple-count">{countOf('pending')}</span>
               </button>
             </div>
 
             <div className="eop-branches">
-              {/* 上路：自营(路径，置灰) ─ 弹性连线 ─ 自营待接单（推至右缘，与分发待接单横向对齐） */}
+              {/* 上路：自营(路径，置灰) ─ 弹性连线 ─ 自营待接单（推至右缘，与转派待接单横向对齐） */}
               <div className="eop-toprow">
                 <button className="tab-card-simple eop-dim" disabled title="选择自营路径即时进入自营待接单，无中间状态">自营</button>
                 <i className="eop-grow eop-arr-r" aria-hidden="true" />
@@ -564,7 +564,7 @@ export default function ExternalOrders() {
                 </button>
               </div>
               <div className="eop-midgap" />
-              {/* 下路：分发方式（报备-匹配待确认 / 指定 / 抢单中 / 比单中）→ 分发待接单 */}
+              {/* 下路：分发方式（报备-匹配待确认 / 指定 / 抢单中 / 比单中）→ 转派待接单 */}
               <div className="eop-botrow">
                 <div className="eop-box">
                   <button
@@ -575,7 +575,7 @@ export default function ExternalOrders() {
                     报备-匹配待确认
                     <span className="tab-card-simple-count">{countOf('report_match_pending')}</span>
                   </button>
-                  <button className="tab-card-simple eop-dim" disabled title="指定分发即时转出，无中间状态">指定</button>
+                  <button className="tab-card-simple eop-dim" disabled title="指定转派即时转出，无中间状态">指定</button>
                   <button className={`tab-card-simple${filterStatus === 'grabbing' ? ' active' : ''}`} onClick={() => setFilterStatus('grabbing')}>
                     抢单中
                     <span className="tab-card-simple-count">{countOf('grabbing')}</span>
@@ -587,7 +587,7 @@ export default function ExternalOrders() {
                 </div>
                 <i className="eop-hln eop-arr-r" aria-hidden="true" />
                 <button className={`tab-card-simple${filterStatus === 'distribute_pending' ? ' active' : ''}`} onClick={() => setFilterStatus('distribute_pending')}>
-                  分发待接单
+                  转派待接单
                   <span className="tab-card-simple-count">{countOf('distribute_pending')}</span>
                 </button>
               </div>
@@ -600,7 +600,7 @@ export default function ExternalOrders() {
               <i className="dn-v eop-arr-u" aria-hidden="true" />
               <i className="dn-h" aria-hidden="true" />
               <button className={`tab-card-simple${filterStatus === 'processed' ? ' active' : ''}`} onClick={() => setFilterStatus('processed')}>
-                流转-已完成
+                分发-已完成
                 <span className="tab-card-simple-count">{countOf('processed')}</span>
               </button>
             </div>
@@ -623,12 +623,12 @@ export default function ExternalOrders() {
                 {listDistOpts.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
               <select className="filter-select" value={listPath} onChange={(e) => setListPath(e.target.value)}>
-                <option value="">全部流转路径</option>
+                <option value="">全部分发路径</option>
                 <option value="self">自营</option>
-                <option value="report">分发-报备</option>
-                <option value="assign">分发-指定</option>
-                <option value="grab">分发-抢单</option>
-                <option value="compare">分发-比单</option>
+                <option value="report">转派-报备</option>
+                <option value="assign">转派-指定</option>
+                <option value="grab">转派-抢单</option>
+                <option value="compare">转派-比单</option>
                 <option value="none">未选择</option>
               </select>
             </>
@@ -640,7 +640,7 @@ export default function ExternalOrders() {
 
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['订单编号', '来源', '客户', '地区', '收件人', '收件地址', '金额', '状态', '流转路径', '合作商', '录入时间', '操作']}
+            headers={['订单编号', '来源', '客户', '地区', '收件人', '收件地址', '金额', '状态', '分发路径', '合作商', '录入时间', '操作']}
             rows={pagedOrders.map((o) => [
               <span key="c" className="cell-mono-emph">{o.code}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.externalOrderNo}</span></span>,
               <span key="src">
@@ -678,7 +678,7 @@ export default function ExternalOrders() {
               <div key="act" className="row-actions" style={{ whiteSpace: 'nowrap' }}>
                 {o.processStatus === 'pending' && (
                   <>
-                    <Button size="sm" onClick={() => openFlow(o)}>流转</Button>
+                    <Button size="sm" onClick={() => openFlow(o)}>分发</Button>
                     {o.items.length >= 1 && <Button size="sm" variant="ghost" onClick={() => { setSplitting(o); setSplitQty({}); }}>拆单</Button>}
                     {o.sourceChannel === 'manual' && <Button size="sm" variant="ghost" onClick={() => { setSelectedId(o.id); startEdit(o); }}>修改</Button>}
                     {o.sourceChannel === 'manual' && <Button size="sm" variant="ghost" onClick={() => setDeleting(o)}>删除</Button>}
@@ -693,7 +693,7 @@ export default function ExternalOrders() {
                 {(o.processStatus === 'self_pending' || o.processStatus === 'distribute_pending') && (
                   <>
                     <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
-                    <Button size="sm" variant="danger" onClick={() => startReflow(o)}>重新流转</Button>
+                    <Button size="sm" variant="danger" onClick={() => startReflow(o)}>重新分发</Button>
                   </>
                 )}
                 {o.processStatus === 'grabbing' && (
@@ -708,7 +708,7 @@ export default function ExternalOrders() {
                 {(o.processStatus === 'processed' || o.processStatus === 'completed') && (
                   <>
                     <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
-                    <Button size="sm" variant="danger" onClick={() => startReflow(o)}>重新流转</Button>
+                    <Button size="sm" variant="danger" onClick={() => startReflow(o)}>重新分发</Button>
                   </>
                 )}
               </div>,
@@ -756,7 +756,7 @@ export default function ExternalOrders() {
             <>
               <Button variant="ghost" onClick={() => setSelectedId(null)}>关闭</Button>
               {current && current.processStatus !== 'pending' && current.processStatus !== 'processed' && current.processStatus !== 'completed' && (
-                <Button variant="danger" onClick={() => startReflow(current)}>重新流转</Button>
+                <Button variant="danger" onClick={() => startReflow(current)}>重新分发</Button>
               )}
               {current && current.sourceChannel === 'manual' && !['processed', 'completed'].includes(current.processStatus) && (
                 <Button onClick={() => startEdit()}>修改</Button>
@@ -851,12 +851,12 @@ export default function ExternalOrders() {
               </table>
             </DrawerSection>
 
-            {/* ── 待处理：提示前往流转弹窗处理 ── */}
+            {/* ── 待处理：提示前往订单分发弹窗处理 ── */}
             {current.processStatus === 'pending' && (
-              <DrawerSection title="流转处理">
+              <DrawerSection title="分发处理">
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
-                  订单待流转：请点击列表行操作「<strong>流转</strong>」按钮，在<strong>流转弹窗</strong>中选择自营或分发（指定 / 报备匹配 / 抢单 / 比单）路径完成流转。
-                  本抽屉用于查看订单信息与流转轨迹，不做流转操作。
+                  订单待分发：请点击列表行操作「<strong>分发</strong>」按钮，在<strong>订单分发弹窗</strong>中选择自营或分发（指定 / 报备匹配 / 抢单 / 比单）路径完成分发。
+                  本抽屉用于查看订单信息与处理轨迹，不做分发操作。
                 </div>
               </DrawerSection>
             )}
@@ -871,7 +871,7 @@ export default function ExternalOrders() {
                   {current.reportMatches?.[0] && <InfoItem label="拟分发合作商">{current.reportMatches[0].partnerName}</InfoItem>}
                 </InfoGrid>
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginTop: 'var(--space-2)', lineHeight: 1.7 }}>
-                  系统在订单保存（手工录入 / 直连推送）时自动与审批通过的报备规则比对，命中即进入本状态。请人工<strong>确认匹配</strong>后分发给报备合作商，进入分发待接单等待接单。
+                  系统在订单保存（手工录入 / 直连推送）时自动与审批通过的报备规则比对，命中即进入本状态。请人工<strong>确认匹配</strong>后分发给报备合作商，进入转派待接单等待接单。
                 </div>
                 <div style={{ marginTop: 'var(--space-3)' }}>
                   <Button onClick={() => setMatchConfirming(current)}>确认匹配并转出</Button>
@@ -883,8 +883,8 @@ export default function ExternalOrders() {
             {current.processStatus === 'self_pending' && (
               <DrawerSection title="自营待接单">
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
-                  请前往 <strong>销售 → 销售订单 → 流转订单</strong> 点击「接单」，接单时填写<strong>跟单人</strong>并选择<strong>采购供应商</strong>后进入自营执行。
-                  需要改路径可点击「重新流转」退回待处理。
+                  请前往 <strong>销售 → 销售订单 → 分发订单</strong> 点击「接单」，接单时填写<strong>跟单人</strong>并选择<strong>采购供应商</strong>后进入自营执行。
+                  需要改路径可点击「重新分发」退回待处理。
                 </div>
               </DrawerSection>
             )}
@@ -935,14 +935,14 @@ export default function ExternalOrders() {
                   </tbody>
                 </table>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 'var(--space-2)' }}>
-                  截止后在「销售 → 比单管理」评分定标；也可在报名合作商中直接选定（转为指定分发）
+                  截止后在「销售 → 比单管理」评分定标；也可在报名合作商中直接选定（转为指定转派）
                 </div>
               </DrawerSection>
             )}
 
-            {/* ── 分发待接单 ── */}
+            {/* ── 转派待接单 ── */}
             {current.processStatus === 'distribute_pending' && current.partnerName && (
-              <DrawerSection title="分发待接单">
+              <DrawerSection title="转派待接单">
                 <InfoGrid>
                   <InfoItem label="合作商">{current.partnerName}</InfoItem>
                   <InfoItem label="分发方式">{TRANSFER_SOURCE_LABELS[current.transferSource ?? '']}</InfoItem>
@@ -950,7 +950,7 @@ export default function ExternalOrders() {
                   {current.reportMatches?.[0] && <InfoItem label="命中报备" mono>{current.reportMatches[0].reportCode}</InfoItem>}
                 </InfoGrid>
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginTop: 'var(--space-2)', lineHeight: 1.7 }}>
-                  等待合作商在终端<strong>订单管理</strong>点击「接单」；接单后订单进入<strong>已处理</strong>。改路径可「重新流转」退回待处理。
+                  等待合作商在终端<strong>订单管理</strong>点击「接单」；接单后订单进入<strong>已处理</strong>。改路径可「重新分发」退回待处理。
                 </div>
               </DrawerSection>
             )}
@@ -1035,11 +1035,11 @@ export default function ExternalOrders() {
         )}
       </DetailDrawer>
 
-      {/* ── 重新流转确认弹窗 ── */}
+      {/* ── 重新分发确认弹窗 ── */}
       {reflowing && (
         <div className="category-dialog-overlay" onClick={() => setReflowing(null)}>
           <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 480 }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>重新流转</div>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>重新分发</div>
             {['processed', 'completed'].includes(reflowing.processStatus) && (
               <div style={{ padding: '10px 14px', background: '#FFF3E0', color: '#E65100', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)', lineHeight: 1.7, fontWeight: 'var(--font-medium)' }}>
                 {processedWarnText(reflowing)}
@@ -1048,11 +1048,11 @@ export default function ExternalOrders() {
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
               确认后订单 <strong className="mono">{reflowing.code}</strong> 将<strong>进入待处理状态重新选择路径</strong>
               {['processed', 'completed'].includes(reflowing.processStatus) ? `，原有执行信息（${reflowing.path === 'self' ? '采购/出入库单据' : '合作商关联、履约进度'}）全部作废。` : '，可重新选择自营或分发路径。'}
-              {reflowing.transferSource === 'report' && ' 该订单原为报备分发，重新流转后报备匹配信息已清除，不会再自动按报备分发。'}
+              {reflowing.transferSource === 'report' && ' 该订单原为报备转派，重新分发后报备匹配信息已清除，不会再自动按报备转派。'}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
               <Button variant="ghost" onClick={() => setReflowing(null)}>取消</Button>
-              <Button variant={['processed', 'completed'].includes(reflowing.processStatus) ? 'danger' : undefined} onClick={confirmReflow}>确认重新流转</Button>
+              <Button variant={['processed', 'completed'].includes(reflowing.processStatus) ? 'danger' : undefined} onClick={confirmReflow}>确认重新分发</Button>
             </div>
           </div>
         </div>
@@ -1114,7 +1114,7 @@ export default function ExternalOrders() {
           <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 460 }}>
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>直接选定合作商</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
-              选定 <strong>{awarding.supplierName}</strong>，订单将跳过评分直接转为<strong>指定分发</strong>，进入分发待接单等待其接单。
+              选定 <strong>{awarding.supplierName}</strong>，订单将跳过评分直接转为<strong>指定转派</strong>，进入转派待接单等待其接单。
             </div>
             <div style={{ marginBottom: 'var(--space-3)' }}>
               <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>选定理由 *</label>
@@ -1133,7 +1133,7 @@ export default function ExternalOrders() {
         </div>
       )}
 
-      {/* ── 流转弹窗（待处理订单独立处理页：直接选择流转方式，含转自营） ── */}
+      {/* ── 订单分发弹窗（待处理订单独立处理页：直接选择分发方式，含转自营） ── */}
       {flowing && (
         <div className="category-dialog-overlay" onClick={() => setFlowingId(null)}>
           <div
@@ -1141,13 +1141,13 @@ export default function ExternalOrders() {
             onClick={(e) => e.stopPropagation()}
             style={{ width: 720, maxWidth: '94vw', height: 'min(80vh, 720px)', display: 'flex', flexDirection: 'column' }}
           >
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>订单流转 · {flowing.code}</div>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>订单分发 · {flowing.code}</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7, flexShrink: 0 }}>
-              {flowing.customerName} · {regionText(flowing)} · 订单金额 {money(flowing.totalAmount)} · 当前状态：待处理。选择流转方式后点击右下角确认完成流转。
+              {flowing.customerName} · {regionText(flowing)} · 订单金额 {money(flowing.totalAmount)} · 当前状态：待处理。选择分发方式后点击右下角确认完成分发。
             </div>
 
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
-              {/* 流转方式：转自营（辅色调，内联实现激活态） + 分发-指定 / 分发-报备 / 分发-抢单（时间有限） / 分发-比单（积分优先） */}
+              {/* 分发方式：转自营（辅色调，内联实现激活态） + 转派-指定 / 转派-报备 / 转派-抢单（时间有限） / 转派-比单（积分优先） */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
                 <button
                   className="tab-card-simple eop-mode-card"
@@ -1163,21 +1163,21 @@ export default function ExternalOrders() {
                   style={flowMode === 'assign' ? { borderColor: 'var(--color-module-current-base)', background: 'var(--color-module-current-lightest)' } : undefined}
                   onClick={() => setFlowMode('assign')}
                 >
-                  <strong style={flowMode === 'assign' ? { color: 'var(--color-module-current-base)' } : undefined}>分发-指定</strong>
+                  <strong style={flowMode === 'assign' ? { color: 'var(--color-module-current-base)' } : undefined}>转派-指定</strong>
                 </button>
                 <button
                   className="tab-card-simple eop-mode-card"
                   style={flowMode === 'report' ? { borderColor: 'var(--color-module-current-base)', background: 'var(--color-module-current-lightest)' } : undefined}
                   onClick={() => setFlowMode('report')}
                 >
-                  <strong style={flowMode === 'report' ? { color: 'var(--color-module-current-base)' } : undefined}>分发-报备</strong>
+                  <strong style={flowMode === 'report' ? { color: 'var(--color-module-current-base)' } : undefined}>转派-报备</strong>
                 </button>
                 <button
                   className="tab-card-simple eop-mode-card"
                   style={flowMode === 'grab' ? { borderColor: 'var(--color-module-current-base)', background: 'var(--color-module-current-lightest)' } : undefined}
                   onClick={() => setFlowMode('grab')}
                 >
-                  <strong style={flowMode === 'grab' ? { color: 'var(--color-module-current-base)' } : undefined}>分发-抢单</strong>
+                  <strong style={flowMode === 'grab' ? { color: 'var(--color-module-current-base)' } : undefined}>转派-抢单</strong>
                   <span className="eop-mode-sub">（时间优先）</span>
                 </button>
                 <button
@@ -1185,7 +1185,7 @@ export default function ExternalOrders() {
                   style={flowMode === 'compare' ? { borderColor: 'var(--color-module-current-base)', background: 'var(--color-module-current-lightest)' } : undefined}
                   onClick={() => setFlowMode('compare')}
                 >
-                  <strong style={flowMode === 'compare' ? { color: 'var(--color-module-current-base)' } : undefined}>分发-比单</strong>
+                  <strong style={flowMode === 'compare' ? { color: 'var(--color-module-current-base)' } : undefined}>转派-比单</strong>
                   <span className="eop-mode-sub">（积分优先）</span>
                 </button>
               </div>
@@ -1193,11 +1193,11 @@ export default function ExternalOrders() {
               {/* 转自营 */}
               {flowMode === 'self' && (
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7, padding: 'var(--space-2) 0' }}>
-                  转自营路径：订单进入<strong>自营待接单</strong>，请在「销售订单 → 流转订单」点击「接单」，接单时填写跟单人并选择采购供应商，进入自营执行（以销定采）。
+                  转自营路径：订单进入<strong>自营待接单</strong>，请在「销售订单 → 分发订单」点击「接单」，接单时填写跟单人并选择采购供应商，进入自营执行（以销定采）。
                 </div>
               )}
 
-              {/* 分发-指定：合作商列表 + 省市县筛选 + 搜索 + 分页 */}
+              {/* 转派-指定：合作商列表 + 省市县筛选 + 搜索 + 分页 */}
               {flowMode === 'assign' && (
                 <div>
                   <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
@@ -1240,7 +1240,7 @@ export default function ExternalOrders() {
                 </div>
               )}
 
-              {/* 分发-报备：地区筛选 + 报备列表 + 分页 */}
+              {/* 转派-报备：地区筛选 + 报备列表 + 分页 */}
               {flowMode === 'report' && (
                 <div>
                   <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)', lineHeight: 1.7 }}>
@@ -1288,7 +1288,7 @@ export default function ExternalOrders() {
                 </div>
               )}
 
-              {/* 分发-抢单：说明 + 地区范围 + 抢单时长设置 */}
+              {/* 转派-抢单：说明 + 地区范围 + 抢单时长设置 */}
               {flowMode === 'grab' && (
                 <div>
                   <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)', lineHeight: 1.7 }}>
@@ -1323,7 +1323,7 @@ export default function ExternalOrders() {
                 </div>
               )}
 
-              {/* 分发-比单：底价 + 地区范围 */}
+              {/* 转派-比单：底价 + 地区范围 */}
               {flowMode === 'compare' && (
                 <div>
                   <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)', lineHeight: 1.7 }}>
@@ -1394,7 +1394,7 @@ export default function ExternalOrders() {
               )}
             </div>
 
-            {/* 右下角：取消 + 确认（确认文案随流转方式变化；转自营用辅色调） */}
+            {/* 右下角：取消 + 确认（确认文案随分发方式变化；转自营用辅色调） */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-3)', flexShrink: 0 }}>
               <Button variant="ghost" onClick={() => setFlowingId(null)}>取消</Button>
               <Button variant={flowMode === 'self' ? 'danger' : undefined} style={flowMode === 'self' ? { transition: 'none' } : undefined} disabled={flowConfirmDisabled} onClick={doFlowConfirm}>{flowConfirmLabel}</Button>
@@ -1403,14 +1403,14 @@ export default function ExternalOrders() {
         </div>
       )}
 
-      {/* ── 拆单弹窗（流转-待处理按商品+数量拆出子订单） ── */}
+      {/* ── 拆单弹窗（分发-待处理按商品+数量拆出子订单） ── */}
       {splitting && (
         <div className="category-dialog-overlay" onClick={() => setSplitting(null)}>
           <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 560, maxWidth: '94vw' }}>
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>拆单 · {splitting.code}</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
               按<strong>商品 + 数量</strong>拆出子订单：子订单编号为母订单编号追加 <strong className="mono">-1 / -2…</strong>（按已拆次数递增），
-              拆出后作为独立订单流转，母订单保留剩余商品；详情页按「母订单 / 子订单」标签页展示。
+              拆出后作为独立订单分发，母订单保留剩余商品；详情页按「母订单 / 子订单」标签页展示。
             </div>
             <table className="detail-inline-table">
               <thead><tr><th>商品名称</th><th>规格</th><th>订单数量</th><th>拆出数量</th></tr></thead>
@@ -1465,7 +1465,7 @@ export default function ExternalOrders() {
                   订单 <strong className="mono">{matchConfirming.code}</strong>（{matchConfirming.customerName} · {money(matchConfirming.totalAmount)}）命中报备
                   <strong className="mono"> {matchConfirming.reportMatches[0].reportCode} </strong>
                   （{PARTNER_REPORT_TYPE_LABELS[matchConfirming.reportMatches[0].reportType]}），拟分发合作商：<strong>{matchConfirming.reportMatches[0].partnerName}</strong>。
-                  确认后订单进入<strong>分发待接单</strong>，等待合作商接单。
+                  确认后订单进入<strong>转派待接单</strong>，等待合作商接单。
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
                   <Button variant="ghost" onClick={() => setMatchConfirming(null)}>取消</Button>

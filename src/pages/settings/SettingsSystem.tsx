@@ -20,7 +20,7 @@ export default function SettingsSystem() {
             <SettingsRow label="默认仓库" description="杭州总仓" action={<Button variant="ghost" size="sm">修改</Button>} />
             <SettingsRow label="货币单位" description="人民币 (CNY)" action={<Button variant="ghost" size="sm">修改</Button>} />
           </SettingsSection>
-          <SettingsSection title="订单流转设置（订单生成&流转）">
+          <SettingsSection title="订单分发设置">
             <SettingsRow
               label="抢单时长"
               description={`发布抢单后合作商可抢的时间窗口（当前 ${settings.grabMinutes} 分钟），超时无人抢自动退回待处理`}

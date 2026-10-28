@@ -362,7 +362,7 @@ export const PARTNER_TRANSFER_KIND_LABELS: Record<string, string> = {
   'order-opportunity': '商机报备转入',
   product: '商品报备转入',
   customer: '客户报备转入',
-  assign: '指定分发',
+  assign: '指定转派',
   grab: '抢单中单',
   compare: '比单中单',
 };

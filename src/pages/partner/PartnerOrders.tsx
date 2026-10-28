@@ -38,12 +38,12 @@ const STATUS_TABS: { key: PartnerOrderStatus | ''; label: string; icon: ReactNod
   { key: 'rejected', label: '已驳回', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 7.5l5 5M12.5 7.5l-5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
 ];
 
-/** 合作商订单管理：平台分发订单 + 报备审批通过后自动转入的订单 + 外部订单流转转入（报备/指定/抢单/比单） */
+/** 合作商订单管理：平台转派订单 + 报备审批通过后自动转入的订单 + 外部订单分发转入（报备/指定/抢单/比单） */
 export default function PartnerOrders() {
   const reports = useReportStore((s) => s.reports);
   /** 报备规则自动转入的订单（商机订单由平台履约） */
   const transferred = useMemo(() => getTransferredOrders(reports), [reports]);
-  /** 外部订单流转中心转入的订单（按当前登录合作商过滤） */
+  /** 外部订单分发中心转入的订单（按当前登录合作商过滤） */
   const flowOrdersVersion = useOrderFlowStore((s) => s.orders);
   const suppliers = useSupplierStore((s) => s.suppliers);
   const flowOrders = useMemo(() => {
@@ -51,7 +51,7 @@ export default function PartnerOrders() {
     const myId = auth?.supplierId ?? suppliers.find((s) => s.terminal.enabled && s.terminal.username === auth?.username)?.id;
     return myId ? getPartnerFlowOrders(myId) : [];
   }, [flowOrdersVersion, suppliers]);
-  /** 平台分发的手动订单 */
+  /** 平台转派的手动订单 */
   const [manualOrders, setManualOrders] = useState<PartnerOrder[]>(initialOrders);
   /** 转入订单的状态覆盖（接单/发货等操作仅存于本次会话） */
   const [transferOverrides, setTransferOverrides] = useState<Record<string, PartnerOrderStatus>>({});
@@ -91,7 +91,7 @@ export default function PartnerOrders() {
 
   const updateStatus = (id: string, status: PartnerOrderStatus) => {
     if (id.startsWith('ext_')) {
-      // 外部订单流转中心转入的订单：状态回写 orderFlowStore（结算自动写积分台账）
+      // 外部订单分发中心转入的订单：状态回写 orderFlowStore（结算自动写积分台账）
       useOrderFlowStore.getState().advancePartner(id.replace('ext_', ''), status, { onTime: true });
     } else if (id.startsWith('transfer_')) {
       setTransferOverrides((prev) => ({ ...prev, [id]: status }));
@@ -110,7 +110,7 @@ export default function PartnerOrders() {
       <PageHead
         eyebrow="合作商终端 · 订单"
         title="订单管理"
-        desc="订单来源于平台分发与报备转入。配送方式：直送订单（合作商直发客户）与入库订单（先入合作仓再发）；合作模式：供应商模式与服务商模式。商机报备转入的订单由平台进货发货，仅同步展示。"
+        desc="订单来源于平台转派与报备转入。配送方式：直送订单（合作商直发客户）与入库订单（先入合作仓再发）；合作模式：供应商模式与服务商模式。商机报备转入的订单由平台进货发货，仅同步展示。"
       />
 
       {/* 订单状态 Tab 卡片 */}

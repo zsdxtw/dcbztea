@@ -23,6 +23,9 @@ import PurchaseReturn from './pages/purchase/PurchaseReturn';
 import SalesOverview from './pages/sales/SalesOverview';
 import SalesOrders from './pages/sales/SalesOrders';
 import ExternalOrders from './pages/sales/ExternalOrders';
+import OrderEntry from './pages/sales/OrderEntry';
+import OrderShipping from './pages/sales/OrderShipping';
+import OrderSettlement from './pages/sales/OrderSettlement';
 import CompareManage from './pages/sales/CompareManage';
 import SalesPricing from './pages/sales/SalesPricing';
 import SalesReconciliation from './pages/sales/SalesReconciliation';
@@ -134,17 +137,22 @@ export const router = createBrowserRouter([
       { path: 'purchase/purchase-supplier-list', element: <PurchaseSuppliers /> },
       { path: 'purchase/purchase-partner-stores', element: <PurchasePartnerStores /> },
       { path: 'purchase/purchase-partner-scores', element: <PartnerScores /> },
+      { path: 'purchase/partner-reports', element: <SalesReports /> },
       { path: 'purchase/purchase-store-overview', element: <PurchaseStoreOverview /> },
       { path: 'purchase/purchase-reconciliation', element: <PurchaseReconciliation /> },
       { path: 'purchase/purchase-return', element: <PurchaseReturn /> },
       /* ── 销售 ── */
       { path: 'sales', element: <SalesOverview /> },
       { path: 'sales/sales-overview', element: <SalesOverview /> },
-      { path: 'sales/sales-order-create', element: <Navigate to="/sales/order-processing" replace /> },
-      { path: 'sales/order-processing', element: <ExternalOrders /> },
+      { path: 'sales/sales-order-create', element: <Navigate to="/sales/order-entry" replace /> },
+      { path: 'sales/order-entry', element: <OrderEntry /> },
+      { path: 'sales/order-processing', element: <Navigate to="/sales/order-distribute" replace /> },
+      { path: 'sales/order-distribute', element: <ExternalOrders /> },
+      { path: 'sales/order-shipping', element: <OrderShipping /> },
+      { path: 'sales/order-settlement', element: <OrderSettlement /> },
       { path: 'sales/sales-orders', element: <SalesOrders /> },
       { path: 'sales/compare-manage', element: <CompareManage /> },
-      { path: 'sales/sales-reports', element: <SalesReports /> },
+      { path: 'sales/sales-reports', element: <Navigate to="/purchase/partner-reports" replace /> },
       { path: 'sales/sales-pricing', element: <SalesPricing /> },
       { path: 'sales/sales-customers', element: <SalesCustomers /> },
       { path: 'sales/sales-customer-accounts', element: <SalesCustomerAccounts /> },

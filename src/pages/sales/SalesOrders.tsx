@@ -320,7 +320,7 @@ export default function SalesOrders() {
   const [showCreate, setShowCreate] = useState(false);
   const [codeSeq, setCodeSeq] = useState(243);
 
-  /* ── 流转订单 Tab（订单处理分流出的自营/分发订单） ── */
+  /* ── 分发订单 Tab（订单分发分流出的自营/分发订单） ── */
   const [tab, setTab] = useState<'sales' | 'flow'>('sales');
   const flowOrders = useOrderFlowStore((s) => s.orders);
   const flowStore = useOrderFlowStore;
@@ -336,7 +336,7 @@ export default function SalesOrders() {
     [accepting],
   );
 
-  /** 流转订单：待接单（自营/分发）+ 执行中/已完成 */
+  /** 分发订单：待接单（自营/分发）+ 执行中/已完成 */
   const visibleFlowOrders = useMemo(
     () => flowOrders.filter((o) => ['self_pending', 'distribute_pending', 'processed', 'completed'].includes(o.processStatus)),
     [flowOrders],
@@ -415,23 +415,23 @@ export default function SalesOrders() {
         actions={<Button onClick={() => setShowCreate(true)}><PlusIcon />新建销售单</Button>}
       />
       <div className="content-body">
-        {/* Tab：销售订单 / 流转订单（订单处理分流出的自营/分发订单） */}
+        {/* Tab：销售订单 / 分发订单（订单分发分流出的自营/分发订单） */}
         <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
           <button className={`tab-card-simple${tab === 'sales' ? ' active' : ''}`} onClick={() => setTab('sales')}>
             销售订单
             <span className="tab-card-simple-count">{orders.length} 单</span>
           </button>
           <button className={`tab-card-simple${tab === 'flow' ? ' active' : ''}`} onClick={() => setTab('flow')}>
-            流转订单
+            分发订单
             <span className="tab-card-simple-count">自营待接单 {selfPendingCount} / 共 {visibleFlowOrders.length} 单</span>
           </button>
         </div>
 
-        {/* ── 流转订单 Tab ── */}
+        {/* ── 分发订单 Tab ── */}
         {tab === 'flow' && (
           <Card style={{ padding: 0 }}>
             <div style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
-              来自<strong>订单生成&流转</strong>分流：自营待接单订单点击「接单」进入自营执行（接单时填写跟单人并生成采购订单）；
+              来自<strong>订单分发</strong>分流：自营待接单订单点击「接单」进入自营执行（接单时填写跟单人并生成采购订单）；
               分发类订单由合作商终端接单履约，此处仅<strong>跟踪进度</strong>，管理后台不做操作。
             </div>
             <Table
@@ -505,7 +505,7 @@ export default function SalesOrders() {
         </>)}
       </div>
 
-      {/* 自营接单弹窗（流转订单：填跟单人 + 选采购供应商，生成采购订单） */}
+      {/* 自营接单弹窗（分发订单：填跟单人 + 选采购供应商，生成采购订单） */}
       {accepting && (
         <div className="category-dialog-overlay" onClick={() => setAccepting(null)}>
           <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 560, maxWidth: '94vw' }}>
