@@ -6,6 +6,7 @@ import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
+import { usePurchaseStore } from '../../stores/purchaseStore';
 import { TRANSFER_SOURCE_LABELS } from '../../data/externalOrders';
 import type { StatCardData, ExternalOrder } from '../../types';
 
@@ -16,11 +17,21 @@ const pill = (bg: string, color: string, text: string) => (
 );
 
 /** 发货环节状态推导：待接单 → 执行中 → 已妥投 */
-function shipStage(o: ExternalOrder): { key: 'waiting' | 'doing' | 'delivered'; label: string; tone: { bg: string; color: string } } {
+function shipStage(o: ExternalOrder, purchaseDocs: { childOrderId: string; status: string; packages: unknown[] }[]): { key: 'waiting' | 'doing' | 'delivered'; label: string; tone: { bg: string; color: string } } {
   if (o.processStatus === 'self_pending') return { key: 'waiting', label: '待接单（自营）', tone: { bg: '#FBF3E2', color: '#9A7A1C' } };
   if (o.processStatus === 'distribute_pending') return { key: 'waiting', label: '待接单', tone: { bg: '#FBF3E2', color: '#9A7A1C' } };
   if (o.path === 'self') {
     if (o.processStatus === 'completed') return { key: 'delivered', label: '已妥投签收', tone: { bg: '#E9F4EF', color: '#01795D' } };
+    if (!o.selfChain) {
+      // 供应方案路径：按其采购单集合派生（到货入库 → 出库发货 → 签收）
+      const pos = purchaseDocs.filter((d) => d.childOrderId === o.id && d.status !== 'settled');
+      if (pos.length > 0 && pos.every((d) => ['received', 'partial_shipped', 'fully_shipped', 'delivered'].includes(d.status))) {
+        return { key: 'doing', label: '已齐套待出库', tone: { bg: '#E0F2F1', color: '#00695C' } };
+      }
+      if (pos.some((d) => d.packages.length > 0)) return { key: 'doing', label: '已出库发货', tone: { bg: '#F3EFFA', color: '#7A5BA6' } };
+      if (pos.length > 0) return { key: 'doing', label: '采购到货中', tone: { bg: '#EDF3FB', color: '#1D64B0' } };
+      return { key: 'doing', label: '库存直发待出库', tone: { bg: '#EDF3FB', color: '#1D64B0' } };
+    }
     const s = o.selfChain;
     if (s?.outboundCode) return { key: 'doing', label: '已出库发货', tone: { bg: '#F3EFFA', color: '#7A5BA6' } };
     if (s?.inboundCode) return { key: 'doing', label: '已到货入库', tone: { bg: '#EDF3FB', color: '#1D64B0' } };
@@ -42,6 +53,8 @@ export default function OrderShipping() {
   const navigate = useNavigate();
   const orders = useOrderFlowStore((s) => s.orders);
   const store = useOrderFlowStore;
+  const purchaseDocs = usePurchaseStore((s) => s.docs);
+  const poStore = usePurchaseStore;
   const [tab, setTab] = useState<'' | 'waiting' | 'doing' | 'delivered'>('');
 
   /** 发货环节订单：已分发到主体的订单（待接单起，至妥投） */
@@ -52,7 +65,7 @@ export default function OrderShipping() {
     return false;
   }), [orders]);
 
-  const stageOf = (o: ExternalOrder) => shipStage(o);
+  const stageOf = (o: ExternalOrder) => shipStage(o, purchaseDocs);
   const filtered = useMemo(
     () => (tab ? shippingOrders.filter((o) => stageOf(o).key === tab) : shippingOrders),
     [shippingOrders, tab],
@@ -97,11 +110,37 @@ export default function OrderShipping() {
               return [
                 <span key="c" className="cell-mono-emph">{o.code}</span>,
                 <span key="cu" className="cell-emph">{o.customerName}</span>,
-                <span key="sub" style={{ fontSize: 'var(--text-sm)' }}>{subject}</span>,
+                <span key="sub" style={{ fontSize: 'var(--text-sm)' }}>
+                  {subject}
+                  {isSelf && o.supplyPlan && (() => {
+                    const pos = purchaseDocs.filter((d) => d.childOrderId === o.id);
+                    const stockQty = o.supplyPlan!.reduce((s, l) => s + l.stockUseQty, 0);
+                    return (
+                      <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>
+                        {stockQty > 0 && `库存直发 ${stockQty} 件`}{stockQty > 0 && pos.length > 0 ? ' · ' : ''}{pos.length > 0 && `采购单 ${pos.length} 张`}
+                      </span>
+                    );
+                  })()}
+                </span>,
                 <span key="src" style={{ fontSize: 'var(--text-sm)' }}>{isSelf ? '转自营' : TRANSFER_SOURCE_LABELS[o.transferSource ?? ''] ?? '—'}</span>,
                 <span key="i" style={{ fontSize: 'var(--text-sm)' }}>{o.items.map((it) => `${it.productName}×${it.quantity}`).join('、')}</span>,
                 <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(o.totalAmount)}</span>,
-                pill(st.tone.bg, st.tone.color, st.label),
+                (() => {
+                  const doc = purchaseDocs.find((d) => d.childOrderCode === o.code);
+                  const active = doc?.packages.filter((x) => x.status !== 'void') ?? [];
+                  const delivered = active.filter((x) => x.status === 'delivered').length;
+                  const last = active[active.length - 1];
+                  return (
+                    <span key="stg">
+                      {pill(st.tone.bg, st.tone.color, st.label)}
+                      {active.length > 0 && (
+                        <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>
+                          {active.length} 个包裹 · {delivered} 已签收{last ? ` · ${last.logisticsCompany} ${last.trackingNo}` : ''}
+                        </span>
+                      )}
+                    </span>
+                  );
+                })(),
                 <div key="act" className="row-actions" style={{ whiteSpace: 'nowrap' }}>
                   {/* 分发链：管理端推进发货 / 确认收货（妥投）；待接单由合作商终端操作 */}
                   {!isSelf && o.processStatus === 'processed' && o.partnerStatus === 'accepted' && (
@@ -120,6 +159,26 @@ export default function OrderShipping() {
                   {isSelf && o.processStatus === 'self_pending' && (
                     <Button size="sm" variant="ghost" onClick={() => navigate('/sales/sales-orders')}>去销售订单接单</Button>
                   )}
+                  {isSelf && o.processStatus === 'processed' && !o.selfChain && o.supplyPlan && (() => {
+                    const pos = purchaseDocs.filter((d) => d.childOrderId === o.id && d.status !== 'settled');
+                    const allReceived = pos.length === 0 || pos.every((d) => ['received', 'partial_shipped', 'fully_shipped', 'delivered'].includes(d.status));
+                    const anyPkg = pos.some((d) => d.packages.length > 0);
+                    return (
+                      <>
+                        {pos.filter((d) => d.status === 'confirmed').map((d) => (
+                          <Button key={d.id} size="sm" variant="ghost" onClick={() => poStore.getState().receiveByChild(d.childOrderCode)}>
+                            到货入库（{d.supplierName.slice(0, 6)}）
+                          </Button>
+                        ))}
+                        {allReceived && !anyPkg && (
+                          <Button size="sm" onClick={() => store.getState().selfPlanOutbound(o.id)}>出库发货</Button>
+                        )}
+                        {anyPkg && o.processStatus === 'processed' && (
+                          <Button size="sm" onClick={() => store.getState().selfComplete(o.id)}>确认签收完成</Button>
+                        )}
+                      </>
+                    );
+                  })()}
                   {isSelf && o.processStatus === 'processed' && o.selfChain && !o.selfChain.inboundCode && (
                     <Button size="sm" onClick={() => store.getState().selfInbound(o.id)}>确认到货入库</Button>
                   )}

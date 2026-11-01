@@ -248,6 +248,7 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
     menus: [
       { key: 'purchase-overview', label: '采购概览', icon: <OverviewIcon /> },
       { key: 'purchase-orders', label: '采购订单', icon: <OrdersIcon /> },
+      { key: 'purchase-demand', label: '采购需求', icon: <PriceIcon /> },
       { key: 'purchase-pricing', label: '采购报（调）价', icon: <PriceIcon /> },
       { key: 'purchase-inbound', label: '入库管理', icon: <InboundIcon /> },
       { key: 'purchase-suppliers', label: '合作商管理', icon: <SuppliersIcon />, children: [

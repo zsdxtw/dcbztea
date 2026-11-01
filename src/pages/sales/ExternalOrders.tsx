@@ -6,6 +6,8 @@ import Button from '../../components/common/Button';
 import Toggle from '../../components/common/Toggle';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { useOrderFlowStore, getSelfPurchaseEstimate, reportMatchesOrder } from '../../stores/orderFlowStore';
+import { buildSupplyPlan } from '../../stores/purchaseStore';
+import type { SupplyPlanLine } from '../../types';
 import { useSupplierStore } from '../../stores/supplierStore';
 import { usePriceStore } from '../../stores/priceStore';
 import { useScoreStore, getScoreSummary } from '../../stores/scoreStore';
@@ -131,9 +133,19 @@ export default function ExternalOrders() {
   const [splitting, setSplitting] = useState<ExternalOrder | null>(null);
   const [splitQty, setSplitQty] = useState<Record<string, string>>({});
 
+  /** 供应方案编辑（自营待接单：行级库存直发量 + 采购行供应商，支持多源） */
+  const [planStock, setPlanStock] = useState<Record<string, string>>({});
+  const [planSupplier, setPlanSupplier] = useState<Record<string, string>>({});
+  const [planMsg, setPlanMsg] = useState('');
+  useEffect(() => { setPlanStock({}); setPlanSupplier({}); setPlanMsg(''); }, [selectedId]);
+
   /** 列表分页：每页条数（10/20/50，右下角下拉）与当前页 */
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
+
+  /** 视图模式：按子单（平铺，现状）/ 按订单（母单聚合可展开） */
+  const [viewMode, setViewMode] = useState<'child' | 'order'>('child');
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   /** 录入弹窗 */
   const [entering, setEntering] = useState(false);
@@ -332,10 +344,33 @@ export default function ExternalOrders() {
 
   const countOf = (key: string) => (key === '' ? orders.length : orders.filter((o) => mergedStatus(o.processStatus) === key).length);
 
+  /** 按订单视图：母单聚合（含无子单的独立单自成一组） */
+  const orderGroups = useMemo(() => {
+    const map = new Map<string, ExternalOrder[]>();
+    for (const o of filtered) {
+      const root = o.parentCode ?? o.code;
+      map.set(root, [...(map.get(root) ?? []), o]);
+    }
+    return [...map.entries()].map(([rootCode, list]) => {
+      const mother = list.find((x) => !x.parentCode) ?? list[0];
+      const children = list.filter((x) => x.parentCode);
+      const done = list.filter((x) => ['completed', 'processed'].includes(x.processStatus)).length;
+      const amount = list.reduce((s, x) => s + x.totalAmount, 0);
+      const statusText = list.every((x) => x.processStatus === 'completed') ? '全部完成'
+        : list.some((x) => ['processed', 'completed'].includes(x.processStatus)) ? '部分履约'
+          : list.some((x) => ['distribute_pending', 'self_pending', 'grabbing', 'comparing', 'report_match_pending'].includes(x.processStatus)) ? '分发中'
+            : '待分发';
+      return { rootCode, mother, children, count: list.length, done, amount, statusText };
+    }).sort((a, b) => b.mother.entryTime.localeCompare(a.mother.entryTime));
+  }, [filtered]);
+  const pagedOrderGroups = orderGroups.slice((page - 1) * pageSize, page * pageSize);
+  const orderViewTotalPages = Math.max(1, Math.ceil(orderGroups.length / pageSize));
+
   /** 列表分页：筛选/搜索/页大小变化回第 1 页，越界自动收敛 */
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pagedOrders = filtered.slice((page - 1) * pageSize, page * pageSize);
   useEffect(() => { setPage(1); }, [keyword, filterStatus, listProv, listCity, listDist, listPath, pageSize]);
+  useEffect(() => { setPage(1); setExpandedOrders(new Set()); }, [viewMode]);
   useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
 
   /** 页码按钮（列表下方分页数字，当前页模块主色） */
@@ -638,6 +673,65 @@ export default function ExternalOrders() {
           </span>
         </div>
 
+        {/* 视图切换：按子单（平铺操作视图）/ 按订单（母单聚合总览） */}
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', alignItems: 'center' }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>视图：</span>
+          <button className={`tab-card-simple${viewMode === 'child' ? ' active' : ''}`} style={{ padding: 'var(--space-1) var(--space-3)' }} onClick={() => setViewMode('child')}>按子单（逐单操作）</button>
+          <button className={`tab-card-simple${viewMode === 'order' ? ' active' : ''}`} style={{ padding: 'var(--space-1) var(--space-3)' }} onClick={() => setViewMode('order')}>按订单（母单聚合）</button>
+        </div>
+
+        {viewMode === 'order' && (
+          <Card style={{ padding: 0 }}>
+            <div style={{ borderBottom: '1px solid var(--color-neutral-100)' }}>
+              {pagedOrderGroups.map((g) => {
+                const open = expandedOrders.has(g.rootCode);
+                return (
+                  <div key={g.rootCode} style={{ borderBottom: '1px solid var(--color-neutral-100)' }}>
+                    <div
+                      style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)', cursor: 'pointer', background: open ? 'var(--color-neutral-50)' : 'transparent' }}
+                      onClick={() => setExpandedOrders((prev) => { const n = new Set(prev); if (n.has(g.rootCode)) n.delete(g.rootCode); else n.add(g.rootCode); return n; })}
+                    >
+                      <svg viewBox="0 0 16 16" fill="none" style={{ width: 12, height: 12, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s', color: 'var(--color-neutral-400)', flexShrink: 0 }}><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      <span className="cell-mono-emph" style={{ minWidth: 140 }}>{g.rootCode}</span>
+                      <span className="cell-emph" style={{ flex: 1 }}>{g.mother.customerName}</span>
+                      {g.count > 1 && pill('#E3F2FD', '#0F64B5', `已拆分 ${g.count} 单`)}
+                      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>妥投 {g.done}/{g.count}</span>
+                      {pill(
+                        g.statusText === '全部完成' ? '#E9F4EF' : g.statusText === '部分履约' ? '#E0F2F1' : g.statusText === '分发中' ? '#FBF3E2' : '#F5F5F5',
+                        g.statusText === '全部完成' ? '#01795D' : g.statusText === '部分履约' ? '#00695C' : g.statusText === '分发中' ? '#9A7A1C' : '#9E9E9E',
+                        g.statusText,
+                      )}
+                      <span className="mono" style={{ fontWeight: 'var(--font-medium)', minWidth: 90, textAlign: 'right' }}>{money(g.amount)}</span>
+                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedId(g.mother.id); }}>详情</Button>
+                    </div>
+                    {open && (
+                      <div style={{ background: 'var(--color-neutral-50)' }}>
+                        {g.children.length === 0 && (
+                          <div style={{ padding: 'var(--space-2) var(--space-4) var(--space-3) 44px', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>未拆分 · 单一订单</div>
+                        )}
+                        {(g.children.length > 0 ? g.children : [g.mother]).map((c) => (
+                          <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-2) var(--space-4)', paddingLeft: 44, borderTop: '1px dashed var(--color-neutral-150)' }}>
+                            <span className="mono" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', minWidth: 150 }}>{c.code}</span>
+                            {statusPill(c.processStatus)}
+                            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', minWidth: 90 }}>{pathLabel(c)}</span>
+                            <span style={{ fontSize: 'var(--text-sm)', flex: 1 }}>{c.partnerName ?? (c.path === 'self' ? '自营' : '—')}</span>
+                            <span className="mono" style={{ fontSize: 'var(--text-sm)' }}>{money(c.totalAmount)}</span>
+                            <Button size="sm" variant="ghost" onClick={() => setSelectedId(c.id)}>查看</Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {pagedOrderGroups.length === 0 && (
+                <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>当前筛选条件下暂无订单</div>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {viewMode === 'child' && (
         <Card style={{ padding: 0 }}>
           <Table
             headers={['订单编号', '来源', '客户', '地区', '收件人', '收件地址', '金额', '状态', '分发路径', '合作商', '录入时间', '操作']}
@@ -715,12 +809,13 @@ export default function ExternalOrders() {
             ])}
           />
         </Card>
+        )}
 
         {/* 列表分页：下方页码数字 + 右下角每页条数下拉（10/20/50 条/页） */}
         {filtered.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginRight: 'auto' }}>
-              共 {filtered.length} 条 · 第 {page} / {totalPages} 页
+              共 {viewMode === 'child' ? filtered.length : orderGroups.length} {viewMode === 'child' ? '条' : '张订单'} · 第 {page} / {viewMode === 'child' ? totalPages : orderViewTotalPages} 页
             </span>
             <Button size="sm" variant="ghost" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => pageBtn(n))}
@@ -815,6 +910,29 @@ export default function ExternalOrders() {
               </DrawerSection>
             )}
 
+            {/* ── 母单总览：子单进度（拆单家族） ── */}
+            {(() => {
+              const rootCode = current.parentCode ?? current.code;
+              const children = orders.filter((o) => o.parentCode === rootCode);
+              if (children.length === 0 || current.parentCode) return null;
+              return (
+                <DrawerSection title={`子单进度（${children.length} 张子单）`}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    {children.map((c) => (
+                      <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)', border: '1px solid var(--color-neutral-100)', borderRadius: 'var(--radius-md)' }}>
+                        <span className="mono" style={{ fontWeight: 'var(--font-medium)', minWidth: 150 }}>{c.code}</span>
+                        {statusPill(c.processStatus)}
+                        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', minWidth: 90 }}>{pathLabel(c)}</span>
+                        <span style={{ fontSize: 'var(--text-sm)', flex: 1 }}>{c.partnerName ?? (c.path === 'self' ? '自营' : '—')}</span>
+                        <span className="mono" style={{ fontSize: 'var(--text-sm)' }}>{money(c.totalAmount)}</span>
+                        <Button size="sm" variant="ghost" onClick={() => setSelectedId(c.id)}>查看</Button>
+                      </div>
+                    ))}
+                  </div>
+                </DrawerSection>
+              );
+            })()}
+
             {/* ── 编辑态：订单信息修改 ── */}
             {Object.keys(editForm).length > 0 && (
               <DrawerSection title="修改订单信息">
@@ -879,12 +997,81 @@ export default function ExternalOrders() {
               </DrawerSection>
             )}
 
-            {/* ── 自营待接单 ── */}
+            {/* ── 自营待接单：供应方案（ATP 净需求：库存直发 + 多源采购） ── */}
             {current.processStatus === 'self_pending' && (
-              <DrawerSection title="自营待接单">
-                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
-                  请前往 <strong>销售 → 销售订单 → 分发订单</strong> 点击「接单」，接单时填写<strong>跟单人</strong>并选择<strong>采购供应商</strong>后进入自营执行。
-                  需要改路径可点击「重新分发」退回待处理。
+              <DrawerSection title="自营供应方案（库存直发 + 采购）">
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)', lineHeight: 1.7 }}>
+                  按商品行计算净需求：可用库存内<strong>库存直发</strong>（不生成采购单，直接出库），缺口<strong>按供应商采购</strong>（行级可选不同供应商，多源生成多张采购单）。
+                </div>
+                <table className="detail-inline-table">
+                  <thead><tr><th>商品</th><th>订单数量</th><th>可用库存</th><th>库存直发</th><th>采购数量</th><th>采购供应商</th></tr></thead>
+                  <tbody>
+                    {buildSupplyPlan(current).map((base) => {
+                      const stockUse = planStock[base.productId] ?? String(base.stockUseQty);
+                      const use = Math.max(0, Math.min(base.orderQty, Number(stockUse) || 0));
+                      const buyQty = base.orderQty - use;
+                      const sid = planSupplier[base.productId] ?? '';
+                      return (
+                        <tr key={base.productId}>
+                          <td style={{ fontWeight: 'var(--font-medium)' }}>{base.productName}</td>
+                          <td className="mono">{base.orderQty}</td>
+                          <td className="mono" style={{ color: base.stockQty > 0 ? '#01795D' : '#C13A54' }}>{base.stockQty}</td>
+                          <td>
+                            <input
+                              className="filter-input mono" type="number" min={0} max={Math.min(base.orderQty, base.stockQty)}
+                              value={stockUse} disabled={base.stockQty <= 0}
+                              onChange={(e) => setPlanStock((f) => ({ ...f, [base.productId]: e.target.value }))}
+                              style={{ width: 80 }}
+                            />
+                          </td>
+                          <td className="mono" style={{ fontWeight: buyQty > 0 ? 'var(--font-semibold)' : 400, color: buyQty > 0 ? '#B26A00' : 'var(--color-neutral-400)' }}>{buyQty}</td>
+                          <td>
+                            {buyQty > 0 ? (
+                              <select
+                                className="filter-select" value={sid}
+                                onChange={(e) => setPlanSupplier((f) => ({ ...f, [base.productId]: e.target.value }))}
+                                style={{ width: 180 }}
+                              >
+                                <option value="">选择供应商 *</option>
+                                {activeSuppliers.map((s) => {
+                                  const sc = scoreOf(s.id, s.name);
+                                  return <option key={s.id} value={s.id}>{s.name}（积分 {sc.total}）</option>;
+                                })}
+                              </select>
+                            ) : (
+                              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>库存直发，无需采购</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', marginTop: 'var(--space-3)' }}>
+                  <Button
+                    disabled={buildSupplyPlan(current).some((l) => {
+                      const use = Math.max(0, Math.min(l.orderQty, Number(planStock[l.productId] ?? l.stockUseQty) || 0));
+                      return l.orderQty - use > 0 && !planSupplier[l.productId];
+                    })}
+                    onClick={() => {
+                      const lines: SupplyPlanLine[] = buildSupplyPlan(current).map((l) => {
+                        const use = Math.max(0, Math.min(l.orderQty, Number(planStock[l.productId] ?? l.stockUseQty) || 0));
+                        const buyQty = l.orderQty - use;
+                        const sid = planSupplier[l.productId];
+                        const sup = activeSuppliers.find((s) => s.id === sid);
+                        return { ...l, stockUseQty: use, purchaseQty: buyQty, netQty: buyQty, supplierId: sup?.id, supplierName: sup?.name };
+                      });
+                      const res = store.getState().applySupplyPlan(current.id, lines);
+                      setPlanMsg(res.msg);
+                      if (res.ok) setSelectedId(null);
+                    }}
+                  >
+                    定案并执行
+                  </Button>
+                  {planMsg && <span style={{ fontSize: 'var(--text-sm)', color: '#01795D' }}>{planMsg}</span>}
+                </div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 'var(--space-2)' }}>
+                  定案后订单进入「分发-已完成」执行：采购部分在「订单发货」跟踪到货入库/出库，库存直发部分可直接出库；也可改走「销售订单 → 分发订单」整单单源接单。
                 </div>
               </DrawerSection>
             )}

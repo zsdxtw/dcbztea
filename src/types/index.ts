@@ -1683,6 +1683,8 @@ export interface ExternalOrder {
   settleOnTime?: boolean;
   /** 自营跟单人（管理后台接单时填写） */
   follower?: string;
+  /** 自营供应方案（ATP：库存直发 + 多源采购；applySupplyPlan 时固化） */
+  supplyPlan?: SupplyPlanLine[];
   selfChain?: SelfChain;
   /** 抢单截止时间戳（毫秒） */
   grabDeadline?: number;
@@ -1745,3 +1747,105 @@ export interface PartnerScoreSummary {
   total: number;
   ontimeRate: number;
 }
+
+/* ═══════════════════════════════════════════════════════════
+ * 采购订单实体（三单分离：SO 子单 → PO → 包裹）
+ * 转派子单 1:1 自动生成直送 PO（Drop-Shipping，合作商直发客户）；
+ * 自营子单经供应方案生成 0..N 张入库制 PO。
+ * 包裹为物流信息唯一挂载点，三键关联 PO + 子单 + 母单。
+ * ═══════════════════════════════════════════════════════════ */
+
+/** PO 来源：转派自动 / 自营自动 / 手工 */
+export type PurchaseDocSource = 'distribute' | 'self' | 'manual';
+
+/** 配送方式：direct=直送客户（免入库）/ warehouse=入库制（到货入库再出库） */
+export type PurchaseDeliveryMode = 'direct' | 'warehouse';
+
+/** PO 状态：待确认（合作商接单）→ 已确认 → 部分发货 → 全部发货 → 已签收 → 已结算 */
+export type PurchaseDocStatus = 'pending' | 'confirmed' | 'partial_shipped' | 'fully_shipped' | 'received' | 'delivered' | 'settled';
+
+/** PO 商品行（行级已发数量支持同一商品分 N 批发货） */
+export interface PurchaseDocItem {
+  productId: string;
+  productName: string;
+  spec: string;
+  quantity: number;
+  /** 累计已发数量（发货登记累加，包裹作废回退） */
+  shippedQty: number;
+  /** 采购口径单价 */
+  price: number;
+}
+
+/** 包裹 / 发货单（每次发货登记生成一条；物流信息唯一挂载点） */
+export interface ShipmentPackage {
+  id: string;
+  packageNo: string;
+  logisticsCompany: string;
+  trackingNo: string;
+  shippedAt: string;
+  /** 本包裹发货商品与数量 */
+  items: { productId: string; productName: string; qty: number }[];
+  /** shipped=已发货 / delivered=已签收 / void=已作废（回退已发数量） */
+  status: 'shipped' | 'delivered' | 'void';
+  operator?: string;
+}
+
+/** 自营子单供应方案行（ATP 净需求：库存直发 or 采购，行级多源供应商） */
+export interface SupplyPlanLine {
+  productId: string;
+  productName: string;
+  spec: string;
+  orderQty: number;
+  /** 可用库存（现存量） */
+  stockQty: number;
+  /** 净需求 = 订单数量 − 库存直发数量 */
+  netQty: number;
+  /** 库存直发数量（0 ~ min(orderQty, stockQty)） */
+  stockUseQty: number;
+  /** 采购数量 = orderQty − stockUseQty */
+  purchaseQty: number;
+  supplierId?: string;
+  supplierName?: string;
+}
+
+/** 采购订单 */
+export interface PurchaseDoc {
+  id: string;
+  code: string;
+  source: PurchaseDocSource;
+  deliveryMode: PurchaseDeliveryMode;
+  /** 关联子销售订单 */
+  childOrderId: string;
+  childOrderCode: string;
+  /** 关联母销售订单 */
+  motherCode: string;
+  supplierId: string;
+  supplierName: string;
+  items: PurchaseDocItem[];
+  /** 采购口径金额 */
+  amount: number;
+  status: PurchaseDocStatus;
+  createTime: string;
+  packages: ShipmentPackage[];
+  remark?: string;
+}
+
+export const PURCHASE_DOC_STATUS_LABELS: Record<PurchaseDocStatus, string> = {
+  pending: '待确认',
+  confirmed: '已确认',
+  partial_shipped: '部分发货',
+  fully_shipped: '全部发货',
+  received: '已入库',
+  delivered: '已签收',
+  settled: '已结算',
+};
+
+export const PURCHASE_DOC_STATUS_TONES: Record<PurchaseDocStatus, { bg: string; color: string }> = {
+  pending: { bg: '#FBF3E2', color: '#9A7A1C' },
+  confirmed: { bg: '#EDF3FB', color: '#1D64B0' },
+  partial_shipped: { bg: '#F3EFFA', color: '#7A5BA6' },
+  fully_shipped: { bg: '#E0F2F1', color: '#00695C' },
+  received: { bg: '#E8EAF6', color: '#3949AB' },
+  delivered: { bg: '#E9F4EF', color: '#01795D' },
+  settled: { bg: '#F0F2F0', color: '#67716B' },
+};

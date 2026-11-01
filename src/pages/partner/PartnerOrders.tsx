@@ -6,6 +6,7 @@ import { PageHead, Pill, ORDER_STATUS_TONE } from './PartnerUI';
 import { getPartnerAuth } from './PartnerLayout';
 import { useReportStore, getTransferredOrders } from '../../stores/reportStore';
 import { useOrderFlowStore, getPartnerFlowOrders } from '../../stores/orderFlowStore';
+import { usePurchaseStore } from '../../stores/purchaseStore';
 import { useSupplierStore } from '../../stores/supplierStore';
 import type { PartnerOrder, PartnerOrderStatus } from '../../types';
 import {
@@ -60,6 +61,14 @@ export default function PartnerOrders() {
   const [filterCoop, setFilterCoop] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [selected, setSelected] = useState<PartnerOrder | null>(null);
+
+  /** 发货登记（行内多次发货）：本次数量 + 物流信息 */
+  const purchaseDocs = usePurchaseStore((s) => s.docs);
+  const [shipQty, setShipQty] = useState<Record<string, string>>({});
+  const [shipCompany, setShipCompany] = useState('');
+  const [shipNo, setShipNo] = useState('');
+  const [shipMsg, setShipMsg] = useState('');
+  const flashShip = (text: string) => { setShipMsg(text); setTimeout(() => setShipMsg(''), 3500); };
 
   const allOrders = useMemo(() => [
     ...flowOrders,
@@ -235,6 +244,113 @@ export default function PartnerOrders() {
                 </tbody>
               </table>
             </DrawerSection>
+
+            {/* ── 发货登记（转派订单：行内多次发货 + 物流信息，同步采购单与销售订单） ── */}
+            {(() => {
+              if (selected.transferKind === 'order-opportunity') return null;
+              const doc = purchaseDocs.find((d) => d.childOrderCode === selected.code);
+              if (!doc) return null;
+              const canShip = ['confirmed', 'partial_shipped', 'fully_shipped'].includes(doc.status) && doc.items.some((it) => it.shippedQty < it.quantity);
+              const activePkgs = doc.packages.filter((x) => x.status !== 'void');
+              return (
+                <DrawerSection title={`发货登记（采购单 ${doc.code}）`}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginBottom: 'var(--space-2)', lineHeight: 1.7 }}>
+                    支持分批发货：同一商品可分多次发货，每批生成一个包裹并填写物流信息；物流将同步至管理后台采购单与销售订单。
+                  </div>
+                  {canShip ? (
+                    <table className="detail-inline-table">
+                      <thead><tr><th>商品名称</th><th>采购数量</th><th>已发</th><th>剩余</th><th>本次发货</th></tr></thead>
+                      <tbody>
+                        {doc.items.map((it) => {
+                          const remain = it.quantity - it.shippedQty;
+                          return (
+                            <tr key={it.productId}>
+                              <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
+                              <td className="mono">{it.quantity}</td>
+                              <td className="mono">{it.shippedQty}</td>
+                              <td className="mono" style={{ color: remain > 0 ? '#9A7A1C' : 'var(--color-neutral-400)' }}>{remain}</td>
+                              <td>
+                                <input
+                                  className="filter-input mono" type="number" min={0} max={remain} disabled={remain <= 0}
+                                  placeholder={remain > 0 ? String(remain) : '—'}
+                                  value={shipQty[it.productId] ?? ''}
+                                  onChange={(e) => setShipQty((f) => ({ ...f, [it.productId]: e.target.value }))}
+                                  style={{ width: 90 }}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)', marginBottom: 'var(--space-2)' }}>
+                      {doc.items.every((it) => it.shippedQty >= it.quantity) ? '全部商品已发完，等待签收。' : '接单后可进行发货登记。'}
+                    </div>
+                  )}
+                  {canShip && (
+                    <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 'var(--space-3)' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>物流公司 *</label>
+                        <input className="filter-input" placeholder="如 顺丰速运" value={shipCompany} onChange={(e) => setShipCompany(e.target.value)} style={{ width: 150 }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>物流单号 *</label>
+                        <input className="filter-input mono" placeholder="物流单号" value={shipNo} onChange={(e) => setShipNo(e.target.value)} style={{ width: 200 }} />
+                      </div>
+                      <Button size="sm" onClick={() => {
+                        const items = doc.items
+                          .map((it) => ({ productId: it.productId, qty: Number(shipQty[it.productId] ?? 0) }))
+                          .filter((x) => x.qty > 0);
+                        const res = usePurchaseStore.getState().registerShipment(doc.childOrderCode, {
+                          logisticsCompany: shipCompany, trackingNo: shipNo, items,
+                          operator: getPartnerAuth()?.name,
+                        });
+                        flashShip(res.msg);
+                        if (res.ok) {
+                          setShipQty({}); setShipCompany(''); setShipNo('');
+                          // 首次发货推进销售订单为发货中
+                          const flowId = selected.id.replace('ext_', '');
+                          const flowOrder = useOrderFlowStore.getState().orders.find((o) => o.id === flowId);
+                          if (flowOrder && flowOrder.partnerStatus === 'accepted') {
+                            useOrderFlowStore.getState().advancePartner(flowId, 'shipping');
+                          }
+                        }
+                      }}>提交发货登记</Button>
+                    </div>
+                  )}
+                  {shipMsg && <div style={{ marginTop: 'var(--space-2)', padding: '8px 12px', background: '#E8F5E9', color: '#01795D', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)' }}>{shipMsg}</div>}
+
+                  {activePkgs.length > 0 && (
+                    <div style={{ marginTop: 'var(--space-3)' }}>
+                      <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>发货台账（{activePkgs.length} 个包裹）</div>
+                      <table className="detail-inline-table">
+                        <thead><tr><th>包裹号</th><th>物流公司 / 单号</th><th>本次发货</th><th>发货时间</th><th>状态</th><th>操作</th></tr></thead>
+                        <tbody>
+                          {activePkgs.map((pkg) => (
+                            <tr key={pkg.id}>
+                              <td className="mono">{pkg.packageNo}</td>
+                              <td>{pkg.logisticsCompany} · <span className="mono">{pkg.trackingNo}</span></td>
+                              <td style={{ fontSize: 'var(--text-sm)' }}>{pkg.items.map((x) => `${x.productName}×${x.qty}`).join('、')}</td>
+                              <td className="mono">{pkg.shippedAt}</td>
+                              <td>{pkg.status === 'delivered' ? <Pill tone="green">已签收</Pill> : <Pill tone="blue">已发货</Pill>}</td>
+                              <td>
+                                {pkg.status === 'shipped' && (
+                                  <div className="row-actions">
+                                    <Button size="sm" variant="ghost" onClick={() => { usePurchaseStore.getState().deliverPackage(doc.childOrderCode, pkg.id); flashShip(`包裹 ${pkg.packageNo} 已签收`); }}>签收</Button>
+                                    <Button size="sm" variant="ghost" onClick={() => { const r = usePurchaseStore.getState().voidPackage(doc.childOrderCode, pkg.id); flashShip(r.msg); }}>作废</Button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </DrawerSection>
+              );
+            })()}
 
             <DrawerSection title="收货信息">
               <InfoGrid>

@@ -11,6 +11,7 @@ import DashboardOperationLog from './pages/dashboard/DashboardOperationLog';
 import PurchaseOverview from './pages/purchase/PurchaseOverview';
 import PurchaseOrders from './pages/purchase/PurchaseOrders';
 import PurchasePricing from './pages/purchase/PurchasePricing';
+import PurchaseDemand from './pages/purchase/PurchaseDemand';
 import PurchaseInbound from './pages/purchase/PurchaseInbound';
 import PurchaseSuppliers from './pages/purchase/PurchaseSuppliers';
 import PurchaseSupplierApprovals from './pages/purchase/PurchaseSupplierApprovals';
@@ -131,6 +132,7 @@ export const router = createBrowserRouter([
       { path: 'purchase/purchase-overview', element: <PurchaseOverview /> },
       { path: 'purchase/purchase-orders', element: <PurchaseOrders /> },
       { path: 'purchase/purchase-pricing', element: <PurchasePricing /> },
+      { path: 'purchase/purchase-demand', element: <PurchaseDemand /> },
       { path: 'purchase/purchase-inbound', element: <PurchaseInbound /> },
       { path: 'purchase/purchase-suppliers', element: <Navigate to="/purchase/purchase-supplier-list" replace /> },
       { path: 'purchase/purchase-supplier-approvals', element: <PurchaseSupplierApprovals /> },

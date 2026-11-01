@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
 import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
@@ -321,7 +322,8 @@ export default function SalesOrders() {
   const [codeSeq, setCodeSeq] = useState(243);
 
   /* ── 分发订单 Tab（订单分发分流出的自营/分发订单） ── */
-  const [tab, setTab] = useState<'sales' | 'flow'>('sales');
+  const navigate = useNavigate();
+  const [tab, setTab] = useState<'ledger' | 'sales' | 'flow'>('ledger');
   const flowOrders = useOrderFlowStore((s) => s.orders);
   const flowStore = useOrderFlowStore;
   const selfPendingCount = flowOrders.filter((o) => o.processStatus === 'self_pending').length;
@@ -417,8 +419,12 @@ export default function SalesOrders() {
       <div className="content-body">
         {/* Tab：销售订单 / 分发订单（订单分发分流出的自营/分发订单） */}
         <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+          <button className={`tab-card-simple${tab === 'ledger' ? ' active' : ''}`} onClick={() => setTab('ledger')}>
+            订单台账（母单）
+            <span className="tab-card-simple-count">{new Set(flowOrders.map((o) => o.parentCode ?? o.code)).size} 张</span>
+          </button>
           <button className={`tab-card-simple${tab === 'sales' ? ' active' : ''}`} onClick={() => setTab('sales')}>
-            销售订单
+            手工销售订单
             <span className="tab-card-simple-count">{orders.length} 单</span>
           </button>
           <button className={`tab-card-simple${tab === 'flow' ? ' active' : ''}`} onClick={() => setTab('flow')}>
@@ -426,6 +432,46 @@ export default function SalesOrders() {
             <span className="tab-card-simple-count">自营待接单 {selfPendingCount} / 共 {visibleFlowOrders.length} 单</span>
           </button>
         </div>
+
+        {/* ── 订单台账 Tab（母单聚合只读档案） ── */}
+        {tab === 'ledger' && (() => {
+          const map = new Map<string, typeof flowOrders>();
+          for (const o of flowOrders) {
+            const root = o.parentCode ?? o.code;
+            map.set(root, [...(map.get(root) ?? []), o]);
+          }
+          const groups = [...map.entries()].map(([rootCode, list]) => {
+            const mother = list.find((x) => !x.parentCode) ?? list[0];
+            const done = list.filter((x) => ['processed', 'completed'].includes(x.processStatus)).length;
+            const amount = list.reduce((s, x) => s + x.totalAmount, 0);
+            const statusText = list.every((x) => x.processStatus === 'completed') ? '全部完成'
+              : done > 0 ? '部分履约' : '分发中';
+            return { rootCode, mother, count: list.length, done, amount, statusText };
+          }).sort((a, b) => b.mother.entryTime.localeCompare(a.mother.entryTime));
+          return (
+            <Card style={{ padding: 0 }}>
+              <Table
+                headers={['母订单号', '客户', '来源', '子单数', '妥投进度', '订单金额（含子单）', '状态', '录入时间', '操作']}
+                rows={groups.map((g) => [
+                  <span key="c" className="cell-mono-emph">{g.rootCode}</span>,
+                  <span key="cu" className="cell-emph">{g.mother.customerName}</span>,
+                  <span key="src" style={{ fontSize: 'var(--text-sm)' }}>{EXTERNAL_PLATFORM_LABELS[g.mother.platform]} · {EXTERNAL_CHANNEL_LABELS[g.mother.sourceChannel]}</span>,
+                  <span key="n" className="mono">{g.count}</span>,
+                  <span key="d" className="mono">{g.done}/{g.count}</span>,
+                  <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>¥{g.amount.toLocaleString()}</span>,
+                  <span key="s" style={{ fontSize: 'var(--text-sm)' }}>{g.statusText}</span>,
+                  <span key="t" className="cell-muted" style={{ whiteSpace: 'nowrap' }}>{g.mother.entryTime}</span>,
+                  <div key="act" className="row-actions">
+                    <Button size="sm" variant="ghost" onClick={() => navigate('/sales/order-distribute')}>去订单分发查看</Button>
+                  </div>,
+                ])}
+              />
+              {groups.length === 0 && (
+                <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>暂无订单台账数据。</div>
+              )}
+            </Card>
+          );
+        })()}
 
         {/* ── 分发订单 Tab ── */}
         {tab === 'flow' && (
