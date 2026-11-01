@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
@@ -6,10 +7,7 @@ import Button from '../../components/common/Button';
 import Toggle from '../../components/common/Toggle';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { useOrderFlowStore, getSelfPurchaseEstimate, reportMatchesOrder } from '../../stores/orderFlowStore';
-import { buildSupplyPlan } from '../../stores/purchaseStore';
-import type { SupplyPlanLine } from '../../types';
 import { useSupplierStore } from '../../stores/supplierStore';
-import { usePriceStore } from '../../stores/priceStore';
 import { useScoreStore, getScoreSummary } from '../../stores/scoreStore';
 import { useReportStore } from '../../stores/reportStore';
 import {
@@ -17,12 +15,9 @@ import {
   TRANSFER_SOURCE_LABELS, SOURCE_TAG_LABELS, compareFloorAmount,
 } from '../../data/externalOrders';
 import { PARTNER_ORDER_STATUS_LABELS, PARTNER_REPORT_TYPE_LABELS } from '../../data/partner';
-import { getSalesDefaultPrice, getPersonalMinPrice } from '../../data/prices';
-import { customerItems, CUSTOMER_TYPE_LABELS } from '../../data/customers';
-import { platformItems } from '../../data/platforms';
 import { REGIONS, getCities, getDistricts } from '../../data/regions';
 import { partnerInRegion } from '../../types';
-import type { ExternalOrder, ExternalOrderItem, ExternalPlatform, RegionScope } from '../../types';
+import type { ExternalOrder, RegionScope } from '../../types';
 
 const pill = (bg: string, color: string, text: string) => (
   <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: bg, color, whiteSpace: 'nowrap' }}>{text}</span>
@@ -35,27 +30,13 @@ const statusPill = (status: string) => {
   return pill(c.bg, c.color, EXTERNAL_STATUS_LABELS[key] ?? status);
 };
 
-/** 状态归并：已完成并入已处理（列表筛选/计数/展示统一） */
-const mergedStatus = (s: string) => (s === 'completed' ? 'processed' : s);
+/** 状态归并：已完成 / 自营执行中（已接单·运输·妥投）并入已处理（列表筛选/计数/展示统一） */
+const mergedStatus = (s: string) => (['completed', 'self_accepted', 'self_shipped', 'self_delivered'].includes(s) ? 'processed' : s);
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
-const PLATFORM_OPTIONS: { value: ExternalPlatform; label: string }[] = [
-  { value: 'tmall', label: '天猫' }, { value: 'jd', label: '京东' }, { value: 'douyin', label: '抖音' },
-  { value: 'pdd', label: '拼多多' }, { value: 'other', label: '其他平台' },
-];
-
 /** 省份选项（地区筛选/范围共用） */
 const PROVINCE_OPTS = REGIONS.map((r) => r.name);
-
-/** 自营执行进度（由 selfChain 推导） */
-function selfStage(o: ExternalOrder): { key: string; label: string; idx: number } {
-  if (!o.selfChain) return { key: 'none', label: '未开始', idx: -1 };
-  if (o.processStatus === 'completed') return { key: 'done', label: '已完成', idx: 3 };
-  if (o.selfChain.outboundCode) return { key: 'outbound', label: '已出库发货', idx: 2 };
-  if (o.selfChain.inboundCode) return { key: 'inbound', label: '已到货入库', idx: 1 };
-  return { key: 'purchasing', label: '采购中', idx: 0 };
-}
 
 /** 路径标签（转派待接单显示来源路径；报备-匹配待确认属转派-报备） */
 function pathLabel(o: ExternalOrder): string {
@@ -98,10 +79,9 @@ function regionText(o: ExternalOrder): string {
 /** 已接单订单重新分发的风险措辞 */
 function processedWarnText(o: ExternalOrder): string {
   if (o.path === 'self') {
-    const st = selfStage(o);
-    if (st.key === 'outbound') return `该订单已接单且【已发货】（出库单 ${o.selfChain?.outboundCode}），重新分发将作废已有采购/出库单据，请谨慎确认！`;
-    if (st.key === 'inbound') return `该订单已接单且【已到货入库】（入库单 ${o.selfChain?.inboundCode}），重新分发需先处理在库商品，请谨慎确认！`;
-    return '该订单已被管理后台接单（采购中），重新分发将作废采购订单，请确认。';
+    if ((o.selfShipments?.length ?? 0) > 0) return '该订单已发货（有物流单号），重新分发将作废发货包裹与采购单据，请谨慎确认！';
+    if (o.selfPo) return '该订单已接单且已下采购单，重新分发将作废采购订单，请确认。';
+    return '该订单已被接单（自营），重新分发将收回订单，请确认。';
   }
   const ps = o.partnerStatus;
   if (ps === 'shipping') return `该订单合作商【已发货】，重新分发将中断合作商履约并可能产生违约责任，请谨慎确认！`;
@@ -109,14 +89,12 @@ function processedWarnText(o: ExternalOrder): string {
   return '该订单已被合作商接单，重新分发将收回订单并通知合作商，请确认。';
 }
 
-interface CustomerOption { id: string; name: string; typeLabel: string; level: string; contactPerson: string; contactPhone: string; contactAddress: string }
-
 export default function ExternalOrders() {
+  const navigate = useNavigate();
   const orders = useOrderFlowStore((s) => s.orders);
   const settings = useOrderFlowStore((s) => s.settings);
   const store = useOrderFlowStore;
   const suppliers = useSupplierStore((s) => s.suppliers);
-  const products = usePriceStore((s) => s.products);
   const scoreEntries = useScoreStore((s) => s.entries);
 
   const [filterStatus, setFilterStatus] = useState('');
@@ -133,34 +111,9 @@ export default function ExternalOrders() {
   const [splitting, setSplitting] = useState<ExternalOrder | null>(null);
   const [splitQty, setSplitQty] = useState<Record<string, string>>({});
 
-  /** 供应方案编辑（自营待接单：行级库存直发量 + 采购行供应商，支持多源） */
-  const [planStock, setPlanStock] = useState<Record<string, string>>({});
-  const [planSupplier, setPlanSupplier] = useState<Record<string, string>>({});
-  const [planMsg, setPlanMsg] = useState('');
-  useEffect(() => { setPlanStock({}); setPlanSupplier({}); setPlanMsg(''); }, [selectedId]);
-
   /** 列表分页：每页条数（10/20/50，右下角下拉）与当前页 */
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
-
-  /** 视图模式：按子单（平铺，现状）/ 按订单（母单聚合可展开） */
-  const [viewMode, setViewMode] = useState<'child' | 'order'>('child');
-  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
-
-  /** 录入弹窗 */
-  const [entering, setEntering] = useState(false);
-  const [platform, setPlatform] = useState<ExternalPlatform>('tmall');
-  const [externalOrderNo, setExternalOrderNo] = useState('');
-  const [customerSearch, setCustomerSearch] = useState('');
-  const [matchedCustomerId, setMatchedCustomerId] = useState('');
-  const [customerType, setCustomerType] = useState('直营客户');
-  const [customerRegion, setCustomerRegion] = useState('');
-  const [receiver, setReceiver] = useState('');
-  const [receiverPhone, setReceiverPhone] = useState('');
-  const [receiverAddress, setReceiverAddress] = useState('');
-  const [remark, setRemark] = useState('');
-  const [items, setItems] = useState<ExternalOrderItem[]>([]);
-  const [entryError, setEntryError] = useState('');
 
   /** 重新分发确认弹窗 */
   const [reflowing, setReflowing] = useState<ExternalOrder | null>(null);
@@ -171,7 +124,7 @@ export default function ExternalOrders() {
   /** 直接选定弹窗 */
   const [awarding, setAwarding] = useState<{ orderId: string; supplierId: string; supplierName: string } | null>(null);
   const [awardReason, setAwardReason] = useState('');
-  /** 订单分发弹窗（待处理订单独立处理页：直接进入分发方式选择，含转自营） */
+  /** 销售单分发弹窗（待处理订单独立处理页：直接进入分发方式选择，含转自营） */
   const [flowingId, setFlowingId] = useState<string | null>(null);
   const [flowMode, setFlowMode] = useState<'self' | 'assign' | 'report' | 'grab' | 'compare'>('assign');
   /** 转派-指定：合作商选择 + 省市县筛选 + 搜索 + 分页 */
@@ -213,7 +166,7 @@ export default function ExternalOrders() {
   const activeSuppliers = useMemo(() => suppliers.filter((s) => s.status === 'active'), [suppliers]);
   const scoreOf = (id: string, name: string) => getScoreSummary(scoreEntries, id, name);
 
-  /** 审批通过的报备记录（订单分发弹窗·报备匹配选择用） */
+  /** 审批通过的报备记录（销售单分发弹窗·报备匹配选择用） */
   const approvedReports = useReportStore((s) => s.reports.filter((r) => r.status === 'approved'));
 
   const flowing = flowingId ? orders.find((o) => o.id === flowingId) ?? null : null;
@@ -275,7 +228,7 @@ export default function ExternalOrders() {
     setFloorType('discount'); setFloorValue('88');
   };
 
-  /** 订单分发弹窗确认按钮（文案随动作变化，右下角取消 + 确认） */
+  /** 销售单分发弹窗确认按钮（文案随动作变化，右下角取消 + 确认） */
   const flowConfirmLabel =
     flowMode === 'self' ? '确认'
       : flowMode === 'assign' ? '指定并转出'
@@ -305,17 +258,6 @@ export default function ExternalOrders() {
     setFlowingId(null);
   };
 
-  const customerOptions: CustomerOption[] = useMemo(() => [
-    ...customerItems.map((c) => ({ id: c.id, name: c.name, typeLabel: CUSTOMER_TYPE_LABELS[c.type], level: c.level || '—', contactPerson: c.contactPerson, contactPhone: c.contactPhone, contactAddress: c.contactAddress || c.region })),
-    ...platformItems.map((p) => ({ id: p.id, name: p.name, typeLabel: '平台客户', level: '—', contactPerson: p.contactPerson, contactPhone: p.contactPhone, contactAddress: p.contactAddress })),
-  ], []);
-
-  const matchedCustomer = matchedCustomerId ? customerOptions.find((c) => c.id === matchedCustomerId) ?? null : null;
-  const customerSuggestions = useMemo(() => {
-    if (!customerSearch || matchedCustomer) return [];
-    return customerOptions.filter((c) => c.name.includes(customerSearch)).slice(0, 6);
-  }, [customerSearch, matchedCustomer, customerOptions]);
-
   const current = selectedId ? orders.find((o) => o.id === selectedId) ?? null : null;
   const enrollOrder = enrollOf ? orders.find((o) => o.id === enrollOf) ?? null : null;
 
@@ -325,8 +267,12 @@ export default function ExternalOrders() {
     }
   }, [selectedId]);
 
+  /** 关键字匹配：编号 / 客户 / 平台单号 / 母订单编号（输入母单号时该母单下所有子单均展出） */
+  const kwMatch = (o: ExternalOrder, kw: string) =>
+    o.code.includes(kw) || (o.parentCode ?? '').includes(kw) || o.customerName.includes(kw) || o.externalOrderNo.includes(kw);
+
   const filtered = useMemo(() => orders.filter((o) => {
-    if (keyword && !o.code.includes(keyword) && !o.customerName.includes(keyword) && !o.externalOrderNo.includes(keyword)) return false;
+    if (keyword && !kwMatch(o, keyword.trim())) return false;
     if (filterStatus !== '') return mergedStatus(o.processStatus) === filterStatus;
     // 「全部」模式下应用地区 + 分发路径筛选
     if (listPath && pathKey(o) !== listPath) return false;
@@ -344,33 +290,10 @@ export default function ExternalOrders() {
 
   const countOf = (key: string) => (key === '' ? orders.length : orders.filter((o) => mergedStatus(o.processStatus) === key).length);
 
-  /** 按订单视图：母单聚合（含无子单的独立单自成一组） */
-  const orderGroups = useMemo(() => {
-    const map = new Map<string, ExternalOrder[]>();
-    for (const o of filtered) {
-      const root = o.parentCode ?? o.code;
-      map.set(root, [...(map.get(root) ?? []), o]);
-    }
-    return [...map.entries()].map(([rootCode, list]) => {
-      const mother = list.find((x) => !x.parentCode) ?? list[0];
-      const children = list.filter((x) => x.parentCode);
-      const done = list.filter((x) => ['completed', 'processed'].includes(x.processStatus)).length;
-      const amount = list.reduce((s, x) => s + x.totalAmount, 0);
-      const statusText = list.every((x) => x.processStatus === 'completed') ? '全部完成'
-        : list.some((x) => ['processed', 'completed'].includes(x.processStatus)) ? '部分履约'
-          : list.some((x) => ['distribute_pending', 'self_pending', 'grabbing', 'comparing', 'report_match_pending'].includes(x.processStatus)) ? '分发中'
-            : '待分发';
-      return { rootCode, mother, children, count: list.length, done, amount, statusText };
-    }).sort((a, b) => b.mother.entryTime.localeCompare(a.mother.entryTime));
-  }, [filtered]);
-  const pagedOrderGroups = orderGroups.slice((page - 1) * pageSize, page * pageSize);
-  const orderViewTotalPages = Math.max(1, Math.ceil(orderGroups.length / pageSize));
-
   /** 列表分页：筛选/搜索/页大小变化回第 1 页，越界自动收敛 */
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pagedOrders = filtered.slice((page - 1) * pageSize, page * pageSize);
   useEffect(() => { setPage(1); }, [keyword, filterStatus, listProv, listCity, listDist, listPath, pageSize]);
-  useEffect(() => { setPage(1); setExpandedOrders(new Set()); }, [viewMode]);
   useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
 
   /** 页码按钮（列表下方分页数字，当前页模块主色） */
@@ -389,84 +312,6 @@ export default function ExternalOrders() {
       {n}
     </button>
   );
-
-  /* ── 录入 ── */
-  const addItemRow = () => {
-    const p = products[0];
-    if (!p) return;
-    let price = p.salesPrice;
-    if (matchedCustomer) {
-      const cust = customerItems.find((c) => c.id === matchedCustomer.id);
-      if (cust) price = getSalesDefaultPrice(p.id, cust.id).price;
-    }
-    setItems((prev) => [...prev, { productId: p.id, productName: p.name, spec: p.spec, quantity: 1, price }]);
-  };
-
-  const setItemProduct = (idx: number, productId: string) => {
-    const p = products.find((x) => x.id === productId);
-    if (!p) return;
-    let price = p.salesPrice;
-    if (matchedCustomer) {
-      const cust = customerItems.find((c) => c.id === matchedCustomer!.id);
-      if (cust) price = getSalesDefaultPrice(p.id, cust.id).price;
-    }
-    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, productId, productName: p.name, spec: p.spec, price } : it)));
-  };
-
-  const minPriceWarning = (it: ExternalOrderItem): string => {
-    if (!matchedCustomer) return '';
-    const cust = customerItems.find((c) => c.id === matchedCustomer!.id);
-    if (!cust || cust.type !== 'personal') return '';
-    const min = getPersonalMinPrice(it.productId, cust.level || 'C级');
-    if (min > 0 && it.price < min) return `低于该客户等级（${cust.level}）最低价 ${money(min)}`;
-    return '';
-  };
-
-  const entryTotal = items.reduce((s, it) => s + it.price * it.quantity, 0);
-  const hasMinPriceWarning = items.some((it) => minPriceWarning(it));
-
-  const selectCustomer = (c: CustomerOption) => {
-    setMatchedCustomerId(c.id);
-    setCustomerSearch(c.name);
-    setCustomerType(c.typeLabel);
-    if (c.contactPerson && !receiver) setReceiver(c.contactPerson);
-    if (c.contactPhone && !receiverPhone) setReceiverPhone(c.contactPhone);
-  };
-
-  const confirmEntry = () => {
-    if (!externalOrderNo.trim() || !customerSearch.trim() || !customerRegion.trim() || !receiver.trim()) {
-      setEntryError('平台单号、客户名称、客户区域、收货人为必填');
-      return;
-    }
-    if (items.length === 0 || items.some((it) => it.quantity <= 0)) {
-      setEntryError('请至少录入一条商品行，且数量大于 0');
-      return;
-    }
-    if (hasMinPriceWarning) {
-      setEntryError('存在低于客户等级最低价的销售实价，请调整后再保存');
-      return;
-    }
-    const order = store.getState().addExternalOrder({
-      platform,
-      externalOrderNo: externalOrderNo.trim(),
-      customerName: customerSearch.trim(),
-      customerType,
-      customerRegion: customerRegion.trim(),
-      items,
-      receiver: receiver.trim(),
-      receiverPhone: receiverPhone.trim() || '—',
-      receiverAddress: receiverAddress.trim() || '—',
-      remark: remark.trim() || undefined,
-      operator: '运营人员',
-      sourceChannel: 'manual',
-    });
-    setEntering(false);
-    setExternalOrderNo(''); setCustomerSearch(''); setMatchedCustomerId(''); setCustomerRegion('');
-    setReceiver(''); setReceiverPhone(''); setReceiverAddress(''); setRemark(''); setItems([]);
-    setEntryError('');
-    // 命中报备的订单进入报备-匹配待确认，打开详情展示匹配信息供确认
-    if (order.processStatus === 'report_match_pending') setSelectedId(order.id);
-  };
 
   /* ── 重新分发 ── */
   const startReflow = (o: ExternalOrder) => setReflowing(o);
@@ -519,11 +364,11 @@ export default function ExternalOrders() {
   /* ── 渲染 ── */
   return (
     <>
-      <ContentHeader title="订单分发" breadcrumbs={['销售', '订单分发']} />
+      <ContentHeader title="销售单分发" breadcrumbs={['销售', '销售单管理', '销售单分发']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-          订单分发是<strong>销售订单的入口</strong>：处理订单生成到分发合作商或自营，明确订单由谁来接单。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>，保存后均自动与审批通过的报备比对。
-          命中报备的订单先进入<strong>报备-匹配待确认</strong>，人工确认匹配后分发给报备合作商；其余订单点击「分发」在弹窗中选择：转自营（管理后台在销售订单接单，接单时填跟单人）、转派-指定、转派-报备、转派-抢单（时间有限）、转派-比单（积分优先）；抢单与比单可限定合作商地区。
+          销售单分发是<strong>销售单的流转入口</strong>：处理销售单生成到分发合作商或自营，明确订单由谁来接单，均<strong>逐个展示子单</strong>（母单聚合总览请前往「销售单管理 → 销售单列表」）。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>，保存后均自动与审批通过的报备比对。
+          命中报备的订单先进入<strong>报备-匹配待确认</strong>，人工确认匹配后分发给报备合作商；其余订单点击「分发」在弹窗中选择：转自营（管理后台在销售单列表·分发订单接单，接单时填跟单人）、转派-指定、转派-报备、转派-抢单（时间有限）、转派-比单（积分优先）；抢单与比单可限定合作商地区。
           待接单订单可「重新分发」回待处理重新选择路径；已接单的重新分发需二次确认。
         </div>
 
@@ -562,7 +407,7 @@ export default function ExternalOrders() {
           .eop-box { display: flex; gap: 12px; padding: 9px 12px; align-items: center; border: 1.5px dashed var(--color-neutral-300); border-radius: 12px; flex: none; }
           .eop-box .tab-card-simple { justify-content: center; }
           .eop-dim { opacity: .45; cursor: not-allowed; }
-          /* 订单分发弹窗 · 分发方式卡片（两行：名称 + 说明小字，文字居中；激活态用内联样式实现，禁用过渡避免干扰） */
+          /* 销售单分发弹窗 · 分发方式卡片（两行：名称 + 说明小字，文字居中；激活态用内联样式实现，禁用过渡避免干扰） */
           .eop-mode-card { flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: var(--space-2) var(--space-3); transition: none; text-align: center; }
           .eop-mode-card strong { font-size: var(--text-sm); }
           .eop-mode-card .eop-mode-sub { font-size: var(--text-xs); font-weight: 400; color: var(--color-neutral-400); line-height: 1.2; white-space: nowrap; }
@@ -642,7 +487,7 @@ export default function ExternalOrders() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
-          <input className="filter-input" placeholder="搜索订单编号、客户、平台单号..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 240 }} />
+          <input className="filter-input" placeholder="搜索订单/母订单编号、客户、平台单号（输入母单号展出其全部子单）..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 320 }} />
           {filterStatus === '' && (
             <>
               <select className="filter-select" value={listProv} onChange={(e) => { setListProv(e.target.value); setListCity(''); setListDist(''); }}>
@@ -669,69 +514,11 @@ export default function ExternalOrders() {
             </>
           )}
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)' }}>
-            <Button onClick={() => setEntering(true)}>+ 录入订单</Button>
+            <Button onClick={() => navigate('/sales/order-entry')}>+ 新建销售单</Button>
           </span>
         </div>
 
-        {/* 视图切换：按子单（平铺操作视图）/ 按订单（母单聚合总览） */}
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', alignItems: 'center' }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>视图：</span>
-          <button className={`tab-card-simple${viewMode === 'child' ? ' active' : ''}`} style={{ padding: 'var(--space-1) var(--space-3)' }} onClick={() => setViewMode('child')}>按子单（逐单操作）</button>
-          <button className={`tab-card-simple${viewMode === 'order' ? ' active' : ''}`} style={{ padding: 'var(--space-1) var(--space-3)' }} onClick={() => setViewMode('order')}>按订单（母单聚合）</button>
-        </div>
-
-        {viewMode === 'order' && (
-          <Card style={{ padding: 0 }}>
-            <div style={{ borderBottom: '1px solid var(--color-neutral-100)' }}>
-              {pagedOrderGroups.map((g) => {
-                const open = expandedOrders.has(g.rootCode);
-                return (
-                  <div key={g.rootCode} style={{ borderBottom: '1px solid var(--color-neutral-100)' }}>
-                    <div
-                      style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)', cursor: 'pointer', background: open ? 'var(--color-neutral-50)' : 'transparent' }}
-                      onClick={() => setExpandedOrders((prev) => { const n = new Set(prev); if (n.has(g.rootCode)) n.delete(g.rootCode); else n.add(g.rootCode); return n; })}
-                    >
-                      <svg viewBox="0 0 16 16" fill="none" style={{ width: 12, height: 12, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s', color: 'var(--color-neutral-400)', flexShrink: 0 }}><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      <span className="cell-mono-emph" style={{ minWidth: 140 }}>{g.rootCode}</span>
-                      <span className="cell-emph" style={{ flex: 1 }}>{g.mother.customerName}</span>
-                      {g.count > 1 && pill('#E3F2FD', '#0F64B5', `已拆分 ${g.count} 单`)}
-                      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>妥投 {g.done}/{g.count}</span>
-                      {pill(
-                        g.statusText === '全部完成' ? '#E9F4EF' : g.statusText === '部分履约' ? '#E0F2F1' : g.statusText === '分发中' ? '#FBF3E2' : '#F5F5F5',
-                        g.statusText === '全部完成' ? '#01795D' : g.statusText === '部分履约' ? '#00695C' : g.statusText === '分发中' ? '#9A7A1C' : '#9E9E9E',
-                        g.statusText,
-                      )}
-                      <span className="mono" style={{ fontWeight: 'var(--font-medium)', minWidth: 90, textAlign: 'right' }}>{money(g.amount)}</span>
-                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedId(g.mother.id); }}>详情</Button>
-                    </div>
-                    {open && (
-                      <div style={{ background: 'var(--color-neutral-50)' }}>
-                        {g.children.length === 0 && (
-                          <div style={{ padding: 'var(--space-2) var(--space-4) var(--space-3) 44px', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>未拆分 · 单一订单</div>
-                        )}
-                        {(g.children.length > 0 ? g.children : [g.mother]).map((c) => (
-                          <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-2) var(--space-4)', paddingLeft: 44, borderTop: '1px dashed var(--color-neutral-150)' }}>
-                            <span className="mono" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', minWidth: 150 }}>{c.code}</span>
-                            {statusPill(c.processStatus)}
-                            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', minWidth: 90 }}>{pathLabel(c)}</span>
-                            <span style={{ fontSize: 'var(--text-sm)', flex: 1 }}>{c.partnerName ?? (c.path === 'self' ? '自营' : '—')}</span>
-                            <span className="mono" style={{ fontSize: 'var(--text-sm)' }}>{money(c.totalAmount)}</span>
-                            <Button size="sm" variant="ghost" onClick={() => setSelectedId(c.id)}>查看</Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {pagedOrderGroups.length === 0 && (
-                <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>当前筛选条件下暂无订单</div>
-              )}
-            </div>
-          </Card>
-        )}
-
-        {viewMode === 'child' && (
+        {/* 子单平铺列表（逐单操作视图；母单聚合总览见「销售单管理 → 销售单列表」） */}
         <Card style={{ padding: 0 }}>
           <Table
             headers={['订单编号', '来源', '客户', '地区', '收件人', '收件地址', '金额', '状态', '分发路径', '合作商', '录入时间', '操作']}
@@ -759,9 +546,7 @@ export default function ExternalOrders() {
               <span key="a" className="mono" style={{ fontWeight: 'var(--font-semibold)' }}>{money(o.totalAmount)}</span>,
               <span key="s">
                 {statusPill(o.processStatus)}
-                {['processed', 'completed'].includes(o.processStatus) && o.path === 'self' && (
-                  <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>{selfStage(o).label}</span>
-                )}
+
                 {['processed', 'completed'].includes(o.processStatus) && o.path === 'distribute' && o.partnerStatus && (
                   <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>{PARTNER_ORDER_STATUS_LABELS[o.partnerStatus]}</span>
                 )}
@@ -784,7 +569,13 @@ export default function ExternalOrders() {
                     <Button size="sm" onClick={() => setMatchConfirming(o)}>确认匹配</Button>
                   </>
                 )}
-                {(o.processStatus === 'self_pending' || o.processStatus === 'distribute_pending') && (
+                {o.processStatus === 'self_pending' && (
+                  <>
+                    <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
+                    <Button size="sm" variant="ghost" onClick={() => navigate('/sales/order-shipping')}>去销售单自营</Button>
+                  </>
+                )}
+                {o.processStatus === 'distribute_pending' && (
                   <>
                     <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
                     <Button size="sm" variant="danger" onClick={() => startReflow(o)}>重新分发</Button>
@@ -809,13 +600,12 @@ export default function ExternalOrders() {
             ])}
           />
         </Card>
-        )}
 
         {/* 列表分页：下方页码数字 + 右下角每页条数下拉（10/20/50 条/页） */}
         {filtered.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginRight: 'auto' }}>
-              共 {viewMode === 'child' ? filtered.length : orderGroups.length} {viewMode === 'child' ? '条' : '张订单'} · 第 {page} / {viewMode === 'child' ? totalPages : orderViewTotalPages} 页
+              共 {filtered.length} 条 · 第 {page} / {totalPages} 页
             </span>
             <Button size="sm" variant="ghost" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => pageBtn(n))}
@@ -850,7 +640,7 @@ export default function ExternalOrders() {
           ) : (
             <>
               <Button variant="ghost" onClick={() => setSelectedId(null)}>关闭</Button>
-              {current && current.processStatus !== 'pending' && current.processStatus !== 'processed' && current.processStatus !== 'completed' && (
+              {current && current.processStatus !== 'pending' && current.processStatus !== 'self_pending' && current.processStatus !== 'processed' && current.processStatus !== 'completed' && (
                 <Button variant="danger" onClick={() => startReflow(current)}>重新分发</Button>
               )}
               {current && current.sourceChannel === 'manual' && !['processed', 'completed'].includes(current.processStatus) && (
@@ -969,11 +759,11 @@ export default function ExternalOrders() {
               </table>
             </DrawerSection>
 
-            {/* ── 待处理：提示前往订单分发弹窗处理 ── */}
+            {/* ── 待处理：提示前往销售单分发弹窗处理 ── */}
             {current.processStatus === 'pending' && (
               <DrawerSection title="分发处理">
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
-                  订单待分发：请点击列表行操作「<strong>分发</strong>」按钮，在<strong>订单分发弹窗</strong>中选择自营或分发（指定 / 报备匹配 / 抢单 / 比单）路径完成分发。
+                  订单待分发：请点击列表行操作「<strong>分发</strong>」按钮，在<strong>销售单分发弹窗</strong>中选择自营或分发（指定 / 报备匹配 / 抢单 / 比单）路径完成分发。
                   本抽屉用于查看订单信息与处理轨迹，不做分发操作。
                 </div>
               </DrawerSection>
@@ -997,82 +787,14 @@ export default function ExternalOrders() {
               </DrawerSection>
             )}
 
-            {/* ── 自营待接单：供应方案（ATP 净需求：库存直发 + 多源采购） ── */}
+            {/* ── 自营待接单：接单/退回在「销售单自营」详情页 ── */}
             {current.processStatus === 'self_pending' && (
-              <DrawerSection title="自营供应方案（库存直发 + 采购）">
-                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)', lineHeight: 1.7 }}>
-                  按商品行计算净需求：可用库存内<strong>库存直发</strong>（不生成采购单，直接出库），缺口<strong>按供应商采购</strong>（行级可选不同供应商，多源生成多张采购单）。
+              <DrawerSection title="自营待接单">
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7, marginBottom: 'var(--space-2)' }}>
+                  订单已转入<strong>自营</strong>：接单（填跟单人）、退回分发等操作请在<strong>销售单自营</strong>菜单的详情页进行；
+                  接单后可拆单，并通过「采购&amp;发货」按仓库分仓直发（各仓快递单号）+ 缺口以销定采。
                 </div>
-                <table className="detail-inline-table">
-                  <thead><tr><th>商品</th><th>订单数量</th><th>可用库存</th><th>库存直发</th><th>采购数量</th><th>采购供应商</th></tr></thead>
-                  <tbody>
-                    {buildSupplyPlan(current).map((base) => {
-                      const stockUse = planStock[base.productId] ?? String(base.stockUseQty);
-                      const use = Math.max(0, Math.min(base.orderQty, Number(stockUse) || 0));
-                      const buyQty = base.orderQty - use;
-                      const sid = planSupplier[base.productId] ?? '';
-                      return (
-                        <tr key={base.productId}>
-                          <td style={{ fontWeight: 'var(--font-medium)' }}>{base.productName}</td>
-                          <td className="mono">{base.orderQty}</td>
-                          <td className="mono" style={{ color: base.stockQty > 0 ? '#01795D' : '#C13A54' }}>{base.stockQty}</td>
-                          <td>
-                            <input
-                              className="filter-input mono" type="number" min={0} max={Math.min(base.orderQty, base.stockQty)}
-                              value={stockUse} disabled={base.stockQty <= 0}
-                              onChange={(e) => setPlanStock((f) => ({ ...f, [base.productId]: e.target.value }))}
-                              style={{ width: 80 }}
-                            />
-                          </td>
-                          <td className="mono" style={{ fontWeight: buyQty > 0 ? 'var(--font-semibold)' : 400, color: buyQty > 0 ? '#B26A00' : 'var(--color-neutral-400)' }}>{buyQty}</td>
-                          <td>
-                            {buyQty > 0 ? (
-                              <select
-                                className="filter-select" value={sid}
-                                onChange={(e) => setPlanSupplier((f) => ({ ...f, [base.productId]: e.target.value }))}
-                                style={{ width: 180 }}
-                              >
-                                <option value="">选择供应商 *</option>
-                                {activeSuppliers.map((s) => {
-                                  const sc = scoreOf(s.id, s.name);
-                                  return <option key={s.id} value={s.id}>{s.name}（积分 {sc.total}）</option>;
-                                })}
-                              </select>
-                            ) : (
-                              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>库存直发，无需采购</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', marginTop: 'var(--space-3)' }}>
-                  <Button
-                    disabled={buildSupplyPlan(current).some((l) => {
-                      const use = Math.max(0, Math.min(l.orderQty, Number(planStock[l.productId] ?? l.stockUseQty) || 0));
-                      return l.orderQty - use > 0 && !planSupplier[l.productId];
-                    })}
-                    onClick={() => {
-                      const lines: SupplyPlanLine[] = buildSupplyPlan(current).map((l) => {
-                        const use = Math.max(0, Math.min(l.orderQty, Number(planStock[l.productId] ?? l.stockUseQty) || 0));
-                        const buyQty = l.orderQty - use;
-                        const sid = planSupplier[l.productId];
-                        const sup = activeSuppliers.find((s) => s.id === sid);
-                        return { ...l, stockUseQty: use, purchaseQty: buyQty, netQty: buyQty, supplierId: sup?.id, supplierName: sup?.name };
-                      });
-                      const res = store.getState().applySupplyPlan(current.id, lines);
-                      setPlanMsg(res.msg);
-                      if (res.ok) setSelectedId(null);
-                    }}
-                  >
-                    定案并执行
-                  </Button>
-                  {planMsg && <span style={{ fontSize: 'var(--text-sm)', color: '#01795D' }}>{planMsg}</span>}
-                </div>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 'var(--space-2)' }}>
-                  定案后订单进入「分发-已完成」执行：采购部分在「订单发货」跟踪到货入库/出库，库存直发部分可直接出库；也可改走「销售订单 → 分发订单」整单单源接单。
-                </div>
+                <Button onClick={() => navigate('/sales/order-shipping')}>前往销售单自营处理</Button>
               </DrawerSection>
             )}
 
@@ -1139,37 +861,6 @@ export default function ExternalOrders() {
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginTop: 'var(--space-2)', lineHeight: 1.7 }}>
                   等待合作商在终端<strong>订单管理</strong>点击「接单」；接单后订单进入<strong>已处理</strong>。改路径可「重新分发」退回待处理。
                 </div>
-              </DrawerSection>
-            )}
-
-            {/* ── 已处理：自营执行 ── */}
-            {(current.processStatus === 'processed' || current.processStatus === 'completed') && current.path === 'self' && current.selfChain && (
-              <DrawerSection title="自营执行（以销定采）">
-                <InfoGrid>
-                  <InfoItem label="采购订单" mono>{current.selfChain.purchaseOrderCode}</InfoItem>
-                  <InfoItem label="采购供应商">{current.selfChain.supplierName}</InfoItem>
-                  <InfoItem label="采购金额" mono>{money(current.selfChain.purchaseAmount)}</InfoItem>
-                  <InfoItem label="入库单号" mono>{current.selfChain.inboundCode ?? '—'}</InfoItem>
-                  <InfoItem label="出库单号" mono>{current.selfChain.outboundCode ?? '—'}</InfoItem>
-                </InfoGrid>
-                {(() => {
-                  const st = selfStage(current);
-                  const steps = ['采购中', '到货入库', '出库发货', '客户签收'];
-                  return (
-                    <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
-                      {steps.map((label, i) => (
-                        <span key={label} style={{ padding: '4px 12px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: i <= st.idx ? '#E8F5E9' : '#F5F5F5', color: i <= st.idx ? '#01795D' : '#9E9E9E' }}>{i + 1}. {label}</span>
-                      ))}
-                    </div>
-                  );
-                })()}
-                {current.processStatus === 'processed' && (
-                  <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
-                    {!current.selfChain.inboundCode && <Button onClick={() => store.getState().selfInbound(current.id)}>确认到货入库</Button>}
-                    {current.selfChain.inboundCode && !current.selfChain.outboundCode && <Button onClick={() => store.getState().selfOutbound(current.id)}>出库发货</Button>}
-                    {current.selfChain.outboundCode && <Button onClick={() => store.getState().selfComplete(current.id)}>确认签收完成</Button>}
-                  </div>
-                )}
               </DrawerSection>
             )}
 
@@ -1320,7 +1011,7 @@ export default function ExternalOrders() {
         </div>
       )}
 
-      {/* ── 订单分发弹窗（待处理订单独立处理页：直接选择分发方式，含转自营） ── */}
+      {/* ── 销售单分发弹窗（待处理订单独立处理页：直接选择分发方式，含转自营） ── */}
       {flowing && (
         <div className="category-dialog-overlay" onClick={() => setFlowingId(null)}>
           <div
@@ -1328,7 +1019,7 @@ export default function ExternalOrders() {
             onClick={(e) => e.stopPropagation()}
             style={{ width: 720, maxWidth: '94vw', height: 'min(80vh, 720px)', display: 'flex', flexDirection: 'column' }}
           >
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>订单分发 · {flowing.code}</div>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>销售单分发 · {flowing.code}</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7, flexShrink: 0 }}>
               {flowing.customerName} · {regionText(flowing)} · 订单金额 {money(flowing.totalAmount)} · 当前状态：待处理。选择分发方式后点击右下角确认完成分发。
             </div>
@@ -1380,7 +1071,7 @@ export default function ExternalOrders() {
               {/* 转自营 */}
               {flowMode === 'self' && (
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7, padding: 'var(--space-2) 0' }}>
-                  转自营路径：订单进入<strong>自营待接单</strong>，请在「销售订单 → 分发订单」点击「接单」，接单时填写跟单人并选择采购供应商，进入自营执行（以销定采）。
+                  转自营路径：订单进入<strong>自营待接单</strong>，请在「销售单列表 → 分发订单」点击「接单」，接单时填写跟单人并选择采购供应商，进入自营执行（以销定采）。
                 </div>
               )}
 
@@ -1670,125 +1361,6 @@ export default function ExternalOrders() {
         </div>
       )}
 
-      {/* ── 录入订单弹窗 ── */}
-      {entering && (
-        <div className="category-dialog-overlay" onClick={() => setEntering(false)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 760, maxWidth: '94vw' }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>录入订单</div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
-              手工录入外部平台订单。客户名称支持从<strong>客户管理</strong>匹配（带出类型/联系人并按客户报价带出默认价）。
-              保存时自动与审批通过的报备比对，命中则进入「报备-匹配待确认」，人工确认后分发合作商。
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>来源平台 *</label>
-                <select className="filter-input" value={platform} onChange={(e) => setPlatform(e.target.value as ExternalPlatform)} style={{ width: '100%' }}>
-                  {PLATFORM_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>平台原始单号 *</label>
-                <input className="filter-input" placeholder="如 TM-88213907" value={externalOrderNo} onChange={(e) => { setExternalOrderNo(e.target.value); setEntryError(''); }} style={{ width: '100%' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>客户类型</label>
-                <select className="filter-input" value={customerType} onChange={(e) => setCustomerType(e.target.value)} style={{ width: '100%' }}>
-                  {['直营客户', '渠道客户', '平台客户', '个人客户', '带货客户'].map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
-              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>客户名称 *（输入可搜索在库客户）</label>
-              <input
-                className="filter-input" placeholder="输入客户名称，支持搜索客户管理中的在库客户" style={{ width: '100%' }}
-                value={customerSearch}
-                onChange={(e) => { setCustomerSearch(e.target.value); setMatchedCustomerId(''); setEntryError(''); }}
-              />
-              {customerSuggestions.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, maxHeight: 220, overflowY: 'auto', background: '#fff', border: '1px solid var(--color-border-primary)', borderRadius: 'var(--radius-md)', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-                  {customerSuggestions.map((c) => (
-                    <div key={c.id} style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }} onClick={() => selectCustomer(c)}>
-                      <span>{c.name}</span>
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>{c.typeLabel} · {c.level}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {matchedCustomer && (
-                <div style={{ display: 'flex', gap: 'var(--space-4)', padding: 'var(--space-2) var(--space-3)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', marginTop: 'var(--space-2)', fontSize: 'var(--text-sm)' }}>
-                  <span>✓ 已匹配在库客户</span>
-                  <span>联系人：{matchedCustomer.contactPerson}</span>
-                  <span>等级：{matchedCustomer.level}</span>
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>客户区域 *</label>
-                <input className="filter-input" placeholder="如 江苏南京" value={customerRegion} onChange={(e) => { setCustomerRegion(e.target.value); setEntryError(''); }} style={{ width: '100%' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>收货人 *</label>
-                <input className="filter-input" placeholder="收货人姓名" value={receiver} onChange={(e) => { setReceiver(e.target.value); setEntryError(''); }} style={{ width: '100%' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>收货地址</label>
-                <input className="filter-input" placeholder="省市区 + 详细地址" value={receiverAddress} onChange={(e) => setReceiverAddress(e.target.value)} style={{ width: '100%' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>联系电话</label>
-                <input className="filter-input" placeholder="联系电话" value={receiverPhone} onChange={(e) => setReceiverPhone(e.target.value)} style={{ width: '100%' }} />
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 'var(--space-3)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-1)' }}>
-                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>商品明细 *</label>
-                <Button size="sm" variant="ghost" onClick={addItemRow}>+ 添加商品行</Button>
-              </div>
-              {items.length === 0 && <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)', padding: 'var(--space-2) 0' }}>尚未添加商品行</div>}
-              {items.map((it, idx) => {
-                const warn = minPriceWarning(it);
-                return (
-                  <div key={idx} style={{ marginBottom: 'var(--space-3)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '2.2fr 0.8fr 1fr auto', gap: 'var(--space-2)', alignItems: 'center' }}>
-                      <select className="filter-input" value={it.productId} onChange={(e) => setItemProduct(idx, e.target.value)} style={{ width: '100%' }}>
-                        {products.map((p) => <option key={p.id} value={p.id}>{p.name}（{p.spec}）</option>)}
-                      </select>
-                      <input className="filter-input mono" type="number" min={1} placeholder="数量" value={it.quantity} onChange={(e) => setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, quantity: Number(e.target.value) } : x)))} style={{ width: '100%' }} />
-                      <input className="filter-input mono" type="number" min={0} placeholder="销售实价" value={it.price} onChange={(e) => setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, price: Number(e.target.value) } : x)))} style={{ width: '100%', borderColor: warn ? '#CB405D' : undefined }} />
-                      <Button size="sm" variant="ghost" onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}>删除</Button>
-                    </div>
-                    <div style={{ fontSize: 'var(--text-xs)', color: warn ? '#CB405D' : 'var(--color-neutral-400)', marginTop: 2, paddingLeft: 2 }}>
-                      {warn ? `⚠ ${warn}` : ''}
-                    </div>
-                  </div>
-                );
-              })}
-              <div style={{ fontSize: 'var(--text-sm)', textAlign: 'right' }}>
-                合计：<strong className="mono" style={{ color: 'var(--color-module-current-base)', fontSize: 'var(--text-md)' }}>{money(entryTotal)}</strong>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 'var(--space-3)' }}>
-              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>备注</label>
-              <input className="filter-input" placeholder="订单备注（平台要求、客户要求等）" value={remark} onChange={(e) => setRemark(e.target.value)} style={{ width: '100%' }} />
-            </div>
-
-            {entryError && (
-              <div style={{ padding: '8px 12px', background: '#FFEBEE', color: '#C62828', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>{entryError}</div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-              <Button variant="ghost" onClick={() => setEntering(false)}>取消</Button>
-              <Button onClick={confirmEntry}>保存订单并匹配报备</Button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

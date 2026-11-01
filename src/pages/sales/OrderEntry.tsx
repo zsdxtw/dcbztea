@@ -20,8 +20,8 @@ const PLATFORM_OPTIONS: { value: ExternalPlatform; label: string }[] = [
 interface CustomerOption { id: string; name: string; typeLabel: string; level: string; contactPerson: string; contactPhone: string; contactAddress: string }
 
 /**
- * 销售 · 订单录入（销售订单生成入口之一：手工录入）
- * 与订单分发页的录入弹窗同源逻辑：客户匹配带出类型/联系人/默认价，保存即匹配报备。
+ * 销售 · 新建销售单（手工录入类型的销售订单生成入口）
+ * 与销售单分发页同源逻辑：客户匹配带出类型/联系人/默认价，保存即匹配报备。
  */
 export default function OrderEntry() {
   const navigate = useNavigate();
@@ -129,8 +129,8 @@ export default function OrderEntry() {
     });
     resetForm();
     setSavedTip(order.processStatus === 'report_match_pending'
-      ? `订单 ${order.code} 已保存并命中报备，进入「报备-匹配待确认」，3 秒后跳转订单分发…`
-      : `订单 ${order.code} 已保存，进入「分发-待处理」，3 秒后跳转订单分发…`);
+      ? `销售单 ${order.code} 已保存并命中报备，进入「报备-匹配待确认」，3 秒后跳转销售单分发…`
+      : `销售单 ${order.code} 已保存，进入「分发-待处理」，3 秒后跳转销售单分发…`);
     setTimeout(() => { setSavedTip(''); navigate('/sales/order-distribute'); }, 3000);
   };
 
@@ -142,10 +142,10 @@ export default function OrderEntry() {
 
   return (
     <>
-      <ContentHeader title="订单录入" breadcrumbs={['销售', '订单录入']} />
+      <ContentHeader title="新建销售单" breadcrumbs={['销售', '销售单管理', '新建销售单']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-          订单录入是销售订单生成的入口之一（三个入口：<strong>本页手工录入</strong> / <strong>平台直连推送</strong> / <strong>报备商机转入</strong>）。
+          新建销售单用于创建<strong>手工录入</strong>类型的销售订单（三个入口：<strong>本页手工录入</strong> / <strong>平台直连推送</strong> / <strong>报备商机转入</strong>）。
           客户名称支持从<strong>客户管理</strong>匹配（带出类型/联系人并按客户报价带出默认价）；
           保存时自动与审批通过的报备比对，命中则进入「报备-匹配待确认」，人工确认后转派报备合作商。
         </div>

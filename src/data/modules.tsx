@@ -267,11 +267,13 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
     label: '销售',
     menus: [
       { key: 'sales-overview', label: '销售概览', icon: <OverviewIcon /> },
-      { key: 'order-entry', label: '订单录入', icon: <QuotationIcon /> },
-      { key: 'order-distribute', label: '订单分发', icon: <OrdersIcon /> },
-      { key: 'order-shipping', label: '订单发货', icon: <InboundIcon /> },
+      { key: 'sales-order-manage', label: '销售单管理', icon: <OrdersIcon />, children: [
+        { key: 'sales-orders', label: '销售单列表', icon: <OrdersIcon /> },
+        { key: 'order-entry', label: '新建销售单', icon: <QuotationIcon /> },
+        { key: 'order-distribute', label: '销售单分发', icon: <OrdersIcon /> },
+      ] },
+      { key: 'order-shipping', label: '销售单自营', icon: <InboundIcon /> },
       { key: 'order-settlement', label: '订单结算', icon: <ReconciliationIcon /> },
-      { key: 'sales-orders', label: '销售订单', icon: <OrdersIcon /> },
       { key: 'compare-manage', label: '比单管理', icon: <ReportMgmtIcon /> },
       { key: 'sales-pricing', label: '销售报（调）价', icon: <QuotationIcon /> },
       { key: 'sales-customers', label: '客户管理', icon: <CustomersIcon /> },

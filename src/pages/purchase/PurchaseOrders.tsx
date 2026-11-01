@@ -32,11 +32,11 @@ function formatMoney(n: number): string {
 
 /* ═══════════════════════════════════════════════════════════
  * 分发采购（采购委托单投影 · 设计文档阶段一）
- * 从订单分发的 orderFlowStore 只读派生：
+ * 从销售单分发的 orderFlowStore 只读派生：
  *  - 分发子单/订单（指定/报备/抢单/比单转出）→ 直送采购委托单
  *  - 自营订单（selfChain）→ 自营采购单（入库制）
  * 金额口径：比单=中单报名价；其余=该供应商采购价规则（缺省按销售实价 55% 折算）
- * 状态随订单分发联动（单一事实源），本页只读，不做双向写
+ * 状态随销售单分发联动（单一事实源），本页只读，不做双向写
  * ═══════════════════════════════════════════════════════════ */
 interface PurchaseOrder {
   id: string;
@@ -218,7 +218,7 @@ const stats: StatCardData[] = [
   },
 ];
 
-/* 分发采购：数据来自 purchaseStore 采购单实体（PO），由订单分发的转派/自营子单自动生成 */
+/* 分发采购：数据来自 purchaseStore 采购单实体（PO），由销售单分发的转派/自营子单自动生成 */
 
 export default function PurchaseOrders() {
   const [orders, setOrders] = useState<PurchaseOrder[]>(mockOrders);
@@ -336,7 +336,7 @@ export default function PurchaseOrders() {
         {tab === 'flow' && (
           <>
             <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-              分发采购单由<strong>销售 → 订单分发</strong>自动生成：转派子单 1:1 生成<strong>直送采购单</strong>（合作商直发客户，免入库）；自营子单接单后生成<strong>入库制采购单</strong>（以销定采）。
+              分发采购单由<strong>销售 → 销售单分发</strong>自动生成：转派子单 1:1 生成<strong>直送采购单</strong>（合作商直发客户，免入库）；自营子单接单后生成<strong>入库制采购单</strong>（以销定采）。
               合作商在终端<strong>发货登记</strong>（同一商品可分多批），每批生成一个包裹，物流信息同时关联采购单与销售订单。
             </div>
 
@@ -376,7 +376,7 @@ export default function PurchaseOrders() {
               />
               {filteredFlowPurchases.length === 0 && (
                 <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>
-                  暂无分发采购单。在「销售 → 订单分发」完成转派或自营接单后，将自动生成对应采购单。
+                  暂无分发采购单。在「销售 → 销售单分发」完成转派或自营接单后，将自动生成对应采购单。
                 </div>
               )}
             </Card>

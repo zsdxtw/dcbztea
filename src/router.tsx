@@ -23,6 +23,7 @@ import PurchaseReturn from './pages/purchase/PurchaseReturn';
 
 import SalesOverview from './pages/sales/SalesOverview';
 import SalesOrders from './pages/sales/SalesOrders';
+import SalesOrderDetail from './pages/sales/SalesOrderDetail';
 import ExternalOrders from './pages/sales/ExternalOrders';
 import OrderEntry from './pages/sales/OrderEntry';
 import OrderShipping from './pages/sales/OrderShipping';
@@ -153,6 +154,7 @@ export const router = createBrowserRouter([
       { path: 'sales/order-shipping', element: <OrderShipping /> },
       { path: 'sales/order-settlement', element: <OrderSettlement /> },
       { path: 'sales/sales-orders', element: <SalesOrders /> },
+      { path: 'sales/sales-orders/:rootCode', element: <SalesOrderDetail /> },
       { path: 'sales/compare-manage', element: <CompareManage /> },
       { path: 'sales/sales-reports', element: <Navigate to="/purchase/partner-reports" replace /> },
       { path: 'sales/sales-pricing', element: <SalesPricing /> },

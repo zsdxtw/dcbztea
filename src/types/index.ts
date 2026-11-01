@@ -1516,7 +1516,9 @@ export type DistributeMode = 'assign' | 'grab' | 'compare';
 /**
  * 订单处理状态（状态机）
  * pending 待处理（手工录入/直连推送，流转弹窗选路径）
- *   ├ 自营：self_pending 自营待接单（管理后台在销售订单接单）→ processed → completed
+ *   ├ 自营（销售单自营菜单处理）：self_pending 自营待接单 → self_accepted 已接单（拆单 / 采购&发货）
+ *   │     → self_shipped 已发货运输中（有物流单号）→ self_delivered 妥投（物流投递完成）→ completed 确认收货
+ *   │     self_pending 可「退回」pending（来源标注自营退回）
  *   └ 分发：
  *       报备命中（录入/直连推送自动匹配）→ report_match_pending 报备-匹配待确认（人工确认）→ distribute_pending
  *       指定 / 报备匹配（人工选择）→ distribute_pending；抢单 grabbing / 比单 comparing 结束 → distribute_pending
@@ -1526,6 +1528,9 @@ export type ExternalProcessStatus =
   | 'pending'
   | 'report_match_pending'
   | 'self_pending'
+  | 'self_accepted'
+  | 'self_shipped'
+  | 'self_delivered'
   | 'grabbing'
   | 'comparing'
   | 'distribute_pending'
@@ -1555,17 +1560,38 @@ export interface ExternalOrderItem {
   price: number;
 }
 
-/** 自营背对背链路（以销定采：采购单 → 入库 → 出库） */
-export interface SelfChain {
-  purchaseOrderCode: string;
+/** 自营发货包裹商品行 */
+export interface SelfShipmentItem {
+  productId: string;
+  productName: string;
+  qty: number;
+}
+
+/**
+ * 自营发货包裹（采购&发货 / 到货出库生成）
+ * 一个仓库一次发运一个包裹、一个快递单号；状态由系统跟踪物流推进（shipped → delivered 妥投）。
+ */
+export interface SelfShipment {
+  id: string;
+  packageNo: string;
+  /** 发货仓库（分仓发货；到货出库时为入库仓） */
+  warehouseId: string;
+  warehouseName: string;
+  logisticsCompany: string;
+  trackingNo: string;
+  items: SelfShipmentItem[];
+  status: 'shipped' | 'delivered';
+  shippedAt: string;
+  deliveredAt?: string;
+}
+
+/** 自营以销定采信息（采购&发货时固化；seedDocs 由此派生采购单） */
+export interface SelfPurchase {
   supplierId: string;
   supplierName: string;
-  purchaseAmount: number;
+  /** direct 直发客户（供应商直发）/ warehouse 入库制（到货入库后再出库） */
+  mode: 'direct' | 'warehouse';
   purchaseDate: string;
-  inboundCode?: string;
-  inboundDate?: string;
-  outboundCode?: string;
-  outboundDate?: string;
 }
 
 /** 比单报名（合作商在规定时间内报名，报价默认带出系统报价） */
@@ -1665,8 +1691,8 @@ export interface ExternalOrder {
   /** 来源渠道：manual=手工录入 / push=平台直连推送 */
   sourceChannel: ExternalChannel;
   processStatus: ExternalProcessStatus;
-  /** 来源附加标签：抢单未成 / 比单未成（分拆后未成交商品形成的子订单） */
-  sourceTag?: 'grab_failed' | 'compare_failed';
+  /** 来源附加标签：抢单未成 / 比单未成（分拆后未成交商品形成的子订单）/ 自营退回 */
+  sourceTag?: 'grab_failed' | 'compare_failed' | 'self_returned';
   /** 母订单编号（拆单生成的子订单指向母订单；详情页按母子 Tab 展示） */
   parentCode?: string;
   /** 报备命中列表（命中即自动转出，列表用于展示「报备分发」来源） */
@@ -1681,11 +1707,12 @@ export interface ExternalOrder {
   partnerStatus?: PartnerOrderStatus;
   /** 结算是否按时（超时扣积分） */
   settleOnTime?: boolean;
-  /** 自营跟单人（管理后台接单时填写） */
+  /** 自营跟单人（销售单自营接单时填写） */
   follower?: string;
-  /** 自营供应方案（ATP：库存直发 + 多源采购；applySupplyPlan 时固化） */
-  supplyPlan?: SupplyPlanLine[];
-  selfChain?: SelfChain;
+  /** 自营以销定采信息（采购&发货时固化，缺口的采购去向） */
+  selfPo?: SelfPurchase;
+  /** 自营发货包裹（分仓发货 / 到货出库生成，按物流单号跟踪妥投） */
+  selfShipments?: SelfShipment[];
   /** 抢单截止时间戳（毫秒） */
   grabDeadline?: number;
   /** 抢单合作商地区范围（可选，省市县） */

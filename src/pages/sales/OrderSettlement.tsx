@@ -16,7 +16,7 @@ const pill = (bg: string, color: string, text: string) => (
 );
 
 /**
- * 销售 · 订单结算（销售订单第三环节）
+ * 销售 · 订单结算（销售单第三环节）
  * 转派类订单妥投后进入待结算，结算完成（按时 +5 / 超时 -5 积分）进入已结算。
  * 自营订单无合作商结算环节，不在本页范围。
  */
@@ -52,7 +52,7 @@ export default function OrderSettlement() {
       <ContentHeader title="订单结算" breadcrumbs={['销售', '订单结算']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-          订单结算是销售订单第三环节：转派类订单<strong>妥投确认收货</strong>后进入<strong>待结算</strong>，结算完成进入<strong>已结算</strong>。
+          订单结算是销售单第三环节：转派类订单<strong>妥投确认收货</strong>后进入<strong>待结算</strong>，结算完成进入<strong>已结算</strong>。
           按时履约结算积分 <strong>+5</strong>、超时发货结算积分 <strong>-5</strong>（自动写入合作商积分台账，影响比单排名）；结算金额同步合作商终端「结算」页。
           自营订单无合作商结算环节，不在本页范围。
         </div>
@@ -97,7 +97,7 @@ export default function OrderSettlement() {
           />
           {list.length === 0 && (
             <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>
-              {tab === 'pending' ? '暂无待结算订单。转派订单在「订单发货」确认收货（妥投）后进入本页。' : '暂无已结算订单。'}
+              {tab === 'pending' ? '暂无待结算订单。转派订单妥投后进入本页待结算（自营订单在「销售单自营」确认收货）。' : '暂无已结算订单。'}
             </div>
           )}
         </Card>

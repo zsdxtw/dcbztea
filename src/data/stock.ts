@@ -15,3 +15,31 @@ export const STOCK_BY_PRODUCT: Record<string, number> = {
 };
 
 export const getStock = (productId: string): number => STOCK_BY_PRODUCT[productId] ?? 0;
+
+/**
+ * 分仓可用库存（自营「采购&发货」分仓发货源）
+ * 仅自有独立仓（杭州总仓 / 武夷仓区 / 苏州分仓 / 福鼎分仓 / 云南总仓）；各仓合计与商品总可用量一致。
+ */
+export const WAREHOUSE_STOCK: Record<string, Record<string, number>> = {
+  'wh-ind-01': { p1: 40, p2: 60, p12: 80, p14: 40, p20: 200 },        // 杭州总仓
+  'wh-ind-02': { p7: 30, p12: 60 },                                    // 武夷仓区
+  'wh-ind-03': { p1: 20, p2: 60, p14: 40 },                            // 苏州分仓
+  'wh-ind-04': { p8: 10 },                                             // 福鼎分仓
+  'wh-ind-05': { p12: 60, p20: 300 },                                  // 云南总仓
+};
+
+export const WAREHOUSE_NAMES: Record<string, string> = {
+  'wh-ind-01': '杭州总仓',
+  'wh-ind-02': '武夷仓区',
+  'wh-ind-03': '苏州分仓',
+  'wh-ind-04': '福鼎分仓',
+  'wh-ind-05': '云南总仓',
+};
+
+/** 某商品有库存的仓库列表（数量 > 0，按仓库名排序） */
+export function getWarehouseStock(productId: string): { warehouseId: string; warehouseName: string; qty: number }[] {
+  return Object.entries(WAREHOUSE_STOCK)
+    .map(([warehouseId, stocks]) => ({ warehouseId, warehouseName: WAREHOUSE_NAMES[warehouseId] ?? warehouseId, qty: stocks[productId] ?? 0 }))
+    .filter((w) => w.qty > 0)
+    .sort((a, b) => a.warehouseName.localeCompare(b.warehouseName));
+}

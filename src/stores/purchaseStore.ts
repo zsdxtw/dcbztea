@@ -3,7 +3,7 @@
  *
  * 生成：
  *  - 转派子单定案（报备确认/指定/抢单定案/比单定标/分拆定案）→ 自动生成 1 张直送 PO（合作商直发客户）
- *  - 自营子单接单 → 生成 1 张入库制 PO（以销定采；多源/库存直发为供应方案后续扩展）
+ *  - 自营「采购&发货」缺口以销定采 → 按模式生成直发/入库制 PO（销售单自营菜单）
  * 状态由订单分发侧动作驱动（接单→已确认；结算→已结算），发货登记在合作商终端完成：
  *  行内多次发货（同一商品分 N 批），每批生成一个包裹，物流信息三键关联 PO+子单+母单。
  */
@@ -135,17 +135,35 @@ function seedDocs(): PurchaseDoc[] {
         }
       }
       docs.push(doc);
-    } else if (o.path === 'self' && o.selfChain && ['processed', 'completed'].includes(o.processStatus)) {
-      const doc = buildDoc(o, 'self', (it) => purchasePriceOf(it, o.selfChain!.supplierId), 'warehouse', o.selfChain.purchaseDate);
-      const stage = o.processStatus === 'completed' ? 'settled' : o.selfChain.outboundCode ? 'fully_shipped' : o.selfChain.inboundCode ? 'confirmed' : 'pending';
-      doc.status = stage as PurchaseDoc['status'];
-      if (stage === 'fully_shipped' || stage === 'settled') {
-        for (const it of doc.items) {
-          it.shippedQty = it.quantity;
-          doc.packages.push(mkPkg(doc, it.productId, it.productName, it.quantity, '京东物流', pkgSeq * 97531, stage === 'settled'));
-        }
+    } else if (o.path === 'self' && o.selfPo
+      && ['self_accepted', 'self_shipped', 'self_delivered', 'completed'].includes(o.processStatus)) {
+      // 采购数量 = 订单数量 − 分仓直发数量；直发模式按妥投状态生成直发包裹
+      const directMap = new Map<string, number>();
+      for (const sh of o.selfShipments ?? []) {
+        for (const it of sh.items) directMap.set(it.productId, (directMap.get(it.productId) ?? 0) + it.qty);
       }
-      docs.push(doc);
+      const remain = o.items
+        .map((it) => ({ ...it, quantity: it.quantity - (directMap.get(it.productId) ?? 0) }))
+        .filter((it) => it.quantity > 0);
+      if (remain.length > 0) {
+        const child = { ...o, items: remain };
+        const doc = buildDoc(child, 'self', (it) => purchasePriceOf(it, o.selfPo!.supplierId), o.selfPo!.mode, o.selfPo!.purchaseDate);
+        const delivered = o.processStatus === 'self_delivered' || o.processStatus === 'completed';
+        if (o.selfPo!.mode === 'direct' && delivered) {
+          // 供应商直发客户：包裹已投递（妥投/确认收货）
+          doc.status = 'delivered';
+          for (const it of doc.items) {
+            it.shippedQty = it.quantity;
+            doc.packages.push(mkPkg(doc, it.productId, it.productName, it.quantity, '顺丰速运', pkgSeq * 97531, true));
+          }
+        } else if (o.selfPo!.mode === 'warehouse') {
+          // 入库制：轨迹含「到货入库」→ 已入库待出库；否则已确认（采购在途）
+          doc.status = o.history.some((h) => h.action === '到货入库') ? 'received' : 'confirmed';
+        } else {
+          doc.status = 'confirmed';
+        }
+        docs.push(doc);
+      }
     }
   }
   return docs;
@@ -166,8 +184,8 @@ function buildDoc(child: ExternalOrder, source: PurchaseDocSource, priceOf: ((it
     childOrderId: child.id,
     childOrderCode: child.code,
     motherCode: child.parentCode ?? child.code,
-    supplierId: child.partnerId ?? child.selfChain?.supplierId ?? '',
-    supplierName: child.partnerName ?? child.selfChain?.supplierName ?? '',
+    supplierId: child.partnerId ?? child.selfPo?.supplierId ?? '',
+    supplierName: child.partnerName ?? child.selfPo?.supplierName ?? '',
     items,
     amount: items.reduce((s, it) => s + it.price * it.quantity, 0),
     status: 'pending',
@@ -186,7 +204,7 @@ export const usePurchaseStore = create<PurchaseState>((set, get) => {
 
     createFromChild: ({ child, source, priceOf, deliveryMode, itemSubset, supplierId, supplierName }) => {
       // 幂等：同一子单同一供应商不重复生成（多源时每供应商一张）
-      const supplierKey = supplierId ?? child.partnerId ?? child.selfChain?.supplierId ?? '';
+      const supplierKey = supplierId ?? child.partnerId ?? child.selfPo?.supplierId ?? '';
       const existed = get().docs.find((d) => d.childOrderCode === child.code && d.supplierId === supplierKey);
       if (existed) return existed;
       const doc = buildDoc(child, source, priceOf, deliveryMode ?? 'direct', now());

@@ -14,7 +14,7 @@ const money = (n: number) => `¥${n.toLocaleString()}`;
 /**
  * 采购 · 采购需求（自营净需求池）
  * 聚合所有「自营待接单」子单的 ATP 缺口行（订单数量 − 可用库存）：
- * 浏览需求、按商品/供应商分析，行操作直达订单分发的供应方案定案（多源生成采购单）。
+ * 浏览需求、按商品/供应商分析（自营订单库存缺口池；缺口采购经「销售单自营 · 采购&发货」定案）。
  * 跨子单合并生成单据为阶段④扩展。
  */
 export default function PurchaseDemand() {
@@ -26,7 +26,7 @@ export default function PurchaseDemand() {
   /** 需求行：自营待接单 × 净需求>0 的商品行 */
   const demandRows = useMemo(() => {
     const rows: { orderId: string; code: string; customer: string; productId: string; productName: string; spec: string; orderQty: number; stockQty: number; netQty: number }[] = [];
-    for (const o of orders.filter((x) => x.processStatus === 'self_pending')) {
+    for (const o of orders.filter((x) => ['self_pending', 'self_accepted'].includes(x.processStatus) && !x.selfPo)) {
       for (const l of buildSupplyPlan(o)) {
         if (l.netQty <= 0) continue;
         rows.push({ orderId: o.id, code: o.code, customer: o.customerName, productId: l.productId, productName: l.productName, spec: l.spec, orderQty: l.orderQty, stockQty: l.stockQty, netQty: l.netQty });
@@ -89,7 +89,7 @@ export default function PurchaseDemand() {
           />
           {filtered.length === 0 && (
             <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>
-              暂无采购需求。自营待接单在「订单分发」选择自营路径后，其商品缺口将进入本需求池。
+              暂无采购需求。自营订单（待接单 / 已接单未采购）的商品缺口将进入本需求池；接单与「采购&发货」在「销售单自营」操作。
             </div>
           )}
         </Card>
