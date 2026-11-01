@@ -195,7 +195,10 @@ export default function SalesOverview() {
         >
           <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-3)' }}>
             {FLOW_BRIEF.map((b) => {
-              const c = EXTERNAL_STATUS_COLORS[b.key === 'handled' ? 'processed' : b.key];
+              // 聚合桶映射到具体状态色：handled→processed、self_doing→self_shipped（自营执行中）
+              const c = EXTERNAL_STATUS_COLORS[
+                b.key === 'handled' ? 'processed' : b.key === 'self_doing' ? 'self_shipped' : b.key
+              ] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
               const count = statusCount[b.key] ?? 0;
               return (
                 <button
