@@ -1312,8 +1312,8 @@ export interface PartnerOrder {
   remark?: string;
   /** 报备转入来源（报备编号），由平台报备规则自动转入的订单才有 */
   sourceReport?: string;
-  /** 报备转入类型：order-self=自营订单报备 / order-opportunity=商机订单报备（平台履约）/ product=商品报备 / customer=客户报备 */
-  transferKind?: 'order-self' | 'order-opportunity' | 'product' | 'customer';
+  /** 报备转入类型：order-self=自营订单报备 / order-opportunity=商机订单报备（平台履约）/ product=商品报备 / customer=客户报备 / assign=指定分发 / grab=抢单中单 / compare=比单中单 */
+  transferKind?: 'order-self' | 'order-opportunity' | 'product' | 'customer' | 'assign' | 'grab' | 'compare';
 }
 
 /** 合作商报备类型：order=订单报备 / product=商品报备 / customer=客户报备 */
@@ -1501,4 +1501,247 @@ export interface CartItem {
   spec: string;
   price: number;
   quantity: number;
+}
+
+/* ════════════════════════════════════════
+ * 外部平台订单分流（订单流转中心）
+ * ════════════════════════════════════════ */
+
+/** 外部订单来源平台 */
+export type ExternalPlatform = 'tmall' | 'jd' | 'douyin' | 'pdd' | 'other';
+
+/** 分发方式：指定 / 抢单（时间优先） / 比单（综合评分） */
+export type DistributeMode = 'assign' | 'grab' | 'compare';
+
+/**
+ * 订单处理状态（状态机）
+ * pending 待处理（手工录入/直连推送，流转弹窗选路径）
+ *   ├ 自营：self_pending 自营待接单（管理后台在销售订单接单）→ processed → completed
+ *   └ 分发：
+ *       报备命中（录入/直连推送自动匹配）→ report_match_pending 报备-匹配待确认（人工确认）→ distribute_pending
+ *       指定 / 报备匹配（人工选择）→ distribute_pending；抢单 grabbing / 比单 comparing 结束 → distribute_pending
+ * distribute_pending 分发待接单（合作商终端接单）→ processed → completed
+ */
+export type ExternalProcessStatus =
+  | 'pending'
+  | 'report_match_pending'
+  | 'self_pending'
+  | 'grabbing'
+  | 'comparing'
+  | 'distribute_pending'
+  | 'processed'
+  | 'completed';
+
+/** 外部订单来源渠道：手工录入 / 平台直连推送 */
+export type ExternalChannel = 'manual' | 'push';
+
+/** 转出来源：报备命中 / 指定 / 抢单 / 比单 */
+export type TransferSource = 'report' | DistributeMode;
+
+/** 报备命中信息（录入时自动匹配审批通过的报备） */
+export interface ReportMatchInfo {
+  reportCode: string;
+  reportType: PartnerReportType;
+  partnerId?: string;
+  partnerName: string;
+}
+
+/** 外部订单商品行 */
+export interface ExternalOrderItem {
+  productId: string;
+  productName: string;
+  spec: string;
+  quantity: number;
+  price: number;
+}
+
+/** 自营背对背链路（以销定采：采购单 → 入库 → 出库） */
+export interface SelfChain {
+  purchaseOrderCode: string;
+  supplierId: string;
+  supplierName: string;
+  purchaseAmount: number;
+  purchaseDate: string;
+  inboundCode?: string;
+  inboundDate?: string;
+  outboundCode?: string;
+  outboundDate?: string;
+}
+
+/** 比单报名（合作商在规定时间内报名，报价默认带出系统报价） */
+export interface CompareQuote {
+  supplierId: string;
+  supplierName: string;
+  amount: number;
+  quoteTime: string;
+  /** 按商品报名：本次报价覆盖的商品名称（缺省视为整单） */
+  items?: string[];
+}
+
+/** 比单评分明细（报价分 + 积分分） */
+export interface CompareScoreBreakdown {
+  quoteScore: number;
+  scoreScore: number;
+  total: number;
+}
+
+/** 比单底价规则：折扣（订单金额的百分比）/ 具体价格（元），报名报价不得低于底价 */
+export interface CompareFloorRule {
+  type: 'discount' | 'price';
+  /** type=discount 时为折扣百分比（如 85 = 订单金额 85 折）；type=price 时为整单最低价（元） */
+  value: number;
+}
+
+/**
+ * 比单会话（公开报名制：全部合作商可在期限内报名，报价带出系统报价可调但不低于底价，
+ * 截止后按「报价 + 积分」评分排名定标，也支持管理台直接选定合作商）
+ */
+export interface CompareSession {
+  deadline: number;
+  /** 底价规则（发起时设定） */
+  floorRule: CompareFloorRule;
+  /** 底价说明（弹窗/列表展示） */
+  floorNote: string;
+  quotes: CompareQuote[];
+  scored: boolean;
+  scores?: Record<string, CompareScoreBreakdown>;
+  winnerId?: string;
+  /** 定标结果：商品名称 → 中单合作商名称（按商品维度按积分排序定标） */
+  itemAwards?: Record<string, string>;
+  /** 报名合作商地区范围（可选，限定省市县内合作商可见可报名） */
+  region?: RegionScope;
+}
+
+/** 地区范围（省/市/县三级，均可选；用于抢单/比单限定合作商地区） */
+export interface RegionScope {
+  province?: string;
+  city?: string;
+  district?: string;
+}
+
+/** 判断合作商是否落在地区范围内（注册地优先，联系地兜底；未设置范围或合作商缺失则全部通过） */
+export function partnerInRegion(
+  supplier: { registeredProvince?: string; registeredCity?: string; registeredDistrict?: string; contactProvince?: string; contactCity?: string; contactDistrict?: string } | undefined,
+  scope?: RegionScope,
+): boolean {
+  if (!scope || (!scope.province && !scope.city && !scope.district)) return true;
+  if (!supplier) return false;
+  return (
+    (!scope.province || supplier.registeredProvince === scope.province || supplier.contactProvince === scope.province) &&
+    (!scope.city || supplier.registeredCity === scope.city || supplier.contactCity === scope.city) &&
+    (!scope.district || supplier.registeredDistrict === scope.district || supplier.contactDistrict === scope.district)
+  );
+}
+
+/** 抢单记录（按商品维度：一次可抢订单内 1 个或多个商品） */
+export interface GrabRecord {
+  supplierId: string;
+  supplierName: string;
+  grabTime: string;
+  ts: number;
+  /** 本次抢到的商品名称 */
+  items?: string[];
+}
+
+/** 外部订单（运营手工录入，分流处理） */
+export interface ExternalOrder {
+  id: string;
+  /** 订单编号（WB + 日期 + 3 位序号） */
+  code: string;
+  platform: ExternalPlatform;
+  /** 平台原始单号 */
+  externalOrderNo: string;
+  customerName: string;
+  customerType: string;
+  customerRegion: string;
+  items: ExternalOrderItem[];
+  totalAmount: number;
+  receiver: string;
+  receiverPhone: string;
+  receiverAddress: string;
+  remark?: string;
+  entryTime: string;
+  operator: string;
+  /** 来源渠道：manual=手工录入 / push=平台直连推送 */
+  sourceChannel: ExternalChannel;
+  processStatus: ExternalProcessStatus;
+  /** 来源附加标签：抢单未成 / 比单未成（分拆后未成交商品形成的子订单） */
+  sourceTag?: 'grab_failed' | 'compare_failed';
+  /** 母订单编号（拆单生成的子订单指向母订单；详情页按母子 Tab 展示） */
+  parentCode?: string;
+  /** 报备命中列表（命中即自动转出，列表用于展示「报备分发」来源） */
+  reportMatches?: ReportMatchInfo[];
+  path?: 'self' | 'distribute';
+  distributeMode?: DistributeMode;
+  partnerId?: string;
+  partnerName?: string;
+  transferSource?: TransferSource;
+  transferTime?: string;
+  /** 转出后履约状态（合作商订单链） */
+  partnerStatus?: PartnerOrderStatus;
+  /** 结算是否按时（超时扣积分） */
+  settleOnTime?: boolean;
+  /** 自营跟单人（管理后台接单时填写） */
+  follower?: string;
+  selfChain?: SelfChain;
+  /** 抢单截止时间戳（毫秒） */
+  grabDeadline?: number;
+  /** 抢单合作商地区范围（可选，省市县） */
+  grabRegion?: RegionScope;
+  grabRecords?: GrabRecord[];
+  compare?: CompareSession;
+  /** 处理轨迹 */
+  history: { time: string; action: string; detail?: string }[];
+}
+
+/** 订单流转设置 */
+export interface FlowSettings {
+  /** 抢单时长（分钟） */
+  grabMinutes: number;
+  /** 比单报名时长（分钟） */
+  compareMinutes: number;
+  /** 比单评分权重（报价 / 积分） */
+  compareWeights: { quote: number; score: number };
+}
+
+/* ════════════════════════════════════════
+ * 合作商积分体系
+ * ════════════════════════════════════════ */
+
+/** 积分维度：客户拜访 / 报备情况 / 履约情况 / 处罚情况 */
+export type ScoreDimension = 'visit' | 'report' | 'fulfillment' | 'penalty';
+
+/** 积分台账流水 */
+export interface PartnerScoreEntry {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  dimension: ScoreDimension;
+  /** 加分为正、扣分为负 */
+  delta: number;
+  reason: string;
+  time: string;
+  /** 关联订单 / 报备 / 比单编号 */
+  refCode?: string;
+  operator?: string;
+}
+
+/** 积分档位（期初分 + 履约率，比单评分用） */
+export interface PartnerScoreBase {
+  /** 期初分（历史累计快照） */
+  base: number;
+  /** 履约率（0-100，按期发货占比） */
+  ontimeRate: number;
+}
+
+/** 积分汇总（四维明细 + 总分） */
+export interface PartnerScoreSummary {
+  supplierId: string;
+  supplierName: string;
+  visit: number;
+  report: number;
+  fulfillment: number;
+  penalty: number;
+  total: number;
+  ontimeRate: number;
 }

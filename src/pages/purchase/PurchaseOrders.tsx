@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
 import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
@@ -8,8 +8,11 @@ import Tag from '../../components/common/Tag';
 import StatusTag, { orderStatusToVariant, orderStatusLabel } from '../../components/common/StatusTag';
 import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
+import { useOrderFlowStore } from '../../stores/orderFlowStore';
+import { usePriceStore } from '../../stores/priceStore';
+import { TRANSFER_SOURCE_LABELS } from '../../data/externalOrders';
 import { TeaCategory, OrderStatus } from '../../types';
-import type { StatCardData, PurchaseOrderItem } from '../../types';
+import type { StatCardData, PurchaseOrderItem, ExternalOrder, ExternalOrderItem } from '../../types';
 import { PRICE_SUPPLIERS, getPurchaseDefaultPrice } from '../../data/prices';
 import { teaProducts } from '../../data/teaProducts';
 
@@ -26,6 +29,55 @@ function categoryToTeaCategory(category: string): TeaCategory {
 
 function formatMoney(n: number): string {
   return `¥${n.toLocaleString('en-US')}`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+ * 分发采购（采购委托单投影 · 设计文档阶段一）
+ * 从订单分发的 orderFlowStore 只读派生：
+ *  - 分发子单/订单（指定/报备/抢单/比单转出）→ 直送采购委托单
+ *  - 自营订单（selfChain）→ 自营采购单（入库制）
+ * 金额口径：比单=中单报名价；其余=该供应商采购价规则（缺省按销售实价 55% 折算）
+ * 状态随订单分发联动（单一事实源），本页只读，不做双向写
+ * ═══════════════════════════════════════════════════════════ */
+interface FlowPurchaseRow {
+  /** 委托单号（= 销售子订单编号） */
+  code: string;
+  /** 关联销售订单（母单或本单） */
+  salesCode: string;
+  /** 来源分发方式 */
+  sourceLabel: string;
+  kind: '直送委托' | '自营采购';
+  supplierName: string;
+  items: ExternalOrderItem[];
+  /** 采购口径金额 */
+  amount: number;
+  status: string;
+  statusTone: { bg: string; color: string };
+  time: string;
+  /** 原分发订单（详情联动） */
+  origin: ExternalOrder;
+}
+
+const fpPill = (bg: string, color: string) => ({ bg, color });
+
+const FLOW_PURCHASE_STATUS: Record<string, { label: string; tone: { bg: string; color: string } }> = {
+  pending_accept: { label: '待接单', tone: fpPill('#FBF3E2', '#9A7A1C') },
+  accepted: { label: '已接单', tone: fpPill('#EDF3FB', '#1D64B0') },
+  shipping: { label: '已发货', tone: fpPill('#F3EFFA', '#7A5BA6') },
+  delivered: { label: '已签收', tone: fpPill('#E9F4EF', '#01795D') },
+  settled: { label: '已结算', tone: fpPill('#F0F2F0', '#67716B') },
+  purchasing: { label: '采购中', tone: fpPill('#FBF3E2', '#9A7A1C') },
+  inbound: { label: '已到货入库', tone: fpPill('#EDF3FB', '#1D64B0') },
+  outbound: { label: '已出库发货', tone: fpPill('#F3EFFA', '#7A5BA6') },
+  done: { label: '已完成', tone: fpPill('#E9F4EF', '#01795D') },
+};
+
+/** 按供应商采购价规则估算采购金额（缺省按销售实价 55% 折算，与自营采购口径一致） */
+function estimatePurchaseAmount(items: ExternalOrderItem[], supplierId: string, rules: { productId: string; supplierId: string; purchasePrice: number; status: string }[]): number {
+  return items.reduce((sum, it) => {
+    const rule = rules.find((r) => r.productId === it.productId && r.supplierId === supplierId && r.status === 'active');
+    return sum + it.quantity * (rule?.purchasePrice ?? Math.round(it.price * 0.55));
+  }, 0);
 }
 
 /* ── 模拟数据 ── */
@@ -216,6 +268,56 @@ export default function PurchaseOrders() {
   const [showCreate, setShowCreate] = useState(false);
   const [codeSeq, setCodeSeq] = useState(152);
 
+  /* ── 分发采购（采购委托单投影） ── */
+  const [tab, setTab] = useState<'manual' | 'flow'>('manual');
+  const [flowKeyword, setFlowKeyword] = useState('');
+  const [flowSource, setFlowSource] = useState('');
+  const [flowDetail, setFlowDetail] = useState<FlowPurchaseRow | null>(null);
+  const flowOrders = useOrderFlowStore((s) => s.orders);
+  const purchaseRules = usePriceStore((s) => s.purchaseRules);
+
+  /** 从订单分发 store 派生采购委托单（只读投影，见文件头注释） */
+  const flowPurchases = useMemo<FlowPurchaseRow[]>(() => {
+    const rows: FlowPurchaseRow[] = [];
+    for (const o of flowOrders) {
+      const salesCode = o.parentCode ?? o.code;
+      if (o.path === 'self' && o.selfChain && ['processed', 'completed'].includes(o.processStatus)) {
+        const stage = o.processStatus === 'completed' ? 'done'
+          : o.selfChain.outboundCode ? 'outbound'
+            : o.selfChain.inboundCode ? 'inbound' : 'purchasing';
+        rows.push({
+          code: o.selfChain.purchaseOrderCode, salesCode, sourceLabel: '转自营', kind: '自营采购',
+          supplierName: o.selfChain.supplierName, items: o.items, amount: o.selfChain.purchaseAmount,
+          status: stage, statusTone: FLOW_PURCHASE_STATUS[stage].tone, time: o.selfChain.purchaseDate, origin: o,
+        });
+      } else if (
+        o.path === 'distribute' && o.partnerId && o.partnerName
+        && ['distribute_pending', 'processed', 'completed'].includes(o.processStatus)
+      ) {
+        const stageKey = o.processStatus === 'distribute_pending' ? 'pending_accept' : (o.partnerStatus ?? 'pending_accept');
+        const stage = stageKey === 'pending_accept' ? 'pending_accept' : stageKey;
+        // 采购口径金额：比单=中单报名价；其余=供应商采购价规则估算
+        const winQuote = o.compare?.quotes.find((q) => q.supplierId === o.partnerId);
+        const amount = o.transferSource === 'compare' && winQuote
+          ? winQuote.amount
+          : estimatePurchaseAmount(o.items, o.partnerId, purchaseRules);
+        rows.push({
+          code: o.code, salesCode, sourceLabel: TRANSFER_SOURCE_LABELS[o.transferSource ?? ''] ?? '分发', kind: '直送委托',
+          supplierName: o.partnerName, items: o.items, amount,
+          status: stage, statusTone: FLOW_PURCHASE_STATUS[stage]?.tone ?? FLOW_PURCHASE_STATUS.pending_accept.tone,
+          time: o.transferTime ?? o.entryTime, origin: o,
+        });
+      }
+    }
+    return rows;
+  }, [flowOrders, purchaseRules]);
+
+  const filteredFlowPurchases = useMemo(() => flowPurchases.filter((r) => {
+    if (flowKeyword && !r.code.includes(flowKeyword) && !r.supplierName.includes(flowKeyword) && !r.salesCode.includes(flowKeyword)) return false;
+    if (flowSource && r.sourceLabel !== flowSource) return false;
+    return true;
+  }), [flowPurchases, flowKeyword, flowSource]);
+
   const handleView = (order: PurchaseOrder) => {
     setSelectedOrder(order);
     setShowDetail(true);
@@ -251,6 +353,22 @@ export default function PurchaseOrders() {
         }
       />
       <div className="content-body">
+        {/* 视图 Tab：手工采购单 / 分发采购（采购委托单投影） */}
+        <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
+          <button className={`tab-card-simple${tab === 'manual' ? ' active' : ''}`} onClick={() => setTab('manual')}>
+            <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><rect x="3.5" y="4.5" width="13" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 8h7M6.5 11.5h4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            手工采购单
+            <span className="tab-card-simple-count">{orders.length} 单</span>
+          </button>
+          <button className={`tab-card-simple${tab === 'flow' ? ' active' : ''}`} onClick={() => setTab('flow')}>
+            <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><path d="M3 13L13 3M6 3h7v7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M4 17h13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            分发采购
+            <span className="tab-card-simple-count">{flowPurchases.length} 单</span>
+          </button>
+        </div>
+
+        {tab === 'manual' && (
+          <>
         {/* 统计卡片 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-5)' }}>
           {stats.map((s, i) => <StatCard key={i} data={s} />)}
@@ -287,6 +405,61 @@ export default function PurchaseOrders() {
             ])}
           />
         </Card>
+          </>
+        )}
+
+        {/* ── 分发采购（采购委托单投影 · 只读） ── */}
+        {tab === 'flow' && (
+          <>
+            <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
+              分发采购单由<strong>销售 → 订单分发</strong>的子订单自动投影生成：分发类子订单（指定 / 报备 / 抢单 / 比单）为<strong>直送委托</strong>（合作商直发客户，免入库）；自营订单为<strong>自营采购</strong>（入库制）。
+              采购金额为<strong>采购口径</strong>（比单=中单报名价，其余按供应商采购价规则），状态与订单分发实时联动，此处只读。
+            </div>
+
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
+              <input className="filter-input" placeholder="搜索委托单号、供应商、销售订单号..." value={flowKeyword} onChange={(e) => setFlowKeyword(e.target.value)} style={{ width: 260 }} />
+              <select className="filter-select" value={flowSource} onChange={(e) => setFlowSource(e.target.value)}>
+                <option value="">全部来源</option>
+                <option value="转派-指定">转派-指定</option>
+                <option value="转派-报备">转派-报备</option>
+                <option value="转派-抢单">转派-抢单</option>
+                <option value="转派-比单">转派-比单</option>
+                <option value="转自营">转自营</option>
+              </select>
+              <span style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', alignSelf: 'center' }}>
+                共 {filteredFlowPurchases.length} 单 · 采购口径合计 ¥{filteredFlowPurchases.reduce((s, r) => s + r.amount, 0).toLocaleString()}
+              </span>
+            </div>
+
+            <Card style={{ padding: 0 }}>
+              <Table
+                headers={['委托单号', '关联销售订单', '来源', '类型', '供应商', '商品', '采购金额', '配送方式', '状态', '时间', '操作']}
+                rows={filteredFlowPurchases.map((r) => [
+                  <span key="c" className="cell-mono-emph">{r.code}</span>,
+                  <span key="s" className="mono" style={{ fontSize: 'var(--text-sm)' }}>{r.salesCode}</span>,
+                  <span key="src" style={{ fontSize: 'var(--text-sm)' }}>{r.sourceLabel}</span>,
+                  <span key="k" style={{ fontSize: 'var(--text-sm)', fontWeight: r.kind === '自营采购' ? 'var(--font-semibold)' : 400 }}>{r.kind}</span>,
+                  <span key="sp" className="cell-emph">{r.supplierName}</span>,
+                  <span key="i" style={{ fontSize: 'var(--text-sm)' }}>{r.items.map((it) => `${it.productName}×${it.quantity}`).join('、')}</span>,
+                  <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>¥{r.amount.toLocaleString()}</span>,
+                  <span key="d" style={{ fontSize: 'var(--text-sm)' }}>{r.kind === '自营采购' ? '入库 · 出库' : '直送客户'}</span>,
+                  <span key="st" style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: r.statusTone.bg, color: r.statusTone.color, whiteSpace: 'nowrap' }}>
+                    {FLOW_PURCHASE_STATUS[r.status]?.label ?? r.status}
+                  </span>,
+                  <span key="t" className="cell-muted" style={{ whiteSpace: 'nowrap', fontSize: 'var(--text-sm)' }}>{r.time}</span>,
+                  <div key="act" className="row-actions">
+                    <Button size="sm" variant="ghost" onClick={() => setFlowDetail(r)}>查看</Button>
+                  </div>,
+                ])}
+              />
+              {filteredFlowPurchases.length === 0 && (
+                <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>
+                  暂无分发采购单。在「销售 → 订单分发」完成分发转出或自营接单后，将在此自动生成对应采购委托单。
+                </div>
+              )}
+            </Card>
+          </>
+        )}
       </div>
 
       {/* 新建采购单抽屉 */}
@@ -381,6 +554,72 @@ export default function PurchaseOrders() {
                     </div>
                   );
                 })}
+              </div>
+            </DrawerSection>
+          </>
+        )}
+      </DetailDrawer>
+
+      {/* ── 分发采购委托单详情抽屉（只读投影） ── */}
+      <DetailDrawer
+        open={!!flowDetail}
+        onClose={() => setFlowDetail(null)}
+        badge="CG"
+        title={flowDetail?.code ?? ''}
+        statusTag={flowDetail && (
+          <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: flowDetail.statusTone.bg, color: flowDetail.statusTone.color }}>
+            {FLOW_PURCHASE_STATUS[flowDetail.status]?.label ?? flowDetail.status}
+          </span>
+        )}
+        subtitle={flowDetail && `${flowDetail.supplierName} · ${flowDetail.kind} · 来源 ${flowDetail.sourceLabel}`}
+        hideFooter
+        footer={<Button variant="ghost" onClick={() => setFlowDetail(null)}>关闭</Button>}
+      >
+        {flowDetail && (
+          <>
+            <DrawerSection title="委托信息">
+              <InfoGrid>
+                <InfoItem label="委托单号" mono emph>{flowDetail.code}</InfoItem>
+                <InfoItem label="关联销售订单" mono>{flowDetail.salesCode}</InfoItem>
+                <InfoItem label="来源方式">{flowDetail.sourceLabel}</InfoItem>
+                <InfoItem label="类型">{flowDetail.kind}</InfoItem>
+                <InfoItem label="供应商">{flowDetail.supplierName}</InfoItem>
+                <InfoItem label="配送方式">{flowDetail.kind === '自营采购' ? '入库 · 出库（自营执行）' : '直送客户（免入库）'}</InfoItem>
+                <InfoItem label="采购金额" mono emph valueStyle={{ color: 'var(--color-module-current-base)' }}>¥{flowDetail.amount.toLocaleString()}</InfoItem>
+                <InfoItem label="生成时间">{flowDetail.time}</InfoItem>
+              </InfoGrid>
+              <div style={{ marginTop: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
+                本单为订单分发生成子订单的采购侧投影：采购金额为采购口径（比单=中单报名价，其余按供应商采购价规则估算）；
+                状态与销售订单分发实时联动，履约与结算请在「销售 → 订单分发」或合作商终端操作，此处只读。
+              </div>
+            </DrawerSection>
+
+            <DrawerSection title={`采购商品（${flowDetail.items.length} 种）`}>
+              <table className="detail-inline-table">
+                <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>销售实价</th><th>小计（销售口径）</th></tr></thead>
+                <tbody>
+                  {flowDetail.items.map((it, i) => (
+                    <tr key={i}>
+                      <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
+                      <td>{it.spec}</td>
+                      <td className="mono">{it.quantity}</td>
+                      <td className="mono">¥{it.price.toLocaleString()}</td>
+                      <td className="mono">¥{(it.price * it.quantity).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </DrawerSection>
+
+            <DrawerSection title="处理轨迹（随销售订单联动）">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                {flowDetail.origin.history.map((h, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 'var(--space-3)', fontSize: 'var(--text-sm)' }}>
+                    <span className="mono" style={{ color: 'var(--color-neutral-400)', flexShrink: 0 }}>{h.time}</span>
+                    <span style={{ fontWeight: 'var(--font-medium)', flexShrink: 0 }}>{h.action}</span>
+                    {h.detail && <span style={{ color: 'var(--color-neutral-500)' }}>{h.detail}</span>}
+                  </div>
+                ))}
               </div>
             </DrawerSection>
           </>

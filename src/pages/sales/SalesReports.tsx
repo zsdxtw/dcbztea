@@ -74,7 +74,7 @@ export default function SalesReports() {
 
   return (
     <>
-      <ContentHeader title="报备管理" breadcrumbs={['销售', '报备管理']} />
+      <ContentHeader title="报备管理" breadcrumbs={['采购', '合作商管理', '报备管理']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           审批合作商终端提交的报备。<strong>订单报备</strong>（自营）：通过后关联订单自动转该合作商履约；<strong>订单报备</strong>（商机）：通过后订单同步至合作商展示、由平台进货发货；<strong>商品报备</strong>：通过后命中的新订单自动转给合作商；<strong>客户报备</strong>：通过后该客户新订单自动转给合作商。

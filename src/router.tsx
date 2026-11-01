@@ -16,12 +16,17 @@ import PurchaseSuppliers from './pages/purchase/PurchaseSuppliers';
 import PurchaseSupplierApprovals from './pages/purchase/PurchaseSupplierApprovals';
 import PurchaseStoreOverview from './pages/purchase/PurchaseStoreOverview';
 import PurchasePartnerStores from './pages/purchase/PurchasePartnerStores';
+import PartnerScores from './pages/purchase/PartnerScores';
 import PurchaseReconciliation from './pages/purchase/PurchaseReconciliation';
 import PurchaseReturn from './pages/purchase/PurchaseReturn';
 
 import SalesOverview from './pages/sales/SalesOverview';
-import SalesOrderCreate from './pages/sales/SalesOrderCreate';
 import SalesOrders from './pages/sales/SalesOrders';
+import ExternalOrders from './pages/sales/ExternalOrders';
+import OrderEntry from './pages/sales/OrderEntry';
+import OrderShipping from './pages/sales/OrderShipping';
+import OrderSettlement from './pages/sales/OrderSettlement';
+import CompareManage from './pages/sales/CompareManage';
 import SalesPricing from './pages/sales/SalesPricing';
 import SalesReconciliation from './pages/sales/SalesReconciliation';
 import SalesCustomers from './pages/sales/SalesCustomers';
@@ -92,6 +97,7 @@ import PartnerLayout from './pages/partner/PartnerLayout';
 import PartnerDashboard from './pages/partner/PartnerDashboard';
 import PartnerOrders from './pages/partner/PartnerOrders';
 import PartnerQuotes from './pages/partner/PartnerQuotes';
+import PartnerGrab from './pages/partner/PartnerGrab';
 import PartnerReports from './pages/partner/PartnerReports';
 import PartnerCustomers from './pages/partner/PartnerCustomers';
 import PartnerSettlement from './pages/partner/PartnerSettlement';
@@ -130,15 +136,23 @@ export const router = createBrowserRouter([
       { path: 'purchase/purchase-supplier-approvals', element: <PurchaseSupplierApprovals /> },
       { path: 'purchase/purchase-supplier-list', element: <PurchaseSuppliers /> },
       { path: 'purchase/purchase-partner-stores', element: <PurchasePartnerStores /> },
+      { path: 'purchase/purchase-partner-scores', element: <PartnerScores /> },
+      { path: 'purchase/partner-reports', element: <SalesReports /> },
       { path: 'purchase/purchase-store-overview', element: <PurchaseStoreOverview /> },
       { path: 'purchase/purchase-reconciliation', element: <PurchaseReconciliation /> },
       { path: 'purchase/purchase-return', element: <PurchaseReturn /> },
       /* ── 销售 ── */
       { path: 'sales', element: <SalesOverview /> },
       { path: 'sales/sales-overview', element: <SalesOverview /> },
-      { path: 'sales/sales-order-create', element: <SalesOrderCreate /> },
+      { path: 'sales/sales-order-create', element: <Navigate to="/sales/order-entry" replace /> },
+      { path: 'sales/order-entry', element: <OrderEntry /> },
+      { path: 'sales/order-processing', element: <Navigate to="/sales/order-distribute" replace /> },
+      { path: 'sales/order-distribute', element: <ExternalOrders /> },
+      { path: 'sales/order-shipping', element: <OrderShipping /> },
+      { path: 'sales/order-settlement', element: <OrderSettlement /> },
       { path: 'sales/sales-orders', element: <SalesOrders /> },
-      { path: 'sales/sales-reports', element: <SalesReports /> },
+      { path: 'sales/compare-manage', element: <CompareManage /> },
+      { path: 'sales/sales-reports', element: <Navigate to="/purchase/partner-reports" replace /> },
       { path: 'sales/sales-pricing', element: <SalesPricing /> },
       { path: 'sales/sales-customers', element: <SalesCustomers /> },
       { path: 'sales/sales-customer-accounts', element: <SalesCustomerAccounts /> },
@@ -222,6 +236,7 @@ export const router = createBrowserRouter([
       { path: 'dashboard', element: <PartnerDashboard /> },
       { path: 'orders', element: <PartnerOrders /> },
       { path: 'quotes', element: <PartnerQuotes /> },
+      { path: 'grab', element: <PartnerGrab /> },
       { path: 'reports', element: <PartnerReports /> },
       { path: 'customers', element: <PartnerCustomers /> },
       { path: 'settlement', element: <PartnerSettlement /> },

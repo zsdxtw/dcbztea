@@ -41,9 +41,6 @@ const ShortcutsIcon = () => (
 const OrdersIcon = () => (
   <svg viewBox="0 0 20 20" fill="none"><rect x="4" y="2" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h6M7 9h6M7 12h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
 );
-const CreateOrderIcon = () => (
-  <svg viewBox="0 0 20 20" fill="none"><rect x="4" y="2" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h4M7 9h4M7 12h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><path d="M13 11v4M11 13h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
-);
 const InboundIcon = () => (
   <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="6" width="14" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M10 3v5M7 6l3-3 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
 );
@@ -257,6 +254,8 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
         { key: 'purchase-supplier-approvals', label: '注册审批', icon: <SupplierApprovalIcon /> },
         { key: 'purchase-supplier-list', label: '合作商列表', icon: <SupplierListIcon /> },
         { key: 'purchase-partner-stores', label: '合作商门店', icon: <StoreIcon /> },
+        { key: 'purchase-partner-scores', label: '合作商积分', icon: <SupplierApprovalIcon /> },
+        { key: 'partner-reports', label: '报备管理', icon: <ReportMgmtIcon /> },
       ] },
       { key: 'purchase-reconciliation', label: '供应商对账', icon: <ReconciliationIcon /> },
       { key: 'purchase-return', label: '采购退货', icon: <ReturnIcon /> },
@@ -267,9 +266,12 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
     label: '销售',
     menus: [
       { key: 'sales-overview', label: '销售概览', icon: <OverviewIcon /> },
-      { key: 'sales-order-create', label: '销售下单', icon: <CreateOrderIcon /> },
+      { key: 'order-entry', label: '订单录入', icon: <QuotationIcon /> },
+      { key: 'order-distribute', label: '订单分发', icon: <OrdersIcon /> },
+      { key: 'order-shipping', label: '订单发货', icon: <InboundIcon /> },
+      { key: 'order-settlement', label: '订单结算', icon: <ReconciliationIcon /> },
       { key: 'sales-orders', label: '销售订单', icon: <OrdersIcon /> },
-      { key: 'sales-reports', label: '报备管理', icon: <ReportMgmtIcon /> },
+      { key: 'compare-manage', label: '比单管理', icon: <ReportMgmtIcon /> },
       { key: 'sales-pricing', label: '销售报（调）价', icon: <QuotationIcon /> },
       { key: 'sales-customers', label: '客户管理', icon: <CustomersIcon /> },
       { key: 'sales-customer-accounts', label: '客户下单账号', icon: <CustomerAccountIcon /> },
