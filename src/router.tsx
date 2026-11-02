@@ -106,6 +106,16 @@ import PartnerSettlement from './pages/partner/PartnerSettlement';
 import PartnerAccountPage from './pages/partner/PartnerAccountPage';
 import PartnerProfile from './pages/partner/PartnerProfile';
 
+/* ── 自营工作台（独立后台） ── */
+import SelfopLogin from './pages/selfop/SelfopLogin';
+import SelfopLayout from './pages/selfop/SelfopLayout';
+import SelfopDashboard from './pages/selfop/SelfopDashboard';
+import SelfopOrders from './pages/selfop/SelfopOrders';
+import SelfopLogistics from './pages/selfop/SelfopLogistics';
+import SelfopPurchase from './pages/selfop/SelfopPurchase';
+import SelfopSettlement from './pages/selfop/SelfopSettlement';
+import SelfopAccount from './pages/selfop/SelfopAccount';
+
 /* ── 客户终端（独立后台） ── */
 import CustomerLogin from './pages/customer/CustomerLogin';
 import CustomerLayout from './pages/customer/CustomerLayout';
@@ -254,6 +264,21 @@ export const router = createBrowserRouter([
       { path: 'profile/store', element: <PartnerProfile section="store" /> },
       { path: 'profile/qualification', element: <PartnerProfile section="qualification" /> },
       { path: 'profile/finance', element: <PartnerProfile section="finance" /> },
+    ],
+  },
+  /* ── 自营工作台（独立布局：登录页 + 工作台/订单/采购/结算/设置） ── */
+  { path: '/selfop/login', element: <SelfopLogin /> },
+  {
+    path: '/selfop',
+    element: <SelfopLayout />,
+    children: [
+      { index: true, element: <Navigate to="/selfop/dashboard" replace /> },
+      { path: 'dashboard', element: <SelfopDashboard /> },
+      { path: 'orders', element: <SelfopOrders /> },
+      { path: 'logistics', element: <SelfopLogistics /> },
+      { path: 'purchase', element: <SelfopPurchase /> },
+      { path: 'settlement', element: <SelfopSettlement /> },
+      { path: 'account', element: <SelfopAccount /> },
     ],
   },
   /* ── 客户终端（独立布局：登录页 + 工作台/商品/购物车/订单/账号） ── */

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { setPartnerAuth, TeaLeafMark } from './PartnerLayout';
 import { useSupplierStore, getTerminalAccounts } from '../../stores/supplierStore';
@@ -9,6 +9,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 /** 合作商终端登录页：左侧品牌视觉 + 右侧极简表单 */
 export default function PartnerLogin() {
   const navigate = useNavigate();
+  useEffect(() => { document.title = '淡茶半盏 — 合作商工作台'; }, []);
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -113,7 +114,7 @@ export default function PartnerLogin() {
         <div className="pk-login-form">
           <div className="pk-login-form-eyebrow">合作商终端</div>
           <h2 className="pk-login-form-title">欢迎登录</h2>
-          <div className="pk-login-form-sub">使用合作商账号登录，处理订单、客户与结算事务</div>
+          <div className="pk-login-form-sub">登录合作商工作台，处理订单、报价、抢单与结算事务</div>
 
           <div className="pk-login-field">
             <label className="pk-login-label">账号</label>
