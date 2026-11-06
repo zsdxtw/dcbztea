@@ -374,7 +374,7 @@ export default function PurchaseSuppliers() {
 
   return (
     <>
-      <ContentHeader title="合作商列表" breadcrumbs={['采购', '合作商管理', '合作商列表']} />
+      <ContentHeader title="供应商档案" breadcrumbs={['采购', '供应商与合作商', '供应商档案']} />
 
       <div className="content-body">
       {/* 统计卡片 */}

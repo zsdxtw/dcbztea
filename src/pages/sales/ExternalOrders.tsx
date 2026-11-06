@@ -124,7 +124,7 @@ export default function ExternalOrders() {
   /** 直接选定弹窗 */
   const [awarding, setAwarding] = useState<{ orderId: string; supplierId: string; supplierName: string } | null>(null);
   const [awardReason, setAwardReason] = useState('');
-  /** 销售单分发弹窗（待处理订单独立处理页：直接进入分发方式选择，含转自营） */
+  /** 履约分配弹窗（待处理订单独立处理页：直接进入分发方式选择，含转自营） */
   const [flowingId, setFlowingId] = useState<string | null>(null);
   const [flowMode, setFlowMode] = useState<'self' | 'assign' | 'report' | 'grab' | 'compare'>('assign');
   /** 转派-指定：合作商选择 + 省市县筛选 + 搜索 + 分页 */
@@ -166,7 +166,7 @@ export default function ExternalOrders() {
   const activeSuppliers = useMemo(() => suppliers.filter((s) => s.status === 'active'), [suppliers]);
   const scoreOf = (id: string, name: string) => getScoreSummary(scoreEntries, id, name);
 
-  /** 审批通过的报备记录（销售单分发弹窗·报备匹配选择用） */
+  /** 审批通过的报备记录（履约分配弹窗·报备匹配选择用） */
   const approvedReports = useReportStore((s) => s.reports.filter((r) => r.status === 'approved'));
 
   const flowing = flowingId ? orders.find((o) => o.id === flowingId) ?? null : null;
@@ -228,7 +228,7 @@ export default function ExternalOrders() {
     setFloorType('discount'); setFloorValue('88');
   };
 
-  /** 销售单分发弹窗确认按钮（文案随动作变化，右下角取消 + 确认） */
+  /** 履约分配弹窗确认按钮（文案随动作变化，右下角取消 + 确认） */
   const flowConfirmLabel =
     flowMode === 'self' ? '确认'
       : flowMode === 'assign' ? '指定并转出'
@@ -364,11 +364,11 @@ export default function ExternalOrders() {
   /* ── 渲染 ── */
   return (
     <>
-      <ContentHeader title="销售单分发" breadcrumbs={['销售', '销售单管理', '销售单分发']} />
+      <ContentHeader title="履约分配" breadcrumbs={['销售', '销售订单管理', '履约分配']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-          销售单分发是<strong>销售单的流转入口</strong>：处理销售单生成到分发合作商或自营，明确订单由谁来接单，均<strong>逐个展示子单</strong>（母单聚合总览请前往「销售单管理 → 销售单列表」）。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>，保存后均自动与审批通过的报备比对。
-          命中报备的订单先进入<strong>报备-匹配待确认</strong>，人工确认匹配后分发给报备合作商；其余订单点击「分发」在弹窗中选择：转自营（管理后台在销售单列表·分发订单接单，接单时填跟单人）、转派-指定、转派-报备、转派-抢单（时间有限）、转派-比单（积分优先）；抢单与比单可限定合作商地区。
+          履约分配决定<strong>销售订单由谁来供货发货</strong>（自营仓发货 / 合作商采购直发），均<strong>逐个展示子单</strong>（母单聚合总览请前往「销售订单管理 → 销售订单」）。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>，保存后均自动与审批通过的报备比对。
+          命中报备的订单先进入<strong>报备-匹配待确认</strong>，人工确认匹配后分发给报备合作商；其余订单点击「分发」在弹窗中选择：转自营（在销售单自营/自营工作台接单，接单时填跟单人）、转派-指定、转派-报备、转派-抢单（时间有限）、转派-比单（积分优先）；抢单与比单可限定合作商地区。
           待接单订单可「重新分发」回待处理重新选择路径；已接单的重新分发需二次确认。
         </div>
 
@@ -407,7 +407,7 @@ export default function ExternalOrders() {
           .eop-box { display: flex; gap: 12px; padding: 9px 12px; align-items: center; border: 1.5px dashed var(--color-neutral-300); border-radius: 12px; flex: none; }
           .eop-box .tab-card-simple { justify-content: center; }
           .eop-dim { opacity: .45; cursor: not-allowed; }
-          /* 销售单分发弹窗 · 分发方式卡片（两行：名称 + 说明小字，文字居中；激活态用内联样式实现，禁用过渡避免干扰） */
+          /* 履约分配弹窗 · 分发方式卡片（两行：名称 + 说明小字，文字居中；激活态用内联样式实现，禁用过渡避免干扰） */
           .eop-mode-card { flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: var(--space-2) var(--space-3); transition: none; text-align: center; }
           .eop-mode-card strong { font-size: var(--text-sm); }
           .eop-mode-card .eop-mode-sub { font-size: var(--text-xs); font-weight: 400; color: var(--color-neutral-400); line-height: 1.2; white-space: nowrap; }
@@ -518,7 +518,7 @@ export default function ExternalOrders() {
           </span>
         </div>
 
-        {/* 子单平铺列表（逐单操作视图；母单聚合总览见「销售单管理 → 销售单列表」） */}
+        {/* 子单平铺列表（逐单操作视图；母单聚合总览见「销售单管理 → 销售订单」） */}
         <Card style={{ padding: 0 }}>
           <Table
             headers={['订单编号', '来源', '客户', '地区', '收件人', '收件地址', '金额', '状态', '分发路径', '合作商', '录入时间', '操作']}
@@ -759,11 +759,11 @@ export default function ExternalOrders() {
               </table>
             </DrawerSection>
 
-            {/* ── 待处理：提示前往销售单分发弹窗处理 ── */}
+            {/* ── 待处理：提示前往履约分配弹窗处理 ── */}
             {current.processStatus === 'pending' && (
               <DrawerSection title="分发处理">
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
-                  订单待分发：请点击列表行操作「<strong>分发</strong>」按钮，在<strong>销售单分发弹窗</strong>中选择自营或分发（指定 / 报备匹配 / 抢单 / 比单）路径完成分发。
+                  订单待分发：请点击列表行操作「<strong>分发</strong>」按钮，在<strong>履约分配弹窗</strong>中选择自营或分发（指定 / 报备匹配 / 抢单 / 比单）路径完成分发。
                   本抽屉用于查看订单信息与处理轨迹，不做分发操作。
                 </div>
               </DrawerSection>
@@ -1011,7 +1011,7 @@ export default function ExternalOrders() {
         </div>
       )}
 
-      {/* ── 销售单分发弹窗（待处理订单独立处理页：直接选择分发方式，含转自营） ── */}
+      {/* ── 履约分配弹窗（待处理订单独立处理页：直接选择分发方式，含转自营） ── */}
       {flowing && (
         <div className="category-dialog-overlay" onClick={() => setFlowingId(null)}>
           <div
@@ -1019,7 +1019,7 @@ export default function ExternalOrders() {
             onClick={(e) => e.stopPropagation()}
             style={{ width: 720, maxWidth: '94vw', height: 'min(80vh, 720px)', display: 'flex', flexDirection: 'column' }}
           >
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>销售单分发 · {flowing.code}</div>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>履约分配 · {flowing.code}</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7, flexShrink: 0 }}>
               {flowing.customerName} · {regionText(flowing)} · 订单金额 {money(flowing.totalAmount)} · 当前状态：待处理。选择分发方式后点击右下角确认完成分发。
             </div>
@@ -1071,7 +1071,7 @@ export default function ExternalOrders() {
               {/* 转自营 */}
               {flowMode === 'self' && (
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7, padding: 'var(--space-2) 0' }}>
-                  转自营路径：订单进入<strong>自营待接单</strong>，请在「销售单列表 → 分发订单」点击「接单」，接单时填写跟单人并选择采购供应商，进入自营执行（以销定采）。
+                  转自营路径：订单进入<strong>自营待接单</strong>，请在「销售单自营」接单，接单时填写跟单人并选择采购供应商，进入自营执行（以销定采）。
                 </div>
               )}
 

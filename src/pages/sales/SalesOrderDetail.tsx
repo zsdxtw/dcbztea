@@ -22,7 +22,7 @@ const pill = (text: string) => {
   );
 };
 
-/** 路径标签（与销售单分发页口径一致） */
+/** 路径标签（与履约分配页口径一致） */
 function pathLabel(o: ExternalOrder): string {
   if (o.processStatus === 'report_match_pending') return '转派-报备';
   if (o.path === 'self') return '自营';
@@ -65,12 +65,12 @@ export default function SalesOrderDetail() {
   if (!family) {
     return (
       <>
-        <ContentHeader title="销售单详情" breadcrumbs={['销售', '销售单管理', '销售单列表', '销售单详情']} />
+        <ContentHeader title="销售单详情" breadcrumbs={['销售', '销售单管理', '销售订单', '销售单详情']} />
         <div className="content-body">
           <Card style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>
             未找到销售单 {rootCode}，可能已被删除或拆分变更。
             <div style={{ marginTop: 'var(--space-3)' }}>
-              <Button variant="ghost" onClick={() => navigate('/sales/sales-orders')}>返回销售单列表</Button>
+              <Button variant="ghost" onClick={() => navigate('/sales/sales-orders')}>返回销售订单</Button>
             </div>
           </Card>
         </div>
@@ -105,7 +105,7 @@ export default function SalesOrderDetail() {
     <>
       <ContentHeader
         title={`销售单详情 · ${family.rootCode}`}
-        breadcrumbs={['销售', '销售单管理', '销售单列表', family.rootCode]}
+        breadcrumbs={['销售', '销售单管理', '销售订单', family.rootCode]}
         actions={<Button variant="ghost" onClick={() => navigate('/sales/sales-orders')}>返回列表</Button>}
       />
       <div className="content-body">

@@ -71,7 +71,7 @@ export default function FinanceSalesCollection() {
 
   return (
     <>
-      <ContentHeader title="销售回款" breadcrumbs={['财务', '结算管理', '销售回款']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建回款</Button></>} />
+      <ContentHeader title="收款管理" breadcrumbs={['财务', '应收应付', '收款管理']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建回款</Button></>} />
       <div className="content-body">
         <div className="stat-cards">
           {stats.map((s, i) => <StatCard key={i} data={s} />)}

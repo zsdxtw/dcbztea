@@ -72,7 +72,7 @@ export default function FinancePurchasePayment() {
 
   return (
     <>
-      <ContentHeader title="采购付款" breadcrumbs={['财务', '结算管理', '采购付款']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建付款</Button></>} />
+      <ContentHeader title="付款管理" breadcrumbs={['财务', '应收应付', '付款管理']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建付款</Button></>} />
       <div className="content-body">
         <div className="stat-cards">
           {stats.map((s, i) => <StatCard key={i} data={s} />)}

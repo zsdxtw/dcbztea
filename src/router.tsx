@@ -13,6 +13,7 @@ import PurchaseOrders from './pages/purchase/PurchaseOrders';
 import PurchasePricing from './pages/purchase/PurchasePricing';
 import PurchaseDemand from './pages/purchase/PurchaseDemand';
 import PurchaseInbound from './pages/purchase/PurchaseInbound';
+import DirectDeliveryConfirm from './pages/purchase/DirectDeliveryConfirm';
 import PurchaseSuppliers from './pages/purchase/PurchaseSuppliers';
 import PurchaseSupplierApprovals from './pages/purchase/PurchaseSupplierApprovals';
 import PurchaseStoreOverview from './pages/purchase/PurchaseStoreOverview';
@@ -27,7 +28,8 @@ import SalesOrderDetail from './pages/sales/SalesOrderDetail';
 import ExternalOrders from './pages/sales/ExternalOrders';
 import OrderEntry from './pages/sales/OrderEntry';
 import OrderShipping from './pages/sales/OrderShipping';
-import OrderSettlement from './pages/sales/OrderSettlement';
+import FulfillmentOrders from './pages/sales/FulfillmentOrders';
+import SalesDelivery from './pages/sales/SalesDelivery';
 import CompareManage from './pages/sales/CompareManage';
 import SalesPricing from './pages/sales/SalesPricing';
 import SalesReconciliation from './pages/sales/SalesReconciliation';
@@ -44,6 +46,8 @@ import InventoryOtherIO from './pages/inventory/InventoryOtherIO';
 import InventoryTransfer from './pages/inventory/InventoryTransfer';
 import InventoryCheck from './pages/inventory/InventoryCheck';
 import InventoryIORecord from './pages/inventory/InventoryIORecord';
+import InventoryDetail from './pages/inventory/InventoryDetail';
+import InventoryReservation from './pages/inventory/InventoryReservation';
 import InventoryAlertSettings from './pages/inventory/InventoryAlertSettings';
 import InventorySettings from './pages/inventory/InventorySettings';
 
@@ -70,6 +74,10 @@ import FinanceInvoice from './pages/finance/FinanceInvoice';
 import FinanceCost from './pages/finance/FinanceCost';
 import FinanceExpense from './pages/finance/FinanceExpense';
 import FinanceBalance from './pages/finance/FinanceBalance';
+import FinanceReceivables from './pages/finance/FinanceReceivables';
+import FinancePayables from './pages/finance/FinancePayables';
+import FinancePartnerSettlement from './pages/finance/FinancePartnerSettlement';
+import FinanceProfit from './pages/finance/FinanceProfit';
 
 import StatisticsSales from './pages/statistics/StatisticsSales';
 import StatisticsBrandAnalysis from './pages/statistics/StatisticsBrandAnalysis';
@@ -152,7 +160,8 @@ export const router = createBrowserRouter([
       { path: 'purchase/purchase-partner-scores', element: <PartnerScores /> },
       { path: 'purchase/partner-reports', element: <SalesReports /> },
       { path: 'purchase/purchase-store-overview', element: <PurchaseStoreOverview /> },
-      { path: 'purchase/purchase-reconciliation', element: <PurchaseReconciliation /> },
+      { path: 'purchase/purchase-reconciliation', element: <Navigate to="/finance/finance-supplier-reconciliation" replace /> },
+      { path: 'purchase/direct-delivery-confirm', element: <DirectDeliveryConfirm /> },
       { path: 'purchase/purchase-return', element: <PurchaseReturn /> },
       /* ── 销售 ── */
       { path: 'sales', element: <SalesOverview /> },
@@ -162,7 +171,9 @@ export const router = createBrowserRouter([
       { path: 'sales/order-processing', element: <Navigate to="/sales/order-distribute" replace /> },
       { path: 'sales/order-distribute', element: <ExternalOrders /> },
       { path: 'sales/order-shipping', element: <OrderShipping /> },
-      { path: 'sales/order-settlement', element: <OrderSettlement /> },
+      { path: 'sales/order-settlement', element: <Navigate to="/finance/finance-partner-settlement" replace /> },
+      { path: 'sales/fulfillment-orders', element: <FulfillmentOrders /> },
+      { path: 'sales/sales-delivery', element: <SalesDelivery /> },
       { path: 'sales/sales-orders', element: <SalesOrders /> },
       { path: 'sales/sales-orders/:rootCode', element: <SalesOrderDetail /> },
       { path: 'sales/compare-manage', element: <CompareManage /> },
@@ -176,6 +187,8 @@ export const router = createBrowserRouter([
       /* ── 仓储 ── */
       { path: 'inventory', element: <InventoryOverview /> },
       { path: 'inventory/inventory-overview', element: <InventoryOverview /> },
+      { path: 'inventory/inventory-detail', element: <InventoryDetail /> },
+      { path: 'inventory/inventory-reservation', element: <InventoryReservation /> },
       { path: 'inventory/inventory-purchase-inbound', element: <InventoryPurchaseInbound /> },
       { path: 'inventory/inventory-sales-outbound', element: <InventorySalesOutbound /> },
       { path: 'inventory/inventory-other-io', element: <InventoryOtherIO /> },
@@ -204,8 +217,14 @@ export const router = createBrowserRouter([
       /* ── 财务 ── */
       { path: 'finance', element: <FinanceOverview /> },
       { path: 'finance/finance-overview', element: <FinanceOverview /> },
+      { path: 'finance/finance-ar', element: <FinanceReceivables /> },
+      { path: 'finance/finance-ap', element: <FinancePayables /> },
       { path: 'finance/finance-purchase-payment', element: <FinancePurchasePayment /> },
       { path: 'finance/finance-sales-collection', element: <FinanceSalesCollection /> },
+      { path: 'finance/finance-partner-settlement', element: <FinancePartnerSettlement /> },
+      { path: 'finance/finance-customer-reconciliation', element: <SalesReconciliation /> },
+      { path: 'finance/finance-supplier-reconciliation', element: <PurchaseReconciliation /> },
+      { path: 'finance/finance-profit', element: <FinanceProfit /> },
       { path: 'finance/finance-other-receivable', element: <FinanceOtherReceivable /> },
       { path: 'finance/finance-other-payable', element: <FinanceOtherPayable /> },
       { path: 'finance/finance-invoice', element: <FinanceInvoice /> },

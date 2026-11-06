@@ -46,7 +46,7 @@ function inboundStatusLabel(status: string) {
 export default function PurchaseInbound() {
   return (
     <>
-      <ContentHeader title="入库管理" breadcrumbs={['采购', '入库管理']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建入库</Button></>} />
+      <ContentHeader title="采购收货" breadcrumbs={['采购', '采购收货']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建入库</Button></>} />
       <div className="content-body">
         <div className="stat-cards">
           {stats.map((s, i) => <StatCard key={i} data={s} />)}

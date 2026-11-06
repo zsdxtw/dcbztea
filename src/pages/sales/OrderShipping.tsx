@@ -91,7 +91,7 @@ export default function OrderShipping() {
           />
           {filtered.length === 0 && (
             <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>
-              暂无自营订单。在「销售单分发」选择「转自营」后，订单将进入本页待接单。
+              暂无自营订单。在「履约分配」选择「转自营」后，订单将进入本页待接单。
             </div>
           )}
         </Card>

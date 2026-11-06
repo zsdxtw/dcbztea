@@ -56,7 +56,7 @@ export default function PurchaseDemand() {
 
   return (
     <>
-      <ContentHeader title="采购需求" breadcrumbs={['采购', '采购需求']} />
+      <ContentHeader title="采购申请" breadcrumbs={['采购', '采购申请']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           采购需求池聚合<strong>自营待接单</strong>的 ATP 净需求（订单数量 − 可用库存）：浏览缺口、按商品汇总；
@@ -89,7 +89,7 @@ export default function PurchaseDemand() {
           />
           {filtered.length === 0 && (
             <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>
-              暂无采购需求。自营订单（待接单 / 已接单未采购）的商品缺口将进入本需求池；接单与「采购&发货」在「销售单自营」操作。
+              暂无采购申请。自营订单（待接单 / 已接单未采购）的商品缺口将进入本需求池；接单与「采购&发货」在「销售单自营」操作。
             </div>
           )}
         </Card>

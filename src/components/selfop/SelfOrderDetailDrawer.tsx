@@ -277,12 +277,12 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
       {current.processStatus === 'self_pending' && (
         <DrawerSection title="接单（自营）">
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)', lineHeight: 1.7 }}>
-            接单后订单进入<strong>已接单</strong>，可进行拆单与采购&amp;发货；退回则订单回到<strong>销售单分发 · 分发-待处理</strong>（来源标注「自营退回」）。进入自营后不支持修改订单内容。
+            接单后订单进入<strong>已接单</strong>，可进行拆单与采购&amp;发货；退回则订单回到<strong>履约分配 · 分发-待处理</strong>（来源标注「自营退回」）。进入自营后不支持修改订单内容。
           </div>
           {returning ? (
             <div style={{ padding: 'var(--space-3)', border: '1px solid #FBEDEF', background: '#FFF8F9', borderRadius: 'var(--radius-md)' }}>
               <div style={{ fontSize: 'var(--text-sm)', lineHeight: 1.7, marginBottom: 'var(--space-2)' }}>
-                确认退回 <strong className="mono">{current.code}</strong> 至销售单分发？退回后重新进入<strong>分发-待处理</strong>，来源将标注「自营退回」。
+                确认退回 <strong className="mono">{current.code}</strong> 至履约分配？退回后重新进入<strong>分发-待处理</strong>，来源将标注「自营退回」。
               </div>
               <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                 <Button variant="ghost" size="sm" onClick={() => setReturning(false)}>取消</Button>
@@ -313,7 +313,7 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
       {current.processStatus === 'self_accepted' && (
         <DrawerSection title="执行操作（已接单）">
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)', lineHeight: 1.7 }}>
-            可<strong>拆单</strong>（拆出后母子单在销售单列表独立展示、各自发货），或<strong>采购&amp;发货</strong>（分仓直发 + 缺口以销定采）。
+            可<strong>拆单</strong>（拆出后母子单在销售订单独立展示、各自发货），或<strong>采购&amp;发货</strong>（分仓直发 + 缺口以销定采）。
           </div>
           {splitOpen ? (
             <div style={{ padding: 'var(--space-3)', border: '1px solid var(--color-neutral-100)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-2)' }}>
