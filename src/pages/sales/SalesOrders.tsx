@@ -1,11 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
+import { customerItems } from '../../data/customers';
+import { PROVINCE_NAMES, getCityNames, getDistricts, regionTextOf } from '../../data/regions';
 import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS, TRANSFER_SOURCE_LABELS, platformLabelOf } from '../../data/externalOrders';
 import { PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
 import {
@@ -43,9 +46,9 @@ function pathLabel(o: ExternalOrder): string {
   return '—';
 }
 
-/** 地区展示（省 / 市） */
+/** 地区展示：省 / 市 / 区（共享助手，见 data/regions.regionTextOf） */
 function regionText(o: ExternalOrder): string {
-  return o.customerRegion || '—';
+  return regionTextOf(o.customerRegion, o.receiverAddress);
 }
 
 /**
@@ -63,7 +66,21 @@ export default function SalesOrders() {
   const [filterDistribute, setFilterDistribute] = useState('');
   const [filterShip, setFilterShip] = useState('');
   const [filterSettle, setFilterSettle] = useState('');
+  /* 新增筛选项:草稿态(输入)→ 点「查询」应用 */
+  const [draftCustomer, setDraftCustomer] = useState('');
+  const [draftReceiver, setDraftReceiver] = useState('');
+  const [draftProv, setDraftProv] = useState('');
+  const [draftCity, setDraftCity] = useState('');
+  const [draftDist, setDraftDist] = useState('');
+  const [draftEntryFrom, setDraftEntryFrom] = useState('');
+  const [draftEntryTo, setDraftEntryTo] = useState('');
+  const [draftOrderFrom, setDraftOrderFrom] = useState('');
+  const [draftOrderTo, setDraftOrderTo] = useState('');
+  const [applied, setApplied] = useState({
+    customer: '', receiver: '', prov: '', city: '', dist: '', entryFrom: '', entryTo: '', orderFrom: '', orderTo: '',
+  });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [viewRoot, setViewRoot] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
 
@@ -83,14 +100,48 @@ export default function SalesOrders() {
     if (filterDistribute && st.distribute !== filterDistribute) return false;
     if (filterShip && st.ship !== filterShip) return false;
     if (filterSettle && st.settle !== filterSettle) return false;
+    // 新增筛选项(查询按钮应用)
+    const a = applied;
+    if (a.customer && f.mother.customerName !== a.customer) return false;
+    if (a.receiver && ![f.mother, ...f.children].some((o) => (o.receiver ?? '').includes(a.receiver))) return false;
+    if (a.prov || a.city || a.dist) {
+      const addr = f.mother.receiverAddress ?? '';
+      if (a.prov && !addr.includes(a.prov)) return false;
+      if (a.city && !addr.includes(a.city)) return false;
+      if (a.dist && !addr.includes(a.dist)) return false;
+    }
+    if (a.entryFrom && f.mother.entryTime.slice(0, 10) < a.entryFrom) return false;
+    if (a.entryTo && f.mother.entryTime.slice(0, 10) > a.entryTo) return false;
+    if (a.orderFrom || a.orderTo) {
+      const t = (f.mother.customerOrderTime ?? '').slice(0, 10);
+      if (!t) return false;
+      if (a.orderFrom && t < a.orderFrom) return false;
+      if (a.orderTo && t > a.orderTo) return false;
+    }
     return true;
-  }), [families, keyword, filterChannel, filterDistribute, filterShip, filterSettle]);
+  }), [families, keyword, filterChannel, filterDistribute, filterShip, filterSettle, applied]);
 
   const totalPages = Math.max(1, Math.ceil(filteredFamilies.length / pageSize));
   const pagedFamilies = filteredFamilies.slice((page - 1) * pageSize, page * pageSize);
-  useEffect(() => { setPage(1); }, [keyword, filterChannel, filterDistribute, filterShip, filterSettle, pageSize]);
+  useEffect(() => { setPage(1); }, [keyword, filterChannel, filterDistribute, filterShip, filterSettle, applied, pageSize]);
   useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
   useEffect(() => { setExpanded(new Set()); }, [tab]);
+
+  const applyFilters = () => {
+    setApplied({
+      customer: draftCustomer.trim(), receiver: draftReceiver.trim(),
+      prov: draftProv, city: draftCity, dist: draftDist,
+      entryFrom: draftEntryFrom, entryTo: draftEntryTo, orderFrom: draftOrderFrom, orderTo: draftOrderTo,
+    });
+    setPage(1);
+  };
+  const resetFilters = () => {
+    setDraftCustomer(''); setDraftReceiver('');
+    setDraftProv(''); setDraftCity(''); setDraftDist('');
+    setDraftEntryFrom(''); setDraftEntryTo(''); setDraftOrderFrom(''); setDraftOrderTo('');
+    setApplied({ customer: '', receiver: '', prov: '', city: '', dist: '', entryFrom: '', entryTo: '', orderFrom: '', orderTo: '' });
+    setPage(1);
+  };
 
   const toggleExpand = (rootCode: string) => setExpanded((prev) => {
     const n = new Set(prev);
@@ -125,17 +176,8 @@ export default function SalesOrders() {
       <ContentHeader
         title="销售单列表"
         breadcrumbs={['销售', '销售单管理', '销售单列表']}
-        actions={<Button onClick={() => navigate('/sales/order-entry')}>+ 新建销售单</Button>}
       />
       <div className="content-body">
-        {/* Tab：全部销售单（母单聚合总览）/ 分发订单（自营接单 + 履约跟踪） */}
-        <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-          <button className={`tab-card-simple${tab === 'all' ? ' active' : ''}`} onClick={() => setTab('all')}>
-            全部母销售单
-            <span className="tab-card-simple-count">{families.length} 张</span>
-          </button>
-        </div>
-
         {/* ── 全部销售单 Tab：母单一行 + 展开子单 ── */}
         {tab === 'all' && (<>
           <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
@@ -144,30 +186,83 @@ export default function SalesOrders() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
-            <input className="filter-input" placeholder="搜索原始/履约销售单号、客户、平台单号..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 280 }} />
+            <span className="so-f-label">关键词：</span>
+            <input className="filter-input" placeholder="搜索原始/履约销售单号、客户、平台单号..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 260 }} />
+            <span className="so-f-label">来源：</span>
             <select className="filter-select" value={filterChannel} onChange={(e) => setFilterChannel(e.target.value)}>
               <option value="">全部来源</option>
               <option value="manual">手工录入</option>
               <option value="push">直连推送</option>
             </select>
+            <span className="so-f-label">分发状态：</span>
             <select className="filter-select" value={filterDistribute} onChange={(e) => setFilterDistribute(e.target.value)}>
               <option value="">全部分发状态</option>
               <option value="待分发">待分发</option>
               <option value="分发中">分发中</option>
               <option value="已分发">已分发</option>
             </select>
+            <span className="so-f-label">发货状态：</span>
             <select className="filter-select" value={filterShip} onChange={(e) => setFilterShip(e.target.value)}>
               <option value="">全部发货状态</option>
               <option value="未发货">未发货</option>
               <option value="部分发货">部分发货</option>
               <option value="全部发货">全部发货</option>
             </select>
+            <span className="so-f-label">结算状态：</span>
             <select className="filter-select" value={filterSettle} onChange={(e) => setFilterSettle(e.target.value)}>
               <option value="">全部结算状态</option>
               <option value="未结算">未结算</option>
               <option value="部分结算">部分结算</option>
               <option value="已结算">已结算</option>
             </select>
+
+            {/* 客户:下拉选择 + 输入自动匹配 */}
+            <span className="so-f-label">客户：</span>
+            <input
+              className="filter-input" list="so-customer-list" placeholder="全部客户（可输入匹配）"
+              value={draftCustomer} onChange={(e) => setDraftCustomer(e.target.value)} style={{ width: 170 }}
+            />
+            <datalist id="so-customer-list">
+              {[...new Set(customerItems.map((c) => c.name))].map((n) => <option key={n} value={n} />)}
+            </datalist>
+
+            {/* 收件人 */}
+            <span className="so-f-label">收件人：</span>
+            <input className="filter-input" placeholder="全部收件人" value={draftReceiver} onChange={(e) => setDraftReceiver(e.target.value)} style={{ width: 110 }} />
+
+            {/* 收件地区:省 / 市 / 县 */}
+            <span className="so-f-label">收件地区：</span>
+            <select className="filter-select" value={draftProv} onChange={(e) => { setDraftProv(e.target.value); setDraftCity(''); setDraftDist(''); }} style={{ width: 96 }}>
+              <option value="">省份</option>
+              {PROVINCE_NAMES.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <select className="filter-select" disabled={!draftProv} value={draftCity} onChange={(e) => { setDraftCity(e.target.value); setDraftDist(''); }} style={{ width: 100 }}>
+              <option value="">地市</option>
+              {draftProv && getCityNames(draftProv).map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select className="filter-select" disabled={!draftCity} value={draftDist} onChange={(e) => setDraftDist(e.target.value)} style={{ width: 100 }}>
+              <option value="">区县</option>
+              {draftProv && draftCity && getDistricts(draftProv, draftCity).map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+
+            {/* 录入日期区间 */}
+            <span className="so-f-label">录入日期：</span>
+            <input className="filter-input" type="date" title="录入日期从" value={draftEntryFrom} onChange={(e) => setDraftEntryFrom(e.target.value)} style={{ width: 138 }} />
+            <span style={{ color: 'var(--color-neutral-300)', flexShrink: 0 }}>~</span>
+            <input className="filter-input" type="date" title="录入日期至" value={draftEntryTo} onChange={(e) => setDraftEntryTo(e.target.value)} style={{ width: 138 }} />
+
+            {/* 客户下单日期区间 */}
+            <span className="so-f-label">客户下单日期：</span>
+            <input className="filter-input" type="date" title="客户下单日期从" value={draftOrderFrom} onChange={(e) => setDraftOrderFrom(e.target.value)} style={{ width: 138 }} />
+            <span style={{ color: 'var(--color-neutral-300)', flexShrink: 0 }}>~</span>
+            <input className="filter-input" type="date" title="客户下单日期至" value={draftOrderTo} onChange={(e) => setDraftOrderTo(e.target.value)} style={{ width: 138 }} />
+
+            {/* 查询 / 重置 */}
+            <Button size="sm" onClick={applyFilters}>
+              <svg viewBox="0 0 16 16" fill="none" style={{ width: 13, height: 13, marginRight: 4 }}><circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+              查询
+            </Button>
+            <Button size="sm" variant="ghost" onClick={resetFilters}>重置</Button>
           </div>
 
           <Card style={{ padding: 0 }}>
@@ -221,7 +316,7 @@ export default function SalesOrders() {
                         {pill(st.settle)}
                         <span className="cell-muted" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{f.mother.entryTime}</span>
                         <span style={{ textAlign: 'center' }}>
-                          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); navigate(`/sales/sales-orders/${f.rootCode}`); }}>查看</Button>
+                          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setViewRoot(f.rootCode); }}>查看</Button>
                         </span>
                       </div>
 
@@ -243,7 +338,7 @@ export default function SalesOrders() {
                                 pill(shipStateOf(c, poDocs.filter((d) => d.childOrderId === c.id))),
                                 pill(settleStateOf(c)),
                                 <div key="act" className="row-actions">
-                                  <Button size="sm" variant="ghost" onClick={() => navigate(`/sales/sales-orders/${f.rootCode}?child=${c.code}`)}>查看</Button>
+                                  <Button size="sm" variant="ghost" onClick={() => setViewRoot(f.rootCode)}>查看</Button>
                                 </div>,
                               ])}
                             />
@@ -279,6 +374,117 @@ export default function SalesOrders() {
         </>)}
       </div>
 
+      {/* ── 销售单详情抽屉（参照客户管理抽屉样式） ── */}
+      <DetailDrawer
+        open={!!viewRoot}
+        onClose={() => setViewRoot(null)}
+        badge="SO"
+        title={viewRoot ?? ''}
+        statusTag={(() => {
+          const fam = families.find((f) => f.rootCode === viewRoot);
+          if (!fam) return null;
+          const st = familyStatesOf(fam);
+          return <>{pill(st.distribute)}{pill(st.ship)}{pill(st.settle)}</>;
+        })()}
+        subtitle={(() => {
+          const fam = families.find((f) => f.rootCode === viewRoot);
+          if (!fam) return '';
+          const m = fam.mother;
+          return `${platformLabelOf(m)} · ${m.customerName}（${m.customerType}） · ${m.receiver} ${m.receiverPhone}`;
+        })()}
+        mode="view"
+      >
+        {(() => {
+          const fam = families.find((f) => f.rootCode === viewRoot);
+          if (!fam) return null;
+          const m = fam.mother;
+          const children = fam.children;
+          const amount = (children.length > 0 ? children : fam.all).reduce((s, o) => s + o.totalAmount, 0);
+          return (
+            <>
+              {/* 原始销售单信息 */}
+              <DrawerSection title="母销售单信息">
+                <InfoGrid cols={3}>
+                  <InfoItem label="母销售单号" emph mono>{fam.rootCode}</InfoItem>
+                  <InfoItem label="来源">{platformLabelOf(m)}{<span style={{ display: 'block', fontSize: 'var(--text-xs)', color: m.sourceChannel === 'push' ? '#7B1FA2' : '#0F64B5' }}>{EXTERNAL_CHANNEL_LABELS[m.sourceChannel]}</span>}</InfoItem>
+                  <InfoItem label="销售路径">{m.salesPath === 'via_platform' ? '经平台销售' : '直接销售'}</InfoItem>
+                  <InfoItem label="客户下单时间">{m.customerOrderTime ?? '—'}</InfoItem>
+                  <InfoItem label="客户侧订单号" mono>{m.customerOrderNo ?? '—'}</InfoItem>
+                  {m.platformCustomerName && <InfoItem label="平台客户">{m.platformCustomerName}</InfoItem>}
+                  <InfoItem label="客户" emph>{m.customerName}<span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{m.customerType}</span></InfoItem>
+                  <InfoItem label="客户区域">{regionText(m)}</InfoItem>
+                  <InfoItem label="订单金额（含子履约单）" emph mono valueStyle={{ color: 'var(--color-module-current-base)' }}>{`¥${amount.toLocaleString()}`}</InfoItem>
+                  <InfoItem label="子履约单数">{children.length > 0 ? `${children.length} 单` : '未拆分（即履约单）'}</InfoItem>
+                  <InfoItem label="录入时间 / 人">{m.entryTime} · {m.operator}</InfoItem>
+                  <InfoItem label="收货人">{m.receiver}</InfoItem>
+                  <InfoItem label="联系电话" mono>{m.receiverPhone}</InfoItem>
+                  <InfoItem label="收货地址" span={3}>{m.receiverAddress || '—'}</InfoItem>
+                  <InfoItem label="备注" span={3}>{m.remark || '—'}</InfoItem>
+                </InfoGrid>
+              </DrawerSection>
+
+              {/* 商品明细（母销售单全量） */}
+              <DrawerSection title={`商品明细（母销售单全量 ${m.items.length} 种）`}>
+                <table className="detail-inline-table">
+                  <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>销售实价</th><th>小计</th></tr></thead>
+                  <tbody>
+                    {m.items.map((it, i) => (
+                      <tr key={i}>
+                        <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
+                        <td>{it.spec}</td>
+                        <td className="mono">{it.quantity}</td>
+                        <td className="mono">¥{it.price.toLocaleString()}</td>
+                        <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>¥{(it.price * it.quantity).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </DrawerSection>
+
+              {/* 子履约单履约情况 */}
+              <DrawerSection title={children.length > 0 ? `子履约单（${children.length}）` : '履约情况（未拆分，母销售单即履约单）'}>
+                {children.length > 0 ? (
+                  <table className="detail-inline-table">
+                    <thead><tr><th>子履约单号</th><th>分发路径</th><th>履约主体</th><th>金额</th><th>分发状态</th><th>发货状态</th><th>结算状态</th></tr></thead>
+                    <tbody>
+                      {children.map((c) => (
+                        <tr key={c.id}>
+                          <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{c.code}</td>
+                          <td style={{ fontSize: 'var(--text-sm)' }}>{pathLabel(c)}</td>
+                          <td style={{ fontSize: 'var(--text-sm)' }}>{c.partnerName ?? (c.path === 'self' ? `自营${c.follower ? ` · ${c.follower}` : ''}` : '—')}</td>
+                          <td className="mono">¥{c.totalAmount.toLocaleString()}</td>
+                          <td>{orderDistributePill(c)}</td>
+                          <td>{pill(shipStateOf(c, poDocs.filter((d) => d.childOrderId === c.id)))}</td>
+                          <td>{pill(settleStateOf(c))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <InfoGrid cols={3}>
+                    <InfoItem label="分发状态">{pill(familyStatesOf(fam).distribute)}</InfoItem>
+                    <InfoItem label="发货状态">{pill(shipStateOf(m, poDocs.filter((d) => d.childOrderId === m.id)))}</InfoItem>
+                    <InfoItem label="结算状态">{pill(settleStateOf(m))}</InfoItem>
+                  </InfoGrid>
+                )}
+              </DrawerSection>
+
+              {/* 处理轨迹（母销售单） */}
+              <DrawerSection title="处理轨迹">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: 280, overflowY: 'auto' }}>
+                  {m.history.map((h, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', alignItems: 'baseline' }}>
+                      <span className="mono" style={{ color: 'var(--color-neutral-400)', flexShrink: 0 }}>{h.time}</span>
+                      <span style={{ fontWeight: 'var(--font-medium)', flexShrink: 0 }}>{h.action}</span>
+                      {h.detail && <span style={{ color: 'var(--color-neutral-500)' }}>{h.detail}</span>}
+                    </div>
+                  ))}
+                </div>
+              </DrawerSection>
+            </>
+          );
+        })()}
+      </DetailDrawer>
     </>
   );
 }

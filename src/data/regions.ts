@@ -261,3 +261,23 @@ export function getCityNames(province: string): string[] {
 export function getDistricts(province: string, city: string): string[] {
   return getCities(province).find(c => c.name === city)?.districts ?? [];
 }
+
+/** 地区展示：省 / 市 / 区（茶人管理标准样式）。
+ * region=客户区域（如"浙江宁波"），address=收货地址（用于解析区县）；
+ * 解析不到的段降级省略，无任何可解析内容时原样返回 region。 */
+export function regionTextOf(region?: string, address?: string): string {
+  const r = region ?? '';
+  const addr = address ?? '';
+  const prov = REGIONS.find((pp) => r.startsWith(pp.name) || addr.startsWith(pp.name));
+  if (!prov) return r || '—';
+  const shortName = (c: string) => c.replace(/市$/, '');
+  const city = prov.cities.find((c) => r.includes(c.name) || addr.includes(c.name))
+    ?? prov.cities.find((c) => r.includes(shortName(c.name)) || addr.includes(shortName(c.name)));
+  const parts: string[] = [prov.name];
+  if (city) {
+    parts.push(city.name);
+    const district = city.districts.find((d) => addr.includes(d)) ?? city.districts.find((d) => r.includes(d));
+    if (district) parts.push(district);
+  }
+  return parts.join(' / ');
+}

@@ -18,14 +18,14 @@ import { getStock } from '../data/stock';
 
 const now = () => new Date().toISOString().slice(0, 10);
 
-/** 由订单编号取原始销售单号（履约单 SO…FO01 → SO…；原始单原样返回） */
-export const soRootOf = (code: string): string => code.split('FO')[0] ?? code;
+/** 由订单编号取母销售单号（子履约单 DXS…LY01 → DXS…；母销售单原样返回） */
+export const soRootOf = (code: string): string => code.split('LY')[0] ?? code;
 
-/** 销售发货单（DO）全平台顺序序列：SO 编号 + DO + 5 位（00001 起，跨单全局递增） */
+/** 销售发货单编号：FHDXS + 2 位发货方（01=自营发货 / 02=合作商发货）+ 4 位（00001 起，全平台顺序递增） */
 let doSeq = 0;
-const genDeliveryNo = (orderCode: string): string => {
+const genDeliveryNo = (shipper: 'self' | 'partner'): string => {
   doSeq += 1;
-  return `${soRootOf(orderCode)}DO${String(doSeq).padStart(5, '0')}`;
+  return `FHDXS${shipper === 'self' ? '01' : '02'}${String(doSeq).padStart(4, '0')}`;
 };
 const nowMin = () => new Date().toISOString().slice(0, 16).replace('T', ' ');
 
@@ -95,7 +95,7 @@ function seedDocs(): PurchaseDoc[] {
   let pkgSeq = 1;
   const mkPkg = (doc: PurchaseDoc, productId: string, productName: string, qty: number, company: string, prefix: number, delivered: boolean): ShipmentPackage => {
     const pkg: ShipmentPackage = {
-      id: `pkg_seed_${pkgSeq}`, packageNo: genDeliveryNo(doc.childOrderCode),
+      id: `pkg_seed_${pkgSeq}`, packageNo: genDeliveryNo(doc.source === 'self' ? 'self' : 'partner'),
       logisticsCompany: company, trackingNo: `${company.includes('顺丰') ? 'SF' : 'DB'}${7000000000 + prefix}`,
       shippedAt: `${doc.createTime} 09:30`,
       items: [{ productId, productName, qty }],
@@ -257,7 +257,7 @@ export const usePurchaseStore = create<PurchaseState>((set, get) => {
       const seq = doc.packages.length + 1;
       const pkg: ShipmentPackage = {
         id: `pkg_${Date.now()}`,
-        packageNo: genDeliveryNo(doc.childOrderCode),
+        packageNo: genDeliveryNo(doc.source === 'self' ? 'self' : 'partner'),
         logisticsCompany: input.logisticsCompany.trim(),
         trackingNo: input.trackingNo.trim(),
         shippedAt: nowMin(),

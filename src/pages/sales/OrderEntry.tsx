@@ -10,14 +10,9 @@ import { customerItems, CUSTOMER_TYPE_LABELS } from '../../data/customers';
 import { platformItems } from '../../data/platforms';
 import { getSalesDefaultPrice, getPersonalMinPrice } from '../../data/prices';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
-import type { ExternalOrderItem, ExternalPlatform } from '../../types';
+import type { ExternalOrderItem } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
-
-const PLATFORM_OPTIONS: { value: ExternalPlatform; label: string }[] = [
-  { value: 'tmall', label: '天猫' }, { value: 'jd', label: '京东' }, { value: 'douyin', label: '抖音' },
-  { value: 'pdd', label: '拼多多' }, { value: 'other', label: '其他平台' },
-];
 
 const DIRECT_TYPES = ['直营客户', '渠道客户', '平台客户', '个人客户'];
 
@@ -42,8 +37,7 @@ export default function OrderEntry() {
 
   /** 销售路径 */
   const [salesPath, setSalesPath] = useState<'direct' | 'via_platform'>('direct');
-  /** 经平台销售:来源平台 + 平台订单号 + 平台客户 */
-  const [platform, setPlatform] = useState<ExternalPlatform>('tmall');
+  /** 经平台销售:平台订单号(来源平台=平台客户,见 platformCustomerId) */
   const [externalOrderNo, setExternalOrderNo] = useState('');
   const [platformCustomerId, setPlatformCustomerId] = useState('');
   /** 客户侧信息 */
@@ -82,7 +76,11 @@ export default function OrderEntry() {
     [],
   );
 
-  const searchPool = isVia ? directCustomerOptions : customerOptions;
+  /** 客户名称下拉:直接销售仅展示当前所选客户类型的客户;经平台销售仅展示直营客户 */
+  const searchPool = useMemo(
+    () => (isVia ? directCustomerOptions : customerOptions.filter((c) => c.typeLabel === customerType)),
+    [isVia, directCustomerOptions, customerOptions, customerType],
+  );
 
   const matchedCustomer = matchedCustomerId ? searchPool.find((c) => c.id === matchedCustomerId) ?? customerOptions.find((c) => c.id === matchedCustomerId) ?? null : null;
   /** 客户下拉列表：点击展开全部在库客户，输入即过滤（可手输搜索） */
@@ -95,7 +93,7 @@ export default function OrderEntry() {
   const selectedPlatformCustomer = platformItems.find((p) => p.id === platformCustomerId) ?? null;
 
   /**
-   * 销售报价取值（价格体系第三层，来自销售报（调）价）：
+   * 销售报价取值（价格体系第三层，来自报品报（调）价）：
    * 个人客户不提前报价；经平台单取所选平台客户的「经平台报价」（自动=客户报价×(1−扣点)）；其余取该客户有效报价（单品价>品牌折扣）。
    */
   const quoteOf = (productId: string): number | undefined => {
@@ -168,6 +166,12 @@ export default function OrderEntry() {
     if (c.contactPhone && !receiverPhone) setReceiverPhone(c.contactPhone);
   };
 
+  const changeCustomerType = (t: string) => {
+    setCustomerType(t);
+    setCustomerSearch(''); setMatchedCustomerId('');
+    setError('');
+  };
+
   const switchPath = (path: 'direct' | 'via_platform') => {
     setSalesPath(path);
     setPlatformCustomerId('');
@@ -185,8 +189,8 @@ export default function OrderEntry() {
   };
 
   const saveOrder = () => {
-    if (isVia && (!platform || !externalOrderNo.trim() || !platformCustomerId)) {
-      setError('经平台销售：来源平台、平台订单号、平台客户为必填');
+    if (isVia && (!externalOrderNo.trim() || !platformCustomerId)) {
+      setError('经平台销售：来源平台（平台客户）、平台订单号为必填');
       return;
     }
     if (!customerSearch.trim() || !regionProv.trim() || !receiver.trim() || !receiverPhone.trim()) {
@@ -203,7 +207,6 @@ export default function OrderEntry() {
     }
     const order = store.getState().addExternalOrder({
       salesPath,
-      platform: isVia ? platform : undefined,
       externalOrderNo: isVia ? externalOrderNo.trim() : undefined,
       platformCustomerId: isVia ? platformCustomerId : undefined,
       platformCustomerName: isVia ? (selectedPlatformCustomer?.name ?? '') : undefined,
@@ -274,30 +277,24 @@ export default function OrderEntry() {
             >
               <strong style={isVia ? { color: 'var(--color-module-current-base)' } : undefined}>经平台销售</strong>
               <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', whiteSpace: 'normal', lineHeight: 1.5 }}>
-                淡茶半盏销售经平台客户销售给直营客户（需选择来源平台与平台客户）
+                淡茶半盏销售经平台客户销售给直营客户（来源平台即平台客户）
               </span>
             </button>
           </div>
 
-          {/* 经平台销售:来源平台 / 平台订单号 / 平台客户 */}
+          {/* 经平台销售:来源平台（下拉取自全部平台客户）/ 平台订单号 */}
           {isVia && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)' }}>
               <div>
-                {label('来源平台', true)}
-                <select className="filter-input" value={platform} onChange={(e) => setPlatform(e.target.value as ExternalPlatform)} style={{ width: '100%' }}>
-                  {PLATFORM_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                {label('来源平台（平台客户）', true)}
+                <select className="filter-input" value={platformCustomerId} onChange={(e) => { setPlatformCustomerId(e.target.value); setError(''); }} style={{ width: '100%' }}>
+                  <option value="">选择平台客户</option>
+                  {platformItems.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
               <div>
                 {label('平台订单号', true)}
                 <input className="filter-input" placeholder="平台给淡茶半盏的订单号" value={externalOrderNo} onChange={(e) => { setExternalOrderNo(e.target.value); setError(''); }} style={{ width: '100%' }} />
-              </div>
-              <div>
-                {label('平台客户（采购买方）', true)}
-                <select className="filter-input" value={platformCustomerId} onChange={(e) => { setPlatformCustomerId(e.target.value); setError(''); }} style={{ width: '100%' }}>
-                  <option value="">选择平台客户</option>
-                  {platformItems.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
               </div>
             </div>
           )}
@@ -307,7 +304,7 @@ export default function OrderEntry() {
             {!isVia && (
               <div>
                 {label('客户类型', true)}
-                <select className="filter-input" value={customerType} onChange={(e) => setCustomerType(e.target.value)} style={{ width: '100%' }}>
+                <select className="filter-input" value={customerType} onChange={(e) => changeCustomerType(e.target.value)} style={{ width: '100%' }}>
                   {DIRECT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
@@ -324,10 +321,10 @@ export default function OrderEntry() {
 
           {/* 客户名称(直接销售=各类型客户;经平台销售=终端直营客户)：可搜索下拉（点击展开全部在库客户，输入即过滤） */}
           <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
-            {label(isVia ? '终端直营客户（下拉选择在库直营客户，可输入搜索）' : '客户名称（下拉选择在库客户，可输入搜索）', true)}
+            {label('客户名称（经平台销售为终端直营客户；下拉选择在库客户，可输入搜索）', true)}
             <div style={{ position: 'relative' }}>
               <input
-                className="filter-input" placeholder={isVia ? '点击选择或输入直营客户名称搜索' : '点击选择客户，或输入名称搜索在库客户'} style={{ width: '100%', paddingRight: 56 }}
+                className="filter-input" placeholder={isVia ? '点击选择终端直营客户，或输入名称搜索' : '点击选择客户，或输入名称搜索'} style={{ width: '100%', paddingRight: 56 }}
                 value={customerSearch}
                 onChange={(e) => { setCustomerSearch(e.target.value); setMatchedCustomerId(''); setError(''); setCustDropOpen(true); }}
                 onFocus={() => setCustDropOpen(true)} onClick={() => setCustDropOpen(true)}

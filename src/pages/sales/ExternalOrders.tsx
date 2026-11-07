@@ -13,7 +13,7 @@ import { useReportStore } from '../../stores/reportStore';
 import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS,
   TRANSFER_SOURCE_LABELS, SOURCE_TAG_LABELS, compareFloorAmount, platformLabelOf } from '../../data/externalOrders';
 import { PARTNER_ORDER_STATUS_LABELS, PARTNER_REPORT_TYPE_LABELS } from '../../data/partner';
-import { REGIONS, getCities, getDistricts } from '../../data/regions';
+import { REGIONS, getCities, getDistricts, regionTextOf } from '../../data/regions';
 import SalesOrderInfoModal from '../../components/business/SalesOrderInfoModal';
 import { usePriceStore } from '../../stores/priceStore';
 import { partnerInRegion } from '../../types';
@@ -58,22 +58,9 @@ function pathKey(o: ExternalOrder): string {
   return 'none';
 }
 
-/** 地区列展示：省 / 市 / 区（与人员-茶人管理同格式；区从收货地址解析，解析不到降级为省市） */
+/** 地区列展示：省 / 市 / 区（共享助手，见 data/regions.regionTextOf） */
 function regionText(o: ExternalOrder): string {
-  const region = o.customerRegion ?? '';
-  const addr = o.receiverAddress ?? '';
-  const prov = REGIONS.find((p) => region.startsWith(p.name) || addr.startsWith(p.name));
-  if (!prov) return region;
-  const shortNames = (c: string) => c.replace(/市$/, '');
-  const city = prov.cities.find((c) => region.includes(c.name) || addr.includes(c.name))
-    ?? prov.cities.find((c) => region.includes(shortNames(c.name)) || addr.includes(shortNames(c.name)));
-  const parts: string[] = [prov.name];
-  if (city) {
-    parts.push(city.name);
-    const district = city.districts.find((d) => region.includes(d)) ?? city.districts.find((d) => addr.includes(d));
-    if (district) parts.push(district);
-  }
-  return parts.join(' / ');
+  return regionTextOf(o.customerRegion, o.receiverAddress);
 }
 
 /** 已接单订单重新分发的风险措辞 */
@@ -1332,7 +1319,7 @@ export default function ExternalOrders() {
             <div style={{ padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-3)' }}>
               <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>快速拆单</div>
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)', lineHeight: 1.6 }}>
-                一键按规则整单拆分：每个分组各生成一张子履约单（同品牌聚在一单 / 每商品一单，编号 = 母销售单编号 + FO01/02…）；母销售单一直存在，不随拆分改变。
+                一键按规则整单拆分：每个分组各生成一张子履约单（同品牌聚在一单 / 每商品一单，编号 = 母销售单编号 + LY01/02…）；母销售单一直存在，不随拆分改变。
               </div>
               <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                 <Button
@@ -1365,7 +1352,7 @@ export default function ExternalOrders() {
 
             <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>手动拆单（按商品 + 数量）</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
-              履约单编号为母销售单编号追加 <strong className="mono">FO01 / FO02…</strong>（按已拆次数递增）。
+              子履约单编号为母销售单编号追加 <strong className="mono">LY01 / LY02…</strong>（按已拆次数递增）。
               拆出部分与剩余部分各生成一张子履约单，各自独立分发；母销售单一直存在（详情页可查看母销售单信息与其下全部子履约单）。
             </div>
             <table className="detail-inline-table">

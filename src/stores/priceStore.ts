@@ -21,8 +21,12 @@ export interface CustomerPlatformQuote {
 /** 单个商品的客户报价（price 缺省 = 按品牌整体折扣计算） */
 export interface CustomerProductQuote {
   productId: string;
-  /** 单品报价（覆盖品牌折扣；缺省=按品牌折扣） */
+  /** 单品报价（覆盖单独折扣与品牌折扣；缺省=按单独折扣/品牌折扣） */
   price?: number;
+  /** 单品单独折扣（百分比，覆盖品牌整体折扣；与单品报价互斥） */
+  discount?: number;
+  /** 是否报品（报给该客户可下单；缺省=是；否=合作商终端客户菜单不展示该商品） */
+  reported?: boolean;
   /** 经平台客户的各平台报价与 SKU（仅经平台客户有内容） */
   platformQuotes: CustomerPlatformQuote[];
 }
@@ -49,6 +53,7 @@ export function effectiveCustomerQuote(
   const p = products.find((x) => x.id === productId);
   if (!p) return undefined;
   if (q?.price !== undefined) return q.price;
+  if (q?.discount !== undefined) return Math.round(p.marketPrice * q.discount) / 100;
   const discount = cfg?.brandDiscounts[p.brand];
   if (discount !== undefined) return Math.round(p.marketPrice * discount) / 100;
   return undefined;
@@ -59,10 +64,9 @@ export function effectivePlatformQuote(
   map: CustomerQuoteMap, customerId: string, productId: string, platformId: string,
   products: { id: string; brand: string; marketPrice: number }[], commissionRate: string,
 ): number | undefined {
-  const base = effectiveCustomerQuote(map, customerId, productId, products);
-  if (base === undefined) return undefined;
+  // 经平台报价为单独设置的价格（不经公司自动计算）；未设置则无报价
   const pq = map[customerId]?.products[productId]?.platformQuotes.find((x) => x.platformId === platformId);
-  return pq?.price ?? calcPlatformNetPrice(base, commissionRate);
+  return pq?.price;
 }
 
 /**
@@ -101,6 +105,10 @@ interface PriceStore {
   removeCustomerQuoteProduct: (customerId: string, productId: string) => void;
   /** 客户报价：设置单品价格（undefined=清除单品价，回到品牌折扣） */
   setCustomerProductPrice: (customerId: string, productId: string, price: number | undefined) => void;
+  /** 客户报价：单品单独折扣/单独报价（patch null=清除单品覆盖，回退品牌折扣；与平台报价子表并存） */
+  setCustomerProductOverride: (customerId: string, productId: string, patch: { price?: number; discount?: number } | null) => void;
+  /** 客户报价：设置单品是否报品（是=合作商终端客户菜单可见可下单） */
+  setCustomerProductReported: (customerId: string, productId: string, reported: boolean) => void;
   /** 客户报价：设置品牌整体折扣（null=删除该品牌折扣） */
   setBrandDiscount: (customerId: string, brand: string, discount: number | null) => void;
   /** 客户报价：设置平台报价（price undefined=恢复自动折算）与平台 SKU */
@@ -226,6 +234,43 @@ export const usePriceStore = create<PriceStore>((set) => ({
         [customerId]: { ...cfg, products: { ...cfg.products, [productId]: { ...cur, price } } },
       },
     };
+  }),
+
+  /** 单品单独折扣/单独报价（参照合作商终端报价：与品牌折扣分层，patch null=清除单品覆盖） */
+  setCustomerProductOverride: (customerId, productId, patch) => set((s) => {
+    const cfg = getQuoteConfig(s.customerQuotes, customerId);
+    const products = { ...cfg.products };
+    if (patch === null) {
+      if (products[productId]) {
+        const cleared = { ...products[productId], price: undefined, discount: undefined };
+        if (cleared.platformQuotes.length > 0) {
+          products[productId] = cleared;
+        } else {
+          delete products[productId];
+        }
+      }
+    } else {
+      const base = products[productId] ?? { productId, platformQuotes: [] };
+      products[productId] = {
+        ...base,
+        price: patch.price !== undefined ? patch.price : undefined,
+        discount: patch.discount !== undefined ? patch.discount : undefined,
+      };
+    }
+    return { customerQuotes: { ...s.customerQuotes, [customerId]: { ...cfg, products } } };
+  }),
+
+  /** 设置单品是否报品（无条目则创建仅含报品标记的条目） */
+  setCustomerProductReported: (customerId, productId, reported) => set((s) => {
+    const cfg = getQuoteConfig(s.customerQuotes, customerId);
+    const cur = cfg.products[productId];
+    const products = { ...cfg.products };
+    if (cur) {
+      products[productId] = { ...cur, reported };
+    } else {
+      products[productId] = { productId, platformQuotes: [], reported };
+    }
+    return { customerQuotes: { ...s.customerQuotes, [customerId]: { ...cfg, products } } };
   }),
 
   setBrandDiscount: (customerId, brand, discount) => set((s) => {

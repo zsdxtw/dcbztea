@@ -11,7 +11,7 @@ export interface OrderFamily {
   rootCode: string;
   /** 母销售单（parentCode 为空；极端情况下家族无母单时退化为首个子单） */
   mother: ExternalOrder;
-  /** 子履约单（按编号升序：FO01、FO02…） */
+  /** 子履约单（按编号升序：LY01、LY02…） */
   children: ExternalOrder[];
   /** 家族全部单（母销售单 + 子履约单） */
   all: ExternalOrder[];

@@ -29,17 +29,17 @@ const now = () => new Date().toISOString().slice(0, 10);
 const nowTs = () => Date.now();
 const nowMin = () => new Date().toISOString().slice(0, 16).replace('T', ' ');
 
-/** 生成母销售单编号：SO + 年月日 + 4 位序号（0001 起，同日递增） */
+/** 生成母销售单编号：DXS + 年月日 + 4 位序号（0001 起，同日递增） */
 const genOrderCode = (orders: ExternalOrder[]): string => {
   const dateKey = now().replace(/-/g, '');
   const seq = orders.filter((o) => !o.parentCode && o.code.includes(dateKey)).length + 1;
-  return `SO${dateKey}${String(seq).padStart(4, '0')}`;
+  return `DXS${dateKey}${String(seq).padStart(4, '0')}`;
 };
 
 /** 生成履约单编号：母销售单编号 + FO + 2 位序号（01 起，挂在母销售单下的履约单数递增） */
 const genFulfillmentCode = (soCode: string, orders: ExternalOrder[]): string => {
   const seq = orders.filter((o) => o.parentCode === soCode).length + 1;
-  return `${soCode}FO${String(seq).padStart(2, '0')}`;
+  return `${soCode}LY${String(seq).padStart(2, '0')}`;
 };
 
 /** 订单 → 平台订单结构（复用报备匹配逻辑） */

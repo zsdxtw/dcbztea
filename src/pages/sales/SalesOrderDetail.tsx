@@ -5,6 +5,7 @@ import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
+import { regionTextOf } from '../../data/regions';
 import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, TRANSFER_SOURCE_LABELS, platformLabelOf } from '../../data/externalOrders';
 import {
   buildFamilies, familyStatesOf, distributeStateOf, shipStateOf, settleStateOf, FAMILY_STATE_COLORS,
@@ -121,7 +122,7 @@ export default function SalesOrderDetail() {
             {infoItem('平台母销售单号', mother.externalOrderNo, { mono: true })}
             {infoItem('来源渠道', EXTERNAL_CHANNEL_LABELS[mother.sourceChannel])}
             {infoItem('客户', `${mother.customerName}（${mother.customerType}）`, { emph: true })}
-            {infoItem('客户区域', mother.customerRegion)}
+            {infoItem('客户区域', regionTextOf(mother.customerRegion, mother.receiverAddress))}
             {infoItem('订单金额（含子单）', <span style={{ color: 'var(--color-module-current-base)', fontWeight: 'var(--font-semibold)' }}>{money(amount)}</span>, { mono: true })}
             {infoItem('子履约单数', children.length > 0 ? `${children.length} 单` : '未拆分（母销售单即履约单）')}
             {infoItem('收货人', mother.receiver)}
@@ -222,7 +223,7 @@ export default function SalesOrderDetail() {
             </div>
           )}
 
-          {/* 销售发货单（DO）标签：该子履约单下全部发货单（PO 包裹 + 自营分仓发货） */}
+          {/* 销售发货单（FHDXS）标签：该子履约单下全部发货单（PO 包裹 + 自营分仓发货） */}
           {(() => {
             const poPkgs = currentPos.flatMap((d) => d.packages.filter((x) => x.status !== 'void').map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, delivered: x.status === 'delivered', items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') })));
             const selfPkgs = (current.selfShipments ?? []).map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, delivered: x.status === 'delivered', items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') }));
