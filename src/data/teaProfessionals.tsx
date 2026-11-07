@@ -36,7 +36,6 @@ export const teaProfessionals: TeaProfessional[] = [
     introduction: '从事茶艺工作10年，擅长乌龙茶与茉莉花茶冲泡技艺，曾为多家企业策划茶会活动，具有丰富的茶文化传播经验。',
     status: 'active',
     settlement: { accountName: '林雨桐', accountNo: '6228****5678', bankName: '中国工商银行福州鼓楼支行', bankNo: '10239100XXX' },
-    isStreamer: true,
   },
   {
     id: '2',
@@ -72,7 +71,6 @@ export const teaProfessionals: TeaProfessional[] = [
     introduction: '资深评茶师，专注普洱茶与红茶品鉴15年，曾为多家知名茶企提供茶叶选品与质量评估服务，具有敏锐的感官审评能力。',
     status: 'active',
     settlement: { accountName: '陈思远', accountNo: '6228****1234', bankName: '中国农业银行昆明盘龙支行', bankNo: '10373100XXX' },
-    isStreamer: true,
   },
   {
     id: '3',
@@ -108,7 +106,6 @@ export const teaProfessionals: TeaProfessional[] = [
     introduction: '武夷岩茶制作技艺传承人，从事茶叶制作20余年，精通大红袍焙火工艺，多次在制茶大赛中获奖，致力于传统制茶技艺的传承与创新。',
     status: 'active',
     settlement: { accountName: '王建国', accountNo: '6228****5678', bankName: '中国建设银行武夷山支行', bankNo: '10539100XXX' },
-    isStreamer: true,
   },
   {
     id: '4',
@@ -145,7 +142,6 @@ export const teaProfessionals: TeaProfessional[] = [
     ],
     introduction: '资深茶艺师兼培训师，擅长龙井茶艺与宋式点茶，拥有丰富的茶会策划与主持经验，致力于茶文化的传播与推广。',
     status: 'active',
-    isStreamer: false,
   },
   {
     id: '5',
@@ -180,7 +176,6 @@ export const teaProfessionals: TeaProfessional[] = [
     ],
     introduction: '普洱茶制作技艺省级传承人，专注普洱茶制作20年，精通古树茶加工与熟茶发酵工艺，对茶叶仓储有深入研究。',
     status: 'active',
-    isStreamer: false,
   },
   {
     id: '6',
@@ -215,7 +210,6 @@ export const teaProfessionals: TeaProfessional[] = [
     ],
     introduction: '高级评茶师兼茶艺师，专注绿茶与红茶品鉴，参与多项茶叶标准制定工作，具有丰富的茶叶感官审评经验。',
     status: 'active',
-    isStreamer: false,
   },
   {
     id: '7',
@@ -250,7 +244,6 @@ export const teaProfessionals: TeaProfessional[] = [
     ],
     introduction: '国家级铁观音制作技艺传承人，从事铁观音制作30年，精通摇青与烘焙工艺，被誉为"铁观音制茶大师"。',
     status: 'active',
-    isStreamer: false,
   },
   {
     id: '8',
@@ -282,7 +275,6 @@ export const teaProfessionals: TeaProfessional[] = [
     ],
     introduction: '新生代茶艺师，擅长四川盖碗茶艺，活跃于茶文化推广领域，风格清新自然，深受年轻茶友喜爱。',
     status: 'active',
-    isStreamer: false,
   },
   {
     id: '9',
@@ -317,7 +309,6 @@ export const teaProfessionals: TeaProfessional[] = [
     ],
     introduction: '资深评茶师与茶叶检验师，专注普洱茶与白茶品鉴，具有丰富的茶叶质量检验与进出口检验经验。',
     status: 'inactive',
-    isStreamer: false,
   },
   {
     id: '10',
@@ -353,7 +344,6 @@ export const teaProfessionals: TeaProfessional[] = [
     ],
     introduction: '高端茶会策划师，擅长商务茶礼与茶酒搭配，服务过多家世界500强企业，将东方茶文化与现代商务场景完美融合。',
     status: 'active',
-    isStreamer: false,
   },
 ];
 

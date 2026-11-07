@@ -27,8 +27,7 @@ import SalesOrders from './pages/sales/SalesOrders';
 import SalesOrderDetail from './pages/sales/SalesOrderDetail';
 import ExternalOrders from './pages/sales/ExternalOrders';
 import OrderEntry from './pages/sales/OrderEntry';
-import OrderShipping from './pages/sales/OrderShipping';
-import FulfillmentOrders from './pages/sales/FulfillmentOrders';
+import SalesFulfillment from './pages/sales/SalesFulfillment';
 import SalesDelivery from './pages/sales/SalesDelivery';
 import CompareManage from './pages/sales/CompareManage';
 import SalesPricing from './pages/sales/SalesPricing';
@@ -98,7 +97,6 @@ import SettingsUnit from './pages/settings/SettingsUnit';
 import PersonnelOrganization from './pages/personnel/PersonnelOrganization';
 import PersonnelTeaProfessional from './pages/personnel/PersonnelTeaProfessional';
 import PersonnelEmployee from './pages/personnel/PersonnelEmployee';
-import PersonnelStreamer from './pages/personnel/PersonnelStreamer';
 
 /* ── 合作商终端（独立后台） ── */
 import PartnerLogin from './pages/partner/PartnerLogin';
@@ -170,9 +168,10 @@ export const router = createBrowserRouter([
       { path: 'sales/order-entry', element: <OrderEntry /> },
       { path: 'sales/order-processing', element: <Navigate to="/sales/order-distribute" replace /> },
       { path: 'sales/order-distribute', element: <ExternalOrders /> },
-      { path: 'sales/order-shipping', element: <OrderShipping /> },
+      { path: 'sales/order-shipping', element: <Navigate to="/selfop/orders" replace /> },
+      { path: 'sales/sales-fulfillment', element: <SalesFulfillment /> },
+      { path: 'sales/fulfillment-orders', element: <Navigate to="/sales/sales-fulfillment" replace /> },
       { path: 'sales/order-settlement', element: <Navigate to="/finance/finance-partner-settlement" replace /> },
-      { path: 'sales/fulfillment-orders', element: <FulfillmentOrders /> },
       { path: 'sales/sales-delivery', element: <SalesDelivery /> },
       { path: 'sales/sales-orders', element: <SalesOrders /> },
       { path: 'sales/sales-orders/:rootCode', element: <SalesOrderDetail /> },
@@ -254,7 +253,7 @@ export const router = createBrowserRouter([
       { path: 'personnel/personnel-organization', element: <PersonnelOrganization /> },
       { path: 'personnel/personnel-employee', element: <PersonnelEmployee /> },
       { path: 'personnel/personnel-tea-professional', element: <PersonnelTeaProfessional /> },
-      { path: 'personnel/personnel-streamer', element: <PersonnelStreamer /> },
+      { path: 'personnel/personnel-streamer', element: <Navigate to="/personnel/personnel-tea-professional" replace /> },
       { path: 'personnel/personnel-stores', element: <SalesStores /> },
     ],
   },

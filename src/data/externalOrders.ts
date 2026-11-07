@@ -10,7 +10,7 @@ const minutesLater = (m: number) => Date.now() + m * 60 * 1000;
 const baseSeeds: ExternalOrder[] = [
   /* ── 待处理（手工录入） ── */
   {
-    id: 'eo1', code: 'WB20261025001', platform: 'tmall', externalOrderNo: 'TM-88213907-1',
+    id: 'eo1', code: 'SO202610250001', platform: 'tmall', externalOrderNo: 'TM-88213907-1',
     customerName: '清心茶坊', customerType: '直营客户', customerRegion: '浙江宁波',
     items: [{ productId: 'p5', productName: '金骏眉·特级', spec: '50g/罐', quantity: 12, price: 1024 }],
     totalAmount: 12288,
@@ -23,7 +23,7 @@ const baseSeeds: ExternalOrder[] = [
 
   /* ── 待处理（平台直连推送） ── */
   {
-    id: 'eo8', code: 'WB20261025002', platform: 'douyin', externalOrderNo: 'DY-99012218',
+    id: 'eo8', code: 'SO202610250002', platform: 'douyin', externalOrderNo: 'DY-99012218',
     customerName: '茶颜悦色文创店', customerType: '渠道客户', customerRegion: '湖南长沙',
     items: [
       { productId: 'p2', productName: '碧螺春·一级', spec: '100g/袋', quantity: 25, price: 328 },
@@ -39,7 +39,7 @@ const baseSeeds: ExternalOrder[] = [
 
   /* ── 自营待接单（等管理后台在销售订单-分发订单接单） ── */
   {
-    id: 'eo9', code: 'WB20261024004', platform: 'tmall', externalOrderNo: 'TM-88012554-3',
+    id: 'eo9', code: 'SO202610240004', platform: 'tmall', externalOrderNo: 'TM-88012554-3',
     customerName: '浦发银行', customerType: '平台客户', customerRegion: '上海浦东',
     items: [{ productId: 'p8', productName: '白毫银针·特级', spec: '50g/罐', quantity: 15, price: 768 }],
     totalAmount: 11520,
@@ -56,7 +56,7 @@ const baseSeeds: ExternalOrder[] = [
 
   /* ── 抢单中（演示：发布后 25 分钟内可抢） ── */
   {
-    id: 'eo5', code: 'WB20261025005', platform: 'pdd', externalOrderNo: 'PDD-2093184-1',
+    id: 'eo5', code: 'SO202610250005', platform: 'pdd', externalOrderNo: 'PDD-2093184-1',
     customerName: '茗香阁直播', customerType: '带货客户', customerRegion: '广东广州',
     items: [{ productId: 'p11', productName: '凤凰单丛·蜜兰香', spec: '100g/袋', quantity: 50, price: 374 }],
     totalAmount: 18700,
@@ -75,7 +75,7 @@ const baseSeeds: ExternalOrder[] = [
 
   /* ── 比单中（公开报名制：底价 88 折，已有 2 家报名） ── */
   {
-    id: 'eo6', code: 'WB20261025006', platform: 'jd', externalOrderNo: 'JD-20603995',
+    id: 'eo6', code: 'SO202610250006', platform: 'jd', externalOrderNo: 'JD-20603995',
     customerName: '天福茗茶', customerType: '渠道客户', customerRegion: '福建厦门',
     items: [
       { productId: 'p9', productName: '铁观音·清香一级', spec: '250g/罐', quantity: 40, price: 208 },
@@ -104,7 +104,7 @@ const baseSeeds: ExternalOrder[] = [
 
   /* ── 报备-匹配待确认（录入即命中云茶商品报备，待人工确认后分发） ── */
   {
-    id: 'eo12', code: 'WB20261025007', platform: 'pdd', externalOrderNo: 'PDD-3355660-2',
+    id: 'eo12', code: 'SO202610250007', platform: 'pdd', externalOrderNo: 'PDD-3355660-2',
     customerName: '无锡梅园茶舍', customerType: '直营客户', customerRegion: '江苏无锡',
     items: [{ productId: 'p7', productName: '武夷岩茶·水金龟', spec: '50g/罐', quantity: 16, price: 420 }],
     totalAmount: 6720,
@@ -123,7 +123,7 @@ const baseSeeds: ExternalOrder[] = [
 
   /* ── 转派待接单（报备转派：命中云茶商品报备自动转出） ── */
   {
-    id: 'eo2', code: 'WB20261024003', platform: 'jd', externalOrderNo: 'JD-20581773',
+    id: 'eo2', code: 'SO202610240003', platform: 'jd', externalOrderNo: 'JD-20581773',
     customerName: '苏州吴门茶事', customerType: '个人客户', customerRegion: '江苏苏州',
     items: [{ productId: 'p7', productName: '武夷岩茶·水金龟', spec: '50g/罐', quantity: 20, price: 420 }],
     totalAmount: 8400,
@@ -142,7 +142,7 @@ const baseSeeds: ExternalOrder[] = [
 
   /* ── 转派待接单（指定转派 → 云茶，等合作商终端接单） ── */
   {
-    id: 'eo10', code: 'WB20261024007', platform: 'other', externalOrderNo: 'WX-20261024-66',
+    id: 'eo10', code: 'SO202610240007', platform: 'other', externalOrderNo: 'WX-20261024-66',
     customerName: '华茗堂茶庄', customerType: '直营客户', customerRegion: '江苏南京',
     items: [{ productId: 'p1', productName: '西湖龙井·明前特级', spec: '50g/罐', quantity: 18, price: 452 }],
     totalAmount: 8136,
@@ -160,7 +160,7 @@ const baseSeeds: ExternalOrder[] = [
 
   /* ── 已处理（报备转派 + 合作商已接单 + 发货中） ── */
   {
-    id: 'eo3', code: 'WB20261021008', platform: 'douyin', externalOrderNo: 'DY-7361902',
+    id: 'eo3', code: 'SO202610210008', platform: 'douyin', externalOrderNo: 'DY-7361902',
     customerName: '南京翠竹茶行', customerType: '渠道客户', customerRegion: '江苏南京',
     items: [{ productId: 'p6', productName: '雨花茶·特级', spec: '100g/罐', quantity: 30, price: 268 }],
     totalAmount: 8040,
@@ -182,7 +182,7 @@ const baseSeeds: ExternalOrder[] = [
 
   /* ── 已处理（自营：管理后台已接单，采购中） ── */
   {
-    id: 'eo11', code: 'WB20261022009', platform: 'jd', externalOrderNo: 'JD-20775210',
+    id: 'eo11', code: 'SO202610220009', platform: 'jd', externalOrderNo: 'JD-20775210',
     customerName: '交通银行', customerType: '平台客户', customerRegion: '上海黄浦',
     items: [{ productId: 'p3', productName: '竹叶青·品味级', spec: '50g/罐', quantity: 40, price: 356 }],
     totalAmount: 14240,
@@ -193,15 +193,15 @@ const baseSeeds: ExternalOrder[] = [
     selfPo: { supplierId: '8', supplierName: '四川省茶业集团股份有限公司', mode: 'warehouse', purchaseDate: '2026-10-23' },
     history: [
       { time: '2026-10-22', action: '直连推送订单', detail: '京东平台 API 同步' },
-      { time: '2026-10-22', action: '选择自营路径', detail: '进入销售单自营 · 等待接单' },
+      { time: '2026-10-22', action: '选择自营路径', detail: '进入自营工作台 · 等待接单' },
       { time: '2026-10-23', action: '接单（自营）', detail: '跟单人 周雨桐 → 已接单' },
-      { time: '2026-10-23', action: '以销定采', detail: '竹叶青·品味级 缺口 40 件 → 入库制采购单 CG-WB20261022009（四川省茶业集团）· 采购在途' },
+      { time: '2026-10-23', action: '以销定采', detail: '竹叶青·品味级 缺口 40 件 → 入库制采购单 CG-SO202610220009（四川省茶业集团）· 采购在途' },
     ],
   },
 
   /* ── 已完成（自营全链路） ── */
   {
-    id: 'eo4', code: 'WB20261018010', platform: 'tmall', externalOrderNo: 'TM-87390115-2',
+    id: 'eo4', code: 'SO202610180010', platform: 'tmall', externalOrderNo: 'TM-87390115-2',
     customerName: '浦发银行', customerType: '平台客户', customerRegion: '上海浦东',
     items: [{ productId: 'p8', productName: '白毫银针·特级', spec: '50g/罐', quantity: 10, price: 768 }],
     totalAmount: 7680,
@@ -211,7 +211,7 @@ const baseSeeds: ExternalOrder[] = [
     processStatus: 'completed',
     path: 'self', follower: '陈默',
     selfShipments: [{
-      id: 'ss_eo4_1', packageNo: 'PKG-WB20261018010-01',
+      id: 'ss_eo4_1', packageNo: 'PKG-SO202610180010FO01',
       warehouseId: 'wh-ind-04', warehouseName: '福鼎分仓',
       logisticsCompany: '京东物流', trackingNo: 'JD0031874520',
       items: [{ productId: 'p8', productName: '白毫银针·特级', qty: 10 }],
@@ -219,7 +219,7 @@ const baseSeeds: ExternalOrder[] = [
     }],
     history: [
       { time: '2026-10-18', action: '手工录入订单', detail: '天猫平台' },
-      { time: '2026-10-18', action: '选择自营路径', detail: '进入销售单自营 · 等待接单' },
+      { time: '2026-10-18', action: '选择自营路径', detail: '进入自营工作台 · 等待接单' },
       { time: '2026-10-19', action: '接单（自营）', detail: '跟单人 陈默 → 已接单' },
       { time: '2026-10-22', action: '采购&发货（分仓直发）', detail: '福鼎分仓 直发 白毫银针·特级×10 · 京东物流 JD0031874520 → 已发货运输中' },
       { time: '2026-10-23', action: '物流妥投', detail: 'JD0031874520 已完成投递 → 妥投' },
@@ -229,7 +229,7 @@ const baseSeeds: ExternalOrder[] = [
 
   /* ── 已完成（比单转派已结算） ── */
   {
-    id: 'eo7', code: 'WB20261012011', platform: 'other', externalOrderNo: 'WX-20261012-88',
+    id: 'eo7', code: 'SO202610120011', platform: 'other', externalOrderNo: 'WX-20261012-88',
     customerName: '华茗堂茶庄', customerType: '直营客户', customerRegion: '江苏南京',
     items: [{ productId: 'p1', productName: '西湖龙井·明前特级', spec: '50g/罐', quantity: 20, price: 452 }],
     totalAmount: 9040,
@@ -329,7 +329,7 @@ function buildOne(seq: number, statusPlan: {
   const items = statusPlan.items;
   return {
     id: `demo_${seq}`,
-    code: `WB202610${String(day).padStart(2, '0')}9${String(seq).padStart(2, '0')}`,
+    code: `SO202610${String(day).padStart(2, '0')}${String(9000 + seq).padStart(4, '0')}`,
     platform,
     externalOrderNo: `${platform === 'tmall' ? 'TM' : platform === 'jd' ? 'JD' : platform === 'douyin' ? 'DY' : platform === 'pdd' ? 'PDD' : 'WX'}-DEMO-${1000 + seq}`,
     customerName: cust.name,
@@ -383,7 +383,7 @@ function buildDemoOrders(): ExternalOrder[] {
       items: isFamilyB && i === 0 ? pickItems(s) : pickItems(s),
       processStatus: 'pending',
       history: isFamilyB && i > 0
-        ? [{ time: D(s), action: '拆单生成子订单', detail: `从母订单拆出（演示拆单家族）` }]
+        ? [{ time: D(s), action: '拆单生成子订单', detail: `从母销售单拆出（演示拆单家族）` }]
         : [],
       extra: isFamilyB && i > 0 ? { parentCode: undefined } : undefined,
     }));
@@ -391,9 +391,9 @@ function buildDemoOrders(): ExternalOrder[] {
   // 家族 B：前三笔组成母子（第一笔为母，后两笔挂 parentCode）
   const famBMother = orders[orders.length - 8];
   orders[orders.length - 7].parentCode = famBMother.code;
-  orders[orders.length - 7].code = `${famBMother.code}-1`;
+  orders[orders.length - 7].code = `${famBMother.code}FO01`;
   orders[orders.length - 6].parentCode = famBMother.code;
-  orders[orders.length - 6].code = `${famBMother.code}-2`;
+  orders[orders.length - 6].code = `${famBMother.code}FO02`;
 
   /* ── 报备-匹配待确认 ×4（命中两条已审批报备） ── */
   for (let i = 0; i < 4; i++) {
@@ -504,34 +504,58 @@ function buildDemoOrders(): ExternalOrder[] {
   const famC = orders[orders.length - 2];
   const famC2 = orders[orders.length - 1];
   const motherCodeC = famC.code.replace(/9\d$/, '80');
-  famC.parentCode = motherCodeC; famC.code = `${motherCodeC}-1`;
+  famC.parentCode = motherCodeC; famC.code = `${motherCodeC}FO01`;
   famC.transferSource = 'compare';
   famC.history.push({ time: D(20), action: '比单定标（按商品·积分优先）', detail: `按商品积分排名第一中单 → ${famC.partnerName} · 等待合作商接单` });
-  famC2.parentCode = motherCodeC; famC2.code = `${motherCodeC}-2`;
+  famC2.parentCode = motherCodeC; famC2.code = `${motherCodeC}FO02`;
   famC2.processStatus = 'pending';
   famC2.path = undefined; famC2.distributeMode = undefined;
   famC2.partnerId = undefined; famC2.partnerName = undefined;
   famC2.transferSource = undefined; famC2.transferTime = undefined;
   famC2.sourceTag = 'compare_failed';
   famC2.history = [{ time: D(20), action: '拆单生成子订单', detail: '比单定标分拆' }, { time: D(20), action: '比单未成退回', detail: '无报名商品形成子订单，重新进入分发-待处理' }];
+  // 母销售单（一直存在：整单分拆后保持不变，履约见其下 FO 子履约单）
+  orders.push({
+    ...famC, id: 'eo_famC_mother', code: motherCodeC, parentCode: undefined,
+    items: [...famC.items, ...famC2.items],
+    totalAmount: [...famC.items, ...famC2.items].reduce((s, it) => s + it.price * it.quantity, 0),
+    processStatus: 'completed',
+    history: [
+      { time: D(20), action: '手工录入订单', detail: '母销售单' },
+      { time: D(20), action: '发起比单', detail: '公开报名 · 按商品积分排名定标' },
+      { time: D(20), action: '整单分拆定案完成', detail: '已生成 2 张子履约单，均挂本母销售单下' },
+    ],
+  });
 
   // 抢单未成孤儿子单（挂于不存在的母编号，演示「抢单未成」标签）：取分发-待处理组第 5 笔改造
   const orphan = orders[7];
   const orphanMother = orphan.code.replace(/9\d$/, '60');
   orphan.parentCode = orphanMother;
-  orphan.code = `${orphanMother}-1`;
+  orphan.code = `${orphanMother}FO01`;
   orphan.sourceTag = 'grab_failed';
   orphan.history = [{ time: D(9), action: '拆单生成子订单', detail: '抢单分拆定案' }, { time: D(9), action: '抢单未成退回', detail: '未被抢购商品形成子订单，重新进入分发-待处理' }];
+  // 孤儿家族的母销售单容器
+  orders.push({
+    ...orphan, id: 'eo_orphan_mother', code: orphanMother, parentCode: undefined,
+    items: [...orphan.items],
+    totalAmount: orphan.items.reduce((s, it) => s + it.price * it.quantity, 0),
+    processStatus: 'completed',
+    history: [
+      { time: D(9), action: '手工录入订单', detail: '母销售单' },
+      { time: D(9), action: '发布抢单', detail: '按商品先到先得' },
+      { time: D(9), action: '整单分拆定案完成', detail: '未被抢购商品形成子履约单退回，母销售单保持不变' },
+    ],
+  });
 
-  /* ── 销售单自营 ×4：已接单（采购在途）/ 已接单（到货待发）/ 已发货运输中（分仓直发）/ 妥投（直发采购） ── */
+  /* ── 自营链种子 ×4：已接单（采购在途）/ 已接单（到货待发）/ 已发货运输中（分仓直发）/ 妥投（直发采购） ── */
   for (let i = 0; i < 4; i++) {
     const s = next();
     const sup = DEMO_PARTNERS[(i + 3) % DEMO_PARTNERS.length];
     const items = pickItems(s);
-    const code = `WB202610${String(11 + (s % 15)).padStart(2, '0')}9${String(s).padStart(2, '0')}`;
+    const code = `SO202610${String(11 + (s % 15)).padStart(2, '0')}${String(9000 + s).padStart(4, '0')}`;
     const stage = i % 4; // 0 已接单·采购在途 / 1 已接单·到货待发 / 2 已发货运输中 / 3 妥投
     const hist: ExternalOrder['history'] = [
-      { time: D(s), action: '选择自营路径', detail: '进入销售单自营 · 等待接单' },
+      { time: D(s), action: '选择自营路径', detail: '进入自营工作台 · 等待接单' },
       { time: D(s), action: '接单（自营）', detail: `跟单人 ${DEMO_FOLLOWERS[i]} → 已接单` },
     ];
     const extra: Record<string, unknown> = { path: 'self', follower: DEMO_FOLLOWERS[i] };

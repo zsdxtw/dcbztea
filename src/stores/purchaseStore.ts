@@ -17,6 +17,16 @@ import type { SupplyPlanLine } from '../types';
 import { getStock } from '../data/stock';
 
 const now = () => new Date().toISOString().slice(0, 10);
+
+/** 由订单编号取原始销售单号（履约单 SO…FO01 → SO…；原始单原样返回） */
+export const soRootOf = (code: string): string => code.split('FO')[0] ?? code;
+
+/** 销售发货单（DO）全平台顺序序列：SO 编号 + DO + 5 位（00001 起，跨单全局递增） */
+let doSeq = 0;
+const genDeliveryNo = (orderCode: string): string => {
+  doSeq += 1;
+  return `${soRootOf(orderCode)}DO${String(doSeq).padStart(5, '0')}`;
+};
 const nowMin = () => new Date().toISOString().slice(0, 16).replace('T', ' ');
 
 /** 采购口径单价：比单用中单价（由调用方传入），否则按供应商采购价规则（缺省销售实价 55%） */
@@ -85,7 +95,7 @@ function seedDocs(): PurchaseDoc[] {
   let pkgSeq = 1;
   const mkPkg = (doc: PurchaseDoc, productId: string, productName: string, qty: number, company: string, prefix: number, delivered: boolean): ShipmentPackage => {
     const pkg: ShipmentPackage = {
-      id: `pkg_seed_${pkgSeq}`, packageNo: `PKG-${String(pkgSeq).padStart(4, '0')}`,
+      id: `pkg_seed_${pkgSeq}`, packageNo: genDeliveryNo(doc.childOrderCode),
       logisticsCompany: company, trackingNo: `${company.includes('顺丰') ? 'SF' : 'DB'}${7000000000 + prefix}`,
       shippedAt: `${doc.createTime} 09:30`,
       items: [{ productId, productName, qty }],
@@ -247,7 +257,7 @@ export const usePurchaseStore = create<PurchaseState>((set, get) => {
       const seq = doc.packages.length + 1;
       const pkg: ShipmentPackage = {
         id: `pkg_${Date.now()}`,
-        packageNo: `PKG-${doc.code}-${String(seq).padStart(2, '0')}`,
+        packageNo: genDeliveryNo(doc.childOrderCode),
         logisticsCompany: input.logisticsCompany.trim(),
         trackingNo: input.trackingNo.trim(),
         shippedAt: nowMin(),

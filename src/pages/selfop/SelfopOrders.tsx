@@ -90,7 +90,7 @@ export default function SelfopOrders() {
         />
         {filtered.length === 0 && (
           <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: 'var(--color-neutral-400)' }}>
-            暂无自营订单（管理后台「履约分配」转自营后进入此处）
+            暂无自营订单（管理后台「销售单分发」转自营后进入此处）
           </div>
         )}
       </div>

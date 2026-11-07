@@ -112,7 +112,7 @@ export default function SalesDelivery() {
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           统一管理所有<strong>实际发货</strong>：<strong>平台仓发货</strong>（自营分仓出库，扣平台库存）、<strong>合作商直发</strong>（转派采购直发，扣合作商对应库存）、
-          <strong>供应商直发</strong>（以销定采直发客户）。发货明细均关联履约任务与采购明细；签收（妥投）回写订单履约状态。
+          <strong>供应商直发</strong>（以销定采直发客户）。发货明细均关联销售单履约与采购明细；签收（妥投）回写订单履约状态。
           发货执行：平台仓在「销售单自营 · 采购&amp;发货」，直发由合作商/供应商端发货登记。
         </div>
 
@@ -150,7 +150,7 @@ export default function SalesDelivery() {
                 : pill('#FBF3E2', '#9A7A1C', '在途'),
               <div key="act" className="row-actions" style={{ whiteSpace: 'nowrap' }}>
                 {r.status !== 'delivered' && <Button size="sm" variant="ghost" onClick={() => deliver(r)}>模拟签收</Button>}
-                <Button size="sm" variant="ghost" onClick={() => navigate('/sales/fulfillment-orders')}>看履约任务</Button>
+                <Button size="sm" variant="ghost" onClick={() => navigate('/sales/sales-fulfillment')}>看销售单履约</Button>
               </div>,
             ])}
           />

@@ -16,6 +16,8 @@ import {
 } from '../../data/externalOrders';
 import { PARTNER_ORDER_STATUS_LABELS, PARTNER_REPORT_TYPE_LABELS } from '../../data/partner';
 import { REGIONS, getCities, getDistricts } from '../../data/regions';
+import SalesOrderInfoModal from '../../components/business/SalesOrderInfoModal';
+import { usePriceStore } from '../../stores/priceStore';
 import { partnerInRegion } from '../../types';
 import type { ExternalOrder, RegionScope } from '../../types';
 
@@ -98,6 +100,9 @@ export default function ExternalOrders() {
   const scoreEntries = useScoreStore((s) => s.entries);
 
   const [filterStatus, setFilterStatus] = useState('');
+  const [linkOrderCode, setLinkOrderCode] = useState<string | null>(null);
+  const [quickMsg, setQuickMsg] = useState('');
+  const products = usePriceStore((s) => s.products);
   const [keyword, setKeyword] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -124,7 +129,7 @@ export default function ExternalOrders() {
   /** 直接选定弹窗 */
   const [awarding, setAwarding] = useState<{ orderId: string; supplierId: string; supplierName: string } | null>(null);
   const [awardReason, setAwardReason] = useState('');
-  /** 履约分配弹窗（待处理订单独立处理页：直接进入分发方式选择，含转自营） */
+  /** 销售单分发弹窗（待处理订单独立处理页：直接进入分发方式选择，含转自营） */
   const [flowingId, setFlowingId] = useState<string | null>(null);
   const [flowMode, setFlowMode] = useState<'self' | 'assign' | 'report' | 'grab' | 'compare'>('assign');
   /** 转派-指定：合作商选择 + 省市县筛选 + 搜索 + 分页 */
@@ -166,7 +171,7 @@ export default function ExternalOrders() {
   const activeSuppliers = useMemo(() => suppliers.filter((s) => s.status === 'active'), [suppliers]);
   const scoreOf = (id: string, name: string) => getScoreSummary(scoreEntries, id, name);
 
-  /** 审批通过的报备记录（履约分配弹窗·报备匹配选择用） */
+  /** 审批通过的报备记录（销售单分发弹窗·报备匹配选择用） */
   const approvedReports = useReportStore((s) => s.reports.filter((r) => r.status === 'approved'));
 
   const flowing = flowingId ? orders.find((o) => o.id === flowingId) ?? null : null;
@@ -228,7 +233,7 @@ export default function ExternalOrders() {
     setFloorType('discount'); setFloorValue('88');
   };
 
-  /** 履约分配弹窗确认按钮（文案随动作变化，右下角取消 + 确认） */
+  /** 销售单分发弹窗确认按钮（文案随动作变化，右下角取消 + 确认） */
   const flowConfirmLabel =
     flowMode === 'self' ? '确认'
       : flowMode === 'assign' ? '指定并转出'
@@ -267,11 +272,15 @@ export default function ExternalOrders() {
     }
   }, [selectedId]);
 
-  /** 关键字匹配：编号 / 客户 / 平台单号 / 母订单编号（输入母单号时该母单下所有子单均展出） */
+  /** 关键字匹配：编号 / 客户 / 平台单号 / 母销售单编号（输入母单号时该母单下所有子单均展出） */
   const kwMatch = (o: ExternalOrder, kw: string) =>
     o.code.includes(kw) || (o.parentCode ?? '').includes(kw) || o.customerName.includes(kw) || o.externalOrderNo.includes(kw);
 
+  // 已拆分的母销售单不在分发列表/计数展示（由其下各子履约单呈现）
+  const motherCodes = useMemo(() => new Set(orders.map((x) => x.parentCode).filter(Boolean) as string[]), [orders]);
+  const listOrders = useMemo(() => orders.filter((o) => o.parentCode || !motherCodes.has(o.code)), [orders, motherCodes]);
   const filtered = useMemo(() => orders.filter((o) => {
+    if (!o.parentCode && motherCodes.has(o.code)) return false;
     if (keyword && !kwMatch(o, keyword.trim())) return false;
     if (filterStatus !== '') return mergedStatus(o.processStatus) === filterStatus;
     // 「全部」模式下应用地区 + 分发路径筛选
@@ -283,12 +292,12 @@ export default function ExternalOrders() {
       if (listDist && d !== listDist) return false;
     }
     return true;
-  }), [orders, keyword, filterStatus, listProv, listCity, listDist, listPath]);
+  }), [listOrders, keyword, filterStatus, listProv, listCity, listDist, listPath]);
 
   const listCityOpts = listProv ? getCities(listProv).map((c) => c.name) : [];
   const listDistOpts = listProv && listCity ? getDistricts(listProv, listCity) : [];
 
-  const countOf = (key: string) => (key === '' ? orders.length : orders.filter((o) => mergedStatus(o.processStatus) === key).length);
+  const countOf = (key: string) => (key === '' ? listOrders.length : listOrders.filter((o) => mergedStatus(o.processStatus) === key).length);
 
   /** 列表分页：筛选/搜索/页大小变化回第 1 页，越界自动收敛 */
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -364,10 +373,10 @@ export default function ExternalOrders() {
   /* ── 渲染 ── */
   return (
     <>
-      <ContentHeader title="履约分配" breadcrumbs={['销售', '销售订单管理', '履约分配']} />
+      <ContentHeader title="销售单分发" breadcrumbs={['销售', '销售单管理', '销售单分发']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-          履约分配决定<strong>销售订单由谁来供货发货</strong>（自营仓发货 / 合作商采购直发），均<strong>逐个展示子单</strong>（母单聚合总览请前往「销售订单管理 → 销售订单」）。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>，保存后均自动与审批通过的报备比对。
+          销售单分发决定<strong>销售订单由谁来供货发货</strong>（自营仓发货 / 合作商采购直发），均<strong>逐个展示子单</strong>（母单聚合总览请前往「销售单管理 → 销售订单」）。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>，保存后均自动与审批通过的报备比对。
           命中报备的订单先进入<strong>报备-匹配待确认</strong>，人工确认匹配后分发给报备合作商；其余订单点击「分发」在弹窗中选择：转自营（在销售单自营/自营工作台接单，接单时填跟单人）、转派-指定、转派-报备、转派-抢单（时间有限）、转派-比单（积分优先）；抢单与比单可限定合作商地区。
           待接单订单可「重新分发」回待处理重新选择路径；已接单的重新分发需二次确认。
         </div>
@@ -407,7 +416,7 @@ export default function ExternalOrders() {
           .eop-box { display: flex; gap: 12px; padding: 9px 12px; align-items: center; border: 1.5px dashed var(--color-neutral-300); border-radius: 12px; flex: none; }
           .eop-box .tab-card-simple { justify-content: center; }
           .eop-dim { opacity: .45; cursor: not-allowed; }
-          /* 履约分配弹窗 · 分发方式卡片（两行：名称 + 说明小字，文字居中；激活态用内联样式实现，禁用过渡避免干扰） */
+          /* 销售单分发弹窗 · 分发方式卡片（两行：名称 + 说明小字，文字居中；激活态用内联样式实现，禁用过渡避免干扰） */
           .eop-mode-card { flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: var(--space-2) var(--space-3); transition: none; text-align: center; }
           .eop-mode-card strong { font-size: var(--text-sm); }
           .eop-mode-card .eop-mode-sub { font-size: var(--text-xs); font-weight: 400; color: var(--color-neutral-400); line-height: 1.2; white-space: nowrap; }
@@ -415,7 +424,7 @@ export default function ExternalOrders() {
         <div className="eop-flowbar">
           <button className={`tab-card-simple${filterStatus === '' ? ' active' : ''}`} onClick={() => setFilterStatus('')}>
             全部
-            <span className="tab-card-simple-count">{orders.length}</span>
+            <span className="tab-card-simple-count">{listOrders.length}</span>
           </button>
 
           <div className="eop-flow">
@@ -487,7 +496,7 @@ export default function ExternalOrders() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
-          <input className="filter-input" placeholder="搜索订单/母订单编号、客户、平台单号（输入母单号展出其全部子单）..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 320 }} />
+          <input className="filter-input" placeholder="搜索订单/母销售单编号、客户、平台单号（输入母单号展出其全部子单）..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 320 }} />
           {filterStatus === '' && (
             <>
               <select className="filter-select" value={listProv} onChange={(e) => { setListProv(e.target.value); setListCity(''); setListDist(''); }}>
@@ -521,9 +530,22 @@ export default function ExternalOrders() {
         {/* 子单平铺列表（逐单操作视图；母单聚合总览见「销售单管理 → 销售订单」） */}
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['订单编号', '来源', '客户', '地区', '收件人', '收件地址', '金额', '状态', '分发路径', '合作商', '录入时间', '操作']}
+            headers={['订单编号', '关联销售单', '来源', '客户', '地区', '收件人', '收件地址', '金额', '状态', '分发路径', '合作商', '录入时间', '操作']}
             rows={pagedOrders.map((o) => [
               <span key="c" className="cell-mono-emph">{o.code}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.externalOrderNo}</span></span>,
+              o.parentCode ? (
+                <span
+                  key="link"
+                  className="mono"
+                  style={{ fontSize: 'var(--text-sm)', color: 'var(--color-module-current-base)', cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted' }}
+                  title="点击查看母销售单信息"
+                  onClick={() => setLinkOrderCode(o.parentCode!)}
+                >
+                  {o.parentCode}
+                </span>
+              ) : (
+                <span key="link" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>—</span>
+              ),
               <span key="src">
                 {EXTERNAL_PLATFORM_LABELS[o.platform]}
                 <span style={{ display: 'block' }}>{pill(
@@ -558,7 +580,7 @@ export default function ExternalOrders() {
                 {o.processStatus === 'pending' && (
                   <>
                     <Button size="sm" onClick={() => openFlow(o)}>分发</Button>
-                    {o.items.length >= 1 && <Button size="sm" variant="ghost" onClick={() => { setSplitting(o); setSplitQty({}); }}>拆单</Button>}
+                    {o.items.length >= 1 && <Button size="sm" variant="ghost" onClick={() => { setSplitting(o); setSplitQty({}); setQuickMsg(''); }}>拆单</Button>}
                     {o.sourceChannel === 'manual' && <Button size="sm" variant="ghost" onClick={() => { setSelectedId(o.id); startEdit(o); }}>修改</Button>}
                     {o.sourceChannel === 'manual' && <Button size="sm" variant="ghost" onClick={() => setDeleting(o)}>删除</Button>}
                   </>
@@ -572,7 +594,7 @@ export default function ExternalOrders() {
                 {o.processStatus === 'self_pending' && (
                   <>
                     <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
-                    <Button size="sm" variant="ghost" onClick={() => navigate('/sales/order-shipping')}>去销售单自营</Button>
+                    <Button size="sm" variant="ghost" onClick={() => navigate('/selfop/orders')}>去自营工作台处理</Button>
                   </>
                 )}
                 {o.processStatus === 'distribute_pending' && (
@@ -652,7 +674,7 @@ export default function ExternalOrders() {
       >
         {current && (
           <>
-            {/* ── 母子订单标签页（拆单家族：母订单 + 子订单1..N） ── */}
+            {/* ── 母子订单标签页（拆单家族：母销售单 + 子订单1..N） ── */}
             {(() => {
               const rootCode = current.parentCode ?? current.code;
               const mother = orders.find((o) => o.code === rootCode && !o.parentCode);
@@ -675,7 +697,7 @@ export default function ExternalOrders() {
               );
               return (
                 <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
-                  {mother ? tab(mother.code, `母订单 ${mother.code}`) : null}
+                  {mother ? tab(mother.code, `母销售单 ${mother.code}`) : null}
                   {children.map((c, i) => tab(c.code, `子订单${i + 1} ${c.code}`))}
                 </div>
               );
@@ -687,7 +709,7 @@ export default function ExternalOrders() {
                 <InfoGrid>
                   <InfoItem label="订单编号" mono emph>{current.code}</InfoItem>
                   <InfoItem label="来源平台">{EXTERNAL_PLATFORM_LABELS[current.platform]}</InfoItem>
-                  <InfoItem label="平台原始单号" mono>{current.externalOrderNo}</InfoItem>
+                  <InfoItem label="平台母销售单号" mono>{current.externalOrderNo}</InfoItem>
                   <InfoItem label="来源渠道">{current.sourceChannel === 'manual' ? '手工录入' : '直连推送'}</InfoItem>
                   <InfoItem label="客户">{current.customerName}（{current.customerType}）</InfoItem>
                   <InfoItem label="客户区域">{regionText(current)}</InfoItem>
@@ -695,7 +717,7 @@ export default function ExternalOrders() {
                   <InfoItem label="录入时间">{current.entryTime}</InfoItem>
                   <InfoItem label="录入人">{current.operator}</InfoItem>
                   <InfoItem label="当前路径">{pathLabel(current)}</InfoItem>
-                  {current.parentCode && <InfoItem label="母订单编号" mono>{current.parentCode}</InfoItem>}
+                  {current.parentCode && <InfoItem label="母销售单编号" mono>{current.parentCode}</InfoItem>}
                 </InfoGrid>
               </DrawerSection>
             )}
@@ -727,7 +749,7 @@ export default function ExternalOrders() {
             {Object.keys(editForm).length > 0 && (
               <DrawerSection title="修改订单信息">
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
-                  {editField('平台原始单号', 'externalOrderNo')}
+                  {editField('平台母销售单号', 'externalOrderNo')}
                   {editField('客户名称', 'customerName')}
                   {editField('客户区域', 'customerRegion')}
                   {editField('收货人', 'receiver')}
@@ -759,11 +781,11 @@ export default function ExternalOrders() {
               </table>
             </DrawerSection>
 
-            {/* ── 待处理：提示前往履约分配弹窗处理 ── */}
+            {/* ── 待处理：提示前往销售单分发弹窗处理 ── */}
             {current.processStatus === 'pending' && (
               <DrawerSection title="分发处理">
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
-                  订单待分发：请点击列表行操作「<strong>分发</strong>」按钮，在<strong>履约分配弹窗</strong>中选择自营或分发（指定 / 报备匹配 / 抢单 / 比单）路径完成分发。
+                  订单待分发：请点击列表行操作「<strong>分发</strong>」按钮，在<strong>销售单分发弹窗</strong>中选择自营或分发（指定 / 报备匹配 / 抢单 / 比单）路径完成分发。
                   本抽屉用于查看订单信息与处理轨迹，不做分发操作。
                 </div>
               </DrawerSection>
@@ -794,7 +816,7 @@ export default function ExternalOrders() {
                   订单已转入<strong>自营</strong>：接单（填跟单人）、退回分发等操作请在<strong>销售单自营</strong>菜单的详情页进行；
                   接单后可拆单，并通过「采购&amp;发货」按仓库分仓直发（各仓快递单号）+ 缺口以销定采。
                 </div>
-                <Button onClick={() => navigate('/sales/order-shipping')}>前往销售单自营处理</Button>
+                <Button onClick={() => navigate('/selfop/orders')}>前往自营工作台处理</Button>
               </DrawerSection>
             )}
 
@@ -1011,7 +1033,7 @@ export default function ExternalOrders() {
         </div>
       )}
 
-      {/* ── 履约分配弹窗（待处理订单独立处理页：直接选择分发方式，含转自营） ── */}
+      {/* ── 销售单分发弹窗（待处理订单独立处理页：直接选择分发方式，含转自营） ── */}
       {flowing && (
         <div className="category-dialog-overlay" onClick={() => setFlowingId(null)}>
           <div
@@ -1019,7 +1041,7 @@ export default function ExternalOrders() {
             onClick={(e) => e.stopPropagation()}
             style={{ width: 720, maxWidth: '94vw', height: 'min(80vh, 720px)', display: 'flex', flexDirection: 'column' }}
           >
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>履约分配 · {flowing.code}</div>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>销售单分发 · {flowing.code}</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7, flexShrink: 0 }}>
               {flowing.customerName} · {regionText(flowing)} · 订单金额 {money(flowing.totalAmount)} · 当前状态：待处理。选择分发方式后点击右下角确认完成分发。
             </div>
@@ -1286,9 +1308,46 @@ export default function ExternalOrders() {
         <div className="category-dialog-overlay" onClick={() => setSplitting(null)}>
           <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 560, maxWidth: '94vw' }}>
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>拆单 · {splitting.code}</div>
+
+            {/* 快速拆单：按品牌 / 按商品 */}
+            <div style={{ padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-3)' }}>
+              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>快速拆单</div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)', lineHeight: 1.6 }}>
+                一键按规则整单拆分：每个分组各生成一张子履约单（同品牌聚在一单 / 每商品一单，编号 = 母销售单编号 + FO01/02…）；母销售单一直存在，不随拆分改变。
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                <Button
+                  size="sm"
+                  disabled={splitting.items.length < 2 || new Set(splitting.items.map((it) => products.find((p) => p.id === it.productId)?.brand ?? products.find((p) => p.name === it.productName)?.brand ?? '其他')).size < 2}
+                  onClick={() => {
+                    const res = store.getState().quickSplit(splitting.id, 'brand');
+                    if (res.ok) { setSplitting(null); } else { setQuickMsg(res.msg); }
+                  }}
+                >
+                  按品牌拆单
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={splitting.items.length < 2}
+                  onClick={() => {
+                    const res = store.getState().quickSplit(splitting.id, 'product');
+                    if (res.ok) { setSplitting(null); } else { setQuickMsg(res.msg); }
+                  }}
+                >
+                  按商品拆单
+                </Button>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>
+                  {splitting.items.length < 2 ? '订单仅 1 种商品，无法快速拆单'
+                    : `当前 ${splitting.items.length} 种商品 · ${new Set(splitting.items.map((it) => products.find((p) => p.id === it.productId)?.brand ?? products.find((p) => p.name === it.productName)?.brand ?? '其他')).size} 个品牌`}
+                </span>
+              </div>
+              {quickMsg && <div style={{ marginTop: 'var(--space-2)', padding: '6px 10px', background: '#FFEBEE', color: '#C62828', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)' }}>{quickMsg}</div>}
+            </div>
+
+            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>手动拆单（按商品 + 数量）</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
-              按<strong>商品 + 数量</strong>拆出子订单：子订单编号为母订单编号追加 <strong className="mono">-1 / -2…</strong>（按已拆次数递增），
-              拆出后作为独立订单分发，母订单保留剩余商品；详情页按「母订单 / 子订单」标签页展示。
+              履约单编号为母销售单编号追加 <strong className="mono">FO01 / FO02…</strong>（按已拆次数递增）。
+              拆出部分与剩余部分各生成一张子履约单，各自独立分发；母销售单一直存在（详情页可查看母销售单信息与其下全部子履约单）。
             </div>
             <table className="detail-inline-table">
               <thead><tr><th>商品名称</th><th>规格</th><th>订单数量</th><th>拆出数量</th></tr></thead>
@@ -1311,7 +1370,7 @@ export default function ExternalOrders() {
               </tbody>
             </table>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 'var(--space-2)' }}>
-              提示：留空或 0 表示不拆出该商品；不能拆出全部商品（母订单至少保留一件）。
+              提示：留空或 0 表示不拆出该商品；不能拆出全部商品（母销售单至少保留一件）。
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
               <Button variant="ghost" onClick={() => setSplitting(null)}>取消</Button>
@@ -1361,6 +1420,8 @@ export default function ExternalOrders() {
         </div>
       )}
 
+      {/* ── 母销售单信息弹窗（关联销售单点击） ── */}
+      <SalesOrderInfoModal code={linkOrderCode} onClose={() => setLinkOrderCode(null)} />
     </>
   );
 }

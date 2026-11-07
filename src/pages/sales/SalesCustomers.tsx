@@ -11,7 +11,6 @@ import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
 import { generateCustomerCode } from '../../utils/customerCode';
 import { useDrawerWidth } from '../../hooks/useDrawerWidth';
 import { getAllPersonOptions, getPersonName as getPersonNameFromOrg, PERSON_TYPE_LABELS } from '../../data/organization';
-import { streamers } from '../../data/streamers';
 import DeptEmployeeSelect from '../../components/business/DeptEmployeeSelect';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 

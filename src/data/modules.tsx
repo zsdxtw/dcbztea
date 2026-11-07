@@ -53,6 +53,16 @@ const SupplierApprovalIcon = () => (
 const SupplierListIcon = () => (
   <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3.5" width="14" height="13" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 7.5h7M6.5 10.5h7M6.5 13.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
 );
+const CustomerAccountIcon = () => (
+  <svg viewBox="0 0 20 20" fill="none"><circle cx="8" cy="6.5" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M3 16a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="15" cy="11.5" r="1.8" stroke="currentColor" strokeWidth="1.2"/><path d="M16.4 12.9L18 14.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+);
+const ReportMgmtIcon = () => (
+  <svg viewBox="0 0 20 20" fill="none"><rect x="4" y="2" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h6M7 9h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><circle cx="13.2" cy="13.2" r="2.7" stroke="currentColor" strokeWidth="1.1"/><path d="M12.1 13.2l0.8 0.8 1.5-1.6" stroke="currentColor" strokeWidth="1.0" strokeLinecap="round" strokeLinejoin="round"/></svg>
+);
+const NewArrivalIcon = () => (
+  <svg viewBox="0 0 20 20" fill="none"><path d="M10 3a5 5 0 015 5v3l1.6 2.4H3.4L5 11V8a5 5 0 015-5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M8 15a2 2 0 004 0" stroke="currentColor" strokeWidth="1.3"/><path d="M15.5 2.5v3M14 4h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+);
+
 const OutboundIcon = () => (
   <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="6" width="14" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M10 13V8M7 10l3 3 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
 );
@@ -215,19 +225,6 @@ const OrgChartIcon = () => (
 const EmployeeIcon = () => (
   <svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="6" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M1 17a6 6 0 0112 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="15" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.2"/><path d="M13 16a4 4 0 015 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
 );
-const StreamerIcon = () => (
-  <svg viewBox="0 0 20 20" fill="none"><path d="M3 10l2 2 4-6 4 8 2-4h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg>
-);
-const CustomerAccountIcon = () => (
-  <svg viewBox="0 0 20 20" fill="none"><circle cx="8" cy="6.5" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M3 16a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="15" cy="11.5" r="1.8" stroke="currentColor" strokeWidth="1.2"/><path d="M16.4 12.9L18 14.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-);
-const ReportMgmtIcon = () => (
-  <svg viewBox="0 0 20 20" fill="none"><rect x="4" y="2" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h6M7 9h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><circle cx="13.2" cy="13.2" r="2.7" stroke="currentColor" strokeWidth="1.1"/><path d="M12.1 13.2l0.8 0.8 1.5-1.6" stroke="currentColor" strokeWidth="1.0" strokeLinecap="round" strokeLinejoin="round"/></svg>
-);
-const NewArrivalIcon = () => (
-  <svg viewBox="0 0 20 20" fill="none"><path d="M10 3a5 5 0 015 5v3l1.6 2.4H3.4L5 11V8a5 5 0 015-5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M8 15a2 2 0 004 0" stroke="currentColor" strokeWidth="1.3"/><path d="M15.5 2.5v3M14 4h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-);
-
 /* ── 模块配置 ── */
 
 export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
@@ -267,14 +264,11 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
     label: '销售',
     menus: [
       { key: 'sales-overview', label: '销售概览', icon: <OverviewIcon /> },
-      { key: 'sales-order-manage', label: '销售订单管理', icon: <OrdersIcon />, children: [
-        { key: 'sales-orders', label: '销售订单', icon: <OrdersIcon /> },
-        { key: 'order-entry', label: '新建销售订单', icon: <QuotationIcon /> },
-        { key: 'order-distribute', label: '履约分配', icon: <OrdersIcon /> },
-      ] },
-      { key: 'fulfillment-manage', label: '履约任务', icon: <InboundIcon />, children: [
-        { key: 'fulfillment-orders', label: '履约任务', icon: <OrdersIcon /> },
-        { key: 'order-shipping', label: '销售单自营', icon: <InboundIcon /> },
+      { key: 'sales-order-manage', label: '销售单管理', icon: <OrdersIcon />, children: [
+        { key: 'order-entry', label: '新建销售单', icon: <QuotationIcon /> },
+        { key: 'sales-orders', label: '销售单列表', icon: <OrdersIcon /> },
+        { key: 'order-distribute', label: '销售单分发', icon: <OrdersIcon /> },
+        { key: 'sales-fulfillment', label: '销售单履约', icon: <InboundIcon /> },
       ] },
       { key: 'sales-delivery', label: '销售发货', icon: <OutboundIcon /> },
       { key: 'compare-manage', label: '比单管理', icon: <ReportMgmtIcon /> },
@@ -385,7 +379,6 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
       { key: 'personnel-organization', label: '组织架构', icon: <OrgChartIcon /> },
       { key: 'personnel-employee', label: '员工管理', icon: <EmployeeIcon /> },
       { key: 'personnel-tea-professional', label: '茶人管理', icon: <TeaProfessionalIcon /> },
-      { key: 'personnel-streamer', label: '带货人管理', icon: <StreamerIcon /> },
       { key: 'personnel-stores', label: '门店管理', icon: <StoreIcon /> },
     ],
   },

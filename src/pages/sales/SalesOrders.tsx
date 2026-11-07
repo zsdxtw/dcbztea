@@ -35,7 +35,7 @@ const orderDistributePill = (o: ExternalOrder) => {
   );
 };
 
-/** 路径标签（与履约分配页口径一致） */
+/** 路径标签（与销售单分发页口径一致） */
 function pathLabel(o: ExternalOrder): string {
   if (o.processStatus === 'report_match_pending') return '转派-报备';
   if (o.path === 'self') return '自营';
@@ -52,8 +52,8 @@ function regionText(o: ExternalOrder): string {
 
 /**
  * 销售 · 销售单管理
- * 全部销售单总览：以原始母销售单（手工录入 / 直连推送）为一行，点击展开该母单下全部子销售单；
- * 母单行含三状态（分发 / 发货 / 结算），「查看」进入母子详情页。分发订单 Tab 保留自营接单与履约跟踪。
+ * 全部销售单总览：以母销售单（手工录入 / 直连推送）为一行，点击展开该母销售单下全部子履约单；
+ * 母销售单行含三状态（分发 / 发货 / 结算），「查看」进入销售单履约详情页。分发订单 Tab 保留自营接单与履约跟踪。
  */
 export default function SalesOrders() {
   const navigate = useNavigate();
@@ -125,15 +125,15 @@ export default function SalesOrders() {
   return (
     <>
       <ContentHeader
-        title="销售订单"
-        breadcrumbs={['销售', '销售订单管理', '销售订单']}
+        title="销售单列表"
+        breadcrumbs={['销售', '销售单管理', '销售单列表']}
         actions={<Button onClick={() => navigate('/sales/order-entry')}>+ 新建销售单</Button>}
       />
       <div className="content-body">
         {/* Tab：全部销售单（母单聚合总览）/ 分发订单（自营接单 + 履约跟踪） */}
         <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
           <button className={`tab-card-simple${tab === 'all' ? ' active' : ''}`} onClick={() => setTab('all')}>
-            全部销售订单（母单）
+            全部母销售单
             <span className="tab-card-simple-count">{families.length} 张</span>
           </button>
         </div>
@@ -141,12 +141,12 @@ export default function SalesOrders() {
         {/* ── 全部销售单 Tab：母单一行 + 展开子单 ── */}
         {tab === 'all' && (<>
           <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-            展示<strong>全部销售订单</strong>：以原始<strong>手工录入</strong>或<strong>直连推送</strong>的母订单为一行（三状态为该母单含全部子单的聚合），点击母单行展开其下全部子销售单；点击「查看」进入<strong>母子详情页</strong>。
-            逐单分配操作请前往「<strong>销售订单管理 → 履约分配</strong>」；执行跟踪见「履约任务」。
+            展示<strong>全部母销售单</strong>：以<strong>手工录入</strong>或<strong>直连推送</strong>的母销售单（SO）为一行（三状态为该母销售单含全部子履约单的聚合），点击母销售单行展开其下全部子履约单（FO）；未拆分的母销售单即履约单；点击「查看」进入销售单履约详情页。
+            逐单分发操作请前往「<strong>销售单管理 → 销售单分发</strong>」；履约进度跟踪见「销售单履约」。
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
-            <input className="filter-input" placeholder="搜索母/子销售单号、客户、平台单号..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 280 }} />
+            <input className="filter-input" placeholder="搜索原始/履约销售单号、客户、平台单号..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 280 }} />
             <select className="filter-select" value={filterChannel} onChange={(e) => setFilterChannel(e.target.value)}>
               <option value="">全部来源</option>
               <option value="manual">手工录入</option>
@@ -183,7 +183,7 @@ export default function SalesOrders() {
                   <span>客户</span>
                   <span>地区</span>
                   <span>收件人</span>
-                  <span style={{ textAlign: 'right' }}>金额（含子单）</span>
+                  <span style={{ textAlign: 'right' }}>金额（含子履约单）</span>
                   <span style={{ textAlign: 'center' }}>子单数</span>
                   <span>分发状态</span>
                   <span>发货状态</span>
@@ -195,10 +195,10 @@ export default function SalesOrders() {
                 {pagedFamilies.map((f) => {
                   const open = expanded.has(f.rootCode);
                   const st = familyStatesOf(f);
-                  const amount = f.all.reduce((s, o) => s + o.totalAmount, 0);
+                  const amount = (f.children.length > 0 ? f.children : f.all).reduce((s, o) => s + o.totalAmount, 0);
                   return (
                     <div key={f.rootCode} style={{ borderBottom: '1px solid var(--color-neutral-100)' }}>
-                      {/* 母单行（点击整行展开/收起子单） */}
+                      {/* 母销售单行（点击整行展开/收起履约单） */}
                       <div
                         style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', alignItems: 'center', padding: 'var(--space-3) var(--space-4)', cursor: 'pointer', background: open ? 'var(--color-neutral-50)' : 'transparent' }}
                         onClick={() => toggleExpand(f.rootCode)}
@@ -227,14 +227,14 @@ export default function SalesOrders() {
                         </span>
                       </div>
 
-                      {/* 子单展开区（母单下全部子销售单，各展示自身内容） */}
+                      {/* 履约单展开区（母销售单下全部履约单，各展示自身内容） */}
                       {open && (
                         <div style={{ background: 'var(--color-neutral-50)', padding: 'var(--space-2) var(--space-4) var(--space-3)' }}>
                           {f.children.length === 0 ? (
                             <div style={{ padding: 'var(--space-2) 0 var(--space-2) 28px', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>未拆分 · 单一销售单（点击「查看」进入详情）</div>
                           ) : (
                             <Table
-                              headers={['子销售单号', '分发路径', '合作商 / 跟单人', '商品', '金额', '分发状态', '发货状态', '结算状态', '操作']}
+                              headers={['子履约单号', '分发路径', '合作商 / 跟单人', '商品', '金额', '分发状态', '发货状态', '结算状态', '操作']}
                               rows={f.children.map((c) => [
                                 <span key="c" className="cell-mono-emph">{c.code}</span>,
                                 <span key="p" style={{ fontSize: 'var(--text-sm)' }}>{pathLabel(c)}</span>,
@@ -266,7 +266,7 @@ export default function SalesOrders() {
           {filteredFamilies.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginRight: 'auto' }}>
-                共 {filteredFamilies.length} 张母订单 · 第 {page} / {totalPages} 页
+                共 {filteredFamilies.length} 张母销售单 · 第 {page} / {totalPages} 页
               </span>
               <Button size="sm" variant="ghost" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => pageBtn(n))}

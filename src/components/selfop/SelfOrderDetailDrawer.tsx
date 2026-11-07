@@ -34,7 +34,7 @@ export interface SelfOrderDetailDrawerProps {
 }
 
 /**
- * 自营订单详情抽屉（管理后台「销售单自营」与「自营工作台 · 订单管理」共用）
+ * 自营订单详情抽屉（自营工作台 · 订单管理）
  * 按状态提供操作：待接单（接单/退回，仅详情页）→ 已接单（拆单/采购&发货/到货入库/出库）
  * → 运输中（包裹妥投推进）→ 妥投（确认收货）。进入自营后不可修改订单内容。
  */
@@ -238,7 +238,7 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
       <DrawerSection title="订单信息">
         <InfoGrid>
           <InfoItem label="订单编号" mono emph>{current.code}</InfoItem>
-          {current.parentCode && <InfoItem label="母订单编号" mono>{current.parentCode}</InfoItem>}
+          {current.parentCode && <InfoItem label="关联母销售单" mono>{current.parentCode}</InfoItem>}
           <InfoItem label="客户">{current.customerName}（{current.customerType}）</InfoItem>
           <InfoItem label="跟单人">{current.follower ?? '—'}</InfoItem>
           <InfoItem label="订单金额" mono emph valueStyle={{ color: 'var(--color-module-current-base)' }}>{money(current.totalAmount)}</InfoItem>

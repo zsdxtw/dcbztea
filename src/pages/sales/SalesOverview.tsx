@@ -48,7 +48,7 @@ const statusPill = (status: string, label?: string) => {
   );
 };
 
-/** 路径标签（与履约分配页口径一致：自营 / 转派-报备·指定·抢单·比单） */
+/** 路径标签（与销售单分发页口径一致：自营 / 转派-报备·指定·抢单·比单） */
 const pathLabel = (o: ExternalOrder): string => {
   if (o.path === 'self') return '自营';
   if (o.transferSource) return TRANSFER_SOURCE_LABELS[o.transferSource];
@@ -61,7 +61,7 @@ export default function SalesOverview() {
   const navigate = useNavigate();
   const flowOrders = useOrderFlowStore((s) => s.orders);
 
-  /** 履约分配各状态单数（已处理 = 已处理 + 已完成） */
+  /** 销售单分发各状态单数（已处理 = 已处理 + 已完成） */
   const statusCount = useMemo(() => {
     const c: Record<string, number> = {};
     flowOrders.forEach((o) => {
@@ -86,7 +86,7 @@ export default function SalesOverview() {
     [flowOrders],
   );
 
-  /* ── 统计卡片（履约分配待办来自分发中心实时数据） ── */
+  /* ── 统计卡片（销售单分发待办来自分发中心实时数据） ── */
   const statCards: StatCardData[] = [
     {
       label: '本月销售额',
@@ -102,7 +102,7 @@ export default function SalesOverview() {
       icon: <svg viewBox="0 0 18 18" fill="none"><rect x="4" y="2" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.3"/></svg>,
     },
     {
-      label: '履约分配待办',
+      label: '销售单分发待办',
       value: String(flowTodo),
       trend: { direction: flowTodo > 0 ? 'up' : 'down', value: `比单报名 ${statusCount.comparing ?? 0} 单` },
       icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M7 8h4M7 11h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
@@ -128,7 +128,7 @@ export default function SalesOverview() {
     },
   ];
 
-  /* ── 待办事项：由履约分配状态实时派生 ── */
+  /* ── 待办事项：由销售单分发状态实时派生 ── */
   const todoItems = [
     (statusCount.pending ?? 0) > 0 && {
       text: `${statusCount.pending} 单外部订单待分流（自营 / 指定 · 抢单 · 比单）`, tag: '待处理', color: EXTERNAL_STATUS_COLORS.pending, to: '/sales/order-distribute',
@@ -137,10 +137,10 @@ export default function SalesOverview() {
       text: `${statusCount.report_match_pending} 单命中报备待确认匹配（确认后分发报备合作商）`, tag: '报备', color: EXTERNAL_STATUS_COLORS.report_match_pending, to: '/sales/order-distribute',
     },
     (statusCount.self_pending ?? 0) > 0 && {
-      text: `${statusCount.self_pending} 单自营订单待接单（接单 / 退回在销售单自营详情页）`, tag: '自营', color: EXTERNAL_STATUS_COLORS.self_pending, to: '/sales/order-shipping',
+      text: `${statusCount.self_pending} 单自营订单待接单（接单 / 退回在自营工作台）`, tag: '自营', color: EXTERNAL_STATUS_COLORS.self_pending, to: '/selfop/orders',
     },
     (statusCount.self_doing ?? 0) > 0 && {
-      text: `${statusCount.self_doing} 单自营订单执行中（已接单 / 运输 / 妥投）`, tag: '自营执行', color: EXTERNAL_STATUS_COLORS.self_shipped, to: '/sales/order-shipping',
+      text: `${statusCount.self_doing} 单自营订单执行中（已接单 / 运输 / 妥投）`, tag: '自营执行', color: EXTERNAL_STATUS_COLORS.self_shipped, to: '/selfop/orders',
     },
     (statusCount.comparing ?? 0) > 0 && {
       text: `${statusCount.comparing} 单比单报名中 · 已报名 ${compareQuotes} 家`, tag: '比单', color: EXTERNAL_STATUS_COLORS.comparing, to: '/sales/compare-manage',
@@ -167,7 +167,7 @@ export default function SalesOverview() {
           <Card title="销售趋势">
             <LineChart data={salesTrendData} />
           </Card>
-          <Card title="待办事项" headerRight={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-module-sales-secondary)' }}>{todoItems.length} 项待处理 · 来自履约分配中心</span>}>
+          <Card title="待办事项" headerRight={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-module-sales-secondary)' }}>{todoItems.length} 项待处理 · 来自销售单分发中心</span>}>
             <div style={{ padding: 'var(--space-2) 0' }}>
               {todoItems.map((item, i) => (
                 <div
@@ -181,15 +181,15 @@ export default function SalesOverview() {
                 </div>
               ))}
               {todoItems.length === 0 && (
-                <div style={{ padding: 'var(--space-4) 0', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)', textAlign: 'center' }}>履约分配暂无待办</div>
+                <div style={{ padding: 'var(--space-4) 0', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)', textAlign: 'center' }}>销售单分发暂无待办</div>
               )}
             </div>
           </Card>
         </div>
 
-        {/* 履约分配动态（分发中心实时数据） */}
+        {/* 销售单分发动态（分发中心实时数据） */}
         <Card
-          title="履约分配动态"
+          title="销售单分发动态"
           style={{ marginTop: 'var(--space-4)' }}
           headerRight={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>本月分发金额 <span className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)' }}>{money(monthFlowAmount)}</span></span>}
         >

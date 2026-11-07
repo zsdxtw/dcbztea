@@ -41,7 +41,6 @@ const emptyForm = {
   introduction: '',
   type: [] as TeaProfessionalType[],
   settlement: { accountName: '', accountNo: '', bankName: '', bankNo: '' },
-  isStreamer: false,
 };
 
 export default function PersonnelTeaProfessional() {
@@ -411,20 +410,9 @@ export default function PersonnelTeaProfessional() {
               </>
             )}
 
-            {/* 是否带货 & 结算信息 */}
-            <h4 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-3)', color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border-primary)', paddingBottom: 'var(--space-2)' }}>带货 & 结算信息</h4>
+            {/* 结算信息 */}
+            <h4 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-3)', color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border-primary)', paddingBottom: 'var(--space-2)' }}>结算信息</h4>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-3)', marginBottom: 'var(--space-5)' }}>
-              <div key="isStreamer" style={{ fontSize: 'var(--text-sm)' }}>
-                <span style={{ color: 'var(--color-text-tertiary)' }}>是否带货：</span>
-                <span style={{
-                  padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)',
-                  background: selectedPerson.isStreamer ? '#9D73BD15' : 'var(--color-bg-tertiary)',
-                  color: selectedPerson.isStreamer ? '#9D73BD' : 'var(--color-text-secondary)',
-                  border: selectedPerson.isStreamer ? '1px solid #9D73BD30' : '1px solid var(--color-border-primary)',
-                }}>
-                  {selectedPerson.isStreamer ? '是' : '否'}
-                </span>
-              </div>
               {[
                 ['户名', selectedPerson.settlement?.accountName],
                 ['卡号', selectedPerson.settlement?.accountNo],
@@ -512,18 +500,10 @@ export default function PersonnelTeaProfessional() {
                 <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 4, color: 'var(--color-text-secondary)' }}>简介</label>
                 <textarea className="filter-input" placeholder="请输入茶人简介" style={{ width: '100%', minHeight: 80, resize: 'vertical' }} />
               </div>
-              {/* 是否带货 */}
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 4, color: 'var(--color-text-secondary)' }}>是否带货</label>
-                <select className="filter-select" style={{ width: '100%' }} value={form.isStreamer ? 'yes' : 'no'} onChange={e => setForm({ ...form, isStreamer: e.target.value === 'yes' })}>
-                  <option value="no">否</option>
-                  <option value="yes">是</option>
-                </select>
-              </div>
-              {/* 结算信息（是否带货为"是"时必填） */}
+              {/* 结算信息 */}
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 4, color: 'var(--color-text-secondary)' }}>
-                  结算信息{form.isStreamer ? ' *' : ''}
+                  结算信息
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-2)' }}>
                   <input className="filter-input" placeholder="户名" style={{ width: '100%' }} value={form.settlement.accountName} onChange={e => setForm({ ...form, settlement: { ...form.settlement, accountName: e.target.value } })} />
@@ -531,11 +511,6 @@ export default function PersonnelTeaProfessional() {
                   <input className="filter-input" placeholder="开户银行" style={{ width: '100%' }} value={form.settlement.bankName} onChange={e => setForm({ ...form, settlement: { ...form.settlement, bankName: e.target.value } })} />
                   <input className="filter-input" placeholder="开户行号" style={{ width: '100%' }} value={form.settlement.bankNo} onChange={e => setForm({ ...form, settlement: { ...form.settlement, bankNo: e.target.value } })} />
                 </div>
-                {form.isStreamer && (
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-                    该茶人已开启带货，结算信息为必填项
-                  </div>
-                )}
               </div>
             </div>
 

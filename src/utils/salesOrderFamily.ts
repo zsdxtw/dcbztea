@@ -5,15 +5,15 @@
 import type { ExternalOrder } from '../types';
 import { EXTERNAL_STATUS_LABELS } from '../data/externalOrders';
 
-/** 母子家族：母单（parentCode 为空）+ 其全部子单（parentCode 指向母编号） */
+/** 母子家族：母销售单（parentCode 为空）+ 其全部子履约单（parentCode 指向母销售单编号） */
 export interface OrderFamily {
-  /** 母单编号（= 根编号） */
+  /** 母销售单编号（= 根编号） */
   rootCode: string;
-  /** 母订单（parentCode 为空；极端情况下家族无母单时退化为首个子单） */
+  /** 母销售单（parentCode 为空；极端情况下家族无母单时退化为首个子单） */
   mother: ExternalOrder;
-  /** 子订单（按编号升序：-1、-2…） */
+  /** 子履约单（按编号升序：FO01、FO02…） */
   children: ExternalOrder[];
-  /** 家族全部单（母 + 子） */
+  /** 家族全部单（母销售单 + 子履约单） */
   all: ExternalOrder[];
 }
 

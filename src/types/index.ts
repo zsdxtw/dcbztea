@@ -480,8 +480,6 @@ export interface TeaProfessional {
   status: 'active' | 'inactive';
   /** 结算信息（户名、卡号、开户银行、开户行号） */
   settlement?: EmployeeSettlement;
-  /** 是否带货 */
-  isStreamer?: boolean;
 }
 
 /**
@@ -679,8 +677,8 @@ export type CustomerBankAccount = PlatformBankAccount;
 /** 客户发票信息（与平台发票信息结构一致） */
 export type CustomerInvoiceInfo = PlatformInvoiceInfo;
 
-/** 人员角色类型：员工 / 茶人 / 带货人 */
-export type PersonRoleType = 'employee' | 'tea_professional' | 'streamer';
+/** 人员角色类型：员工 / 茶人 */
+export type PersonRoleType = 'employee' | 'tea_professional';
 
 /** 分润比例设置 */
 export interface ProfitShareConfig {
@@ -747,7 +745,7 @@ export interface PlatformItem {
   deposit?: number;
   /** 保证金应收日期 */
   depositDueDate?: string;
-  /** 拓客人 ID（原主办人，负责该平台客户的拓展与维护，可为员工/茶人/带货人） */
+  /** 拓客人 ID（原主办人，负责该平台客户的拓展与维护，可为员工/茶人） */
   developerId?: string;
   /** 拓客人类型 */
   developerType?: PersonRoleType;
@@ -788,19 +786,19 @@ export interface CustomerItem {
   platformIds: string[];
   /** 平台扣点映射（仅"带平台方"的直营客户设置，键为平台ID，值为扣点如"8%"；扣点跟随平台，同一客户不同平台可有不同扣点） */
   platformCommissionRates?: Record<string, string>;
-  /** 拓客人 ID（原主办人，负责客户拓展，可为员工/茶人/带货人） */
+  /** 拓客人 ID（原主办人，负责客户拓展，可为员工/茶人） */
   developerId?: string;
   /** 拓客人类型 */
   developerType?: PersonRoleType;
   /** 拓客人姓名（冗余，便于展示） */
   developerName?: string;
-  /** 维护人 ID（负责客户维护，可为员工/茶人/带货人） */
+  /** 维护人 ID（负责客户维护，可为员工/茶人） */
   maintainerId?: string;
   /** 维护人类型 */
   maintainerType?: PersonRoleType;
   /** 维护人姓名（冗余，便于展示） */
   maintainerName?: string;
-  /** 跟单人 ID（负责订单跟进，可为员工/茶人/带货人） */
+  /** 跟单人 ID（负责订单跟进，可为员工/茶人） */
   followerId?: string;
   /** 跟单人类型 */
   followerType?: PersonRoleType;
@@ -1238,21 +1236,6 @@ export interface Employee {
   emergencyContactPhone?: string;
 }
 
-/** 带货人 */
-export interface Streamer {
-  id: string;
-  /** 姓名 */
-  name: string;
-  /** 手机号码 */
-  phone: string;
-  /** 结算信息（户名、卡号、开户银行、开户行号） */
-  settlement: EmployeeSettlement;
-  /** 备注 */
-  remark?: string;
-  /** 关联的茶人 ID（若由茶人联动创建） */
-  linkedTeaProfessionalId?: string;
-}
-
 /** 订单销售场景（6种情况） */
 export type SalesScenario = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -1675,7 +1658,7 @@ export interface ExternalOrder {
   /** 订单编号（WB + 日期 + 3 位序号） */
   code: string;
   platform: ExternalPlatform;
-  /** 平台原始单号 */
+  /** 平台母销售单号 */
   externalOrderNo: string;
   customerName: string;
   customerType: string;
@@ -1693,7 +1676,7 @@ export interface ExternalOrder {
   processStatus: ExternalProcessStatus;
   /** 来源附加标签：抢单未成 / 比单未成（分拆后未成交商品形成的子订单）/ 自营退回 */
   sourceTag?: 'grab_failed' | 'compare_failed' | 'self_returned';
-  /** 母订单编号（拆单生成的子订单指向母订单；详情页按母子 Tab 展示） */
+  /** 母销售单编号（拆单生成的子订单指向母销售单；详情页按母子 Tab 展示） */
   parentCode?: string;
   /** 报备命中列表（命中即自动转出，列表用于展示「报备分发」来源） */
   reportMatches?: ReportMatchInfo[];
