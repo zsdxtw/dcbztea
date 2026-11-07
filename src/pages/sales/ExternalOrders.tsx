@@ -70,7 +70,7 @@ function regionText(o: ExternalOrder): string {
   const parts: string[] = [prov.name];
   if (city) {
     parts.push(city.name);
-    const district = city.districts.find((d) => addr.includes(d));
+    const district = city.districts.find((d) => region.includes(d)) ?? city.districts.find((d) => addr.includes(d));
     if (district) parts.push(district);
   }
   return parts.join(' / ');
@@ -153,6 +153,15 @@ export default function ExternalOrders() {
   const [floorValue, setFloorValue] = useState('88');
   /** 确认报备匹配弹窗（报备-匹配待确认状态订单） */
   const [matchConfirming, setMatchConfirming] = useState<ExternalOrder | null>(null);
+  /** 管理弹窗：报备清单 / 抢单管理 / 比单管理 */
+  const [reportListOpen, setReportListOpen] = useState(false);
+  const [grabMgmtOpen, setGrabMgmtOpen] = useState(false);
+  const [compareMgmtOpen, setCompareMgmtOpen] = useState(false);
+  /** 报备管理筛选 */
+  const [reportStatusFilter, setReportStatusFilter] = useState('');
+  const [reportKw, setReportKw] = useState('');
+  const [grabMsg, setGrabMsg] = useState('');
+  const [compareMsg, setCompareMsg] = useState('');
 
   /** 修改抽屉编辑态 */
   const [editForm, setEditForm] = useState<Record<string, string>>({});
@@ -171,6 +180,8 @@ export default function ExternalOrders() {
 
   /** 审批通过的报备记录（销售单分发弹窗·报备匹配选择用） */
   const approvedReports = useReportStore((s) => s.reports.filter((r) => r.status === 'approved'));
+  /** 全部报备记录（报备清单弹窗用） */
+  const allReports = useReportStore((s) => s.reports);
 
   const flowing = flowingId ? orders.find((o) => o.id === flowingId) ?? null : null;
 
@@ -414,6 +425,7 @@ export default function ExternalOrders() {
           .eop-box { display: flex; gap: 12px; padding: 9px 12px; align-items: center; border: 1.5px dashed var(--color-neutral-300); border-radius: 12px; flex: none; }
           .eop-box .tab-card-simple { justify-content: center; }
           .eop-dim { opacity: .45; cursor: not-allowed; }
+
           /* 销售单分发弹窗 · 分发方式卡片（两行：名称 + 说明小字，文字居中；激活态用内联样式实现，禁用过渡避免干扰） */
           .eop-mode-card { flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: var(--space-2) var(--space-3); transition: none; text-align: center; }
           .eop-mode-card strong { font-size: var(--text-sm); }
@@ -522,6 +534,10 @@ export default function ExternalOrders() {
           )}
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)' }}>
             <Button onClick={() => navigate('/sales/order-entry')}>+ 新建销售单</Button>
+            {/* 管理按钮仅在对应状态页面展示 */}
+            {filterStatus === 'report_match_pending' && <Button onClick={() => setReportListOpen(true)}>报备管理</Button>}
+            {filterStatus === 'grabbing' && <Button onClick={() => setGrabMgmtOpen(true)}>抢单管理</Button>}
+            {filterStatus === 'comparing' && <Button onClick={() => setCompareMgmtOpen(true)}>比单管理</Button>}
           </span>
         </div>
 
@@ -1425,6 +1441,192 @@ export default function ExternalOrders() {
 
       {/* ── 母销售单信息弹窗（关联销售单点击） ── */}
       <SalesOrderInfoModal code={linkOrderCode} onClose={() => setLinkOrderCode(null)} />
+      {/* ── 报备管理弹窗（报备-匹配待确认节点） ── */}
+      {reportListOpen && (
+        <div className="category-dialog-overlay" onClick={() => setReportListOpen(false)}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 860, maxWidth: '94vw', height: 'min(80vh, 700px)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>报备管理</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7, flexShrink: 0 }}>
+              合作商提交的全部报备记录（商机 / 客户 / 商品 / 订单报备）。<strong>已通过</strong>的报备参与订单保存时的自动匹配，命中进入「报备-匹配待确认」；
+              报备审批在「采购 → 供应商与合作商 → 报备管理」。
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>
+              <select className="filter-select" value={reportStatusFilter} onChange={(e) => setReportStatusFilter(e.target.value)}>
+                <option value="">全部状态</option>
+                <option value="pending">待审核</option>
+                <option value="approved">已通过</option>
+                <option value="rejected">已驳回</option>
+              </select>
+              <input className="filter-input" placeholder="搜索报备编号/标题/合作商..." value={reportKw} onChange={(e) => setReportKw(e.target.value)} style={{ width: 240 }} />
+              <span style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', alignSelf: 'center' }}>共 {allReports.filter((r) => (!reportStatusFilter || r.status === reportStatusFilter) && (!reportKw.trim() || r.code.includes(reportKw.trim()) || r.title.includes(reportKw.trim()) || r.partnerName.includes(reportKw.trim()))).length} 条</span>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <table className="detail-inline-table">
+                <thead><tr><th>报备编号</th><th>类型</th><th>标题</th><th>合作商</th><th>报备商品/订单</th><th>状态</th><th>提交时间</th><th>命中待确认订单</th></tr></thead>
+                <tbody>
+                  {allReports
+                    .filter((r) => (!reportStatusFilter || r.status === reportStatusFilter) && (!reportKw.trim() || r.code.includes(reportKw.trim()) || r.title.includes(reportKw.trim()) || r.partnerName.includes(reportKw.trim())))
+                    .sort((a, b) => b.submitTime.localeCompare(a.submitTime))
+                    .map((r) => {
+                      const matchedOrders = orders.filter((o) => o.processStatus === 'report_match_pending' && o.reportMatches?.some((m) => m.reportCode === r.code));
+                      return (
+                        <tr key={r.id}>
+                          <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{r.code}</td>
+                          <td>{PARTNER_REPORT_TYPE_LABELS[r.type]}</td>
+                          <td style={{ fontSize: 'var(--text-sm)' }}>{r.title}</td>
+                          <td style={{ fontSize: 'var(--text-sm)' }}>{r.partnerName}</td>
+                          <td style={{ fontSize: 'var(--text-sm)' }}>{r.productName ? `${r.productName}${r.productSpec ? `（${r.productSpec}）` : ''}` : r.relatedOrderCode ? `订单 ${r.relatedOrderCode}` : '—'}</td>
+                          <td>{pill(
+                            r.status === 'approved' ? '#E8F5E9' : r.status === 'pending' ? '#FBF3E2' : '#FBEDEF',
+                            r.status === 'approved' ? '#01795D' : r.status === 'pending' ? '#9A7A1C' : '#C13A54',
+                            r.status === 'approved' ? '已通过' : r.status === 'pending' ? '待审核' : '已驳回',
+                          )}</td>
+                          <td className="mono" style={{ fontSize: 'var(--text-sm)' }}>{r.submitTime}</td>
+                          <td style={{ fontSize: 'var(--text-sm)' }}>
+                            {matchedOrders.length > 0
+                              ? <span className="mono" style={{ color: 'var(--color-module-current-base)' }}>{matchedOrders.map((o) => o.code).join('、')}</span>
+                              : <span style={{ color: 'var(--color-neutral-400)' }}>—</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+              {allReports.filter((r) => (!reportStatusFilter || r.status === reportStatusFilter) && (!reportKw.trim() || r.code.includes(reportKw.trim()) || r.title.includes(reportKw.trim()) || r.partnerName.includes(reportKw.trim()))).length === 0 && (
+                <div style={{ padding: 'var(--space-5)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>当前筛选条件下暂无报备记录</div>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-3)', flexShrink: 0 }}>
+              <Button variant="ghost" onClick={() => setReportListOpen(false)}>关闭</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 抢单管理弹窗（抢单中节点） ── */}
+      {grabMgmtOpen && (
+        <div className="category-dialog-overlay" onClick={() => setGrabMgmtOpen(false)}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 860, maxWidth: '94vw', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>抢单管理</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
+              全部<strong>抢单中</strong>订单：查看各单抢单记录（合作商按商品抢、时间优先），可<strong>延长抢单时间</strong>或<strong>立即定案</strong>
+              （有记录按合作商分拆转出，未抢商品退回分发-待处理；无记录整体退回·抢单未成）。合作商在终端「抢单大厅」参与抢单。
+            </div>
+            {orders.filter((o) => o.processStatus === 'grabbing').length === 0 && (
+              <div style={{ padding: 'var(--space-5)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>当前无抢单中的订单（在订单「分配」中选择「转派-抢单」发起）</div>
+            )}
+            {orders.filter((o) => o.processStatus === 'grabbing').map((o) => {
+              const taken = new Set((o.grabRecords ?? []).flatMap((g) => g.items ?? []));
+              const remain = o.items.filter((i) => !taken.has(i.productName));
+              return (
+                <div key={o.id} style={{ border: '1px solid var(--color-neutral-100)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
+                    <span className="cell-mono-emph">{o.code}</span>
+                    <span className="cell-emph">{o.customerName}</span>
+                    <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>{o.items.map((i) => `${i.productName}×${i.quantity}`).join('、')}</span>
+                    {o.grabRegion && pill('#E0F7FA', '#00838F', `限 ${[o.grabRegion.province, o.grabRegion.city, o.grabRegion.district].filter(Boolean).join(' ')}`)}
+                    <span style={{ marginLeft: 'auto', fontSize: 'var(--text-sm)' }}>
+                      剩余 <strong className="mono" style={{ color: (o.grabDeadline ?? 0) - tick > 0 ? '#E65100' : '#C62828' }}>
+                        {Math.max(0, Math.floor(((o.grabDeadline ?? 0) - tick) / 60000))} 分 {Math.max(0, Math.floor((((o.grabDeadline ?? 0) - tick) % 60000) / 1000))} 秒
+                      </strong>
+                    </span>
+                  </div>
+                  <table className="detail-inline-table" style={{ marginBottom: 'var(--space-2)' }}>
+                    <thead><tr><th>抢单合作商</th><th>抢到商品</th><th>抢单时间</th></tr></thead>
+                    <tbody>
+                      {(o.grabRecords ?? []).length === 0 && <tr><td colSpan={3} style={{ color: 'var(--color-neutral-400)', textAlign: 'center', padding: 'var(--space-2)' }}>暂无合作商抢单</td></tr>}
+                      {(o.grabRecords ?? []).map((g, i) => (
+                        <tr key={i}>
+                          <td style={{ fontWeight: 'var(--font-medium)' }}>{g.supplierName}</td>
+                          <td>{(g.items ?? []).join('、')}</td>
+                          <td className="mono">{g.grabTime}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {remain.length > 0 && (o.grabRecords ?? []).length > 0 && (
+                    <div style={{ fontSize: 'var(--text-xs)', color: '#B26A00', marginBottom: 'var(--space-2)' }}>未抢商品：{remain.map((i) => i.productName).join('、')}（定案后退回分发-待处理）</div>
+                  )}
+                  <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                    <Button size="sm" variant="ghost" onClick={() => store.getState().extendGrab(o.id, 10)}>延长 10 分钟</Button>
+                    <Button size="sm" onClick={() => { const r = store.getState().forceFinalizeGrab(o.id); window.setTimeout(() => setGrabMsg(r.msg), 0); }}>立即定案</Button>
+                  </div>
+                </div>
+              );
+            })}
+            {grabMsg && <div style={{ padding: '8px 12px', background: '#E8F5E9', color: '#01795D', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)' }}>{grabMsg}</div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button variant="ghost" onClick={() => { setGrabMgmtOpen(false); setGrabMsg(''); }}>关闭</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 比单管理弹窗（比单中节点） ── */}
+      {compareMgmtOpen && (
+        <div className="category-dialog-overlay" onClick={() => setCompareMgmtOpen(false)}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 880, maxWidth: '94vw', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>比单管理</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
+              全部<strong>比单中</strong>订单：查看各单公开报名情况（报价不得低于底价），支持<strong>延长报名</strong>、<strong>评分定标</strong>
+              （截止前可强制：评分=报价 {settings.compareWeights.quote}0% + 积分 {settings.compareWeights.score}0%，按商品积分排名定标）与<strong>直接选定</strong>（转为指定转派）。
+            </div>
+            {orders.filter((o) => o.processStatus === 'comparing').length === 0 && (
+              <div style={{ padding: 'var(--space-5)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>当前无比单中的订单（在订单「分配」中选择「转派-比单」发起）</div>
+            )}
+            {orders.filter((o) => o.processStatus === 'comparing').map((o) => {
+              const cmp = o.compare!;
+              const minQuote = cmp.quotes.length > 0 ? Math.min(...cmp.quotes.map((q) => q.amount)) : 0;
+              return (
+                <div key={o.id} style={{ border: '1px solid var(--color-neutral-100)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
+                    <span className="cell-mono-emph">{o.code}</span>
+                    <span className="cell-emph">{o.customerName}</span>
+                    <span className="mono" style={{ fontSize: 'var(--text-sm)' }}>{money(o.totalAmount)}</span>
+                    {cmp.region && pill('#E0F7FA', '#00838F', `限 ${[cmp.region.province, cmp.region.city, cmp.region.district].filter(Boolean).join(' ')}`)}
+                    <span style={{ fontSize: 'var(--text-xs)', color: '#B26A00' }}>底价：{cmp.floorNote}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 'var(--text-sm)' }}>
+                      截止剩余 <strong className="mono" style={{ color: cmp.deadline - tick > 0 ? '#7B1FA2' : '#C62828' }}>
+                        {Math.max(0, Math.floor((cmp.deadline - tick) / 60000))} 分 {Math.max(0, Math.floor(((cmp.deadline - tick) % 60000) / 1000))} 秒
+                      </strong>
+                    </span>
+                  </div>
+                  <table className="detail-inline-table" style={{ marginBottom: 'var(--space-2)' }}>
+                    <thead><tr><th>报名合作商</th><th>报名报价</th><th>报价分预览</th><th>积分</th><th>报名商品</th><th>报名时间</th><th>操作</th></tr></thead>
+                    <tbody>
+                      {cmp.quotes.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--color-neutral-400)', textAlign: 'center', padding: 'var(--space-2)' }}>暂无合作商报名</td></tr>}
+                      {cmp.quotes.map((q) => {
+                        const sc = scoreOf(q.supplierId, q.supplierName);
+                        const quoteScore = q.amount > 0 && minQuote > 0 ? Math.round((minQuote / q.amount) * 100) : 0;
+                        return (
+                          <tr key={q.supplierId}>
+                            <td style={{ fontWeight: 'var(--font-medium)' }}>{q.supplierName}</td>
+                            <td className="mono">{money(q.amount)}</td>
+                            <td className="mono">{quoteScore}</td>
+                            <td className="mono">{sc.total}</td>
+                            <td style={{ fontSize: 'var(--text-sm)' }}>{(q.items ?? o.items.map((i) => i.productName)).join('、')}</td>
+                            <td className="mono">{q.quoteTime}</td>
+                            <td><Button size="sm" variant="ghost" onClick={() => { setAwarding({ orderId: o.id, supplierId: q.supplierId, supplierName: q.supplierName }); setAwardReason(''); }}>直接选定</Button></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                    <Button size="sm" variant="ghost" onClick={() => store.getState().extendCompare(o.id, 10)}>延长报名 10 分钟</Button>
+                    <Button size="sm" disabled={cmp.quotes.length === 0} onClick={() => { const r = store.getState().finalizeCompare(o.id, true); setCompareMsg(r.msg); }}>评分定标（按商品·积分优先）</Button>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>截止前定标为强制定标</span>
+                  </div>
+                </div>
+              );
+            })}
+            {compareMsg && <div style={{ padding: '8px 12px', background: '#E8F5E9', color: '#01795D', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)' }}>{compareMsg}</div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button variant="ghost" onClick={() => { setCompareMgmtOpen(false); setCompareMsg(''); }}>关闭</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

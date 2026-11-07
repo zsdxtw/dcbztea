@@ -270,8 +270,6 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
         { key: 'order-distribute', label: '销售单分发', icon: <OrdersIcon /> },
         { key: 'sales-fulfillment', label: '销售单履约', icon: <InboundIcon /> },
       ] },
-      { key: 'sales-delivery', label: '销售发货', icon: <OutboundIcon /> },
-      { key: 'compare-manage', label: '比单管理', icon: <ReportMgmtIcon /> },
       { key: 'sales-pricing', label: '销售报（调）价', icon: <QuotationIcon /> },
       { key: 'sales-customers', label: '客户管理', icon: <CustomersIcon /> },
       { key: 'sales-customer-accounts', label: '客户下单账号', icon: <CustomerAccountIcon /> },

@@ -157,6 +157,8 @@ interface OrderFlowState {
   tryGrab: (id: string, supplierId: string, supplierName: string, itemNames: string[]) => { ok: boolean; msg: string };
   /** 延长抢单时间（分钟） */
   extendGrab: (id: string, minutes: number) => void;
+  /** 抢单管理：立即结束抢单（有抢单记录按合作商分拆定案；无记录退回分发-待处理·抢单未成） */
+  forceFinalizeGrab: (id: string) => { ok: boolean; msg: string };
   expireGrabs: () => void;
 
   /* ── 比单（公开报名制） ── */
@@ -762,6 +764,21 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       patchOrder(id, {
         grabDeadline: Math.max(order.grabDeadline, nowTs()) + minutes * 60 * 1000,
       }, { action: '延长抢单时间', detail: `管理后台延长 ${minutes} 分钟` });
+    },
+
+    forceFinalizeGrab: (id) => {
+      const order = get().orders.find((o) => o.id === id);
+      if (!order) return { ok: false, msg: '订单不存在' };
+      if (order.processStatus !== 'grabbing') return { ok: false, msg: '该订单不在抢单中' };
+      if ((order.grabRecords?.length ?? 0) > 0) {
+        finalizeGrabSplit(id);
+        return { ok: true, msg: '已按抢单记录分拆定案（未抢商品退回分发-待处理）' };
+      }
+      patchOrder(id, {
+        processStatus: 'pending', distributeMode: undefined, sourceTag: 'grab_failed',
+        grabDeadline: undefined, grabRecords: undefined, grabRegion: undefined,
+      }, { action: '抢单管理·立即结束（抢单未成）', detail: '无人抢购，退回分发-待处理' });
+      return { ok: true, msg: '抢单已结束，订单退回分发-待处理（抢单未成）' };
     },
 
     expireGrabs: () => {

@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
-import { PageHead, Pill } from './CustomerUI';
+import { PageHead, Pill, getCustomerAuth } from './CustomerUI';
 import { useCustomerStore } from '../../stores/customerStore';
+import { customerItems } from '../../data/customers';
+import { usePriceStore, effectiveCustomerQuote } from '../../stores/priceStore';
 import {
   customerCatalog,
   CATALOG_TEA_CATEGORIES,
@@ -44,6 +46,15 @@ function ProdVisual() {
 export default function CustomerProducts() {
   const addToCart = useCustomerStore((s) => s.addToCart);
   const cart = useCustomerStore((s) => s.cart);
+  /** 客户维度价格体系：本客户销售报价（单品价>品牌折扣）> 销售价回退（个人客户不提前报价） */
+  const auth = getCustomerAuth();
+  const quoteMap = usePriceStore((s) => s.customerQuotes);
+  const storeProducts = usePriceStore((s) => s.products);
+  const custId = customerItems.find((c) => c.name === auth?.customerName)?.id;
+  const priceOf = (p: { id: string; salesPrice: number }): number =>
+    (custId ? effectiveCustomerQuote(quoteMap, custId, p.id, storeProducts) : undefined) ?? p.salesPrice;
+  const isQuoted = (p: { id: string }): boolean =>
+    !!custId && effectiveCustomerQuote(quoteMap, custId, p.id, storeProducts) !== undefined;
 
   const [keyword, setKeyword] = useState('');
   const [teaCategory, setTeaCategory] = useState('');
@@ -60,15 +71,15 @@ export default function CustomerProducts() {
       if (brand && p.brand !== brand) return false;
       return true;
     });
-    if (sortBy === 'price-asc') list = [...list].sort((a, b) => a.salesPrice - b.salesPrice);
-    if (sortBy === 'price-desc') list = [...list].sort((a, b) => b.salesPrice - a.salesPrice);
+    if (sortBy === 'price-asc') list = [...list].sort((a, b) => priceOf(a) - priceOf(b));
+    if (sortBy === 'price-desc') list = [...list].sort((a, b) => priceOf(b) - priceOf(a));
     if (sortBy === 'stock-desc') list = [...list].sort((a, b) => b.stock - a.stock);
     return list;
-  }, [keyword, teaCategory, brand, sortBy]);
+  }, [keyword, teaCategory, brand, sortBy, quoteMap, storeProducts, custId]);
 
   /** 快速加入购物车（默认 1 件） */
   const quickAdd = (p: CustomerCatalogProduct) => {
-    addToCart({ productId: p.id, productName: p.name, spec: p.spec, price: p.salesPrice, quantity: 1 });
+    addToCart({ productId: p.id, productName: p.name, spec: p.spec, price: priceOf(p), quantity: 1 });
     setAddedId(p.id);
     setTimeout(() => setAddedId(''), 1200);
   };
@@ -129,8 +140,9 @@ export default function CustomerProducts() {
                 <span className="ck-prod-meta-item">{p.spec}</span>
               </div>
               <div className="ck-prod-price-row">
-                <span className="ck-prod-price"><small>¥</small>{p.salesPrice.toLocaleString()}</span>
+                <span className="ck-prod-price"><small>¥</small>{priceOf(p).toLocaleString()}</span>
                 <span className="ck-prod-market">市场价 ¥{p.marketPrice.toLocaleString()}</span>
+                {isQuoted(p) && <span className="ck-prod-market" style={{ color: 'var(--pk-accent)', fontWeight: 600 }}>专享报价</span>}
               </div>
               <div className="ck-prod-foot">
                 <span className={`ck-prod-stock${p.stock < 100 ? ' low' : ''}`}>
@@ -168,7 +180,7 @@ export default function CustomerProducts() {
             <>
               <Button variant="ghost" onClick={() => setDetail(null)}>关闭</Button>
               <Button onClick={() => {
-                addToCart({ productId: detail.id, productName: detail.name, spec: detail.spec, price: detail.salesPrice, quantity: detailQty });
+                addToCart({ productId: detail.id, productName: detail.name, spec: detail.spec, price: priceOf(detail), quantity: detailQty });
                 setDetail(null);
               }}>
                 加入购物车（{detailQty} 件）
@@ -190,7 +202,7 @@ export default function CustomerProducts() {
                 <InfoItem label="产地">{detail.origin}</InfoItem>
                 <InfoItem label="等级">{detail.grade}</InfoItem>
                 <InfoItem label="当前库存">{detail.stock} 件</InfoItem>
-                <InfoItem label="销售价" mono emph valueStyle={{ color: 'var(--pk-accent)' }}>¥{detail.salesPrice.toLocaleString()}</InfoItem>
+                <InfoItem label={isQuoted(detail) ? '我的报价' : '销售价'} mono emph valueStyle={{ color: 'var(--pk-accent)' }}>¥{priceOf(detail).toLocaleString()}</InfoItem>
                 <InfoItem label="市场价" mono>¥{detail.marketPrice.toLocaleString()}</InfoItem>
                 <InfoItem label="购买数量">
                   <div style={{ paddingTop: 2 }}><Qty value={detailQty} onChange={v => setDetailQty(Math.max(1, v))} /></div>

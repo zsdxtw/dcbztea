@@ -141,7 +141,7 @@ export default function SalesOverview() {
       text: `${statusCount.self_doing} 单自营订单执行中（已接单 / 运输 / 妥投）`, tag: '自营执行', color: EXTERNAL_STATUS_COLORS.self_shipped, to: '/selfop/orders',
     },
     (statusCount.comparing ?? 0) > 0 && {
-      text: `${statusCount.comparing} 单比单报名中 · 已报名 ${compareQuotes} 家`, tag: '比单', color: EXTERNAL_STATUS_COLORS.comparing, to: '/sales/compare-manage',
+      text: `${statusCount.comparing} 单比单报名中 · 已报名 ${compareQuotes} 家`, tag: '比单', color: EXTERNAL_STATUS_COLORS.comparing, to: '/sales/order-distribute',
     },
     (statusCount.grabbing ?? 0) > 0 && {
       text: `${statusCount.grabbing} 单抢单进行中（合作商大厅先到先得）`, tag: '抢单', color: EXTERNAL_STATUS_COLORS.grabbing, to: '/sales/order-distribute',

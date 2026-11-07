@@ -29,7 +29,6 @@ import ExternalOrders from './pages/sales/ExternalOrders';
 import OrderEntry from './pages/sales/OrderEntry';
 import SalesFulfillment from './pages/sales/SalesFulfillment';
 import SalesDelivery from './pages/sales/SalesDelivery';
-import CompareManage from './pages/sales/CompareManage';
 import SalesPricing from './pages/sales/SalesPricing';
 import SalesReconciliation from './pages/sales/SalesReconciliation';
 import SalesCustomers from './pages/sales/SalesCustomers';
@@ -175,7 +174,6 @@ export const router = createBrowserRouter([
       { path: 'sales/sales-delivery', element: <SalesDelivery /> },
       { path: 'sales/sales-orders', element: <SalesOrders /> },
       { path: 'sales/sales-orders/:rootCode', element: <SalesOrderDetail /> },
-      { path: 'sales/compare-manage', element: <CompareManage /> },
       { path: 'sales/sales-reports', element: <Navigate to="/purchase/partner-reports" replace /> },
       { path: 'sales/sales-pricing', element: <SalesPricing /> },
       { path: 'sales/sales-customers', element: <SalesCustomers /> },
