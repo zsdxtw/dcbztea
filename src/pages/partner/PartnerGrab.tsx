@@ -6,7 +6,7 @@ import Button from '../../components/common/Button';
 import { useOrderFlowStore, getPartnerSystemQuote } from '../../stores/orderFlowStore';
 import { useSupplierStore } from '../../stores/supplierStore';
 import { useScoreStore } from '../../stores/scoreStore';
-import { EXTERNAL_PLATFORM_LABELS } from '../../data/externalOrders';
+import { EXTERNAL_PLATFORM_LABELS, platformLabelOf } from '../../data/externalOrders';
 import { partnerInRegion, type ExternalOrder, type RegionScope } from '../../types';
 import './partner.css';
 
@@ -195,7 +195,7 @@ export default function PartnerGrab() {
                   <div style={{ flex: 1, minWidth: 260 }}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <span className="mono" style={{ fontWeight: 700, fontSize: 14 }}>{o.code}</span>
-                      <Pill tone="amber">{EXTERNAL_PLATFORM_LABELS[o.platform]}</Pill>
+                      <Pill tone="amber">{platformLabelOf(o)}</Pill>
                       <Pill tone={done ? 'gray' : 'green'}>{done ? '已抢完' : '抢单中'}</Pill>
                       {grabbedCount > 0 && <Pill tone="gray">已有 {grabbedCount} 种商品被抢</Pill>}
                     </div>

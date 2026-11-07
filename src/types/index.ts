@@ -1657,9 +1657,19 @@ export interface ExternalOrder {
   id: string;
   /** 订单编号（WB + 日期 + 3 位序号） */
   code: string;
-  platform: ExternalPlatform;
+  /** 销售路径:direct=直接销售(路径1-4:直营/渠道/平台/个人客户) / via_platform=经平台销售(路径5:淡茶→平台客户→直营客户) */
+  salesPath?: 'direct' | 'via_platform';
+  /** 来源平台(经平台销售时必选;直接销售一般为空,直连推送订单为其所属平台渠道) */
+  platform?: ExternalPlatform;
+  /** 客户下单时间(客户在平台/渠道侧下单的时间) */
+  customerOrderTime?: string;
+  /** 客户侧订单号(客户在自己下单渠道的订单号,非必输) */
+  customerOrderNo?: string;
+  /** 平台客户(经平台销售时的采购买方,即路径5的中间平台) */
+  platformCustomerId?: string;
+  platformCustomerName?: string;
   /** 平台母销售单号 */
-  externalOrderNo: string;
+  externalOrderNo?: string;
   customerName: string;
   customerType: string;
   customerRegion: string;

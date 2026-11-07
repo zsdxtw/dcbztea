@@ -710,6 +710,11 @@ export const TRANSFER_SOURCE_LABELS: Record<string, string> = {
   compare: '转派-比单',
 };
 
+/** 来源平台标签(直接销售无平台时兜底「直接销售」) */
+export function platformLabelOf(o: { platform?: ExternalPlatform; salesPath?: 'direct' | 'via_platform' }): string {
+  return o.platform ? (EXTERNAL_PLATFORM_LABELS[o.platform] ?? '其他平台') : (o.salesPath === 'via_platform' ? '经平台销售' : '直接销售');
+}
+
 /** 计算比单底价金额（元） */
 export function compareFloorAmount(totalAmount: number, rule: { type: 'discount' | 'price'; value: number }): number {
   return rule.type === 'discount' ? Math.round(totalAmount * rule.value) / 100 : rule.value;

@@ -10,10 +10,8 @@ import StatusTag, { orderStatusToVariant, orderStatusLabel } from '../../compone
 import LineChart from '../../components/charts/LineChart';
 import { salesOrders } from '../../data/mock';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
-import {
-  EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS,
-  EXTERNAL_STATUS_COLORS, TRANSFER_SOURCE_LABELS,
-} from '../../data/externalOrders';
+import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS,
+  EXTERNAL_STATUS_COLORS, TRANSFER_SOURCE_LABELS, platformLabelOf } from '../../data/externalOrders';
 import type { StatCardData, ExternalOrder } from '../../types';
 
 /* ── 销售趋势数据（mock） ── */
@@ -217,7 +215,7 @@ export default function SalesOverview() {
             headers={['订单编号', '来源', '客户', '路径', '金额', '状态', '操作']}
             rows={recentFlow.map((o) => [
               <span key="c" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{o.code}</span>,
-              <span key="src">{EXTERNAL_PLATFORM_LABELS[o.platform]} · {EXTERNAL_CHANNEL_LABELS[o.sourceChannel]}</span>,
+              <span key="src">{platformLabelOf(o)} · {EXTERNAL_CHANNEL_LABELS[o.sourceChannel]}</span>,
               <span key="cu" style={{ fontWeight: 'var(--font-medium)' }}>{o.customerName}</span>,
               <span key="p">{pathLabel(o)}</span>,
               <span key="a" className="mono">{money(o.totalAmount)}</span>,

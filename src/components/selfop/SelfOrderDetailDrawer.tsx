@@ -4,7 +4,7 @@ import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../common/Detai
 import DeptEmployeeSelect from '../business/DeptEmployeeSelect';
 import { useOrderFlowStore, getSelfPurchaseEstimate } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
-import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS } from '../../data/externalOrders';
+import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, platformLabelOf } from '../../data/externalOrders';
 import { getWarehouseStock, WAREHOUSE_NAMES } from '../../data/stock';
 import { getEmployeeName, employees } from '../../data/organization';
 import { selfStageOf, acceptedSub, STAGE_META } from './selfStage';
@@ -210,7 +210,7 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
       badge="WB"
       title={current.code}
       statusTag={pill(meta.bg, meta.color, meta.label)}
-      subtitle={`${EXTERNAL_PLATFORM_LABELS[current.platform]} · ${EXTERNAL_CHANNEL_LABELS[current.sourceChannel]} · ${current.customerName} · ${money(current.totalAmount)}`}
+      subtitle={`${platformLabelOf(current)} · ${EXTERNAL_CHANNEL_LABELS[current.sourceChannel]} · ${current.customerName} · ${money(current.totalAmount)}`}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>关闭</Button>
@@ -242,7 +242,7 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
           <InfoItem label="客户">{current.customerName}（{current.customerType}）</InfoItem>
           <InfoItem label="跟单人">{current.follower ?? '—'}</InfoItem>
           <InfoItem label="订单金额" mono emph valueStyle={{ color: 'var(--color-module-current-base)' }}>{money(current.totalAmount)}</InfoItem>
-          <InfoItem label="来源">{EXTERNAL_PLATFORM_LABELS[current.platform]} · {EXTERNAL_CHANNEL_LABELS[current.sourceChannel]}</InfoItem>
+          <InfoItem label="来源">{platformLabelOf(current)} · {EXTERNAL_CHANNEL_LABELS[current.sourceChannel]}</InfoItem>
           <InfoItem label="录入时间">{current.entryTime}</InfoItem>
           <InfoItem label="收货人">{current.receiver}（{current.receiverPhone}）</InfoItem>
           <InfoItem label="收货地址" span={3}>{current.receiverAddress}</InfoItem>

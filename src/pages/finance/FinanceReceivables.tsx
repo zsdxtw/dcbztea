@@ -6,7 +6,7 @@ import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
-import { EXTERNAL_PLATFORM_LABELS } from '../../data/externalOrders';
+import { EXTERNAL_PLATFORM_LABELS, platformLabelOf } from '../../data/externalOrders';
 import type { StatCardData } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
@@ -45,7 +45,7 @@ export default function FinanceReceivables() {
     const dueDate = addDays(o.entryTime, 30);
     const overdue = !settled && new Date(dueDate) < new Date('2026-11-30');
     return {
-      code: o.code, customer: o.customerName, platform: EXTERNAL_PLATFORM_LABELS[o.platform],
+      code: o.code, customer: o.customerName, platform: platformLabelOf(o),
       amount: o.totalAmount, received, unreceived: o.totalAmount - received,
       dueDate, confirmed, settled, overdue,
     };

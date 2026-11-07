@@ -17,19 +17,35 @@ const PLATFORM_OPTIONS: { value: ExternalPlatform; label: string }[] = [
   { value: 'pdd', label: '拼多多' }, { value: 'other', label: '其他平台' },
 ];
 
+const DIRECT_TYPES = ['直营客户', '渠道客户', '平台客户', '个人客户'];
+
 interface CustomerOption { id: string; name: string; typeLabel: string; level: string; contactPerson: string; contactPhone: string; contactAddress: string }
 
+const nowLocal = () => {
+  const d = new Date();
+  const p = (x: number) => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
 /**
- * 销售 · 新建销售订单（手工录入类型的销售订单生成入口）
- * 与销售单分发页同源逻辑：客户匹配带出类型/联系人/默认价，保存即匹配报备。
+ * 销售 · 新建销售单（手工录入类型的销售订单生成入口）
+ * 首先选择销售路径：直接销售（路径1-4：直营/渠道/平台/个人客户）/ 经平台销售（路径5：淡茶→平台客户→直营客户）。
+ * 客户匹配带出类型/联系人/默认价，保存即匹配报备。
  */
 export default function OrderEntry() {
   const navigate = useNavigate();
   const store = useOrderFlowStore;
   const products = usePriceStore((s) => s.products);
 
+  /** 销售路径 */
+  const [salesPath, setSalesPath] = useState<'direct' | 'via_platform'>('direct');
+  /** 经平台销售:来源平台 + 平台订单号 + 平台客户 */
   const [platform, setPlatform] = useState<ExternalPlatform>('tmall');
   const [externalOrderNo, setExternalOrderNo] = useState('');
+  const [platformCustomerId, setPlatformCustomerId] = useState('');
+  /** 客户侧信息 */
+  const [customerOrderNo, setCustomerOrderNo] = useState('');
+  const [customerOrderTime, setCustomerOrderTime] = useState(nowLocal());
   const [customerSearch, setCustomerSearch] = useState('');
   const [matchedCustomerId, setMatchedCustomerId] = useState('');
   const [customerType, setCustomerType] = useState('直营客户');
@@ -42,16 +58,29 @@ export default function OrderEntry() {
   const [error, setError] = useState('');
   const [savedTip, setSavedTip] = useState('');
 
+  const isVia = salesPath === 'via_platform';
+
+  /** 全部客户(直接销售选择用) */
   const customerOptions: CustomerOption[] = useMemo(() => [
     ...customerItems.map((c) => ({ id: c.id, name: c.name, typeLabel: CUSTOMER_TYPE_LABELS[c.type], level: c.level || '—', contactPerson: c.contactPerson, contactPhone: c.contactPhone, contactAddress: c.contactAddress || c.region })),
     ...platformItems.map((p) => ({ id: p.id, name: p.name, typeLabel: '平台客户', level: '—', contactPerson: p.contactPerson, contactPhone: p.contactPhone, contactAddress: p.contactAddress })),
   ], []);
 
-  const matchedCustomer = matchedCustomerId ? customerOptions.find((c) => c.id === matchedCustomerId) ?? null : null;
+  /** 终端直营客户(经平台销售的终端客户选择用) */
+  const directCustomerOptions: CustomerOption[] = useMemo(
+    () => customerItems.filter((c) => c.type === 'direct').map((c) => ({ id: c.id, name: c.name, typeLabel: '直营客户', level: c.level || '—', contactPerson: c.contactPerson, contactPhone: c.contactPhone, contactAddress: c.contactAddress || c.region })),
+    [],
+  );
+
+  const searchPool = isVia ? directCustomerOptions : customerOptions;
+
+  const matchedCustomer = matchedCustomerId ? searchPool.find((c) => c.id === matchedCustomerId) ?? customerOptions.find((c) => c.id === matchedCustomerId) ?? null : null;
   const customerSuggestions = useMemo(() => {
     if (!customerSearch || matchedCustomer) return [];
-    return customerOptions.filter((c) => c.name.includes(customerSearch)).slice(0, 6);
-  }, [customerSearch, matchedCustomer, customerOptions]);
+    return searchPool.filter((c) => c.name.includes(customerSearch)).slice(0, 6);
+  }, [customerSearch, matchedCustomer, searchPool]);
+
+  const selectedPlatformCustomer = platformItems.find((p) => p.id === platformCustomerId) ?? null;
 
   const defaultPriceOf = (productId: string): number => {
     const p = products.find((x) => x.id === productId);
@@ -90,19 +119,34 @@ export default function OrderEntry() {
   const selectCustomer = (c: CustomerOption) => {
     setMatchedCustomerId(c.id);
     setCustomerSearch(c.name);
-    setCustomerType(c.typeLabel);
+    if (!isVia) setCustomerType(c.typeLabel);
     if (c.contactPerson && !receiver) setReceiver(c.contactPerson);
     if (c.contactPhone && !receiverPhone) setReceiverPhone(c.contactPhone);
   };
 
+  const switchPath = (path: 'direct' | 'via_platform') => {
+    setSalesPath(path);
+    setPlatformCustomerId('');
+    setExternalOrderNo('');
+    setCustomerSearch(''); setMatchedCustomerId('');
+    setCustomerType('直营客户');
+    setError('');
+  };
+
   const resetForm = () => {
-    setExternalOrderNo(''); setCustomerSearch(''); setMatchedCustomerId(''); setCustomerRegion('');
+    setPlatformCustomerId(''); setExternalOrderNo(''); setCustomerOrderNo('');
+    setCustomerOrderTime(nowLocal());
+    setCustomerSearch(''); setMatchedCustomerId(''); setCustomerRegion('');
     setReceiver(''); setReceiverPhone(''); setReceiverAddress(''); setRemark(''); setItems([]); setError('');
   };
 
   const saveOrder = () => {
-    if (!externalOrderNo.trim() || !customerSearch.trim() || !customerRegion.trim() || !receiver.trim()) {
-      setError('平台单号、客户名称、客户区域、收货人为必填');
+    if (isVia && (!platform || !externalOrderNo.trim() || !platformCustomerId)) {
+      setError('经平台销售：来源平台、平台订单号、平台客户为必填');
+      return;
+    }
+    if (!customerSearch.trim() || !customerRegion.trim() || !receiver.trim()) {
+      setError('客户名称、客户区域、收货人为必填');
       return;
     }
     if (items.length === 0 || items.some((it) => it.quantity <= 0)) {
@@ -114,10 +158,15 @@ export default function OrderEntry() {
       return;
     }
     const order = store.getState().addExternalOrder({
-      platform,
-      externalOrderNo: externalOrderNo.trim(),
+      salesPath,
+      platform: isVia ? platform : undefined,
+      externalOrderNo: isVia ? externalOrderNo.trim() : undefined,
+      platformCustomerId: isVia ? platformCustomerId : undefined,
+      platformCustomerName: isVia ? (selectedPlatformCustomer?.name ?? '') : undefined,
+      customerOrderTime: customerOrderTime || undefined,
+      customerOrderNo: customerOrderNo.trim() || undefined,
       customerName: customerSearch.trim(),
-      customerType,
+      customerType: isVia ? '直营客户' : customerType,
       customerRegion: customerRegion.trim(),
       items,
       receiver: receiver.trim(),
@@ -146,7 +195,7 @@ export default function OrderEntry() {
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           新建销售单用于创建<strong>手工录入</strong>类型的销售订单（三个入口：<strong>本页手工录入</strong> / <strong>平台直连推送</strong> / <strong>报备商机转入</strong>）。
-          客户名称支持从<strong>客户管理</strong>匹配（带出类型/联系人并按客户报价带出默认价）；
+          首先选择<strong>销售路径</strong>：直接销售（直营 / 渠道 / 平台 / 个人客户）或经平台销售（淡茶 → 平台客户 → 直营客户）；
           保存时自动与审批通过的报备比对，命中则进入「报备-匹配待确认」，人工确认后转派报备合作商。
         </div>
 
@@ -155,29 +204,85 @@ export default function OrderEntry() {
         )}
 
         <Card title="订单信息">
+          {/* 销售路径选择 */}
+          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>销售路径 *</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+            <button
+              className="tab-card-simple eop-mode-card"
+              style={{
+                flexDirection: 'column', alignItems: 'flex-start', gap: 3, textAlign: 'left', padding: 'var(--space-3) var(--space-4)', transition: 'none',
+                ...(salesPath === 'direct' ? { borderColor: 'var(--color-module-current-base)', background: 'var(--color-module-current-lightest)' } : {}),
+              }}
+              onClick={() => switchPath('direct')}
+            >
+              <strong style={salesPath === 'direct' ? { color: 'var(--color-module-current-base)' } : undefined}>直接销售</strong>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', whiteSpace: 'normal', lineHeight: 1.5 }}>
+                淡茶半盏直接销售给：直营客户 / 渠道客户 / 平台客户 / 个人客户
+              </span>
+            </button>
+            <button
+              className="tab-card-simple eop-mode-card"
+              style={{
+                flexDirection: 'column', alignItems: 'flex-start', gap: 3, textAlign: 'left', padding: 'var(--space-3) var(--space-4)', transition: 'none',
+                ...(isVia ? { borderColor: 'var(--color-module-current-base)', background: 'var(--color-module-current-lightest)' } : {}),
+              }}
+              onClick={() => switchPath('via_platform')}
+            >
+              <strong style={isVia ? { color: 'var(--color-module-current-base)' } : undefined}>经平台销售</strong>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', whiteSpace: 'normal', lineHeight: 1.5 }}>
+                淡茶半盏销售经平台客户销售给直营客户（需选择来源平台与平台客户）
+              </span>
+            </button>
+          </div>
+
+          {/* 经平台销售:来源平台 / 平台订单号 / 平台客户 */}
+          {isVia && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)' }}>
+              <div>
+                {label('来源平台', true)}
+                <select className="filter-input" value={platform} onChange={(e) => setPlatform(e.target.value as ExternalPlatform)} style={{ width: '100%' }}>
+                  {PLATFORM_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </div>
+              <div>
+                {label('平台订单号', true)}
+                <input className="filter-input" placeholder="平台给淡茶半盏的订单号" value={externalOrderNo} onChange={(e) => { setExternalOrderNo(e.target.value); setError(''); }} style={{ width: '100%' }} />
+              </div>
+              <div>
+                {label('平台客户（采购买方）', true)}
+                <select className="filter-input" value={platformCustomerId} onChange={(e) => { setPlatformCustomerId(e.target.value); setError(''); }} style={{ width: '100%' }}>
+                  <option value="">选择平台客户</option>
+                  {platformItems.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* 客户类型(仅直接销售)+ 客户侧订单号 + 客户下单时间 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
+            {!isVia && (
+              <div>
+                {label('客户类型', true)}
+                <select className="filter-input" value={customerType} onChange={(e) => setCustomerType(e.target.value)} style={{ width: '100%' }}>
+                  {DIRECT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            )}
             <div>
-              {label('来源平台', true)}
-              <select className="filter-input" value={platform} onChange={(e) => setPlatform(e.target.value as ExternalPlatform)} style={{ width: '100%' }}>
-                {PLATFORM_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </select>
+              {label('客户侧订单号（客户下单渠道的单号，非必输）')}
+              <input className="filter-input" placeholder="客户侧订单号" value={customerOrderNo} onChange={(e) => setCustomerOrderNo(e.target.value)} style={{ width: '100%' }} />
             </div>
             <div>
-              {label('平台原始单号', true)}
-              <input className="filter-input" placeholder="如 TM-88213907" value={externalOrderNo} onChange={(e) => { setExternalOrderNo(e.target.value); setError(''); }} style={{ width: '100%' }} />
-            </div>
-            <div>
-              {label('客户类型')}
-              <select className="filter-input" value={customerType} onChange={(e) => setCustomerType(e.target.value)} style={{ width: '100%' }}>
-                {['直营客户', '渠道客户', '平台客户', '个人客户', '带货客户'].map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+              {label('客户下单时间')}
+              <input className="filter-input" type="datetime-local" value={customerOrderTime} onChange={(e) => setCustomerOrderTime(e.target.value)} style={{ width: '100%' }} />
             </div>
           </div>
 
+          {/* 客户名称(直接销售=各类型客户;经平台销售=终端直营客户) */}
           <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
-            {label('客户名称（输入可搜索在库客户）', true)}
+            {label(isVia ? '终端直营客户（搜索在库直营客户）' : '客户名称（输入可搜索在库客户）', true)}
             <input
-              className="filter-input" placeholder="输入客户名称，支持搜索客户管理中的在库客户" style={{ width: '100%' }}
+              className="filter-input" placeholder={isVia ? '输入直营客户名称' : '输入客户名称，支持搜索客户管理中的在库客户'} style={{ width: '100%' }}
               value={customerSearch}
               onChange={(e) => { setCustomerSearch(e.target.value); setMatchedCustomerId(''); setError(''); }}
             />

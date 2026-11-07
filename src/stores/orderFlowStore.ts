@@ -85,8 +85,19 @@ const floorAmount = (totalAmount: number, rule: CompareFloorRule) =>
   rule.type === 'discount' ? Math.round(totalAmount * rule.value) / 100 : rule.value;
 
 export interface AddExternalInput {
-  platform: ExternalPlatform;
-  externalOrderNo: string;
+  /** 销售路径:direct=直接销售(路径1-4) / via_platform=经平台销售(路径5:淡茶→平台客户→直营客户) */
+  salesPath: 'direct' | 'via_platform';
+  /** 来源平台(经平台销售必选;直连推送为其所属平台渠道;直接销售可空) */
+  platform?: ExternalPlatform;
+  /** 平台订单号(经平台销售时=平台给淡茶半盏的采购单号) */
+  externalOrderNo?: string;
+  /** 平台客户(经平台销售的采购买方) */
+  platformCustomerId?: string;
+  platformCustomerName?: string;
+  /** 客户下单时间(客户在平台/渠道侧下单的时间) */
+  customerOrderTime?: string;
+  /** 客户侧订单号(客户在自己下单渠道的订单号,非必输) */
+  customerOrderNo?: string;
   customerName: string;
   customerType: string;
   customerRegion: string;
@@ -294,7 +305,15 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         totalAmount: input.items.reduce((s, it) => s + it.price * it.quantity, 0),
         entryTime: now(),
         processStatus: 'pending',
-        history: [{ time: now(), action: input.sourceChannel === 'push' ? '直连推送订单' : '手工录入订单', detail: input.sourceChannel === 'push' ? '平台 API 自动同步' : '手工录入' }],
+        history: [{
+          time: now(),
+          action: input.sourceChannel === 'push' ? '直连推送订单' : '手工录入订单',
+          detail: (input.sourceChannel === 'push' ? '平台 API 自动同步' : '手工录入')
+            + (input.salesPath === 'via_platform'
+              ? ` · 经平台销售（${input.platformCustomerName ?? '—'}）`
+              : ' · 直接销售')
+            + (input.customerOrderNo ? ` · 客户侧单号 ${input.customerOrderNo}` : ''),
+        }],
       };
       // 保存即匹配：命中审批通过的报备 → 进入报备-匹配待确认（人工确认后分发）
       const matches = matchExternalOrder(order);

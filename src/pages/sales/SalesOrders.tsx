@@ -6,9 +6,7 @@ import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
-import {
-  EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS, TRANSFER_SOURCE_LABELS,
-} from '../../data/externalOrders';
+import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS, TRANSFER_SOURCE_LABELS, platformLabelOf } from '../../data/externalOrders';
 import { PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
 import {
   buildFamilies, familyStatesOf, shipStateOf, settleStateOf, FAMILY_STATE_COLORS,
@@ -78,7 +76,7 @@ export default function SalesOrders() {
   const filteredFamilies = useMemo(() => families.filter((f) => {
     const kw = keyword.trim();
     if (kw && ![f.mother, ...f.children].some((o) =>
-      o.code.includes(kw) || (o.parentCode ?? '').includes(kw) || o.customerName.includes(kw) || o.externalOrderNo.includes(kw),
+      o.code.includes(kw) || (o.parentCode ?? '').includes(kw) || o.customerName.includes(kw) || (o.externalOrderNo ?? '').includes(kw),
     )) return false;
     if (filterChannel && f.mother.sourceChannel !== filterChannel) return false;
     const st = familyStatesOf(f);
@@ -206,7 +204,7 @@ export default function SalesOrders() {
                         <svg viewBox="0 0 16 16" fill="none" style={{ width: 12, height: 12, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s', color: 'var(--color-neutral-400)' }}><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         <span className="cell-mono-emph">{f.rootCode}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{f.mother.externalOrderNo}</span></span>
                         <span style={{ fontSize: 'var(--text-sm)' }}>
-                          {EXTERNAL_PLATFORM_LABELS[f.mother.platform]}
+                          {platformLabelOf(f.mother)}
                           <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: f.mother.sourceChannel === 'push' ? '#7B1FA2' : '#0F64B5' }}>{EXTERNAL_CHANNEL_LABELS[f.mother.sourceChannel]}</span>
                         </span>
                         <span className="cell-emph">{f.mother.customerName}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{f.mother.customerType}</span></span>

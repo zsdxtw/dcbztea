@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Button from '../common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
-import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_STATUS_LABELS } from '../../data/externalOrders';
+import { EXTERNAL_STATUS_LABELS, platformLabelOf } from '../../data/externalOrders';
 import type { ExternalOrder } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
@@ -44,13 +44,17 @@ export default function SalesOrderInfoModal({ code, onClose }: { code: string | 
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2) var(--space-3)', marginBottom: 'var(--space-3)' }}>
                   <div><div style={infoLabel}>母销售单号</div><div className="mono" style={{ ...infoValue, fontWeight: 600 }}>{original.code}</div></div>
-                  <div><div style={infoLabel}>来源平台</div><div style={infoValue}>{EXTERNAL_PLATFORM_LABELS[original.platform]}</div></div>
-                  <div><div style={infoLabel}>平台母销售单号</div><div className="mono" style={infoValue}>{original.externalOrderNo}</div></div>
+                  <div><div style={infoLabel}>销售路径</div><div style={infoValue}>{original.salesPath === 'via_platform' ? '经平台销售' : '直接销售'}</div></div>
+                  <div><div style={infoLabel}>来源平台</div><div style={infoValue}>{platformLabelOf(original)}</div></div>
+                  <div><div style={infoLabel}>平台母销售单号</div><div className="mono" style={infoValue}>{original.externalOrderNo ?? '—'}</div></div>
                   <div><div style={infoLabel}>客户</div><div style={{ ...infoValue, fontWeight: 600 }}>{original.customerName}</div></div>
                   <div><div style={infoLabel}>客户类型</div><div style={infoValue}>{original.customerType}</div></div>
                   <div><div style={infoLabel}>客户区域</div><div style={infoValue}>{original.customerRegion}</div></div>
                   <div><div style={infoLabel}>收货人</div><div style={infoValue}>{original.receiver} · {original.receiverPhone}</div></div>
                   <div><div style={infoLabel}>订单金额</div><div className="mono" style={{ ...infoValue, fontWeight: 600 }}>{money(original.totalAmount)}</div></div>
+                  <div><div style={infoLabel}>客户下单时间</div><div style={infoValue}>{original.customerOrderTime ?? '—'}</div></div>
+                  <div><div style={infoLabel}>客户侧订单号</div><div className="mono" style={infoValue}>{original.customerOrderNo ?? '—'}</div></div>
+                  {original.platformCustomerName && <div style={{ gridColumn: 'span 2' }}><div style={infoLabel}>平台客户</div><div style={infoValue}>{original.platformCustomerName}</div></div>}
                   <div><div style={infoLabel}>录入时间 / 人</div><div style={infoValue}>{original.entryTime} · {original.operator}</div></div>
                   <div style={{ gridColumn: 'span 3' }}><div style={infoLabel}>收货地址</div><div style={infoValue}>{original.receiverAddress}</div></div>
                   {original.remark && <div style={{ gridColumn: 'span 3' }}><div style={infoLabel}>备注</div><div style={infoValue}>{original.remark}</div></div>}

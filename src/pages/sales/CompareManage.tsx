@@ -6,7 +6,7 @@ import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { useScoreStore, getScoreSummary } from '../../stores/scoreStore';
-import { EXTERNAL_PLATFORM_LABELS, compareFloorAmount } from '../../data/externalOrders';
+import { EXTERNAL_PLATFORM_LABELS, compareFloorAmount, platformLabelOf } from '../../data/externalOrders';
 import type { ExternalOrder } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
@@ -109,7 +109,7 @@ export default function CompareManage() {
         badge="BD"
         title={current?.code ?? ''}
         statusTag={current?.compare?.scored ? pill('#E8F5E9', '#01795D', '已定标') : pill('#F3E5F5', '#7B1FA2', '报名中')}
-        subtitle={current ? `${EXTERNAL_PLATFORM_LABELS[current.platform]} · ${current.customerName} · 订单金额 ${money(current.totalAmount)}` : ''}
+        subtitle={current ? `${platformLabelOf(current)} · ${current.customerName} · 订单金额 ${money(current.totalAmount)}` : ''}
         hideFooter
         footer={
           <>

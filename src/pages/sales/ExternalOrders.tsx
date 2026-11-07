@@ -10,10 +10,8 @@ import { useOrderFlowStore, getSelfPurchaseEstimate, reportMatchesOrder } from '
 import { useSupplierStore } from '../../stores/supplierStore';
 import { useScoreStore, getScoreSummary } from '../../stores/scoreStore';
 import { useReportStore } from '../../stores/reportStore';
-import {
-  EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS,
-  TRANSFER_SOURCE_LABELS, SOURCE_TAG_LABELS, compareFloorAmount,
-} from '../../data/externalOrders';
+import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS,
+  TRANSFER_SOURCE_LABELS, SOURCE_TAG_LABELS, compareFloorAmount, platformLabelOf } from '../../data/externalOrders';
 import { PARTNER_ORDER_STATUS_LABELS, PARTNER_REPORT_TYPE_LABELS } from '../../data/partner';
 import { REGIONS, getCities, getDistricts } from '../../data/regions';
 import SalesOrderInfoModal from '../../components/business/SalesOrderInfoModal';
@@ -274,7 +272,7 @@ export default function ExternalOrders() {
 
   /** 关键字匹配：编号 / 客户 / 平台单号 / 母销售单编号（输入母单号时该母单下所有子单均展出） */
   const kwMatch = (o: ExternalOrder, kw: string) =>
-    o.code.includes(kw) || (o.parentCode ?? '').includes(kw) || o.customerName.includes(kw) || o.externalOrderNo.includes(kw);
+    o.code.includes(kw) || (o.parentCode ?? '').includes(kw) || o.customerName.includes(kw) || (o.externalOrderNo ?? '').includes(kw);
 
   // 已拆分的母销售单不在分发列表/计数展示（由其下各子履约单呈现）
   const motherCodes = useMemo(() => new Set(orders.map((x) => x.parentCode).filter(Boolean) as string[]), [orders]);
@@ -340,7 +338,7 @@ export default function ExternalOrders() {
     const target = order ?? current;
     if (!target) return;
     setEditForm({
-      externalOrderNo: target.externalOrderNo,
+      externalOrderNo: target.externalOrderNo ?? '',
       customerName: target.customerName,
       customerRegion: target.customerRegion,
       receiver: target.receiver,
@@ -532,7 +530,7 @@ export default function ExternalOrders() {
           <Table
             headers={['订单编号', '关联销售单', '来源', '客户', '地区', '收件人', '收件地址', '金额', '状态', '分发路径', '合作商', '录入时间', '操作']}
             rows={pagedOrders.map((o) => [
-              <span key="c" className="cell-mono-emph">{o.code}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.externalOrderNo}</span></span>,
+              <span key="c" className="cell-mono-emph">{o.code}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.externalOrderNo ?? '—'}</span></span>,
               o.parentCode ? (
                 <span
                   key="link"
@@ -547,7 +545,7 @@ export default function ExternalOrders() {
                 <span key="link" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>—</span>
               ),
               <span key="src">
-                {EXTERNAL_PLATFORM_LABELS[o.platform]}
+                {platformLabelOf(o)}
                 <span style={{ display: 'block' }}>{pill(
                   o.sourceChannel === 'push' ? '#F3E5F5' : '#E3F2FD',
                   o.sourceChannel === 'push' ? '#7B1FA2' : '#0F64B5',
@@ -652,7 +650,7 @@ export default function ExternalOrders() {
         badge="WB"
         title={current?.code ?? ''}
         statusTag={current ? statusPill(current.processStatus) : null}
-        subtitle={current ? `${EXTERNAL_PLATFORM_LABELS[current.platform]} · ${current.externalOrderNo} · ${EXTERNAL_CHANNEL_LABELS[current.sourceChannel]} · ${current.customerName}` : ''}
+        subtitle={current ? `${platformLabelOf(current)} · ${current.externalOrderNo ?? '—'} · ${EXTERNAL_CHANNEL_LABELS[current.sourceChannel]} · ${current.customerName}` : ''}
         footer={
           Object.keys(editForm).length > 0 ? (
             <>
@@ -708,15 +706,20 @@ export default function ExternalOrders() {
               <DrawerSection title="订单信息">
                 <InfoGrid>
                   <InfoItem label="订单编号" mono emph>{current.code}</InfoItem>
-                  <InfoItem label="来源平台">{EXTERNAL_PLATFORM_LABELS[current.platform]}</InfoItem>
-                  <InfoItem label="平台母销售单号" mono>{current.externalOrderNo}</InfoItem>
+                  <InfoItem label="来源平台">{platformLabelOf(current)}</InfoItem>
+                  <InfoItem label="平台母销售单号" mono>{current.externalOrderNo ?? '—'}</InfoItem>
                   <InfoItem label="来源渠道">{current.sourceChannel === 'manual' ? '手工录入' : '直连推送'}</InfoItem>
                   <InfoItem label="客户">{current.customerName}（{current.customerType}）</InfoItem>
                   <InfoItem label="客户区域">{regionText(current)}</InfoItem>
                   <InfoItem label="订单金额" mono emph valueStyle={{ color: 'var(--color-module-current-base)' }}>{money(current.totalAmount)}</InfoItem>
                   <InfoItem label="录入时间">{current.entryTime}</InfoItem>
                   <InfoItem label="录入人">{current.operator}</InfoItem>
+                  <InfoItem label="销售路径">{current.salesPath === 'via_platform' ? '经平台销售' : '直接销售'}</InfoItem>
+                  <InfoItem label="客户下单时间">{current.customerOrderTime ?? '—'}</InfoItem>
+                  <InfoItem label="客户侧订单号" mono>{current.customerOrderNo ?? '—'}</InfoItem>
+                  {current.platformCustomerName && <InfoItem label="平台客户">{current.platformCustomerName}</InfoItem>}
                   <InfoItem label="当前路径">{pathLabel(current)}</InfoItem>
+                  {current.parentCode && <InfoItem label="母销售单编号" mono>{current.parentCode}</InfoItem>}
                   {current.parentCode && <InfoItem label="母销售单编号" mono>{current.parentCode}</InfoItem>}
                 </InfoGrid>
               </DrawerSection>
