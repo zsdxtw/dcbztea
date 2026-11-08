@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
@@ -22,11 +22,12 @@ import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
 import { useSupplierStore, getTerminalAccounts } from '../../stores/supplierStore';
 
 /* ── 合作商类型筛选配置 ── */
-const TYPE_FILTER: { key: SupplierType | 'all'; label: string; desc: string }[] = [
-  { key: 'all', label: '全部合作商', desc: '所有合作商' },
-  { key: 'brand', label: '品牌商', desc: '品牌拥有方，平台直接合作' },
-  { key: 'supplier', label: '供应商', desc: '差价模式：平台按价格采购，背对背销售' },
-  { key: 'service', label: '服务商', desc: '扣点模式：按售价收取服务费，差价归服务商' },
+/** 类型筛选卡片：样式参照销售-客户列表的类型卡片（图标+徽章+大数字），配色统一取合作商主色调 */
+const TYPE_FILTER: { key: SupplierType | 'all'; label: string; tag: string; desc: string; icon: ReactNode }[] = [
+  { key: 'all', label: '全部合作商', tag: '全部', desc: '所有合作商', icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="3" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" /><rect x="10" y="3" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" /><rect x="3" y="10" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" /><rect x="10" y="10" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" /></svg> },
+  { key: 'brand', label: '品牌商', tag: '直接合作', desc: '品牌拥有方，平台直接合作', icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="6.5" r="3.5" stroke="currentColor" strokeWidth="1.3" /><path d="M7.2 9.4L5.5 15.5l3.5-2 3.5 2-1.7-6.1" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round" /></svg> },
+  { key: 'supplier', label: '供应商', tag: '差价模式', desc: '差价模式：平台按价格采购，背对背销售', icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2.5l6 3v7l-6 3-6-3v-7l6-3z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><path d="M3 5.5l6 3 6-3M9 8.5v7" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /></svg> },
+  { key: 'service', label: '服务商', tag: '扣点模式', desc: '扣点模式：按售价收取服务费，差价归服务商', icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 11a6 6 0 0112 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /><rect x="2.5" y="10" width="3" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.3" /><rect x="12.5" y="10" width="3" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.3" /><path d="M15.5 14.5v.5a2 2 0 01-2 2h-2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg> },
 ];
 
 /** 详情抽屉 Tab 键 */
@@ -348,18 +349,28 @@ export default function PurchaseSuppliers() {
       <div className="content-body">
       {/* 统计卡片 */}
 
-      {/* 类型筛选卡片 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
+      {/* 类型筛选卡片（样式参照销售-客户列表，配色取合作商主色调） */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
         {TYPE_FILTER.map(tf => {
           const count = tf.key === 'all' ? list.length : list.filter(s => s.types.includes(tf.key as SupplierType)).length;
           const isActive = activeType === tf.key;
           return (
-            <div key={tf.key} style={{ cursor: 'pointer', border: isActive ? '2px solid var(--color-module-current-base)' : '1px solid var(--color-border-primary)', background: isActive ? 'var(--color-module-current-lightest)' : 'var(--color-bg-primary)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)', boxShadow: 'var(--shadow-sm)' }} onClick={() => setActiveType(isActive ? 'all' : tf.key)}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontWeight: 'var(--font-semibold)', fontSize: 'var(--text-base)', color: 'var(--color-text-primary)' }}>{tf.label}</span>
-                <span style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-module-current-base)' }}>{count}</span>
+            <div key={tf.key} onClick={() => setActiveType(isActive ? 'all' : tf.key)} style={{ cursor: 'pointer', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', position: 'relative', border: isActive ? '2px solid var(--color-module-current-base)' : '1px solid var(--color-neutral-200)', background: isActive ? 'var(--color-module-current-lightest)' : 'var(--color-neutral-0)', boxShadow: isActive ? 'var(--shadow-md)' : 'var(--shadow-sm)', transition: 'var(--transition-fast)' }}>
+              {/* 右上角合作模式徽章 */}
+              <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, fontWeight: 'var(--font-medium)', padding: '1px 6px', borderRadius: 'var(--radius-sm)', background: 'var(--color-module-current-lightest)', color: 'var(--color-module-current-base)', border: '1px solid var(--color-module-current-light)' }}>
+                {tf.tag}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 6 }}>
+                <span style={{ width: 30, height: 30, borderRadius: 'var(--radius-md)', background: isActive ? 'var(--color-module-current-light)' : 'var(--color-neutral-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isActive ? 'var(--color-module-current-base)' : 'var(--color-neutral-500)', transition: 'var(--transition-fast)' }}>{tf.icon}</span>
+                <span style={{ fontWeight: 'var(--font-semibold)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-800)' }}>{tf.label}</span>
               </div>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>{tf.desc}</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
+                <span style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-bold)', color: isActive ? 'var(--color-module-current-base)' : 'var(--color-neutral-600)' }}>{count}</span>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>家</span>
+              </div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', lineHeight: 1.4, height: 28, overflow: 'hidden' }}>
+                {tf.desc}
+              </div>
             </div>
           );
         })}
