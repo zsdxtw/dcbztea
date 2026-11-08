@@ -1,10 +1,9 @@
 import { useState, useMemo } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
-import type { StatCardData, CustomerItem, CustomerType, PlatformItem, PlatformBankAccount, PlatformInvoiceInfo, CustomerBankAccount, CustomerInvoiceInfo, OrderContact, CustomerSubOrganization } from '../../types';
+import type { CustomerItem, CustomerType, PlatformItem, PlatformBankAccount, PlatformInvoiceInfo, CustomerBankAccount, CustomerInvoiceInfo, OrderContact, CustomerSubOrganization } from '../../types';
 import { customerItems as initialCustomers, CUSTOMER_TYPE_LABELS, CUSTOMER_TYPE_DESC, LEVEL_COLORS, CUSTOMER_GROUP_MAP, generateOrderContactId, convertPersonalToDirect } from '../../data/customers';
 import { platformItems as globalPlatforms } from '../../data/platforms';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
@@ -122,19 +121,6 @@ export default function SalesCustomers() {
 
   const getPlatformName = (id: string) => platforms.find(p => p.id === id)?.shortName ?? id;
 
-  const stats: StatCardData[] = useMemo(() => {
-    const direct = data.filter(c => c.type === 'direct');
-    const channel = data.filter(c => c.type === 'channel');
-    const personal = data.filter(c => c.type === 'personal');
-    const enterpriseActive = data.filter(c => CUSTOMER_GROUP_MAP[c.type] === 'enterprise' && c.status === 'active').length;
-    const platformActive = platforms.filter(p => p.status === 'active').length;
-    return [
-      { label: '客户总数', value: String(data.length + platforms.length), unit: '家', trend: { direction: 'up', value: `合作中 ${enterpriseActive + platformActive}` }, icon: <IconUsers /> },
-      { label: '直营客户', value: String(direct.length), unit: '家', trend: { direction: 'up', value: `合作中 ${direct.filter(c => c.status === 'active').length}` }, icon: <IconHome /> },
-      { label: '渠道客户', value: String(channel.length), unit: '家', trend: { direction: 'up', value: `合作中 ${channel.filter(c => c.status === 'active').length}` }, icon: <IconChannel /> },
-      { label: '个人客户', value: String(personal.length), unit: '家', trend: { direction: 'up', value: `合作中 ${personal.filter(c => c.status === 'active').length}` }, icon: <IconPersonal /> },
-    ];
-  }, [data, platforms]);
 
   const enterDeleteMode = () => { setDeleteMode(true); setSelectedForDelete(new Set()); };
   const exitDeleteMode = () => { setDeleteMode(false); setSelectedForDelete(new Set()); };

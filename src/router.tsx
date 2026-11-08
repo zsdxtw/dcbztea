@@ -14,11 +14,11 @@ import PurchasePricing from './pages/purchase/PurchasePricing';
 import PurchaseDemand from './pages/purchase/PurchaseDemand';
 import PurchaseInbound from './pages/purchase/PurchaseInbound';
 import DirectDeliveryConfirm from './pages/purchase/DirectDeliveryConfirm';
-import PurchaseSuppliers from './pages/purchase/PurchaseSuppliers';
-import PurchaseSupplierApprovals from './pages/purchase/PurchaseSupplierApprovals';
+import CooperationPartners from './pages/cooperation/CooperationPartners';
+import CooperationApprovals from './pages/cooperation/CooperationApprovals';
 import PurchaseStoreOverview from './pages/purchase/PurchaseStoreOverview';
-import PurchasePartnerStores from './pages/purchase/PurchasePartnerStores';
-import PartnerScores from './pages/purchase/PartnerScores';
+import CooperationStores from './pages/cooperation/CooperationStores';
+import CooperationScores from './pages/cooperation/CooperationScores';
 import PurchaseReconciliation from './pages/purchase/PurchaseReconciliation';
 import PurchaseReturn from './pages/purchase/PurchaseReturn';
 
@@ -36,7 +36,6 @@ import SalesStores from './pages/sales/SalesStores';
 import SalesReturn from './pages/sales/SalesReturn';
 import SalesReports from './pages/sales/SalesReports';
 
-import InventoryOverview from './pages/inventory/InventoryOverview';
 import InventoryPurchaseInbound from './pages/inventory/InventoryPurchaseInbound';
 import InventorySalesOutbound from './pages/inventory/InventorySalesOutbound';
 import InventoryOtherIO from './pages/inventory/InventoryOtherIO';
@@ -149,12 +148,19 @@ export const router = createBrowserRouter([
       { path: 'purchase/purchase-pricing', element: <PurchasePricing /> },
       { path: 'purchase/purchase-demand', element: <PurchaseDemand /> },
       { path: 'purchase/purchase-inbound', element: <PurchaseInbound /> },
-      { path: 'purchase/purchase-suppliers', element: <Navigate to="/purchase/purchase-supplier-list" replace /> },
-      { path: 'purchase/purchase-supplier-approvals', element: <PurchaseSupplierApprovals /> },
-      { path: 'purchase/purchase-supplier-list', element: <PurchaseSuppliers /> },
-      { path: 'purchase/purchase-partner-stores', element: <PurchasePartnerStores /> },
-      { path: 'purchase/purchase-partner-scores', element: <PartnerScores /> },
-      { path: 'purchase/partner-reports', element: <SalesReports /> },
+      { path: 'purchase/purchase-suppliers', element: <Navigate to="/cooperation/cooperation-partners" replace /> },
+      { path: 'purchase/purchase-supplier-approvals', element: <Navigate to="/cooperation/cooperation-approvals" replace /> },
+      { path: 'purchase/purchase-supplier-list', element: <Navigate to="/cooperation/cooperation-partners" replace /> },
+      { path: 'purchase/purchase-partner-stores', element: <Navigate to="/cooperation/cooperation-stores" replace /> },
+      { path: 'purchase/purchase-partner-scores', element: <Navigate to="/cooperation/cooperation-scores" replace /> },
+      { path: 'purchase/partner-reports', element: <Navigate to="/cooperation/cooperation-reports" replace /> },
+      /* ── 合作商一级菜单(cooperation 前缀路由) ── */
+      { path: 'cooperation/cooperation-partners', element: <CooperationPartners /> },
+      { path: 'cooperation/cooperation-approvals', element: <CooperationApprovals /> },
+      { path: 'cooperation/cooperation-stores', element: <CooperationStores /> },
+      { path: 'cooperation/cooperation-scores', element: <CooperationScores /> },
+      { path: 'cooperation/cooperation-reports', element: <SalesReports /> },
+      { path: 'cooperation', element: <Navigate to="/cooperation/cooperation-partners" replace /> },
       { path: 'purchase/purchase-store-overview', element: <PurchaseStoreOverview /> },
       { path: 'purchase/purchase-reconciliation', element: <Navigate to="/finance/finance-supplier-reconciliation" replace /> },
       { path: 'purchase/direct-delivery-confirm', element: <DirectDeliveryConfirm /> },
@@ -173,7 +179,7 @@ export const router = createBrowserRouter([
       { path: 'sales/sales-delivery', element: <SalesDelivery /> },
       { path: 'sales/sales-orders', element: <SalesOrders /> },
       { path: 'sales/sales-orders/:rootCode', element: <SalesOrderDetail /> },
-      { path: 'sales/sales-reports', element: <Navigate to="/purchase/partner-reports" replace /> },
+      { path: 'sales/sales-reports', element: <Navigate to="/cooperation/cooperation-reports" replace /> },
       { path: 'sales/sales-pricing', element: <SalesPricing /> },
       { path: 'sales/sales-customers', element: <SalesCustomers /> },
       { path: 'sales/sales-customer-accounts', element: <Navigate to="/sales/sales-customers" replace /> },
@@ -181,8 +187,8 @@ export const router = createBrowserRouter([
       { path: 'sales/sales-reconciliation', element: <SalesReconciliation /> },
       { path: 'sales/sales-return', element: <SalesReturn /> },
       /* ── 仓储 ── */
-      { path: 'inventory', element: <InventoryOverview /> },
-      { path: 'inventory/inventory-overview', element: <InventoryOverview /> },
+      { path: 'inventory', element: <Navigate to="/purchase/purchase-overview" replace /> },
+      { path: 'inventory/inventory-overview', element: <Navigate to="/purchase/purchase-overview" replace /> },
       { path: 'inventory/inventory-detail', element: <InventoryDetail /> },
       { path: 'inventory/inventory-reservation', element: <InventoryReservation /> },
       { path: 'inventory/inventory-purchase-inbound', element: <InventoryPurchaseInbound /> },

@@ -4,15 +4,8 @@ import Table from '../../components/common/Table';
 import StatusTag from '../../components/common/StatusTag';
 import Button from '../../components/common/Button';
 import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
-import StatCard from '../../components/common/StatCard';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
-const stats: StatCardData[] = [
-  { label: '待入库', value: '8', trend: { direction: 'up', value: '2 单', label: '较昨日' }, icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M3 9h12" stroke="currentColor" strokeWidth="1.3"/></svg> },
-  { label: '已入库', value: '156', unit: '单', trend: { direction: 'up', value: '12%', label: '较上月' }, icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M3 9h12" stroke="currentColor" strokeWidth="1.3"/><path d="M6 10l3 3 4-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '入库总量', value: '4,280', unit: 'kg', trend: { direction: 'up', value: '8.5%', label: '较上月' }, icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/></svg> },
-  { label: '入库金额', value: '1,286,400', unit: '¥', trend: { direction: 'up', value: '15.2%', label: '较上月' }, icon: <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 8h2M5 11h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-];
 
 const inboundItems = [
   { id: 'IB-2025-0089', orderId: 'PO-2025-0151', supplier: '武夷山茶业', product: '大红袍 — 特级', teaCategory: '青茶', quantity: '50 kg', amount: '¥ 28,500', warehouse: '武夷仓区', operator: '张仓管', status: 'pending' as const },
@@ -46,11 +39,8 @@ function inboundStatusLabel(status: string) {
 export default function PurchaseInbound() {
   return (
     <>
-      <ContentHeader title="采购收货" breadcrumbs={['采购', '采购收货']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建入库</Button></>} />
+      <ContentHeader title="采购收货" breadcrumbs={['采购&仓储', '采购收货']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建入库</Button></>} />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
         <FilterBar>
           <FilterInput placeholder="搜索入库单号、采购单号、供应商..." />
           <FilterSelect options={['全部状态', '待入库', '入库中', '已入库']} />

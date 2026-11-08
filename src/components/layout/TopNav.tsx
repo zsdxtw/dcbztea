@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
-import { TOPNAV_TABS } from '../../data/modules';
+import { TOPNAV_TABS, MODULE_HOME_PATH } from '../../data/modules';
 import { ModuleKey } from '../../types';
 import BrandLogo from '../common/BrandLogo';
 import { TERMINAL_SWITCH_LIST } from '../../data/terminals';
@@ -37,7 +37,7 @@ export default function TopNav() {
 
   const handleTabClick = (key: ModuleKey) => {
     switchModule(key);
-    navigate(`/${key}`);
+    navigate(MODULE_HOME_PATH[key]);
   };
 
   return (

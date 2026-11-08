@@ -1,13 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -49,11 +48,6 @@ export default function FinancePayables() {
   const totalPaid = rows.filter((r) => r.settled).reduce((s, r) => s + r.amount, 0);
   const confirmedUnpaid = rows.filter((r) => r.confirmed && !r.settled).reduce((s, r) => s + r.amount, 0);
 
-  const stats: StatCardData[] = [
-    { label: '应付总额', value: (totalAP / 10000).toFixed(1), unit: '万', trend: { direction: 'up', value: `${rows.length} 张采购单` }, icon: <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 8h2M5 11h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
-    { label: '已确认未付', value: (confirmedUnpaid / 10000).toFixed(1), unit: '万', trend: { direction: 'down', value: '达到确认节点' }, icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M9 5.5V9l2 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-    { label: '已付金额', value: (totalPaid / 10000).toFixed(1), unit: '万', trend: { direction: 'up', value: '付款核销见付款管理' }, icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 9l2 2 3.5-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  ];
 
   return (
     <>
@@ -64,7 +58,6 @@ export default function FinancePayables() {
           入库制采购到货入库确认、直发采购客户签收确认（「采购 → 直发确认」操作）；付款核销在「付款管理」，支持按单/按周期汇总付款。
         </div>
 
-        <div className="stat-cards">{stats.map((s, i) => <StatCard key={i} data={s} />)}</div>
 
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', marginTop: 'var(--space-4)', flexWrap: 'wrap' }}>
           {([['', '全部应付'], ['unsettled', '未付'], ['settled', '已付']] as const).map(([k, label]) => (

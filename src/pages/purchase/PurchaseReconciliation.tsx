@@ -1,42 +1,14 @@
 import { useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import StatusTag from '../../components/common/StatusTag';
 import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
 /* ── 统计卡片 ── */
-const stats: StatCardData[] = [
-  {
-    label: '待对账',
-    value: '8',
-    trend: { direction: 'up', value: '需及时处理' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="4" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M6 8h6M6 11h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
-  },
-  {
-    label: '对账中',
-    value: '5',
-    trend: { direction: 'up', value: '+1单' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6.5" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  },
-  {
-    label: '已确认',
-    value: '32',
-    trend: { direction: 'up', value: '+4单' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><path d="M4 9l3.5 3.5L14 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  },
-  {
-    label: '本月对账额',
-    value: '1,256,800',
-    unit: '¥',
-    trend: { direction: 'up', value: '12.5%' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 7h2v7H2V9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  },
-];
 
 /* ── 对账状态 ── */
 type ReconciliationStatus = 'pending' | 'reconciling' | 'confirmed' | 'disputed';
@@ -251,7 +223,7 @@ export default function PurchaseReconciliation() {
     <>
       <ContentHeader
         title="供应商对账"
-        breadcrumbs={['采购', '供应商对账']}
+        breadcrumbs={['采购&仓储', '供应商对账']}
         actions={
           <>
             <Button variant="ghost">导出</Button>
@@ -260,11 +232,6 @@ export default function PurchaseReconciliation() {
         }
       />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => (
-            <StatCard key={i} data={s} />
-          ))}
-        </div>
 
         <FilterBar>
           <FilterInput placeholder="搜索对账单号、供应商..." />

@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
@@ -11,7 +10,7 @@ import SalesOrderInfoModal from '../../components/business/SalesOrderInfoModal';
 import {
   EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS, TRANSFER_SOURCE_LABELS,
 } from '../../data/externalOrders';
-import type { StatCardData, ExternalOrder } from '../../types';
+import type { ExternalOrder } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -77,13 +76,6 @@ export default function SalesFulfillment() {
   const countOf = (k: '' | StageKey) => (k === '' ? units.length : units.filter((u) => u.stageIdx === STAGE_CHAIN.findIndex((s) => s.key === k)).length);
   const filtered = useMemo(() => (tab === '' ? units : units.filter((u) => u.stageIdx === STAGE_CHAIN.findIndex((s) => s.key === tab))), [units, tab]);
 
-  const stats: StatCardData[] = [
-    { label: '履约单元', value: String(units.length), unit: '单', trend: { direction: 'up', value: '子单 / 未拆分母单' }, icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="4.5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 8h5M6.5 11h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
-    { label: '待接单', value: String(countOf('accept')), unit: '单', trend: { direction: 'down', value: '自营 / 转派' }, icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v3l2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-    { label: '履约+运输中', value: String(countOf('doing') + countOf('transit')), unit: '单', trend: { direction: 'up', value: '备货 / 在途' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M2 13L13 2M6 2h7v7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-    { label: '已妥投/结算', value: String(countOf('done')), unit: '单', trend: { direction: 'up', value: '闭环' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2l7 3v8l-7 3-7-3V5l7-3z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M6 9l2 2 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  ];
-
   return (
     <>
       <ContentHeader title="销售单履约" breadcrumbs={['销售', '销售单管理', '销售单履约']} />
@@ -94,9 +86,7 @@ export default function SalesFulfillment() {
           已拆分的母销售单由其子履约单各自呈现；包裹物流与合作商发货登记实时联动。
         </div>
 
-        <div className="stat-cards">{stats.map((s, i) => <StatCard key={i} data={s} />)}</div>
-
-        <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', flexWrap: 'wrap', marginTop: 'var(--space-4)' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
           <button className={`tab-card-simple${tab === '' ? ' active' : ''}`} style={{ transition: 'none' }} onClick={() => setTab('')}>
             全部<span className="tab-card-simple-count">{units.length} 单</span>
           </button>

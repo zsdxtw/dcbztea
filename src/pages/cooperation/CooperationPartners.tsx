@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
@@ -18,16 +17,16 @@ import {
   genSupplierCode,
 } from '../../data/suppliers';
 import type { SupplierItem, SupplierType, SupplierGrade, SupplierWarehouse, SupplierStore, SupplierTerminal, SupplierTerminalAccount, BrandAuthFiles } from '../../types';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
 import { useSupplierStore, getTerminalAccounts } from '../../stores/supplierStore';
 
 /* ── 合作商类型筛选配置 ── */
-const TYPE_FILTER: { key: SupplierType | 'all'; label: string; color: string; desc: string }[] = [
-  { key: 'all', label: '全部合作商', color: 'var(--color-module-current-base)', desc: '所有合作商' },
-  { key: 'brand', label: '品牌商', color: '#CB405D', desc: '品牌拥有方，平台直接合作' },
-  { key: 'supplier', label: '供应商', color: '#0DAFC6', desc: '差价模式：平台按价格采购，背对背销售' },
-  { key: 'service', label: '服务商', color: '#9D73BD', desc: '扣点模式：按售价收取服务费，差价归服务商' },
+const TYPE_FILTER: { key: SupplierType | 'all'; label: string; desc: string }[] = [
+  { key: 'all', label: '全部合作商', desc: '所有合作商' },
+  { key: 'brand', label: '品牌商', desc: '品牌拥有方，平台直接合作' },
+  { key: 'supplier', label: '供应商', desc: '差价模式：平台按价格采购，背对背销售' },
+  { key: 'service', label: '服务商', desc: '扣点模式：按售价收取服务费，差价归服务商' },
 ];
 
 /** 详情抽屉 Tab 键 */
@@ -127,36 +126,6 @@ export default function PurchaseSuppliers() {
     });
   }, [list, activeType, keyword, filterGrade]);
 
-  // 统计
-  const stats: StatCardData[] = useMemo(() => {
-    const brandCount = list.filter(s => s.types.includes('brand')).length;
-    const supplierCount = list.filter(s => s.types.includes('supplier')).length;
-    const serviceCount = list.filter(s => s.types.includes('service')).length;
-    const activeCount = list.filter(s => s.status === 'active').length;
-    const gradeA = list.filter(s => s.grade === 'A' || s.grade === 'S').length;
-    return [
-      {
-        label: '品牌商', value: String(brandCount), unit: '家',
-        trend: { direction: 'up', value: `在册 ${list.filter(s => s.types.includes('brand') && s.status === 'active').length} 家` },
-        icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2L3 5v5c0 5 3.5 7.5 7 9 3.5-1.5 7-4 7-9V5L9 2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
-      },
-      {
-        label: '供应商', value: String(supplierCount), unit: '家',
-        trend: { direction: 'up', value: `服务商 ${serviceCount} 家` },
-        icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="14" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.2"/></svg>,
-      },
-      {
-        label: '在册合作商', value: String(activeCount), unit: '家',
-        trend: { direction: 'up', value: `总计 ${list.length} 家` },
-        icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M3 9h12M7 5V3h4v2" stroke="currentColor" strokeWidth="1.3"/></svg>,
-      },
-      {
-        label: 'A级以上', value: String(gradeA), unit: '家',
-        trend: { direction: 'up', value: `占比 ${(gradeA / list.length * 100).toFixed(0)}%` },
-        icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2l2.5 5 5.5.8-4 3.9.9 5.5L9 14.7 5.1 17.2l.9-5.5-4-3.9L7.5 7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
-      },
-    ];
-  }, [list]);
 
   // 删除
   const handleEnterDeleteMode = () => { setDeleteMode(true); setSelectedForDelete(new Set()); };
@@ -374,13 +343,10 @@ export default function PurchaseSuppliers() {
 
   return (
     <>
-      <ContentHeader title="供应商档案" breadcrumbs={['采购', '供应商与合作商', '供应商档案']} />
+      <ContentHeader title="合作商列表" breadcrumbs={['合作商', '合作商列表']} />
 
       <div className="content-body">
       {/* 统计卡片 */}
-      <div className="stat-cards">
-        {stats.map((s, i) => <StatCard key={i} data={s} />)}
-      </div>
 
       {/* 类型筛选卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
@@ -388,10 +354,10 @@ export default function PurchaseSuppliers() {
           const count = tf.key === 'all' ? list.length : list.filter(s => s.types.includes(tf.key as SupplierType)).length;
           const isActive = activeType === tf.key;
           return (
-            <div key={tf.key} style={{ cursor: 'pointer', border: isActive ? `2px solid ${tf.color}` : '1px solid var(--color-border-primary)', background: isActive ? `${tf.color}08` : 'var(--color-bg-primary)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)', boxShadow: 'var(--shadow-sm)' }} onClick={() => setActiveType(isActive ? 'all' : tf.key)}>
+            <div key={tf.key} style={{ cursor: 'pointer', border: isActive ? '2px solid var(--color-module-current-base)' : '1px solid var(--color-border-primary)', background: isActive ? 'var(--color-module-current-lightest)' : 'var(--color-bg-primary)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)', boxShadow: 'var(--shadow-sm)' }} onClick={() => setActiveType(isActive ? 'all' : tf.key)}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontWeight: 'var(--font-semibold)', fontSize: 'var(--text-base)', color: 'var(--color-text-primary)' }}>{tf.label}</span>
-                <span style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-bold)', color: tf.color }}>{count}</span>
+                <span style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-module-current-base)' }}>{count}</span>
               </div>
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>{tf.desc}</div>
             </div>
@@ -412,14 +378,14 @@ export default function PurchaseSuppliers() {
         </Button>
         {deleteMode ? (
           <>
-            <Button style={{ background: '#0F64B5', borderColor: '#0F64B5' }} onClick={() => setShowDeleteConfirm(true)} disabled={selectedForDelete.size === 0}>
+            <Button style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)' }} onClick={() => setShowDeleteConfirm(true)} disabled={selectedForDelete.size === 0}>
               <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14 }}><path d="M2 4h12M5.33 4V2.67a1.33 1.33 0 011.34-1.34h2.66a1.33 1.33 0 011.34 1.34V4m2 0v9.33a1.33 1.33 0 01-1.34 1.34H4.67a1.33 1.33 0 01-1.34-1.34V4h9.34z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
               删除所选({selectedForDelete.size})
             </Button>
             <Button variant="ghost" onClick={handleCancelDeleteMode}>取消</Button>
           </>
         ) : (
-          <Button style={{ background: '#0F64B5', borderColor: '#0F64B5' }} onClick={handleEnterDeleteMode}>
+          <Button style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)' }} onClick={handleEnterDeleteMode}>
             <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14 }}><path d="M2 4h12M5.33 4V2.67a1.33 1.33 0 011.34-1.34h2.66a1.33 1.33 0 011.34 1.34V4m2 0v9.33a1.33 1.33 0 01-1.34 1.34H4.67a1.33 1.33 0 01-1.34-1.34V4h9.34z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             删除
           </Button>
@@ -468,7 +434,7 @@ export default function PurchaseSuppliers() {
             <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)' }}>确定要删除选中的 {selectedForDelete.size} 家合作商吗？此操作不可撤销。</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
               <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>取消</Button>
-              <Button style={{ background: '#0F64B5', borderColor: '#0F64B5' }} onClick={handleCancelDeleteMode}>确认删除</Button>
+              <Button style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)' }} onClick={handleCancelDeleteMode}>确认删除</Button>
             </div>
           </div>
         </div>

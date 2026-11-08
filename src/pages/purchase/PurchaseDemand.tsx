@@ -1,13 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { buildSupplyPlan } from '../../stores/purchaseStore';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -48,22 +47,16 @@ export default function PurchaseDemand() {
     return [...m.values()].sort((a, b) => b.netQty - a.netQty);
   }, [filtered]);
 
-  const stats: StatCardData[] = [
-    { label: '需求行数', value: String(filtered.length), unit: '行', trend: { direction: 'up', value: `${demandRows.length} 行待定案` }, icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="4.5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 8h5M6.5 11h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
-    { label: '净需求总量', value: String(totalNet), unit: '件', trend: { direction: 'down', value: '缺口 = 订单 − 可用库存' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 13L13 3M6 3h7v7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M4 16h11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-    { label: '涉及商品', value: String(byProduct.length), unit: '种', trend: { direction: 'up', value: byProduct[0] ? `最大缺口 ${byProduct[0].productName}` : '—' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2l7 3v8l-7 3-7-3V5l7-3z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg> },
-  ];
 
   return (
     <>
-      <ContentHeader title="采购申请" breadcrumbs={['采购', '采购申请']} />
+      <ContentHeader title="采购申请" breadcrumbs={['采购&仓储', '采购申请']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           采购需求池聚合<strong>自营待接单</strong>的 ATP 净需求（订单数量 − 可用库存）：浏览缺口、按商品汇总；
           在「去供应方案」中行级选择库存直发与供应商（多源），定案后自动按供应商分组生成入库制采购单。
         </div>
 
-        <div className="stat-cards">{stats.map((s, i) => <StatCard key={i} data={s} />)}</div>
 
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)', flexWrap: 'wrap' }}>
           <input className="filter-input" placeholder="搜索商品、订单号、客户..." value={kw} onChange={(e) => setKw(e.target.value)} style={{ width: 240 }} />

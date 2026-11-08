@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
@@ -9,15 +8,9 @@ import StatusTag from '../../components/common/StatusTag';
 import Toggle from '../../components/common/Toggle';
 import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
 import { TeaCategory } from '../../types';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
 /* ── 统计数据 ── */
-const stats: StatCardData[] = [
-  { label: '预警规则数', value: '8', unit: '条', icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v4M9 12.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-  { label: '已触发预警', value: '5', trend: { direction: 'up', value: '需关注' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M10 3a5 5 0 015 5v3l2 2H3l2-2V8a5 5 0 015-5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M8 15a2 2 0 004 0" stroke="currentColor" strokeWidth="1.3"/></svg> },
-  { label: '预警商品数', value: '12', unit: '种', trend: { direction: 'down', value: '-3种' }, icon: <svg viewBox="0 0 18 18" fill="none"><rect x="4" y="4" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M4 8h10M8 4v10" stroke="currentColor" strokeWidth="1.2"/></svg> },
-  { label: '预警类型数', value: '4', unit: '种', icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="3" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="11" y="3" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="3" y="11" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="11" y="11" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.3"/></svg> },
-];
 
 /* ── 模拟数据 ── */
 interface AlertRule {
@@ -68,11 +61,8 @@ export default function InventoryAlertSettings() {
 
   return (
     <>
-      <ContentHeader title="预警设置" breadcrumbs={['仓储', '预警设置']} actions={<Button><PlusIcon />新增预警规则</Button>} />
+      <ContentHeader title="预警设置" breadcrumbs={['采购&仓储', '预警设置']} actions={<Button><PlusIcon />新增预警规则</Button>} />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
         <FilterBar>
           <FilterInput placeholder="搜索商品名称..." />
           <FilterSelect options={['全部预警类型', '库存下限', '库存上限']} />

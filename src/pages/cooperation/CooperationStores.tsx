@@ -77,7 +77,7 @@ export default function PurchasePartnerStores() {
 
   return (
     <>
-      <ContentHeader title="合作商门店" breadcrumbs={['采购', '合作商管理', '合作商门店']} />
+      <ContentHeader title="合作商门店" breadcrumbs={['合作商', '合作商门店']} />
 
       <div className="content-body">
         {/* 工具栏：搜索 + 合作商/地区/主营品牌筛选 + 地图总览 */}

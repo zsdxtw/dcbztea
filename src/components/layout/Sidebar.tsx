@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
-import { MODULE_CONFIGS } from '../../data/modules';
+import { MODULE_CONFIGS, moduleMenuPath } from '../../data/modules';
 import clsx from 'clsx';
 import type { MenuItem } from '../../types';
 
@@ -22,7 +22,7 @@ export default function Sidebar() {
 
   const handleMenuClick = (menuKey: string) => {
     switchSubMenu(menuKey);
-    navigate(`/${currentModule}/${menuKey}`);
+    navigate(moduleMenuPath(currentModule, menuKey));
   };
 
   const handleToggleExpand = (menuKey: string) => {

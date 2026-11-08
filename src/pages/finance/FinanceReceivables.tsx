@@ -1,13 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { EXTERNAL_PLATFORM_LABELS, platformLabelOf } from '../../data/externalOrders';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -56,11 +55,6 @@ export default function FinanceReceivables() {
   const totalReceived = rows.reduce((s, r) => s + r.received, 0);
   const totalUnreceived = totalAR - totalReceived;
 
-  const stats: StatCardData[] = [
-    { label: '应收总额', value: (totalAR / 10000).toFixed(1), unit: '万', trend: { direction: 'up', value: `${rows.length} 单` }, icon: <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 8h2M5 11h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
-    { label: '已收金额', value: (totalReceived / 10000).toFixed(1), unit: '万', trend: { direction: 'up', value: '收款核销见收款管理' }, icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 9l2 2 3.5-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-    { label: '未收金额', value: (totalUnreceived / 10000).toFixed(1), unit: '万', trend: { direction: 'down', value: `含逾期 ${rows.filter((r) => r.overdue && !r.settled).length} 单` }, icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M9 5.5V9l2 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-  ];
 
   return (
     <>
@@ -71,7 +65,6 @@ export default function FinanceReceivables() {
           收款核销在「收款管理」（支持一笔收款核销多单、部分收款与预收款）。
         </div>
 
-        <div className="stat-cards">{stats.map((s, i) => <StatCard key={i} data={s} />)}</div>
 
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', marginTop: 'var(--space-4)', flexWrap: 'wrap' }}>
           {([['', '全部应收'], ['unsettled', '未结清'], ['settled', '已结清']] as const).map(([k, label]) => (

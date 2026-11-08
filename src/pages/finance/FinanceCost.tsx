@@ -1,19 +1,12 @@
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import StatusTag from '../../components/common/StatusTag';
 import PieChart from '../../components/charts/PieChart';
 import Button from '../../components/common/Button';
 import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
-const stats: StatCardData[] = [
-  { label: '本月采购成本', value: '856,200', unit: '¥', trend: { direction: 'up', value: '12.3%' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 5h12l-1.2 8H4.2L3 5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg> },
-  { label: '运输成本', value: '23,500', unit: '¥', trend: { direction: 'down', value: '3.2%' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M2 14l2-4 3 2 3-6 3 3 3-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '仓储成本', value: '18,200', unit: '¥', trend: { direction: 'up', value: '5.8%' }, icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M3 9h12M7 5V3h4v2" stroke="currentColor" strokeWidth="1.3"/></svg> },
-  { label: '综合成本率', value: '38.5', unit: '%', trend: { direction: 'down', value: '2.1%' }, icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M9 5v4l3 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-];
 
 interface CostItem {
   name: string;
@@ -66,9 +59,6 @@ export default function FinanceCost() {
     <>
       <ContentHeader title="成本核算" breadcrumbs={['财务', '成本核算']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新增成本项</Button></>} />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
         <FilterBar>
           <FilterInput placeholder="搜索成本项名称..." />
           <FilterSelect options={['全部类别', '采购成本', '运输成本', '仓储成本', '加工成本']} />

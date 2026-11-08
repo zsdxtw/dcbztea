@@ -5,7 +5,7 @@ import { TooltipComponent, VisualMapComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
-import './PurchaseStoreOverview.css';
+import './CooperationStoreOverview.css';
 
 echarts.use([MapChart, TooltipComponent, VisualMapComponent, CanvasRenderer]);
 

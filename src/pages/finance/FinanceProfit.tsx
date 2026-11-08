@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { usePriceStore } from '../../stores/priceStore';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -69,12 +68,6 @@ export default function FinanceProfit() {
     return [...map.values()].sort((a, b) => b.revenue - a.revenue);
   }, [dim, orderRows]);
 
-  const stats: StatCardData[] = [
-    { label: '完结订单数', value: String(orderRows.length), unit: '单', trend: { direction: 'up', value: `自营 ${orderRows.filter((r) => r.mode === '自营履约').length} / 合作商 ${orderRows.filter((r) => r.mode === '合作商履约').length}` }, icon: <svg viewBox="0 0 18 18" fill="none"><rect x="4" y="2" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h4M7 9h4M7 12h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
-    { label: '销售收入', value: (totals.revenue / 10000).toFixed(1), unit: '万', trend: { direction: 'up', value: money(totals.revenue) }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-    { label: '商品成本', value: (totals.cost / 10000).toFixed(1), unit: '万', trend: { direction: 'down', value: '采购 + 库存出库' }, icon: <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/></svg> },
-    { label: '毛利（估算）', value: (totals.gross / 10000).toFixed(1), unit: '万', trend: { direction: 'up', value: `毛利率 ${totals.revenue > 0 ? Math.round((totals.gross / totals.revenue) * 100) : 0}%` }, icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 9l2 2 3.5-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  ];
 
   return (
     <>
@@ -85,7 +78,6 @@ export default function FinanceProfit() {
           预计毛利实时估算；最终经营利润以实际成本、退货与费用核算为准（退货 / 物流费未接入前为演示口径）。
         </div>
 
-        <div className="stat-cards">{stats.map((s, i) => <StatCard key={i} data={s} />)}</div>
 
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', marginTop: 'var(--space-4)', flexWrap: 'wrap' }}>
           {([['order', '按订单'], ['customer', '按客户'], ['product', '按商品'], ['partner', '按合作商/自营']] as const).map(([k, label]) => (

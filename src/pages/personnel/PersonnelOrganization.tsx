@@ -4,7 +4,6 @@ import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Table from '../../components/common/Table';
 import StatusTag from '../../components/common/StatusTag';
-import StatCard from '../../components/common/StatCard';
 import {
   orgNodes as initialOrgNodes,
   employees as initialEmployees,
@@ -13,7 +12,7 @@ import {
   getOrgNodeName,
   EMP_STATUS_LABELS,
 } from '../../data/organization';
-import type { OrgNode, Employee, OrgNodeType, StatCardData, StatusVariant } from '../../types';
+import type {OrgNode, Employee, OrgNodeType, StatusVariant} from '../../types';
 
 /* ── 常量与辅助函数 ── */
 
@@ -87,12 +86,6 @@ export default function PersonnelOrganization() {
   const selectedNode = useMemo(() => nodes.find((n) => n.id === selectedId) ?? null, [nodes, selectedId]);
 
   /* 统计卡片 */
-  const stats: StatCardData[] = [
-    { label: '部门总数', value: String(departments.length), unit: '个', icon: <DeptIcon /> },
-    { label: '团队总数', value: String(nodes.filter((n) => n.type === 'team').length), unit: '个', icon: <TeamIcon /> },
-    { label: '员工总数', value: String(emps.length), unit: '人', icon: <EmpIcon /> },
-    { label: '在职员工', value: String(emps.filter((e) => e.status === 'active').length), unit: '人', icon: <ActiveEmpIcon /> },
-  ];
 
   /* 当前节点下的员工 */
   const nodeEmployees = useMemo(() => {
@@ -265,9 +258,6 @@ export default function PersonnelOrganization() {
         actions={<Button onClick={openAddDepartment}><PlusIcon />新增部门</Button>}
       />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
 
         <div style={{ display: 'flex', gap: 'var(--space-4)', alignItems: 'stretch' }}>
           {/* 左侧：组织架构树 */}

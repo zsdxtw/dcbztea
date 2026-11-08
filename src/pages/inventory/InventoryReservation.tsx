@@ -55,7 +55,7 @@ export default function InventoryReservation() {
 
   return (
     <>
-      <ContentHeader title="库存预留" breadcrumbs={['仓储', '库存管理', '库存预留']} />
+      <ContentHeader title="库存预留" breadcrumbs={['采购&仓储', '库存管理', '库存预留']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           销售订单分配到平台仓时先<strong>锁定库存</strong>（防超卖）：<strong>可用库存 = 实物 − 预留 − 不可用</strong>。

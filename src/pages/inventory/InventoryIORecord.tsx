@@ -78,7 +78,7 @@ export default function InventoryIORecord() {
 
   return (
     <>
-      <ContentHeader title="库存流水" breadcrumbs={['仓储', '库存流水']} />
+      <ContentHeader title="库存流水" breadcrumbs={['采购&仓储', '库存流水']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           记录所有库存变化，是库存追溯的底层依据：<strong>所有库存变动必须有业务来源单据</strong>（采购入库 / 销售出库 / 调拨 / 盘点调整等），禁止直接修改库存余额。

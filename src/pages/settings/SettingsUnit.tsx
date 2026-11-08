@@ -1,17 +1,10 @@
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import StatusTag from '../../components/common/StatusTag';
 import Button from '../../components/common/Button';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
-const stats: StatCardData[] = [
-  { label: '计量单位数', value: '12', icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="3" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 7h4M7 9h4M7 11h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
-  { label: '重量单位', value: '6', icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 3l6 12H3z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M9 8v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-  { label: '包装单位', value: '5', icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M6 5V3h6v2" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg> },
-  { label: '特殊单位', value: '1', icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v6M6 9h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
-];
 
 const weightUnits = [
   { name: '千克', symbol: 'kg', base: '基准单位', productCount: 86, active: true },
@@ -39,9 +32,6 @@ export default function SettingsUnit() {
     <>
       <ContentHeader title="单位设置" breadcrumbs={['系统', '单位设置']} />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
 
         <Card title="重量单位" headerRight={
           <Button variant="ghost" size="sm"><PlusIcon /> 新增</Button>

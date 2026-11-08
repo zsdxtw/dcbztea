@@ -1,37 +1,14 @@
 import { useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import StatusTag from '../../components/common/StatusTag';
 import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
 /* ── 统计卡片 ── */
-const stats: StatCardData[] = [
-  {
-    label: '退货单数', value: '8',
-    trend: { direction: 'down', value: '2 单', label: '较上月' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 6h12l-1.2 8H4.2L3 6z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M7 10l3 3M10 10l-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
-  },
-  {
-    label: '退货金额', value: '28,960', unit: '¥',
-    trend: { direction: 'down', value: '5.4%' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 8h2M5 11h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
-  },
-  {
-    label: '待处理', value: '2',
-    trend: { direction: 'up', value: '需及时处理' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v4M9 12.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
-  },
-  {
-    label: '退货率', value: '1.2', unit: '%',
-    trend: { direction: 'down', value: '0.3%' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  },
-];
 
 /* ── 退货状态 ── */
 type ReturnStatus = 'pending' | 'approved' | 'completed' | 'rejected';
@@ -163,9 +140,6 @@ export default function SalesReturn() {
         actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建退货单</Button></>}
       />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
 
         <FilterBar>
           <FilterInput placeholder="搜索退货单号、客户..." />

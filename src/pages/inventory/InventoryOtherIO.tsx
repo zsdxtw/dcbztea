@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
@@ -9,15 +8,9 @@ import StatusTag from '../../components/common/StatusTag';
 import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { TeaCategory } from '../../types';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
 /* ── 统计数据 ── */
-const stats: StatCardData[] = [
-  { label: '出入库单数', value: '12', unit: '单', icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2v10M5 8l4 4 4-4M9 14V4M5 8l4-4 4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '入库量', value: '2,500', unit: 'kg', trend: { direction: 'up', value: '+12%' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2v10M5 8l4 4 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 14h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-  { label: '出库量', value: '1,800', unit: 'kg', trend: { direction: 'down', value: '-5%' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 14V4M5 8l4-4 4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 14h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-  { label: '待审核', value: '2', unit: '单', icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v3l2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-];
 
 /* ── 模拟数据 ── */
 interface OtherIORecord {
@@ -112,11 +105,8 @@ export default function InventoryOtherIO() {
 
   return (
     <>
-      <ContentHeader title="其他出入库" breadcrumbs={['仓储', '其他出入库']} actions={<Button><PlusIcon />新建单据</Button>} />
+      <ContentHeader title="其他出入库" breadcrumbs={['采购&仓储', '其他出入库']} actions={<Button><PlusIcon />新建单据</Button>} />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
         <FilterBar>
           <FilterInput placeholder="搜索单号、商品..." />
           <FilterSelect options={['全部类型', '其他入库', '其他出库']} />

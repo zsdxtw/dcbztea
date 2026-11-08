@@ -49,7 +49,7 @@ export default function InventoryDetail() {
 
   return (
     <>
-      <ContentHeader title="库存明细" breadcrumbs={['仓储', '库存管理', '库存明细']} />
+      <ContentHeader title="库存明细" breadcrumbs={['采购&仓储', '库存管理', '库存明细']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           按 <strong>SKU × 仓库 × 货主 × 批次</strong>的库存台账：货权当前为<strong>平台所有</strong>（合作商库存归合作商库存域，未经验证不作为平台可用库存）；

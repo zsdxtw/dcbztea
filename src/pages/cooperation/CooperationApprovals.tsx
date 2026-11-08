@@ -78,7 +78,7 @@ export default function PurchaseSupplierApprovals() {
 
   return (
     <>
-      <ContentHeader title="注册审批" breadcrumbs={['采购', '合作商管理', '注册审批']} />
+      <ContentHeader title="注册审批" breadcrumbs={['合作商', '注册审批']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           审批合作商终端提交的申请。<strong>注册申请</strong>：通过后自动创建合作商档案（渠道来源=终端注册）并开通终端账号；<strong>信息修改申请</strong>：通过后覆盖对应合作商档案。当前待审批 <strong style={{ color: 'var(--color-module-current-base)' }}>{pendingCount}</strong> 条。

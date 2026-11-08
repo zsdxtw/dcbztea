@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
@@ -9,15 +8,9 @@ import StatusTag from '../../components/common/StatusTag';
 import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { TeaCategory } from '../../types';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
 /* ── 统计数据 ── */
-const stats: StatCardData[] = [
-  { label: '调拨单数', value: '8', unit: '单', icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 9h12M12 6l3 3-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '调拨中', value: '3', unit: '单', trend: { direction: 'up', value: '+1单' }, icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v3l2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '已完成', value: '5', unit: '单', icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M6 10l2 2 4-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '待审核', value: '2', unit: '单', icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v4M9 12.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-];
 
 /* ── 模拟数据 ── */
 interface TransferOrder {
@@ -101,11 +94,8 @@ export default function InventoryTransfer() {
 
   return (
     <>
-      <ContentHeader title="库存调拨" breadcrumbs={['仓储', '库存调拨']} actions={<Button><PlusIcon />新建调拨</Button>} />
+      <ContentHeader title="库存调拨" breadcrumbs={['采购&仓储', '库存调拨']} actions={<Button><PlusIcon />新建调拨</Button>} />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
         <FilterBar>
           <FilterInput placeholder="搜索调拨单号..." />
           <FilterSelect options={['全部状态', '待审核', '调拨中', '已完成']} />

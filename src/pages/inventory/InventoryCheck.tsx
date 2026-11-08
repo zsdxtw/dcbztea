@@ -1,21 +1,14 @@
 import { useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import StatusTag from '../../components/common/StatusTag';
 import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem, RowActions, RowDeleteButton } from '../../components/common/DetailDrawer';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
 /* ── 统计数据 ── */
-const stats: StatCardData[] = [
-  { label: '盘点单数', value: '6', unit: '单', icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v4M9 12.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-  { label: '盘点中', value: '2', unit: '单', trend: { direction: 'up', value: '+1单' }, icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v4l3 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '差异项', value: '8', unit: '种', trend: { direction: 'down', value: '-2种' }, icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M6 10l2 2 4-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '盘点准确率', value: '97.2', unit: '%', trend: { direction: 'up', value: '+0.5%' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-];
 
 /* ── 模拟数据 ── */
 interface CheckOrder {
@@ -162,11 +155,8 @@ export default function InventoryCheck() {
 
   return (
     <>
-      <ContentHeader title="库存盘点" breadcrumbs={['仓储', '库存盘点']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建盘点</Button></>} />
+      <ContentHeader title="库存盘点" breadcrumbs={['采购&仓储', '库存盘点']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建盘点</Button></>} />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
         <FilterBar>
           <FilterInput placeholder="搜索盘点单号..." />
           <FilterSelect options={['全部状态', '待盘点', '盘点中', '已完成']} />

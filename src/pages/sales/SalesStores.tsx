@@ -1,11 +1,10 @@
 import { useState, useMemo } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
-import type { StoreItem, StatCardData } from '../../types';
+import type {StoreItem} from '../../types';
 import { storeItems as initialStores, generateStoreCode } from '../../data/stores';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
 
@@ -13,16 +12,6 @@ const PRIMARY = '#0F64B5';
 const PRIMARY_LIGHT = '#EBF3FC';
 const SECONDARY = '#CB405D';
 
-const stats = (list: StoreItem[]): StatCardData[] => {
-  const active = list.filter(s => s.status === 'active');
-  const totalArea = list.reduce((sum, s) => sum + s.area, 0);
-  return [
-    { label: '门店总数', value: String(list.length), unit: '家', icon: <IconStore />, trend: { direction: 'up', value: `营业中 ${active.length}` } },
-    { label: '营业中', value: String(active.length), unit: '家', icon: <IconActive />, trend: { direction: 'up', value: `占比 ${list.length ? Math.round(active.length / list.length * 100) : 0}%` } },
-    { label: '已停业', value: String(list.length - active.length), unit: '家', icon: <IconInactive />, trend: { direction: 'down', value: '暂停营业' } },
-    { label: '门店总面积', value: String(totalArea), unit: '㎡', icon: <IconArea />, trend: { direction: 'up', value: `均值 ${list.length ? Math.round(totalArea / list.length) : 0}㎡` } },
-  ];
-};
 
 const emptyForm: StoreItem = {
   id: '',
@@ -119,9 +108,6 @@ export default function SalesStores() {
     <>
       <ContentHeader title="门店管理" breadcrumbs={['人员', '门店管理']} />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats(data).map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-5)' }}>
           <input className="filter-input" placeholder="搜索门店名称、编号、店长、地区..." value={keyword} onChange={e => setKeyword(e.target.value)} style={{ width: 280 }} />

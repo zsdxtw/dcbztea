@@ -14,6 +14,10 @@ export const SalesTabIcon = () => (
 export const InventoryTabIcon = () => (
   <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M3 9h12M7 5V3h4v2" stroke="currentColor" strokeWidth="1.3"/></svg>
 );
+
+export const PartnerTabIcon = () => (
+  <svg viewBox="0 0 18 18" fill="none"><circle cx="6" cy="9" r="3.2" stroke="currentColor" strokeWidth="1.3"/><circle cx="12" cy="9" r="3.2" stroke="currentColor" strokeWidth="1.3"/><path d="M8 12.5l1-1 1 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+);
 export const ProductTabIcon = () => (
   <svg viewBox="0 0 18 18" fill="none"><path d="M9 2L3 5v8l6 3 6-3V5L9 2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M9 8l6-3M9 8v10M9 8L3 5" stroke="currentColor" strokeWidth="1.3"/></svg>
 );
@@ -238,22 +242,41 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
   },
   [ModuleKey.PURCHASE]: {
     key: ModuleKey.PURCHASE,
-    label: '采购',
+    label: '采购&仓储',
     menus: [
-      { key: 'purchase-overview', label: '采购概览', icon: <OverviewIcon /> },
-      { key: 'purchase-demand', label: '采购申请', icon: <PriceIcon /> },
-      { key: 'purchase-orders', label: '采购订单', icon: <OrdersIcon /> },
-      { key: 'purchase-pricing', label: '采购报（调）价', icon: <PriceIcon /> },
-      { key: 'purchase-inbound', label: '采购收货', icon: <InboundIcon /> },
-      { key: 'direct-delivery-confirm', label: '直发确认', icon: <OutboundIcon /> },
-      { key: 'purchase-suppliers', label: '供应商与合作商', icon: <SuppliersIcon />, children: [
-        { key: 'purchase-supplier-list', label: '供应商档案', icon: <SupplierListIcon /> },
-        { key: 'purchase-supplier-approvals', label: '注册审批', icon: <SupplierApprovalIcon /> },
-        { key: 'purchase-partner-stores', label: '合作商门店', icon: <StoreIcon /> },
-        { key: 'purchase-partner-scores', label: '合作商积分', icon: <SupplierApprovalIcon /> },
-        { key: 'partner-reports', label: '报备管理', icon: <ReportMgmtIcon /> },
+      { key: 'purchase-overview', label: '概览', icon: <OverviewIcon /> },
+      { key: 'purchase-manage', label: '采购管理', icon: <OrdersIcon />, children: [
+        { key: 'purchase-demand', label: '采购申请', icon: <PriceIcon /> },
+        { key: 'purchase-orders', label: '采购订单', icon: <OrdersIcon /> },
+        { key: 'purchase-pricing', label: '采购报（调）价', icon: <PriceIcon /> },
+        { key: 'purchase-return', label: '采购退货', icon: <ReturnIcon /> },
       ] },
-      { key: 'purchase-return', label: '采购退货', icon: <ReturnIcon /> },
+      { key: 'warehouse-io', label: '入库出库', icon: <InboundIcon />, children: [
+        { key: 'purchase-inbound', label: '采购收货', icon: <InboundIcon /> },
+        { key: 'inventory-sales-outbound', label: '销售出库', icon: <OutboundIcon /> },
+        { key: 'direct-delivery-confirm', label: '直发确认', icon: <OutboundIcon /> },
+        { key: 'inventory-other-io', label: '其他出入库', icon: <InboundRecordIcon /> },
+        { key: 'inventory-transfer', label: '库存调拨', icon: <TraceabilityIcon /> },
+      ] },
+      { key: 'warehouse-stock', label: '库存管理', icon: <StockIcon />, children: [
+        { key: 'inventory-detail', label: '库存明细', icon: <StockIcon /> },
+        { key: 'inventory-reservation', label: '库存预留', icon: <CheckIcon /> },
+        { key: 'inventory-check', label: '库存盘点', icon: <CheckIcon /> },
+        { key: 'inventory-io-record', label: '库存流水', icon: <InboundRecordIcon /> },
+        { key: 'inventory-warehouse-settings', label: '仓库设置', icon: <WarehouseSettingsIcon /> },
+        { key: 'inventory-alert-settings', label: '预警设置', icon: <AlertSettingsIcon /> },
+      ] },
+    ],
+  },
+  [ModuleKey.PARTNER]: {
+    key: ModuleKey.PARTNER,
+    label: '合作商',
+    menus: [
+      { key: 'cooperation-partners', label: '合作商列表', icon: <SupplierListIcon /> },
+      { key: 'cooperation-approvals', label: '注册审批', icon: <SupplierApprovalIcon /> },
+      { key: 'cooperation-stores', label: '合作商门店', icon: <StoreIcon /> },
+      { key: 'cooperation-scores', label: '合作商积分', icon: <SupplierApprovalIcon /> },
+      { key: 'cooperation-reports', label: '报备管理', icon: <ReportMgmtIcon /> },
     ],
   },
   [ModuleKey.SALES]: {
@@ -273,25 +296,6 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
       ] },
       { key: 'sales-reconciliation', label: '客户对账', icon: <ReconciliationIcon /> },
       { key: 'sales-return', label: '销售退货', icon: <ReturnIcon /> },
-    ],
-  },
-  [ModuleKey.INVENTORY]: {
-    key: ModuleKey.INVENTORY,
-    label: '仓储',
-    menus: [
-      { key: 'inventory-overview', label: '库存总览', icon: <OverviewIcon /> },
-      { key: 'inventory-stock', label: '库存管理', icon: <StockIcon />, children: [
-        { key: 'inventory-detail', label: '库存明细', icon: <StockIcon /> },
-        { key: 'inventory-reservation', label: '库存预留', icon: <CheckIcon /> },
-        { key: 'inventory-purchase-inbound', label: '采购入库', icon: <InboundIcon /> },
-        { key: 'inventory-sales-outbound', label: '销售出库', icon: <OutboundIcon /> },
-        { key: 'inventory-other-io', label: '其他出入库', icon: <InboundRecordIcon /> },
-        { key: 'inventory-transfer', label: '库存调拨', icon: <TraceabilityIcon /> },
-      ] },
-      { key: 'inventory-check', label: '库存盘点', icon: <CheckIcon /> },
-      { key: 'inventory-io-record', label: '库存流水', icon: <InboundRecordIcon /> },
-      { key: 'inventory-warehouse-settings', label: '仓库设置', icon: <WarehouseSettingsIcon /> },
-      { key: 'inventory-alert-settings', label: '预警设置', icon: <AlertSettingsIcon /> },
     ],
   },
   [ModuleKey.PRODUCT]: {
@@ -388,12 +392,47 @@ export function getModuleMenus(key: ModuleKey): MenuItem[] {
 /** 顶栏模块 Tab 列表（含图标组件） */
 export const TOPNAV_TABS: Array<{ key: ModuleKey; label: string; icon: React.ReactNode }> = [
   { key: ModuleKey.DASHBOARD, label: '工作台', icon: <DashboardTabIcon /> },
-  { key: ModuleKey.PURCHASE, label: '采购', icon: <PurchaseTabIcon /> },
+  { key: ModuleKey.PURCHASE, label: '采购&仓储', icon: <PurchaseTabIcon /> },
   { key: ModuleKey.SALES, label: '销售', icon: <SalesTabIcon /> },
+  { key: ModuleKey.PARTNER, label: '合作商', icon: <PartnerTabIcon /> },
   { key: ModuleKey.PRODUCT, label: '商品', icon: <ProductTabIcon /> },
-  { key: ModuleKey.INVENTORY, label: '仓储', icon: <InventoryTabIcon /> },
   { key: ModuleKey.PERSONNEL, label: '人员', icon: <PersonnelTabIcon /> },
   { key: ModuleKey.FINANCE, label: '财务', icon: <FinanceTabIcon /> },
   { key: ModuleKey.STATISTICS, label: '统计', icon: <StatisticsTabIcon /> },
   { key: ModuleKey.SETTINGS, label: '系统', icon: <SettingsTabIcon /> },
 ];
+
+/**
+ * 模块路径解析:合作商一级菜单页面路由仍在 /purchase/* 下(避免与合作商终端 /partner 冲突),
+ * 其余模块路径前缀 = /{moduleKey}。
+ */
+export const moduleBasePath = (module: ModuleKey): string =>
+  module === ModuleKey.PARTNER ? '/cooperation' : `/${module}`;
+
+/**
+ * 菜单 key 前缀 → 路由前缀重写:
+ * 采购&仓储合并后,仓储类菜单(inventory-*)页面路由仍挂在 /inventory/* 下(站内旧链接直达),菜单点击需按前缀重写。
+ */
+const MENU_PATH_PREFIX_OVERRIDES: Record<string, string> = {
+  'inventory-': '/inventory',
+};
+
+/** 菜单项完整路径 */
+export const moduleMenuPath = (module: ModuleKey, menuKey: string): string => {
+  const override = Object.keys(MENU_PATH_PREFIX_OVERRIDES).find((prefix) => menuKey.startsWith(prefix));
+  return override ? `${MENU_PATH_PREFIX_OVERRIDES[override]}/${menuKey}` : `${moduleBasePath(module)}/${menuKey}`;
+};
+
+/** 一级菜单落地页(首个菜单;分组菜单取其第一个子项) */
+export const MODULE_HOME_PATH: Record<ModuleKey, string> = {
+  [ModuleKey.DASHBOARD]: '/dashboard/overview',
+  [ModuleKey.PURCHASE]: '/purchase/purchase-overview',
+  [ModuleKey.PARTNER]: '/cooperation/cooperation-partners',
+  [ModuleKey.SALES]: '/sales/sales-overview',
+  [ModuleKey.PRODUCT]: '/product/product-overview',
+  [ModuleKey.FINANCE]: '/finance/finance-overview',
+  [ModuleKey.STATISTICS]: '/statistics/statistics-sales',
+  [ModuleKey.PERSONNEL]: '/personnel/personnel-organization',
+  [ModuleKey.SETTINGS]: '/settings/settings-system',
+};
+

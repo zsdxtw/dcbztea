@@ -81,7 +81,7 @@ export default function PartnerScores() {
 
   return (
     <>
-      <ContentHeader title="合作商积分" breadcrumbs={['采购', '合作商管理', '合作商积分']} />
+      <ContentHeader title="合作商积分" breadcrumbs={['合作商', '合作商积分']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           积分 = <strong>客户拜访 + 报备情况 + 履约情况 + 处罚情况</strong> 四维台账汇总（期初分 + 流水累加），是<strong>比单评分（40%）</strong>的数据源。

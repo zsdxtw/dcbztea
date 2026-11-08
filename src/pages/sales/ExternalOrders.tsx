@@ -1435,7 +1435,7 @@ export default function ExternalOrders() {
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>报备管理</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7, flexShrink: 0 }}>
               合作商提交的全部报备记录（商机 / 客户 / 商品 / 订单报备）。<strong>已通过</strong>的报备参与订单保存时的自动匹配，命中进入「报备-匹配待确认」；
-              报备审批在「采购 → 供应商与合作商 → 报备管理」。
+              报备审批在「采购 → 合作商管理 → 报备管理」。
             </div>
             <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>
               <select className="filter-select" value={reportStatusFilter} onChange={(e) => setReportStatusFilter(e.target.value)}>

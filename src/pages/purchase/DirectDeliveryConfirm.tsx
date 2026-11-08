@@ -47,7 +47,7 @@ export default function DirectDeliveryConfirm() {
 
   return (
     <>
-      <ContentHeader title="直发确认" breadcrumbs={['采购', '直发确认']} />
+      <ContentHeader title="直发确认" breadcrumbs={['采购&仓储', '直发确认']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           采购直发的<strong>交付确认</strong>：货物由供应商/合作商直接交付客户，不进入平台仓库（不产生平台入库单）。

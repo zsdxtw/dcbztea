@@ -1,13 +1,12 @@
 import { useMemo, useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { TRANSFER_SOURCE_LABELS } from '../../data/externalOrders';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -57,12 +56,6 @@ export default function FinancePartnerSettlement() {
   const ontimeCount = settledList.filter((o) => o.settleOnTime !== false).length;
   const ontimeRate = settledList.length > 0 ? Math.round((ontimeCount / settledList.length) * 100) : 100;
 
-  const stats: StatCardData[] = [
-    { label: '待结算', value: String(pendingList.length), unit: '单', trend: { direction: 'down', value: money(pendingAmount) }, icon: <svg viewBox="0 0 18 18" fill="none"><rect x="2.5" y="4.5" width="13" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M5.5 8h7M5.5 11h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
-    { label: '已结算金额', value: settledAmount.toLocaleString(), unit: '¥', trend: { direction: 'up', value: `${settledList.length} 单` }, icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6l2 3 2-3M9 9v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-    { label: '按时履约率', value: String(ontimeRate), unit: '%', trend: { direction: ontimeRate >= 90 ? 'up' : 'down', value: '按时 +5 积分' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-    { label: '结算合作商', value: String(partnerRows.length), unit: '家', trend: { direction: 'up', value: `采购额 ${money(partnerRows.reduce((s, r) => s + r.amount, 0))}` }, icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-  ];
 
   const list = view === 'pending' ? pendingList : view === 'settled' ? settledList : [];
 
@@ -76,7 +69,6 @@ export default function FinancePartnerSettlement() {
           自营订单无合作商结算环节（见「经营利润」）。
         </div>
 
-        <div className="stat-cards">{stats.map((s, i) => <StatCard key={i} data={s} />)}</div>
 
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', marginTop: 'var(--space-4)', flexWrap: 'wrap' }}>
           {([['partner', '按合作商汇总'], ['pending', `待结算 ${pendingList.length}`], ['settled', `已结算 ${settledList.length}`]] as const).map(([k, label]) => (

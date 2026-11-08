@@ -2,8 +2,8 @@
 export enum ModuleKey {
   DASHBOARD = 'dashboard',
   PURCHASE = 'purchase',
+  PARTNER = 'partner',
   SALES = 'sales',
-  INVENTORY = 'inventory',
   PRODUCT = 'product',
   FINANCE = 'finance',
   STATISTICS = 'statistics',
