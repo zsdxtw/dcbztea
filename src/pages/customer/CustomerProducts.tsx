@@ -51,6 +51,14 @@ export default function CustomerProducts() {
   const quoteMap = usePriceStore((s) => s.customerQuotes);
   const storeProducts = usePriceStore((s) => s.products);
   const custId = customerItems.find((c) => c.name === auth?.customerName)?.id;
+  /* 报品机制:仅报品=是的商品展示给该客户(价格为直销报价);未显式设否的商品默认可见 */
+  const isReported = useMemo(() => {
+    const cfg = custId ? quoteMap[custId] : undefined;
+    return (productId: string) => {
+      const q = cfg?.products[productId];
+      return q ? q.reported !== false : true;
+    };
+  }, [quoteMap, custId]);
   const priceOf = (p: { id: string; salesPrice: number }): number =>
     (custId ? effectiveCustomerQuote(quoteMap, custId, p.id, storeProducts) : undefined) ?? p.salesPrice;
   const isQuoted = (p: { id: string }): boolean =>
@@ -66,6 +74,7 @@ export default function CustomerProducts() {
 
   const filtered = useMemo(() => {
     let list = customerCatalog.filter(p => {
+      if (!isReported(p.id)) return false;
       if (keyword && !p.name.includes(keyword) && !p.brand.includes(keyword) && !p.category.includes(keyword)) return false;
       if (teaCategory && p.teaCategory !== teaCategory) return false;
       if (brand && p.brand !== brand) return false;
@@ -75,7 +84,7 @@ export default function CustomerProducts() {
     if (sortBy === 'price-desc') list = [...list].sort((a, b) => priceOf(b) - priceOf(a));
     if (sortBy === 'stock-desc') list = [...list].sort((a, b) => b.stock - a.stock);
     return list;
-  }, [keyword, teaCategory, brand, sortBy, quoteMap, storeProducts, custId]);
+  }, [keyword, teaCategory, brand, sortBy, quoteMap, storeProducts, custId, isReported]);
 
   /** 快速加入购物车（默认 1 件） */
   const quickAdd = (p: CustomerCatalogProduct) => {

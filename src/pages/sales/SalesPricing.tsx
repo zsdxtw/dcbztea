@@ -317,7 +317,7 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
       {/* 单品报价设置弹窗(参照合作商终端:跟随品牌 / 单独折扣 / 单独报价) */}
       {overrideDialog && (
         <div className="category-dialog-overlay" onClick={() => setOverrideDialog(null)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 440 }}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: allowPlatformQuotes && customer.platforms.length > 0 ? 640 : 440, maxWidth: '94vw' }}>
             <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 4 }}>设置单品报价</h3>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-4)' }}>
               {overrideDialog.product.name} · {overrideDialog.product.brand} · 市场价 {formatMoney(overrideDialog.product.marketPrice)}{cfg.brandDiscounts[overrideDialog.product.brand] !== undefined ? ` · 品牌折扣 ${cfg.brandDiscounts[overrideDialog.product.brand]}%` : ''}
@@ -335,9 +335,14 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
                 </span>
                 {m !== 'none' && overrideDialog.mode === m && (
                   <input
-                    className="filter-input mono" type="number" placeholder={m === 'discount' ? '如 85' : '如 368'}
+                    className="filter-input mono" type="text" inputMode={m === 'discount' ? 'numeric' : 'decimal'}
+                    placeholder={m === 'discount' ? '如 85' : '如 368'}
                     style={{ width: 110, height: 30, fontSize: 'var(--text-sm)', flexShrink: 0 }}
-                    value={overrideDialog.value} onChange={(e) => setOverrideDialog({ ...overrideDialog, value: e.target.value })}
+                    value={overrideDialog.value}
+                    onChange={(e) => {
+                      const filtered = m === 'discount' ? e.target.value.replace(/[^\d]/g, '') : e.target.value.replace(/[^\d.]/g, '');
+                      setOverrideDialog(d => d ? { ...d, value: filtered } : d);
+                    }}
                   />
                 )}
               </label>
@@ -360,9 +365,12 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
                           <td style={{ fontSize: 'var(--text-sm)' }}>{plat.name} <span style={{ color: '#E65100', fontSize: 'var(--text-xs)' }}>（扣 {plat.rate}）</span></td>
                           <td>
                             <input
-                              className="filter-input mono" type="number" min={0} placeholder="未设置"
+                              className="filter-input mono" type="text" inputMode="decimal" placeholder="未设置"
                               value={pq?.price ?? ''}
-                              onChange={(e) => setCustomerPlatformQuote(customer.id, overrideDialog.product.id, plat.id, { price: e.target.value === '' ? undefined : Number(e.target.value) || 0 })}
+                              onChange={(e) => {
+                                const digits = e.target.value.replace(/[^\d.]/g, '');
+                                setCustomerPlatformQuote(customer.id, overrideDialog.product.id, plat.id, { price: digits === '' ? undefined : Number(digits) || 0 });
+                              }}
                               style={{ width: '100%', height: 28 }}
                             />
                           </td>

@@ -152,10 +152,10 @@ export default function OrderEntry() {
   const entryTotal = items.reduce((s, it) => s + it.price * it.quantity, 0);
   const hasMinPriceWarning = items.some((it) => minPriceWarning(it));
 
-  /** 商品选择列表：品牌 + 名称过滤 */
+  /** 商品选择列表：品牌 + 名称过滤(仅上架商品;报品与否不影响销售开单可选商品) */
   const pickerProducts = useMemo(() => {
     const kw = itemSearch.trim();
-    return products.filter((p) => (!itemBrand || p.brand === itemBrand) && (!kw || p.name.includes(kw))).slice(0, 24);
+    return products.filter((p) => p.shelfStatus === 'on' && (!itemBrand || p.brand === itemBrand) && (!kw || p.name.includes(kw))).slice(0, 24);
   }, [products, itemBrand, itemSearch]);
 
   const selectCustomer = (c: CustomerOption) => {

@@ -283,23 +283,15 @@ export const usePriceStore = create<PriceStore>((set) => ({
 
   setCustomerPlatformQuote: (customerId, productId, platformId, patch) => set((s) => {
     const cfg = getQuoteConfig(s.customerQuotes, customerId);
-    const cur = cfg.products[productId];
-    if (!cur) return s;
-    return {
-      customerQuotes: {
-        ...s.customerQuotes,
-        [customerId]: {
-          ...cfg,
-          products: {
-            ...cfg.products,
-            [productId]: {
-              ...cur,
-              platformQuotes: cur.platformQuotes.map((pq) => (pq.platformId === platformId ? { ...pq, ...patch } : pq)),
-            },
-          },
-        },
-      },
-    };
+    const products = { ...cfg.products };
+    const cur = products[productId] ?? { productId, platformQuotes: [] };
+    // 平台行 upsert:无该平台条目则新建,确保输入即时落库
+    const exists = cur.platformQuotes.some((pq) => pq.platformId === platformId);
+    const platformQuotes = exists
+      ? cur.platformQuotes.map((pq) => (pq.platformId === platformId ? { ...pq, ...patch } : pq))
+      : [...cur.platformQuotes, { platformId, sku: '', ...patch }];
+    products[productId] = { ...cur, platformQuotes };
+    return { customerQuotes: { ...s.customerQuotes, [customerId]: { ...cfg, products } } };
   }),
 }));
 
