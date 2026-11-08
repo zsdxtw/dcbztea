@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import { useSupplierStore } from '../../stores/supplierStore';
-import StoreMapPanel from './StoreMapPanel';
-import type { StatCardData } from '../../types';
+import StoreMapPanel from '../cooperation/StoreMapPanel';
+import type {} from '../../types';
 
 /**
  * 采购-合作商管理-门店总览：
@@ -40,39 +39,13 @@ export default function PurchaseStoreOverview() {
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—';
   }, [stores]);
 
-  // 统计卡片
-  const stats: StatCardData[] = useMemo(() => [
-    {
-      label: '合作门店总数', value: String(stores.length), unit: '家',
-      trend: { direction: 'up', value: `覆盖 ${provinceCount.size} 个省份` },
-      icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 8l1.5-4h11L17 8M3 8v9h14V8M3 8h14M8 17v-5h4v5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
-    },
-    {
-      label: '覆盖省份', value: String(provinceCount.size), unit: '个',
-      trend: { direction: 'up', value: `涉及 ${brandTotal} 个品牌` },
-      icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2L3 5v8l6 3 6-3V5L9 2zM9 8l6-3M9 8v10M9 8L3 5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
-    },
-    {
-      label: '合作品牌', value: String(brandTotal), unit: '个',
-      trend: { direction: 'up', value: `TOP1 ${topBrand}` },
-      icon: <svg viewBox="0 0 18 18" fill="none"><path d="M10 2l2.5 5 5.5.8-4 3.9.9 5.5L10 14.7 5.1 17.2l.9-5.5-4-3.9L7.5 7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
-    },
-    {
-      label: '门店合作商', value: String(new Set(stores.map(st => st.supplierName)).size), unit: '家',
-      trend: { direction: 'up', value: `合作商共 ${suppliers.length} 家` },
-      icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="14" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.2"/></svg>,
-    },
-  ], [stores, provinceCount, brandTotal, topBrand, suppliers.length]);
 
   return (
     <>
-      <ContentHeader title="门店总览" breadcrumbs={['采购', '合作商管理', '门店总览']} />
+      <ContentHeader title="门店总览" breadcrumbs={['采购&仓储', '合作商管理', '门店总览']} />
 
       <div className="content-body">
         {/* 统计卡片 */}
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
 
         {/* 中国地图 + 品牌 TOP10（与「合作商门店」地图总览弹层共用） */}
         <StoreMapPanel stores={stores} />

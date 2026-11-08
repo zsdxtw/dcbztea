@@ -207,7 +207,7 @@ export default function PartnerRegister() {
             </div>
             <div className="pk-reg-success-t">注册申请已提交</div>
             <div className="pk-reg-success-d">
-              以下信息请妥善保存，审批通过后即可登录合作商终端，仓库、门店、结算等信息可在「设置」菜单中维护。
+              以下信息请妥善保存，审批通过后即可登录合作商工作台，仓库、门店、结算等信息可在「设置」菜单中维护。
             </div>
             {/* 编号 + 管理员账号 + 初始密码 信息卡 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '20px 0', textAlign: 'left' }}>
@@ -258,7 +258,7 @@ export default function PartnerRegister() {
         </p>
         <div className="pk-register-tip">
           带 * 内容均为必填：资质文件区所列方框（营业执照、食品经营许可证、各品牌授权书）均需勾选提交。
-          仓库、门店、结算信息无需在本页填写，审批通过后登录合作商终端在「设置」菜单中维护即可。
+          仓库、门店、结算信息无需在本页填写，审批通过后登录合作商工作台在「设置」菜单中维护即可。
           管理员登录账号将根据合作商简称自动生成。
         </div>
 

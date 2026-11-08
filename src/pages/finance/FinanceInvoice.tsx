@@ -1,20 +1,13 @@
 import { useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import StatusTag from '../../components/common/StatusTag';
 import Button from '../../components/common/Button';
 import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
-const stats: StatCardData[] = [
-  { label: '待开票', value: '8', unit: '笔', icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v4M9 12.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-  { label: '本月开票额', value: '856,200', unit: '¥', trend: { direction: 'up', value: '15.6%' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '本月收票额', value: '423,600', unit: '¥', trend: { direction: 'up', value: '8.2%' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 5h12l-1.2 8H4.2L3 5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg> },
-  { label: '开票单数', value: '35', unit: '笔', icon: <svg viewBox="0 0 18 18" fill="none"><rect x="4" y="2" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h4M7 9h4M7 12h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
-];
 
 interface InvoiceRecord {
   code: string;
@@ -72,9 +65,6 @@ export default function FinanceInvoice() {
     <>
       <ContentHeader title="发票管理" breadcrumbs={['财务', '发票管理']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />开具新发票</Button></>} />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
         <FilterBar>
           <FilterInput placeholder="搜索发票号、往来单位..." />
           <FilterSelect options={['全部类型', '销项发票', '进项发票']} />

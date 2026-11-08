@@ -11,37 +11,39 @@ import DashboardOperationLog from './pages/dashboard/DashboardOperationLog';
 import PurchaseOverview from './pages/purchase/PurchaseOverview';
 import PurchaseOrders from './pages/purchase/PurchaseOrders';
 import PurchasePricing from './pages/purchase/PurchasePricing';
+import PurchaseDemand from './pages/purchase/PurchaseDemand';
 import PurchaseInbound from './pages/purchase/PurchaseInbound';
-import PurchaseSuppliers from './pages/purchase/PurchaseSuppliers';
-import PurchaseSupplierApprovals from './pages/purchase/PurchaseSupplierApprovals';
+import DirectDeliveryConfirm from './pages/purchase/DirectDeliveryConfirm';
+import CooperationPartners from './pages/cooperation/CooperationPartners';
+import CooperationApprovals from './pages/cooperation/CooperationApprovals';
 import PurchaseStoreOverview from './pages/purchase/PurchaseStoreOverview';
-import PurchasePartnerStores from './pages/purchase/PurchasePartnerStores';
-import PartnerScores from './pages/purchase/PartnerScores';
+import CooperationStores from './pages/cooperation/CooperationStores';
+import CooperationScores from './pages/cooperation/CooperationScores';
 import PurchaseReconciliation from './pages/purchase/PurchaseReconciliation';
 import PurchaseReturn from './pages/purchase/PurchaseReturn';
 
 import SalesOverview from './pages/sales/SalesOverview';
 import SalesOrders from './pages/sales/SalesOrders';
+import SalesOrderDetail from './pages/sales/SalesOrderDetail';
 import ExternalOrders from './pages/sales/ExternalOrders';
 import OrderEntry from './pages/sales/OrderEntry';
-import OrderShipping from './pages/sales/OrderShipping';
-import OrderSettlement from './pages/sales/OrderSettlement';
-import CompareManage from './pages/sales/CompareManage';
+import SalesFulfillment from './pages/sales/SalesFulfillment';
+import SalesDelivery from './pages/sales/SalesDelivery';
 import SalesPricing from './pages/sales/SalesPricing';
 import SalesReconciliation from './pages/sales/SalesReconciliation';
 import SalesCustomers from './pages/sales/SalesCustomers';
 import SalesStores from './pages/sales/SalesStores';
 import SalesReturn from './pages/sales/SalesReturn';
 import SalesReports from './pages/sales/SalesReports';
-import SalesCustomerAccounts from './pages/sales/SalesCustomerAccounts';
 
-import InventoryOverview from './pages/inventory/InventoryOverview';
 import InventoryPurchaseInbound from './pages/inventory/InventoryPurchaseInbound';
 import InventorySalesOutbound from './pages/inventory/InventorySalesOutbound';
 import InventoryOtherIO from './pages/inventory/InventoryOtherIO';
 import InventoryTransfer from './pages/inventory/InventoryTransfer';
 import InventoryCheck from './pages/inventory/InventoryCheck';
 import InventoryIORecord from './pages/inventory/InventoryIORecord';
+import InventoryDetail from './pages/inventory/InventoryDetail';
+import InventoryReservation from './pages/inventory/InventoryReservation';
 import InventoryAlertSettings from './pages/inventory/InventoryAlertSettings';
 import InventorySettings from './pages/inventory/InventorySettings';
 
@@ -68,6 +70,10 @@ import FinanceInvoice from './pages/finance/FinanceInvoice';
 import FinanceCost from './pages/finance/FinanceCost';
 import FinanceExpense from './pages/finance/FinanceExpense';
 import FinanceBalance from './pages/finance/FinanceBalance';
+import FinanceReceivables from './pages/finance/FinanceReceivables';
+import FinancePayables from './pages/finance/FinancePayables';
+import FinancePartnerSettlement from './pages/finance/FinancePartnerSettlement';
+import FinanceProfit from './pages/finance/FinanceProfit';
 
 import StatisticsSales from './pages/statistics/StatisticsSales';
 import StatisticsBrandAnalysis from './pages/statistics/StatisticsBrandAnalysis';
@@ -88,7 +94,6 @@ import SettingsUnit from './pages/settings/SettingsUnit';
 import PersonnelOrganization from './pages/personnel/PersonnelOrganization';
 import PersonnelTeaProfessional from './pages/personnel/PersonnelTeaProfessional';
 import PersonnelEmployee from './pages/personnel/PersonnelEmployee';
-import PersonnelStreamer from './pages/personnel/PersonnelStreamer';
 
 /* ── 合作商终端（独立后台） ── */
 import PartnerLogin from './pages/partner/PartnerLogin';
@@ -103,6 +108,16 @@ import PartnerCustomers from './pages/partner/PartnerCustomers';
 import PartnerSettlement from './pages/partner/PartnerSettlement';
 import PartnerAccountPage from './pages/partner/PartnerAccountPage';
 import PartnerProfile from './pages/partner/PartnerProfile';
+
+/* ── 自营工作台（独立后台） ── */
+import SelfopLogin from './pages/selfop/SelfopLogin';
+import SelfopLayout from './pages/selfop/SelfopLayout';
+import SelfopDashboard from './pages/selfop/SelfopDashboard';
+import SelfopOrders from './pages/selfop/SelfopOrders';
+import SelfopLogistics from './pages/selfop/SelfopLogistics';
+import SelfopPurchase from './pages/selfop/SelfopPurchase';
+import SelfopSettlement from './pages/selfop/SelfopSettlement';
+import SelfopAccount from './pages/selfop/SelfopAccount';
 
 /* ── 客户终端（独立后台） ── */
 import CustomerLogin from './pages/customer/CustomerLogin';
@@ -131,15 +146,24 @@ export const router = createBrowserRouter([
       { path: 'purchase/purchase-overview', element: <PurchaseOverview /> },
       { path: 'purchase/purchase-orders', element: <PurchaseOrders /> },
       { path: 'purchase/purchase-pricing', element: <PurchasePricing /> },
+      { path: 'purchase/purchase-demand', element: <PurchaseDemand /> },
       { path: 'purchase/purchase-inbound', element: <PurchaseInbound /> },
-      { path: 'purchase/purchase-suppliers', element: <Navigate to="/purchase/purchase-supplier-list" replace /> },
-      { path: 'purchase/purchase-supplier-approvals', element: <PurchaseSupplierApprovals /> },
-      { path: 'purchase/purchase-supplier-list', element: <PurchaseSuppliers /> },
-      { path: 'purchase/purchase-partner-stores', element: <PurchasePartnerStores /> },
-      { path: 'purchase/purchase-partner-scores', element: <PartnerScores /> },
-      { path: 'purchase/partner-reports', element: <SalesReports /> },
+      { path: 'purchase/purchase-suppliers', element: <Navigate to="/cooperation/cooperation-partners" replace /> },
+      { path: 'purchase/purchase-supplier-approvals', element: <Navigate to="/cooperation/cooperation-approvals" replace /> },
+      { path: 'purchase/purchase-supplier-list', element: <Navigate to="/cooperation/cooperation-partners" replace /> },
+      { path: 'purchase/purchase-partner-stores', element: <Navigate to="/cooperation/cooperation-stores" replace /> },
+      { path: 'purchase/purchase-partner-scores', element: <Navigate to="/cooperation/cooperation-scores" replace /> },
+      { path: 'purchase/partner-reports', element: <Navigate to="/cooperation/cooperation-reports" replace /> },
+      /* ── 合作商一级菜单(cooperation 前缀路由) ── */
+      { path: 'cooperation/cooperation-partners', element: <CooperationPartners /> },
+      { path: 'cooperation/cooperation-approvals', element: <CooperationApprovals /> },
+      { path: 'cooperation/cooperation-stores', element: <CooperationStores /> },
+      { path: 'cooperation/cooperation-scores', element: <CooperationScores /> },
+      { path: 'cooperation/cooperation-reports', element: <SalesReports /> },
+      { path: 'cooperation', element: <Navigate to="/cooperation/cooperation-partners" replace /> },
       { path: 'purchase/purchase-store-overview', element: <PurchaseStoreOverview /> },
-      { path: 'purchase/purchase-reconciliation', element: <PurchaseReconciliation /> },
+      { path: 'purchase/purchase-reconciliation', element: <Navigate to="/finance/finance-supplier-reconciliation" replace /> },
+      { path: 'purchase/direct-delivery-confirm', element: <DirectDeliveryConfirm /> },
       { path: 'purchase/purchase-return', element: <PurchaseReturn /> },
       /* ── 销售 ── */
       { path: 'sales', element: <SalesOverview /> },
@@ -148,20 +172,25 @@ export const router = createBrowserRouter([
       { path: 'sales/order-entry', element: <OrderEntry /> },
       { path: 'sales/order-processing', element: <Navigate to="/sales/order-distribute" replace /> },
       { path: 'sales/order-distribute', element: <ExternalOrders /> },
-      { path: 'sales/order-shipping', element: <OrderShipping /> },
-      { path: 'sales/order-settlement', element: <OrderSettlement /> },
+      { path: 'sales/order-shipping', element: <Navigate to="/selfop/orders" replace /> },
+      { path: 'sales/sales-fulfillment', element: <SalesFulfillment /> },
+      { path: 'sales/fulfillment-orders', element: <Navigate to="/sales/sales-fulfillment" replace /> },
+      { path: 'sales/order-settlement', element: <Navigate to="/finance/finance-partner-settlement" replace /> },
+      { path: 'sales/sales-delivery', element: <SalesDelivery /> },
       { path: 'sales/sales-orders', element: <SalesOrders /> },
-      { path: 'sales/compare-manage', element: <CompareManage /> },
-      { path: 'sales/sales-reports', element: <Navigate to="/purchase/partner-reports" replace /> },
+      { path: 'sales/sales-orders/:rootCode', element: <SalesOrderDetail /> },
+      { path: 'sales/sales-reports', element: <Navigate to="/cooperation/cooperation-reports" replace /> },
       { path: 'sales/sales-pricing', element: <SalesPricing /> },
       { path: 'sales/sales-customers', element: <SalesCustomers /> },
-      { path: 'sales/sales-customer-accounts', element: <SalesCustomerAccounts /> },
+      { path: 'sales/sales-customer-accounts', element: <Navigate to="/sales/sales-customers" replace /> },
       { path: 'sales/sales-platforms', element: <Navigate to="/sales/sales-customers" replace /> },
       { path: 'sales/sales-reconciliation', element: <SalesReconciliation /> },
       { path: 'sales/sales-return', element: <SalesReturn /> },
       /* ── 仓储 ── */
-      { path: 'inventory', element: <InventoryOverview /> },
-      { path: 'inventory/inventory-overview', element: <InventoryOverview /> },
+      { path: 'inventory', element: <Navigate to="/purchase/purchase-overview" replace /> },
+      { path: 'inventory/inventory-overview', element: <Navigate to="/purchase/purchase-overview" replace /> },
+      { path: 'inventory/inventory-detail', element: <InventoryDetail /> },
+      { path: 'inventory/inventory-reservation', element: <InventoryReservation /> },
       { path: 'inventory/inventory-purchase-inbound', element: <InventoryPurchaseInbound /> },
       { path: 'inventory/inventory-sales-outbound', element: <InventorySalesOutbound /> },
       { path: 'inventory/inventory-other-io', element: <InventoryOtherIO /> },
@@ -190,8 +219,14 @@ export const router = createBrowserRouter([
       /* ── 财务 ── */
       { path: 'finance', element: <FinanceOverview /> },
       { path: 'finance/finance-overview', element: <FinanceOverview /> },
+      { path: 'finance/finance-ar', element: <FinanceReceivables /> },
+      { path: 'finance/finance-ap', element: <FinancePayables /> },
       { path: 'finance/finance-purchase-payment', element: <FinancePurchasePayment /> },
       { path: 'finance/finance-sales-collection', element: <FinanceSalesCollection /> },
+      { path: 'finance/finance-partner-settlement', element: <FinancePartnerSettlement /> },
+      { path: 'finance/finance-customer-reconciliation', element: <SalesReconciliation /> },
+      { path: 'finance/finance-supplier-reconciliation', element: <PurchaseReconciliation /> },
+      { path: 'finance/finance-profit', element: <FinanceProfit /> },
       { path: 'finance/finance-other-receivable', element: <FinanceOtherReceivable /> },
       { path: 'finance/finance-other-payable', element: <FinanceOtherPayable /> },
       { path: 'finance/finance-invoice', element: <FinanceInvoice /> },
@@ -221,7 +256,7 @@ export const router = createBrowserRouter([
       { path: 'personnel/personnel-organization', element: <PersonnelOrganization /> },
       { path: 'personnel/personnel-employee', element: <PersonnelEmployee /> },
       { path: 'personnel/personnel-tea-professional', element: <PersonnelTeaProfessional /> },
-      { path: 'personnel/personnel-streamer', element: <PersonnelStreamer /> },
+      { path: 'personnel/personnel-streamer', element: <Navigate to="/personnel/personnel-tea-professional" replace /> },
       { path: 'personnel/personnel-stores', element: <SalesStores /> },
     ],
   },
@@ -250,6 +285,21 @@ export const router = createBrowserRouter([
       { path: 'profile/store', element: <PartnerProfile section="store" /> },
       { path: 'profile/qualification', element: <PartnerProfile section="qualification" /> },
       { path: 'profile/finance', element: <PartnerProfile section="finance" /> },
+    ],
+  },
+  /* ── 自营工作台（独立布局：登录页 + 工作台/订单/采购/结算/设置） ── */
+  { path: '/selfop/login', element: <SelfopLogin /> },
+  {
+    path: '/selfop',
+    element: <SelfopLayout />,
+    children: [
+      { index: true, element: <Navigate to="/selfop/dashboard" replace /> },
+      { path: 'dashboard', element: <SelfopDashboard /> },
+      { path: 'orders', element: <SelfopOrders /> },
+      { path: 'logistics', element: <SelfopLogistics /> },
+      { path: 'purchase', element: <SelfopPurchase /> },
+      { path: 'settlement', element: <SelfopSettlement /> },
+      { path: 'account', element: <SelfopAccount /> },
     ],
   },
   /* ── 客户终端（独立布局：登录页 + 工作台/商品/购物车/订单/账号） ── */

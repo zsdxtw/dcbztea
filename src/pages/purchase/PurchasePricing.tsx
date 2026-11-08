@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
@@ -9,7 +8,7 @@ import StatusTag from '../../components/common/StatusTag';
 import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { TeaCategory } from '../../types';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 import { PRICE_SUPPLIERS, purchasePriceRules, getPurchasePrice } from '../../data/prices';
 import { teaProducts } from '../../data/teaProducts';
 
@@ -178,28 +177,6 @@ const initialRecords: PricingRecord[] = [
 ];
 
 /* ── 统计数据 ── */
-const stats: StatCardData[] = [
-  {
-    label: '报价单数', value: '35', unit: '单',
-    trend: { direction: 'up', value: '+3', label: '单' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M3 9h12M7 5V3h4v2" stroke="currentColor" strokeWidth="1.3"/></svg>,
-  },
-  {
-    label: '待确认', value: '8', unit: '单',
-    trend: { direction: 'up', value: '需及时处理' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v3l2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
-  },
-  {
-    label: '本月调价', value: '12', unit: '项',
-    trend: { direction: 'down', value: '2', label: '项' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  },
-  {
-    label: '平均调幅', value: '-2.3', unit: '%',
-    trend: { direction: 'down', value: '0.5', label: '%' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2l2.5 5 5.5.8-4 3.9.9 5.5L9 14.7 5.1 17.2l.9-5.5-4-3.9L7.5 7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
-  },
-];
 
 /* ── 供应商列表（用于筛选） ── */
 const suppliers = ['全部供应商', ...Array.from(new Set(initialRecords.map(r => r.supplier)))];
@@ -346,13 +323,10 @@ export default function PurchasePricing() {
     <>
       <ContentHeader
         title="采购报（调）价"
-        breadcrumbs={['采购', '采购报（调）价']}
+        breadcrumbs={['采购&仓储', '采购报（调）价']}
         actions={<Button onClick={handleOpenForm}><PlusIcon />新增报价</Button>}
       />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
 
         <FilterBar>
           <FilterInput placeholder="搜索报价单号、供应商、商品..." />

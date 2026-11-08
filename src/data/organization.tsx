@@ -5,7 +5,6 @@ import type { OrgNode, Employee, EmployeePerformance, SalesScenario, PersonRoleT
 import { customerItems } from './customers';
 import { platformItems } from './platforms';
 import { teaProfessionals } from './teaProfessionals';
-import { streamers } from './streamers';
 
 /* ── 组织架构：公司 → 部门 → 团队 ── */
 
@@ -334,7 +333,7 @@ export const EMP_STATUS_LABELS: Record<string, string> = {
   probation: '试用期',
 };
 
-/* ── 统一人员选择（员工 + 茶人 + 带货人） ── */
+/* ── 统一人员选择（员工 + 茶人） ── */
 
 /** 统一人员选项 */
 export interface PersonOption {
@@ -348,11 +347,10 @@ export interface PersonOption {
 const PERSON_TYPE_LABELS: Record<PersonRoleType, string> = {
   employee: '员工',
   tea_professional: '茶人',
-  streamer: '带货人',
 };
 
 /**
- * 获取所有可选人员（员工 + 茶人 + 带货人）
+ * 获取所有可选人员（员工 + 茶人）
  * 用于拓客人、维护人、跟单人的下拉选择
  */
 export function getAllPersonOptions(): PersonOption[] {
@@ -382,16 +380,6 @@ export function getAllPersonOptions(): PersonOption[] {
     }
   });
 
-  streamers.forEach((s) => {
-    options.push({
-      id: s.id,
-      name: s.name,
-      type: 'streamer',
-      typeLabel: '带货人',
-      phone: s.phone,
-    });
-  });
-
   return options;
 }
 
@@ -405,9 +393,6 @@ export function getPersonName(personId?: string, personType?: PersonRoleType): s
   }
   if (personType === 'tea_professional') {
     return teaProfessionals.find((t) => t.id === personId)?.name ?? '—';
-  }
-  if (personType === 'streamer') {
-    return streamers.find((s) => s.id === personId)?.name ?? '—';
   }
   return '—';
 }

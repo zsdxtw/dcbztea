@@ -72,7 +72,7 @@ const todoItems = [
 export default function PurchaseOverview() {
   return (
     <>
-      <ContentHeader title="采购概览" breadcrumbs={['采购', '采购概览']} />
+      <ContentHeader title="采购概览" breadcrumbs={['采购&仓储', '采购概览']} />
       <div className="content-body">
         {/* 核心指标 */}
         <div className="stat-cards">

@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Toggle from '../../components/common/Toggle';
@@ -15,17 +14,10 @@ import {
   WAREHOUSE_CATEGORY_COLORS,
 } from '../../data/warehouses';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
-import type { Warehouse, WarehouseCategory, StatCardData } from '../../types';
+import type {Warehouse, WarehouseCategory} from '../../types';
 
 type TabKey = WarehouseCategory;
 
-const stats = (ownList: Warehouse[], storeList: Warehouse[], partnerList: Warehouse[]): StatCardData[] => [
-  { label: '仓库总数', value: String(ownList.length + storeList.length + partnerList.length), unit: '个', icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M3 9h12" stroke="currentColor" strokeWidth="1.3"/></svg> },
-  { label: '独立仓库', value: String(ownList.length), unit: '个', icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2L3 5v5c0 5 3.5 7.5 7 9 3.5-1.5 7-4 7-9V5L9 2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg> },
-  { label: '门店仓库', value: String(storeList.length), unit: '个', icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 7l1.5-3h9L15 7M3 7v8h12V7M3 7h12" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M7 15v-4h4v4" stroke="currentColor" strokeWidth="1.3"/></svg> },
-  { label: '合作仓库', value: String(partnerList.length), unit: '个', icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a5 5 0 0110 0M14 10h4M16 8v4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-  { label: '启用仓库', value: String([...ownList, ...storeList, ...partnerList].filter(w => w.enabled).length), unit: '个', icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M7 10l2 2 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-];
 
 const emptyForm: Warehouse = {
   id: '',
@@ -110,13 +102,10 @@ export default function InventorySettings() {
     <>
       <ContentHeader
         title="仓库设置"
-        breadcrumbs={['仓储', '仓库设置']}
+        breadcrumbs={['采购&仓储', '仓库设置']}
         actions={tab === 'independent' ? <Button onClick={openAdd}><PlusIcon />新增仓库</Button> : undefined}
       />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats(ownList, storeList, partnerList).map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
 
         {/* Tab 切换 */}
         <div style={{ display: 'flex', gap: 'var(--space-1)', marginBottom: 'var(--space-4)', borderBottom: '1px solid var(--color-neutral-200)' }}>

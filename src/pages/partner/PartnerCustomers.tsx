@@ -5,12 +5,29 @@ import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../component
 import { PageHead, Pill, CUSTOMER_TYPE_TONE } from './PartnerUI';
 import type { PartnerCustomer } from '../../types';
 import { partnerCustomers } from '../../data/partner';
+import { customerItems } from '../../data/customers';
+import { usePriceStore } from '../../stores/priceStore';
 
 /** 合作商客户页：展示合作客户及可下单商品，据此营销当地客户 */
 export default function PartnerCustomers() {
   const [keyword, setKeyword] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [selected, setSelected] = useState<PartnerCustomer | null>(null);
+
+  /* 报品过滤:合作商选择了该客户,只能看到该客户下报品=是的商品
+     (按客户名称匹配管理端报品报（调）价配置;未配置/未显式设否的商品默认可见) */
+  const customerQuotes = usePriceStore((s) => s.customerQuotes);
+  const storeProducts = usePriceStore((s) => s.products);
+  const reportedFilter = (customerName: string) => {
+    const mgmtId = customerItems.find((c) => c.name === customerName)?.id;
+    const cfg = mgmtId ? customerQuotes[mgmtId] : undefined;
+    return (productName: string) => {
+      const pid = storeProducts.find((p) => p.name === productName)?.id;
+      if (!pid) return true;
+      const q = cfg?.products[pid];
+      return q ? q.reported !== false : true;
+    };
+  };
 
   const filtered = useMemo(() => partnerCustomers.filter(c => {
     if (keyword && !c.name.includes(keyword) && !c.region.includes(keyword) && !c.contactPerson.includes(keyword)) return false;
@@ -50,7 +67,7 @@ export default function PartnerCustomers() {
             <span key="region">{c.region}</span>,
             <span key="cp">{c.contactPerson}</span>,
             <span key="phone" className="mono cell-muted">{c.contactPhone}</span>,
-            <span key="prods" className="mono">{c.products.length} 款</span>,
+            <span key="prods" className="mono">{c.products.filter(p => reportedFilter(c.name)(p.productName)).length} 款</span>,
             <span key="orders" className="mono">{c.totalOrders} 单</span>,
             <span key="amt" className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--pk-accent)' }}>¥{c.totalAmount.toLocaleString()}</span>,
             statusPill(c.status),
@@ -86,13 +103,13 @@ export default function PartnerCustomers() {
               </InfoGrid>
             </DrawerSection>
 
-            <DrawerSection title={`可下单商品（${selected.products.length} 款）`}>
+            <DrawerSection title={`可下单商品（${selected.products.filter(p => reportedFilter(selected.name)(p.productName)).length} 款）`}>
               <table className="detail-inline-table">
                 <thead>
                   <tr><th>商品名称</th><th>规格</th><th>供货价</th><th>市场价</th><th>价差空间</th></tr>
                 </thead>
                 <tbody>
-                  {selected.products.map(p => {
+                  {selected.products.filter(p => reportedFilter(selected.name)(p.productName)).map(p => {
                     const gap = p.marketPrice - p.supplyPrice;
                     const gapRate = p.marketPrice > 0 ? Math.round((gap / p.marketPrice) * 100) : 0;
                     return (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BrandLogo from '../../components/common/BrandLogo';
 import { useCustomerStore } from '../../stores/customerStore';
@@ -9,6 +9,7 @@ import './customer.css';
 /** 客户终端登录页：左侧品牌视觉 + 右侧极简表单（账号由平台管理台开通） */
 export default function CustomerLogin() {
   const navigate = useNavigate();
+  useEffect(() => { document.title = '淡茶半盏 — 客户采买平台'; }, []);
   const login = useCustomerStore((s) => s.login);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -57,10 +58,10 @@ export default function CustomerLogin() {
 
         {/* 主视觉文案 */}
         <div className="pk-login-hero">
-          <div className="pk-login-eyebrow">CUSTOMER PORTAL</div>
+          <div className="pk-login-eyebrow">客户采买平台 · CUSTOMER PORTAL</div>
           <h1 className="pk-login-title">好茶直达<br />一键下单</h1>
           <div className="pk-login-desc">
-            直营客户专属下单终端。在线浏览在售茶品、查询实时价格与库存，
+            客户采买平台（直营客户专属下单终端）。在线浏览在售茶品、查询实时价格与库存，
             自助下单并全程跟踪订单配送，采购进度尽在掌握。
           </div>
         </div>
@@ -87,7 +88,7 @@ export default function CustomerLogin() {
         <div className="pk-login-form">
           <div className="pk-login-form-eyebrow">客户终端</div>
           <h2 className="pk-login-form-title">欢迎登录</h2>
-          <div className="pk-login-form-sub">使用平台管理员开通的下单账号登录，在线选购茶品</div>
+          <div className="pk-login-form-sub">登录客户采买平台，使用平台开通的下单账号在线选购茶品</div>
 
           <div className="pk-login-field">
             <label className="pk-login-label">账号</label>

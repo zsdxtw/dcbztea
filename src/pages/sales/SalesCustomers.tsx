@@ -1,19 +1,39 @@
 import { useState, useMemo } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
-import type { StatCardData, CustomerItem, CustomerType, PlatformItem, PlatformBankAccount, PlatformInvoiceInfo, CustomerBankAccount, CustomerInvoiceInfo, OrderContact, CustomerSubOrganization, ProfitShareConfig, PersonRoleType } from '../../types';
+import type { CustomerItem, CustomerType, PlatformItem, PlatformBankAccount, PlatformInvoiceInfo, CustomerBankAccount, CustomerInvoiceInfo, OrderContact, CustomerSubOrganization } from '../../types';
 import { customerItems as initialCustomers, CUSTOMER_TYPE_LABELS, CUSTOMER_TYPE_DESC, LEVEL_COLORS, CUSTOMER_GROUP_MAP, generateOrderContactId, convertPersonalToDirect } from '../../data/customers';
 import { platformItems as globalPlatforms } from '../../data/platforms';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
 import { generateCustomerCode } from '../../utils/customerCode';
 import { useDrawerWidth } from '../../hooks/useDrawerWidth';
-import { getAllPersonOptions, getPersonName as getPersonNameFromOrg, PERSON_TYPE_LABELS } from '../../data/organization';
-import { streamers } from '../../data/streamers';
 import DeptEmployeeSelect from '../../components/business/DeptEmployeeSelect';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
+import { useCustomerStore } from '../../stores/customerStore';
+
+/** 客户档案操作记录（页面会话级） */
+interface CustomerOpRecord {
+  id: string;
+  customerCode: string;
+  time: string;
+  action: string;
+  detail?: string;
+  operator: string;
+}
+
+/** 操作记录种子（近两条演示流水） */
+const seedOpRecords: CustomerOpRecord[] = [
+  { id: 'op1', customerCode: 'KHZY-0001', time: '2026-10-20 14:30', action: '开通客户采购端', detail: '管理员账号 hmt001 开通，商品与报价由报品报（调）价统一控制', operator: '管理员' },
+  { id: 'op2', customerCode: 'KHZY-0006', time: '2026-10-18 10:15', action: '新增经平台销售', detail: '关联平台：京东慧采（扣点 8%）', operator: '管理员' },
+];
+
+const nowStamp = () => {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
 
 const PRIMARY = '#0F64B5';
 const PRIMARY_LIGHT = '#EBF3FC';
@@ -44,8 +64,32 @@ export default function SalesCustomers() {
   const [selectedForDelete, setSelectedForDelete] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [detailCustomer, setDetailCustomer] = useState<CustomerItem | null>(null);
+  /** 详情抽屉当前 Tab（参照合作商档案的分页设计） */
+  const [detailTab, setDetailTab] = useState<'basic' | 'finance' | 'viaPlatform' | 'procurement' | 'contacts' | 'suborg' | 'ops'>('basic');
+  /** 客户档案操作记录 */
+  const [opRecords, setOpRecords] = useState<CustomerOpRecord[]>(seedOpRecords);
+  /** 基本信息 / 结算开票 编辑态 */
+  const [editBasic, setEditBasic] = useState<Record<string, string> | null>(null);
+  const [editFinance, setEditFinance] = useState<Record<string, string> | null>(null);
+  /** 经平台销售：新增/修改平台关联表单 */
+  const [platformForm, setPlatformForm] = useState<{ editingId: string | null; platformId: string; rate: string } | null>(null);
+  /** 采购端管理：开通表单 */
+  const [procOpenForm, setProcOpenForm] = useState<{ username: string; password: string; name: string; phone: string } | null>(null);
+
+  /** 写入操作记录 */
+  const addOpRecord = (customerCode: string, action: string, detail?: string) => {
+    setOpRecords(prev => [{ id: `op_${Date.now()}`, customerCode, time: nowStamp(), action, detail, operator: '管理员' }, ...prev]);
+  };
+
+  /** 客户采购端账号（关联当前详情客户） */
+  const customerAccounts = useCustomerStore(s => s.accounts);
+  const csOpenAccount = useCustomerStore(s => s.openAccount);
+  const csSetAccountStatus = useCustomerStore(s => s.setAccountStatus);
+  const csResetPassword = useCustomerStore(s => s.resetPassword);
+  /** 采购端管理：当前详情客户的终端与管理员账号 */
+  const procTerm = detailCustomer?.terminal;
+  const procAdmin = customerAccounts.find(a => a.customerCode === detailCustomer?.customerCode);
   const [showAddDrawer, setShowAddDrawer] = useState(false);
-  const [showPendingMaintain, setShowPendingMaintain] = useState(false);
   const [showOrderContactDrawer, setShowOrderContactDrawer] = useState(false);
   const [currentCustomerForContacts, setCurrentCustomerForContacts] = useState<CustomerItem | null>(null);
   const [showConvertConfirm, setShowConvertConfirm] = useState(false);
@@ -71,39 +115,12 @@ export default function SalesCustomers() {
 
   const filtered = useMemo(() => {
     let result = tabCustomers;
-    if (showPendingMaintain) {
-      result = result.filter(c =>
-        !c.contactPerson || !c.contactPhone || !c.contactAddress ||
-        (c.type !== 'personal' && (c.bankAccounts ?? []).length === 0) ||
-        !c.province || !c.city
-      );
-    }
     if (!keyword) return result;
     return result.filter(c => c.name.includes(keyword) || c.contactPerson.includes(keyword) || c.region.includes(keyword) || c.contactPhone.includes(keyword) || (c.shortName ?? '').includes(keyword) || (c.customerCode ?? '').includes(keyword));
-  }, [tabCustomers, keyword, showPendingMaintain]);
+  }, [tabCustomers, keyword]);
 
   const getPlatformName = (id: string) => platforms.find(p => p.id === id)?.shortName ?? id;
 
-  const getPersonDisplay = (personId?: string, personType?: PersonRoleType, personName?: string) => {
-    if (!personId) return '—';
-    const name = personName || getPersonNameFromOrg(personId, personType);
-    const typeLabel = personType ? PERSON_TYPE_LABELS[personType] : '';
-    return typeLabel ? `${name}（${typeLabel}）` : name;
-  };
-
-  const stats: StatCardData[] = useMemo(() => {
-    const direct = data.filter(c => c.type === 'direct');
-    const channel = data.filter(c => c.type === 'channel');
-    const personal = data.filter(c => c.type === 'personal');
-    const enterpriseActive = data.filter(c => CUSTOMER_GROUP_MAP[c.type] === 'enterprise' && c.status === 'active').length;
-    const platformActive = platforms.filter(p => p.status === 'active').length;
-    return [
-      { label: '客户总数', value: String(data.length + platforms.length), unit: '家', trend: { direction: 'up', value: `合作中 ${enterpriseActive + platformActive}` }, icon: <IconUsers /> },
-      { label: '直营客户', value: String(direct.length), unit: '家', trend: { direction: 'up', value: `合作中 ${direct.filter(c => c.status === 'active').length}` }, icon: <IconHome /> },
-      { label: '渠道客户', value: String(channel.length), unit: '家', trend: { direction: 'up', value: `合作中 ${channel.filter(c => c.status === 'active').length}` }, icon: <IconChannel /> },
-      { label: '个人客户', value: String(personal.length), unit: '家', trend: { direction: 'up', value: `合作中 ${personal.filter(c => c.status === 'active').length}` }, icon: <IconPersonal /> },
-    ];
-  }, [data, platforms]);
 
   const enterDeleteMode = () => { setDeleteMode(true); setSelectedForDelete(new Set()); };
   const exitDeleteMode = () => { setDeleteMode(false); setSelectedForDelete(new Set()); };
@@ -223,6 +240,7 @@ export default function SalesCustomers() {
 
   const handleViewCustomer = (c: CustomerItem) => {
     setDetailCustomer(c);
+    setDetailTab('basic');
   };
 
   const handleOpenOrderContacts = (c: CustomerItem) => {
@@ -286,19 +304,9 @@ export default function SalesCustomers() {
     }
   };
 
-  const handleToggleViaPlatform = (customerId: string, viaPlatform: boolean) => {
-    setData(prev => prev.map(c => {
-      if (c.id !== customerId) return c;
-      return { ...c, viaPlatform };
-    }));
-    if (detailCustomer?.id === customerId) {
-      setDetailCustomer(prev => prev ? { ...prev, viaPlatform } : prev);
-    }
-  };
-
   return (
     <>
-      <ContentHeader title="客户管理" breadcrumbs={['销售', '客户管理']} />
+      <ContentHeader title="客户列表" breadcrumbs={['销售', '客户管理', '客户列表']} />
 
       <div className="content-body">
         {/* 4 个客户类型卡片并列展示，前 3 个属于企业客户板块，第 4 个为个人客户 */}
@@ -360,13 +368,12 @@ export default function SalesCustomers() {
 
             <Card style={{ padding: 0 }}>
               <Table
-                headers={[...(deleteMode ? ['选择'] : ['序号']), '客户简称', '平台编号', '客户名称', '拓客人', '联系人', '联系人职务', '联系电话', '保证金', '结算账户', '发票主体', '状态', '操作']}
+                headers={[...(deleteMode ? ['选择'] : ['序号']), '客户简称', '平台编号', '客户名称', '联系人', '联系人职务', '联系电话', '保证金', '结算账户', '发票主体', '状态', '操作']}
                 rows={filteredPlatforms.map((p, idx) => [
                   deleteMode ? <input key="chk" type="checkbox" checked={selectedForDelete.has(p.id)} onChange={() => togglePlatformSelect(p.id)} /> : <span key="idx" className="mono">{idx + 1}</span>,
                   <span key="sn" className="cell-emph">{p.shortName}</span>,
                   <span key="code" className="mono" style={{ color: 'var(--color-neutral-600)' }}>{p.code}</span>,
                   <span key="name">{p.name}</span>,
-                  <span key="liaison">{p.developerId ? getPersonDisplay(p.developerId, p.developerType, p.developerName) : '—'}</span>,
                   <span key="cp">{p.contactPerson}</span>,
                   <span key="cpo" style={{ color: 'var(--color-neutral-500)', fontSize: 'var(--text-xs)' }}>{p.contactPosition || '—'}</span>,
                   <span key="cph" className="mono" style={{ color: 'var(--color-neutral-600)' }}>{p.contactPhone}</span>,
@@ -386,10 +393,6 @@ export default function SalesCustomers() {
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-5)' }}>
               <input className="filter-input" placeholder={`搜索${CUSTOMER_TYPE_LABELS[activeTab]}客户名称、简称、编号、联系人、地区...`} value={keyword} onChange={e => setKeyword(e.target.value)} style={{ width: 280 }} />
-              <Button variant={showPendingMaintain ? 'primary' : 'ghost'} onClick={() => setShowPendingMaintain(!showPendingMaintain)}>
-                <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14 }}><path d="M8 2v6M8 14v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.2"/></svg>
-                待维护
-              </Button>
               <Button onClick={() => setShowAddDrawer(true)}>
                 <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14 }}><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
                 新增
@@ -413,7 +416,7 @@ export default function SalesCustomers() {
 
             <Card style={{ padding: 0 }}>
               <Table
-                headers={[...(deleteMode ? ['选择'] : ['序号']), '客户简称', '客户编号', '客户名称', ...(activeTab === 'direct' ? ['是否经平台'] : []), ...(activeTab === 'personal' ? ['下单人'] : []), '拓客人', '维护人', '跟单人', '地区', '联系人', '联系电话', '客户来源', '等级', '订单数', '累计金额', '状态', '操作']}
+                headers={[...(deleteMode ? ['选择'] : ['序号']), '客户简称', '客户编号', '客户名称', ...(activeTab === 'direct' ? ['是否经平台'] : []), ...(activeTab === 'personal' ? ['下单人'] : []), '地区', '联系人', '联系电话', '客户来源', '等级', '订单数', '累计金额', '状态', '操作']}
                 rows={filtered.map((c, idx) => {
                   const cells: React.ReactNode[] = [
                     deleteMode ? <input key="chk" type="checkbox" checked={selectedForDelete.has(c.id)} onChange={() => toggleSelect(c.id)} /> : <span key="idx" className="mono">{idx + 1}</span>,
@@ -428,9 +431,6 @@ export default function SalesCustomers() {
                     cells.push(<span key="oc" className="mono">{c.orderContacts?.length || 0}</span>);
                   }
                   cells.push(
-                    <span key="developer" style={{ fontSize: 'var(--text-sm)' }}>{getPersonDisplay(c.developerId, c.developerType, c.developerName)}</span>,
-                    <span key="maintainer" style={{ fontSize: 'var(--text-sm)' }}>{getPersonDisplay(c.maintainerId, c.maintainerType, c.maintainerName)}</span>,
-                    <span key="follower" style={{ fontSize: 'var(--text-sm)' }}>{getPersonDisplay(c.followerId, c.followerType, c.followerName)}</span>,
                     <span key="region" style={{ fontSize: 'var(--text-sm)' }}>{[c.province, c.city, c.district].filter(Boolean).join(' / ') || c.region}</span>,
                     <span key="cp">{c.contactPerson}</span>,
                     <span key="cph" className="mono" style={{ color: 'var(--color-neutral-600)' }}>{c.contactPhone}</span>,
@@ -447,7 +447,6 @@ export default function SalesCustomers() {
                       {activeTab === 'personal' && (
                         <Button size="sm" variant="ghost" onClick={() => handleConvertPersonal(c)}>转直营</Button>
                       )}
-                      <Button size="sm" variant="ghost" onClick={() => handleViewCustomer(c)}>编辑</Button>
                     </div>,
                   );
                   return cells;
@@ -501,48 +500,139 @@ export default function SalesCustomers() {
         >
           {detailCustomer && (
             <>
-              <DrawerSection title="基本信息">
-                <InfoGrid cols={3}>
-                  <InfoItem label="客户编号" emph mono>{detailCustomer.customerCode || '—'}</InfoItem>
-                  <InfoItem label="客户简称" emph>{detailCustomer.shortName || '—'}</InfoItem>
-                  <InfoItem label="客户名称" emph>{detailCustomer.name}</InfoItem>
-                  <InfoItem label="客户类型">{CUSTOMER_TYPE_LABELS[detailCustomer.type]}{detailCustomer.viaPlatform ? ' · 经平台' : ' · 无平台'}</InfoItem>
-                  {detailCustomer.type === 'direct' && (
-                    <InfoItem label="是否经平台">
-                      <select className="filter-select" style={{ width: '100%', height: 30, padding: '0 var(--space-2)' }} value={detailCustomer.viaPlatform ? 'true' : 'false'} onChange={(e) => handleToggleViaPlatform(detailCustomer.id, e.target.value === 'true')}>
-                        <option value="false">否（无平台）</option>
-                        <option value="true">是（经平台）</option>
-                      </select>
-                    </InfoItem>
-                  )}
-                  <InfoItem label="客户等级">{detailCustomer.level}</InfoItem>
-                  <InfoItem label="客户来源">{detailCustomer.source || '—'}</InfoItem>
-                  <InfoItem label="合作日期">{detailCustomer.cooperationDate}</InfoItem>
-                  <InfoItem label="累计金额" mono>{`¥${(detailCustomer.totalAmount / 10000).toFixed(1)}万`}</InfoItem>
-                  <InfoItem label="拓客人">{getPersonDisplay(detailCustomer.developerId, detailCustomer.developerType, detailCustomer.developerName)}</InfoItem>
-                  <InfoItem label="维护人">{getPersonDisplay(detailCustomer.maintainerId, detailCustomer.maintainerType, detailCustomer.maintainerName)}</InfoItem>
-                  <InfoItem label="跟单人">{getPersonDisplay(detailCustomer.followerId, detailCustomer.followerType, detailCustomer.followerName)}</InfoItem>
-                  <InfoItem label="备注" span={3}>{detailCustomer.remark || '—'}</InfoItem>
-                </InfoGrid>
+            {/* Tab 栏：分区标题标签化展示于抽屉顶部（参照采购-合作商档案设计） */}
+            <div className="drawer-tab-bar">
+              {([
+                ['basic', '基本信息', true],
+                ['finance', '结算开票', detailCustomer.type !== 'personal'],
+                ['viaPlatform', '经平台销售', detailCustomer.type !== 'personal'],
+                ['procurement', '采购端管理', detailCustomer.type !== 'personal'],
+                ['contacts', '下单人', detailCustomer.type === 'direct'],
+                ['suborg', '分子机构', detailCustomer.type === 'direct'],
+                ['ops', '操作记录', true],
+              ] as ['basic' | 'finance' | 'viaPlatform' | 'procurement' | 'contacts' | 'suborg' | 'ops', string, boolean][]).map(([key, label, show]) => show ? (
+                <button key={key} type="button" className={`drawer-tab${detailTab === key ? ' active' : ''}`} onClick={() => setDetailTab(key)}>
+                  {label}
+                  {key === 'viaPlatform' && detailCustomer.platformIds.length > 0 && <span className="drawer-tab-count">{detailCustomer.platformIds.length}</span>}
+                  {key === 'contacts' && <span className="drawer-tab-count">{detailCustomer.orderContacts?.length || 0}</span>}
+                  {key === 'suborg' && <span className="drawer-tab-count">{detailCustomer.subOrganizations?.length || 0}</span>}
+                </button>
+              ) : null)}
+            </div>
+            <div className="drawer-tab-contents">
+            {detailTab === 'basic' && (<>
+              <DrawerSection
+                title="基本信息"
+                extra={editBasic === null && (
+                  <Button size="sm" variant="ghost" onClick={() => setEditBasic({
+                    shortName: detailCustomer.shortName ?? '',
+                    level: detailCustomer.level ?? '',
+                    source: detailCustomer.source ?? '',
+                    cooperationDate: detailCustomer.cooperationDate ?? '',
+                    contactPerson: detailCustomer.contactPerson ?? '',
+                    contactPhone: detailCustomer.contactPhone ?? '',
+                    contactEmail: detailCustomer.contactEmail ?? '',
+                    contactAddress: detailCustomer.contactAddress ?? '',
+                    remark: detailCustomer.remark ?? '',
+                  })}>编辑</Button>
+                )}
+              >
+                {editBasic === null ? (
+                  <InfoGrid cols={3}>
+                    <InfoItem label="客户编号" emph mono>{detailCustomer.customerCode || '—'}</InfoItem>
+                    <InfoItem label="客户简称" emph>{detailCustomer.shortName || '—'}</InfoItem>
+                    <InfoItem label="客户名称" emph>{detailCustomer.name}</InfoItem>
+                    <InfoItem label="客户类型">{CUSTOMER_TYPE_LABELS[detailCustomer.type]}</InfoItem>
+                    <InfoItem label="客户等级">{detailCustomer.level}</InfoItem>
+                    <InfoItem label="客户来源">{detailCustomer.source || '—'}</InfoItem>
+                    <InfoItem label="合作日期">{detailCustomer.cooperationDate}</InfoItem>
+                    <InfoItem label="累计金额" mono>{`¥${(detailCustomer.totalAmount / 10000).toFixed(1)}万`}</InfoItem>
+                    <InfoItem label="备注">{detailCustomer.remark || '—'}</InfoItem>
+                  </InfoGrid>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
+                    {([['客户简称 *', 'shortName'], ['客户等级', 'level'], ['客户来源', 'source'], ['合作日期', 'cooperationDate'], ['联系人', 'contactPerson'], ['联系电话', 'contactPhone'], ['联系邮箱', 'contactEmail'], ['备注', 'remark']] as [string, string][]).map(([label, key]) => (
+                      <div key={key}>
+                        <label className="drawer-label">{label}</label>
+                        <input className="filter-input" style={{ width: '100%' }} value={editBasic[key] ?? ''} onChange={e => setEditBasic(f => f ? { ...f, [key]: e.target.value } : f)} />
+                      </div>
+                    ))}
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <label className="drawer-label">联系地址</label>
+                      <input className="filter-input" style={{ width: '100%' }} value={editBasic['contactAddress'] ?? ''} onChange={e => setEditBasic(f => f ? { ...f, contactAddress: e.target.value } : f)} />
+                    </div>
+                  </div>
+                )}
               </DrawerSection>
 
               <DrawerSection title="联系信息">
-                <InfoGrid cols={3}>
-                  <InfoItem label="联系人">{detailCustomer.contactPerson || '—'}</InfoItem>
-                  <InfoItem label="联系电话" mono>{detailCustomer.contactPhone || '—'}</InfoItem>
-                  <InfoItem label="联系邮箱">{detailCustomer.contactEmail || '—'}</InfoItem>
-                  <InfoItem label="所在地区">{[detailCustomer.province, detailCustomer.city, detailCustomer.district].filter(Boolean).join(' / ') || detailCustomer.region || '—'}</InfoItem>
-                  <InfoItem label="联系地址" span={2}>{detailCustomer.contactAddress || '—'}</InfoItem>
-                </InfoGrid>
-              </DrawerSection>
-
-              {detailCustomer.type !== 'personal' && (
-                <DrawerSection title="财务信息">
+                {editBasic === null ? (
                   <InfoGrid cols={3}>
-                    <InfoItem label="结算方式">{detailCustomer.settlementMethod || '—'}</InfoItem>
-                    <InfoItem label="税号" mono>{detailCustomer.taxNo || '—'}</InfoItem>
+                    <InfoItem label="联系人">{detailCustomer.contactPerson || '—'}</InfoItem>
+                    <InfoItem label="联系电话" mono>{detailCustomer.contactPhone || '—'}</InfoItem>
+                    <InfoItem label="联系邮箱">{detailCustomer.contactEmail || '—'}</InfoItem>
+                    <InfoItem label="所在地区">{[detailCustomer.province, detailCustomer.city, detailCustomer.district].filter(Boolean).join(' / ') || detailCustomer.region || '—'}</InfoItem>
+                    <InfoItem label="联系地址" span={2}>{detailCustomer.contactAddress || '—'}</InfoItem>
                   </InfoGrid>
-                  <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-700)', marginBottom: 'var(--space-2)' }}>结算账户（{(detailCustomer.bankAccounts ?? []).length}）</div>
+                ) : (
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>联系人 / 联系电话 / 邮箱 / 地址已在上方编辑表单中，所在地区由省市区选择器维护（本次不在编辑范围）。</div>
+                )}
+              </DrawerSection>
+              {editBasic !== null && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+                  <Button variant="ghost" onClick={() => setEditBasic(null)}>取消</Button>
+                  <Button onClick={() => {
+                    if (!editBasic) return;
+                    const updated: CustomerItem = {
+                      ...detailCustomer,
+                      shortName: editBasic.shortName?.trim() || detailCustomer.shortName,
+                      level: editBasic.level ?? detailCustomer.level,
+                      source: editBasic.source ?? detailCustomer.source,
+                      cooperationDate: editBasic.cooperationDate ?? detailCustomer.cooperationDate,
+                      contactPerson: editBasic.contactPerson?.trim() || detailCustomer.contactPerson,
+                      contactPhone: editBasic.contactPhone?.trim() || detailCustomer.contactPhone,
+                      contactEmail: editBasic.contactEmail?.trim() || detailCustomer.contactEmail,
+                      contactAddress: editBasic.contactAddress?.trim() || detailCustomer.contactAddress,
+                      remark: editBasic.remark?.trim() || undefined,
+                    };
+                    setData(prev => prev.map(c => c.id === updated.id ? updated : c));
+                    setDetailCustomer(updated);
+                    setEditBasic(null);
+                    addOpRecord(updated.customerCode || '—', '修改基本信息', '管理后台编辑客户基本信息');
+                  }}>保存</Button>
+                </div>
+              )}
+            </>)}
+
+              {detailTab === 'finance' && detailCustomer.type !== 'personal' && (<>
+                <DrawerSection
+                  title="财务信息"
+                  extra={editFinance === null && (
+                    <Button size="sm" variant="ghost" onClick={() => setEditFinance({
+                      settlementMethod: detailCustomer.settlementMethod ?? '',
+                      taxNo: detailCustomer.taxNo ?? '',
+                    })}>编辑</Button>
+                  )}
+                >
+                  {editFinance === null ? (
+                    <InfoGrid cols={3}>
+                      <InfoItem label="结算方式">{detailCustomer.settlementMethod || '—'}</InfoItem>
+                      <InfoItem label="税号" mono>{detailCustomer.taxNo || '—'}</InfoItem>
+                    </InfoGrid>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
+                      <div>
+                        <label className="drawer-label">结算方式</label>
+                        <input className="filter-input" style={{ width: '100%' }} value={editFinance.settlementMethod ?? ''} onChange={e => setEditFinance(f => f ? { ...f, settlementMethod: e.target.value } : f)} />
+                      </div>
+                      <div>
+                        <label className="drawer-label">税号</label>
+                        <input className="filter-input mono" style={{ width: '100%' }} value={editFinance.taxNo ?? ''} onChange={e => setEditFinance(f => f ? { ...f, taxNo: e.target.value } : f)} />
+                      </div>
+                    </div>
+                  )}
+                </DrawerSection>
+                <DrawerSection title={`结算账户（${(detailCustomer.bankAccounts ?? []).length}）`}>
                   {(detailCustomer.bankAccounts ?? []).length === 0 ? (
                     <EmptyText>暂无结算账户</EmptyText>
                   ) : (
@@ -568,9 +658,7 @@ export default function SalesCustomers() {
                     </table>
                   )}
                 </DrawerSection>
-              )}
 
-              {detailCustomer.type !== 'personal' && (
                 <DrawerSection title="开票信息">
                   {(detailCustomer.invoiceInfos ?? []).length === 0 ? (
                     <EmptyText>暂无发票信息</EmptyText>
@@ -595,66 +683,274 @@ export default function SalesCustomers() {
                     </table>
                   )}
                 </DrawerSection>
-              )}
+                {editFinance !== null && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+                    <Button variant="ghost" onClick={() => setEditFinance(null)}>取消</Button>
+                    <Button onClick={() => {
+                      if (!editFinance) return;
+                      const updated: CustomerItem = {
+                        ...detailCustomer,
+                        settlementMethod: editFinance.settlementMethod?.trim() || detailCustomer.settlementMethod,
+                        taxNo: editFinance.taxNo?.trim() || detailCustomer.taxNo,
+                      };
+                      setData(prev => prev.map(c => c.id === updated.id ? updated : c));
+                      setDetailCustomer(updated);
+                      setEditFinance(null);
+                      addOpRecord(updated.customerCode || '—', '修改结算开票', `结算方式：${updated.settlementMethod || '—'} · 税号：${updated.taxNo || '—'}`);
+                    }}>保存</Button>
+                  </div>
+                )}
+              </>)}
 
-              {detailCustomer.type !== 'personal' && (
-                <DrawerSection title="分润比例">
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-4)' }}>
-                    <div style={{ textAlign: 'center', padding: 'var(--space-4)', background: '#EBF3FC', borderRadius: 'var(--radius-md)' }}>
-                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)' }}>拓客人</div>
-                      <div style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-bold)', color: '#0F64B5' }}>{detailCustomer.profitShare?.developerRatio ?? 0}%</div>
-                    </div>
-                    <div style={{ textAlign: 'center', padding: 'var(--space-4)', background: '#FEF2F4', borderRadius: 'var(--radius-md)' }}>
-                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)' }}>维护人</div>
-                      <div style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-bold)', color: '#CB405D' }}>{detailCustomer.profitShare?.maintainerRatio ?? 0}%</div>
-                    </div>
-                    <div style={{ textAlign: 'center', padding: 'var(--space-4)', background: '#E8F5E9', borderRadius: 'var(--radius-md)' }}>
-                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)' }}>跟单人</div>
-                      <div style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-bold)', color: '#2E7D32' }}>{detailCustomer.profitShare?.followerRatio ?? 0}%</div>
-                    </div>
+
+              {detailTab === 'viaPlatform' && detailCustomer.type !== 'personal' && (
+                <DrawerSection
+                  title={`经平台销售（${detailCustomer.platformIds.length}）`}
+                  extra={platformForm === null && (
+                    <Button size="sm" variant="ghost" onClick={() => setPlatformForm({ editingId: null, platformId: '', rate: '' })}>+ 新增平台</Button>
+                  )}
+                >
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
+                    已设置平台的客户既可<strong>经平台销售</strong>，也可<strong>直接销售</strong>；未设置平台则仅直接销售。
                   </div>
-                  <div style={{ marginTop: 'var(--space-3)', textAlign: 'center', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>
-                    合计：{(detailCustomer.profitShare?.developerRatio ?? 0) + (detailCustomer.profitShare?.maintainerRatio ?? 0) + (detailCustomer.profitShare?.followerRatio ?? 0)}%
-                  </div>
+                  {platformForm !== null ? (
+                    <div style={{ padding: 'var(--space-3)', border: '1px solid var(--color-module-current-light)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-3)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-3)' }}>
+                        <div>
+                          <label className="drawer-label">选择平台 *</label>
+                          <select className="filter-input" style={{ width: '100%' }} value={platformForm.platformId} onChange={e => setPlatformForm(f => f ? { ...f, platformId: e.target.value } : f)}>
+                            <option value="">请选择平台</option>
+                            {platforms.filter(p => platformForm.editingId === p.id || !detailCustomer.platformIds.includes(p.id)).map(p => (
+                              <option key={p.id} value={p.id}>{p.name}（{p.code}）</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="drawer-label">平台扣点</label>
+                          <input className="filter-input mono" placeholder="如 8%" style={{ width: '100%' }} value={platformForm.rate} onChange={e => setPlatformForm(f => f ? { ...f, rate: e.target.value } : f)} />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+                        <Button variant="ghost" onClick={() => setPlatformForm(null)}>取消</Button>
+                        <Button
+                          disabled={!platformForm.platformId}
+                          onClick={() => {
+                            const p = platforms.find(x => x.id === platformForm.platformId);
+                            if (!p) return;
+                            if (platformForm.editingId) {
+                              // 修改：替换原平台关联（平台与扣点均可改）
+                              const ids = detailCustomer.platformIds.map(id => id === platformForm.editingId ? p.id : id);
+                              const rates = { ...(detailCustomer.platformCommissionRates ?? {}) };
+                              delete rates[platformForm.editingId];
+                              if (platformForm.rate.trim()) rates[p.id] = platformForm.rate.trim();
+                              const updated = { ...detailCustomer, platformIds: ids, platformCommissionRates: rates, viaPlatform: ids.length > 0 };
+                              setData(prev => prev.map(c => c.id === updated.id ? updated : c));
+                              setDetailCustomer(updated);
+                              addOpRecord(updated.customerCode || '—', '修改经平台销售', `平台改为 ${p.name}${platformForm.rate.trim() ? `（扣点 ${platformForm.rate.trim()}）` : ''}`);
+                            } else {
+                              const rates = { ...(detailCustomer.platformCommissionRates ?? {}) };
+                              if (platformForm.rate.trim()) rates[p.id] = platformForm.rate.trim();
+                              const updated = { ...detailCustomer, platformIds: [...detailCustomer.platformIds, p.id], platformCommissionRates: rates, viaPlatform: true };
+                              setData(prev => prev.map(c => c.id === updated.id ? updated : c));
+                              setDetailCustomer(updated);
+                              addOpRecord(updated.customerCode || '—', '新增经平台销售', `关联平台：${p.name}${platformForm.rate.trim() ? `（扣点 ${platformForm.rate.trim()}）` : ''}`);
+                            }
+                            setPlatformForm(null);
+                          }}
+                        >保存</Button>
+                      </div>
+                    </div>
+                  ) : (detailCustomer.platformIds ?? []).length === 0 ? (
+                    <EmptyText>暂未设置经平台销售，点击右上角「+ 新增平台」关联平台后，该客户即可经平台销售</EmptyText>
+                  ) : (
+                    <table className="detail-inline-table">
+                      <thead>
+                        <tr>
+                          <th>平台名称</th>
+                          <th>编码</th>
+                          <th>简称</th>
+                          <th>扣点</th>
+                          <th>联系人</th>
+                          <th>联系电话</th>
+                          <th style={{ width: 120 }}>操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detailCustomer.platformIds.map(id => {
+                          const p = platforms.find(x => x.id === id);
+                          const rate = detailCustomer.platformCommissionRates?.[id];
+                          return p ? (
+                            <tr key={id}>
+                              <td style={{ fontWeight: 'var(--font-medium)' }}>{p.name}</td>
+                              <td className="mono">{p.code}</td>
+                              <td>{p.shortName}</td>
+                              <td style={{ color: SECONDARY, fontWeight: 'var(--font-medium)' }}>{rate || '—'}</td>
+                              <td>{p.contactPerson}</td>
+                              <td className="mono">{p.contactPhone}</td>
+                              <td>
+                                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                  <Button size="sm" variant="ghost" onClick={() => setPlatformForm({ editingId: id, platformId: id, rate: rate || '' })}>修改</Button>
+                                  <Button size="sm" variant="ghost" style={{ color: 'var(--color-module-current-secondary)' }} onClick={() => {
+                                    const updated = {
+                                      ...detailCustomer,
+                                      platformIds: detailCustomer.platformIds.filter(x => x !== id),
+                                      platformCommissionRates: Object.fromEntries(Object.entries(detailCustomer.platformCommissionRates ?? {}).filter(([k]) => k !== id)),
+                                      viaPlatform: detailCustomer.platformIds.filter(x => x !== id).length > 0,
+                                    };
+                                    setData(prev => prev.map(c => c.id === updated.id ? updated : c));
+                                    setDetailCustomer(updated);
+                                    addOpRecord(updated.customerCode || '—', '删除经平台销售', `移除平台：${p.name}`);
+                                  }}>删除</Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : (
+                            <tr key={id}><td>未知平台</td></tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
                 </DrawerSection>
               )}
 
-              {detailCustomer.type === 'direct' && detailCustomer.platformIds.length > 0 && (
-                <DrawerSection title={`平台关联（${detailCustomer.platformIds.length}）`}>
-                  <table className="detail-inline-table">
-                    <thead>
-                      <tr>
-                        <th>平台名称</th>
-                        <th>编码</th>
-                        <th>简称</th>
-                        <th>扣点</th>
-                        <th>联系人</th>
-                        <th>联系电话</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detailCustomer.platformIds.map(id => {
-                        const p = platforms.find(x => x.id === id);
-                        const rate = detailCustomer.platformCommissionRates?.[id];
-                        return p ? (
-                          <tr key={id}>
-                            <td style={{ fontWeight: 'var(--font-medium)' }}>{p.name}</td>
-                            <td className="mono">{p.code}</td>
-                            <td>{p.shortName}</td>
-                            <td style={{ color: SECONDARY, fontWeight: 'var(--font-medium)' }}>{rate || '—'}</td>
-                            <td>{p.contactPerson}</td>
-                            <td className="mono">{p.contactPhone}</td>
+              {detailTab === 'procurement' && detailCustomer.type !== 'personal' && (
+                  <DrawerSection title="采购端管理">
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
+                      开通后该客户即可登录<strong>客户采购端</strong>（客户采买平台）在线选品下单；采购端内可见的<strong>商品与报价统一由「报品报（调）价」菜单设置</strong>。
+                      管理员账号也可由客户在采购端注册页自行注册。
+                    </div>
+                    {!procTerm?.enabled ? (
+                      procOpenForm === null ? (
+                        <div style={{ padding: 'var(--space-3)', background: '#FFF8E1', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                          <span style={{ fontSize: 'var(--text-sm)', color: '#B26A00', flex: 1 }}>该客户尚未开通客户采购端，开通后可凭管理员账号登录采购端选品下单。</span>
+                          <Button onClick={() => setProcOpenForm({ username: `cg${(detailCustomer.customerCode || '').replace(/\D/g, '').slice(-4) || '001'}`, password: '123456', name: detailCustomer.contactPerson || '', phone: detailCustomer.contactPhone || '' })}>开通客户采购端</Button>
+                        </div>
+                      ) : (
+                        <div style={{ padding: 'var(--space-3)', border: '1px solid var(--color-module-current-light)', borderRadius: 'var(--radius-md)' }}>
+                          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-3)' }}>开通客户采购端（创建管理员账号）</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
+                            <div>
+                              <label className="drawer-label">登录账号 *</label>
+                              <input className="filter-input mono" style={{ width: '100%' }} value={procOpenForm.username} onChange={e => setProcOpenForm(f => f ? { ...f, username: e.target.value } : f)} />
+                            </div>
+                            <div>
+                              <label className="drawer-label">初始密码 *</label>
+                              <input className="filter-input mono" style={{ width: '100%' }} value={procOpenForm.password} onChange={e => setProcOpenForm(f => f ? { ...f, password: e.target.value } : f)} />
+                            </div>
+                            <div>
+                              <label className="drawer-label">账号名称 *</label>
+                              <input className="filter-input" style={{ width: '100%' }} value={procOpenForm.name} onChange={e => setProcOpenForm(f => f ? { ...f, name: e.target.value } : f)} />
+                            </div>
+                            <div>
+                              <label className="drawer-label">联系手机</label>
+                              <input className="filter-input mono" style={{ width: '100%' }} value={procOpenForm.phone} onChange={e => setProcOpenForm(f => f ? { ...f, phone: e.target.value } : f)} />
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+                            <Button variant="ghost" onClick={() => setProcOpenForm(null)}>取消</Button>
+                            <Button
+                              disabled={!procOpenForm.username.trim() || !procOpenForm.password.trim() || !procOpenForm.name.trim()}
+                              onClick={() => {
+                                const acc = {
+                                  id: `ca_${Date.now()}`,
+                                  username: procOpenForm.username.trim(),
+                                  password: procOpenForm.password.trim(),
+                                  name: procOpenForm.name.trim(),
+                                  customerName: detailCustomer.name,
+                                  customerCode: detailCustomer.customerCode || '—',
+                                  phone: procOpenForm.phone.trim() || '—',
+                                  status: 'active' as const,
+                                  createTime: new Date().toISOString().slice(0, 10),
+                                  remark: '采购端管理员（客户详情开通）',
+                                };
+                                csOpenAccount(acc);
+                                const updated: CustomerItem = {
+                                  ...detailCustomer,
+                                  terminal: { enabled: true, username: acc.username, password: acc.password, status: 'active', openTime: new Date().toISOString().slice(0, 10) },
+                                };
+                                setData(prev => prev.map(c => c.id === updated.id ? updated : c));
+                                setDetailCustomer(updated);
+                                setProcOpenForm(null);
+                                addOpRecord(updated.customerCode || '—', '开通客户采购端', `管理员账号 ${acc.username} 开通，商品与报价由报品报（调）价统一控制`);
+                              }}
+                            >确认开通</Button>
+                          </div>
+                        </div>
+                      )
+                    ) : procOpenForm === null ? (
+                      <>
+                        <InfoGrid cols={3}>
+                          <InfoItem label="采购端状态">
+                            <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: procAdmin?.status === 'active' ? '#E8F5E9' : '#FFEBEE', color: procAdmin?.status === 'active' ? '#01795D' : '#C62828' }}>
+                              {procAdmin?.status === 'active' ? '已开通 · 启用中' : '已开通 · 已停用'}
+                            </span>
+                          </InfoItem>
+                          <InfoItem label="管理员账号" mono emph>{procAdmin?.username ?? procTerm?.username}</InfoItem>
+                          <InfoItem label="账号名称">{procAdmin?.name ?? '—'}</InfoItem>
+                          <InfoItem label="联系手机" mono>{procAdmin?.phone ?? '—'}</InfoItem>
+                          <InfoItem label="开通时间">{procTerm?.openTime ?? procAdmin?.createTime ?? '—'}</InfoItem>
+                          <InfoItem label="最近登录" mono>{procAdmin?.lastLogin ?? '—'}</InfoItem>
+                        </InfoGrid>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+                          {procAdmin && (
+                            <>
+                              <Button size="sm" variant="ghost" onClick={() => {
+                                csResetPassword(procAdmin.id, '123456');
+                                addOpRecord(detailCustomer.customerCode || '—', '重置采购端密码', `账号 ${procAdmin.username} 密码已重置为初始密码`);
+                              }}>重置密码</Button>
+                              {procAdmin.status === 'active' ? (
+                                <Button size="sm" variant="danger" onClick={() => {
+                                  csSetAccountStatus(procAdmin.id, 'disabled');
+                                  addOpRecord(detailCustomer.customerCode || '—', '停用客户采购端', `账号 ${procAdmin.username} 已停用，无法登录采购端`);
+                                }}>停用采购端</Button>
+                              ) : (
+                                <Button size="sm" onClick={() => {
+                                  csSetAccountStatus(procAdmin.id, 'active');
+                                  addOpRecord(detailCustomer.customerCode || '—', '启用客户采购端', `账号 ${procAdmin.username} 已启用`);
+                                }}>启用采购端</Button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', lineHeight: 1.7 }}>
+                          账号与客户采购端登录实时联动（登录地址 <span className="mono">/customer/login</span>）；采购端内可见商品与报价由「报品报（调）价」统一设置。
+                        </div>
+                      </>
+                    ) : null}
+                  </DrawerSection>
+                )}
+
+              {detailTab === 'ops' && (
+                <DrawerSection title="操作记录">
+                  {opRecords.filter(r => r.customerCode === (detailCustomer.customerCode || '—')).length === 0 ? (
+                    <EmptyText>暂无操作记录</EmptyText>
+                  ) : (
+                    <table className="detail-inline-table">
+                      <thead>
+                        <tr>
+                          <th>时间</th>
+                          <th>操作</th>
+                          <th>说明</th>
+                          <th>操作人</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {opRecords.filter(r => r.customerCode === (detailCustomer.customerCode || '—')).map(r => (
+                          <tr key={r.id}>
+                            <td className="mono" style={{ whiteSpace: 'nowrap' }}>{r.time}</td>
+                            <td style={{ fontWeight: 'var(--font-medium)', whiteSpace: 'nowrap' }}>{r.action}</td>
+                            <td style={{ color: 'var(--color-neutral-500)' }}>{r.detail || '—'}</td>
+                            <td>{r.operator}</td>
                           </tr>
-                        ) : (
-                          <tr key={id}><td>未知平台</td></tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </DrawerSection>
               )}
 
-              {detailCustomer.type === 'direct' && (
+              {detailTab === 'contacts' && detailCustomer.type === 'direct' && (
                 <DrawerSection title={`下单人管理（${detailCustomer.orderContacts?.length || 0}）`}>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-3)' }}>
                     <Button size="sm" onClick={() => handleOpenOrderContacts(detailCustomer)}>管理下单人</Button>
@@ -688,7 +984,7 @@ export default function SalesCustomers() {
                 </DrawerSection>
               )}
 
-              {detailCustomer.type === 'direct' && (
+              {detailTab === 'suborg' && detailCustomer.type === 'direct' && (
                 <DrawerSection title={`分子机构（${detailCustomer.subOrganizations?.length || 0}）`}>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-3)' }}>
                     <Button size="sm" onClick={openAddSubOrg}>新增分子机构</Button>
@@ -703,8 +999,6 @@ export default function SalesCustomers() {
                           <th>联系人</th>
                           <th>联系方式</th>
                           <th>地址</th>
-                          <th>拓客人</th>
-                          <th>维护人</th>
                           <th>备注</th>
                           <th style={{ width: 100 }}>操作</th>
                         </tr>
@@ -716,8 +1010,6 @@ export default function SalesCustomers() {
                             <td>{sub.contactPerson || '—'}</td>
                             <td className="mono">{sub.contactPhone || '—'}</td>
                             <td>{[sub.province, sub.city, sub.district, sub.address].filter(Boolean).join(' ') || '—'}</td>
-                            <td>{getPersonDisplay(sub.developerId, sub.developerType, sub.developerName)}</td>
-                            <td>{getPersonDisplay(sub.maintainerId, sub.maintainerType, sub.maintainerName)}</td>
                             <td style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{sub.remark || '—'}</td>
                             <td>
                               <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
@@ -732,6 +1024,7 @@ export default function SalesCustomers() {
                   )}
                 </DrawerSection>
               )}
+            </div>
             </>
           )}
         </DetailDrawer>
@@ -755,52 +1048,8 @@ export default function SalesCustomers() {
                 <Field label="城市"><select className="filter-select" style={{ width: '100%' }} value={subOrgForm.city ?? ''} disabled={!subOrgForm.province} onChange={e => setSubOrgForm(prev => prev ? { ...prev, city: e.target.value, district: '' } : prev)}><option value="">请选择</option>{(subOrgForm.province ? getCityNames(subOrgForm.province) : []).map(c => <option key={c} value={c}>{c}</option>)}</select></Field>
                 <Field label="区县"><select className="filter-select" style={{ width: '100%' }} value={subOrgForm.district ?? ''} disabled={!subOrgForm.city} onChange={e => setSubOrgForm(prev => prev ? { ...prev, district: e.target.value } : prev)}><option value="">请选择</option>{(subOrgForm.province && subOrgForm.city ? getDistricts(subOrgForm.province, subOrgForm.city) : []).map(d => <option key={d} value={d}>{d}</option>)}</select></Field>
                 <Field label="详细地址" full><input className="filter-input" style={{ width: '100%' }} value={subOrgForm.address ?? ''} onChange={e => setSubOrgForm(prev => prev ? { ...prev, address: e.target.value } : prev)} /></Field>
-                <Field label="拓客人" full>
-                  <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                    <select className="filter-select" style={{ width: 120 }} value={subOrgForm.developerType ?? ''} onChange={(e) => { setSubOrgForm(prev => prev ? { ...prev, developerType: (e.target.value || undefined) as PersonRoleType | undefined, developerId: undefined, developerName: undefined } : prev); }}>
-                      <option value="">请选择</option>
-                      {Object.entries(PERSON_TYPE_LABELS).map(([type, label]) => (
-                        <option key={type} value={type}>{label}</option>
-                      ))}
-                    </select>
-                    {subOrgForm.developerType ? (
-                      <select className="filter-select" style={{ flex: 1 }} value={subOrgForm.developerId ?? ''} onChange={(e) => {
-                        const person = getAllPersonOptions().find(p => p.id === e.target.value);
-                        setSubOrgForm(prev => prev ? { ...prev, developerId: e.target.value || undefined, developerName: person?.name || undefined } : prev);
-                      }}>
-                        <option value="">请选择</option>
-                        {getAllPersonOptions().filter(p => p.type === subOrgForm.developerType).map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div style={{ flex: 1, height: 34, display: 'flex', alignItems: 'center', padding: '0 var(--space-3)', border: '1px solid var(--color-border-primary)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-tertiary)', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>请先选择类型</div>
-                    )}
-                  </div>
-                </Field>
-                <Field label="维护人" full>
-                  <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                    <select className="filter-select" style={{ width: 120 }} value={subOrgForm.maintainerType ?? ''} onChange={(e) => { setSubOrgForm(prev => prev ? { ...prev, maintainerType: (e.target.value || undefined) as PersonRoleType | undefined, maintainerId: undefined, maintainerName: undefined } : prev); }}>
-                      <option value="">请选择</option>
-                      {Object.entries(PERSON_TYPE_LABELS).map(([type, label]) => (
-                        <option key={type} value={type}>{label}</option>
-                      ))}
-                    </select>
-                    {subOrgForm.maintainerType ? (
-                      <select className="filter-select" style={{ flex: 1 }} value={subOrgForm.maintainerId ?? ''} onChange={(e) => {
-                        const person = getAllPersonOptions().find(p => p.id === e.target.value);
-                        setSubOrgForm(prev => prev ? { ...prev, maintainerId: e.target.value || undefined, maintainerName: person?.name || undefined } : prev);
-                      }}>
-                        <option value="">请选择</option>
-                        {getAllPersonOptions().filter(p => p.type === subOrgForm.maintainerType).map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div style={{ flex: 1, height: 34, display: 'flex', alignItems: 'center', padding: '0 var(--space-3)', border: '1px solid var(--color-border-primary)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-tertiary)', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>请先选择类型</div>
-                    )}
-                  </div>
-                </Field>
+                
+                
                 <Field label="备注" full><textarea className="filter-input" style={{ width: '100%', minHeight: 80, resize: 'vertical' }} value={subOrgForm.remark ?? ''} onChange={e => setSubOrgForm(prev => prev ? { ...prev, remark: e.target.value } : prev)} /></Field>
               </div>
             </DrawerSection>
@@ -829,29 +1078,7 @@ export default function SalesCustomers() {
                     <Field label="平台编号"><Text className="mono">{detailPlatform.code}</Text></Field>
                     <Field label="联系人"><input className="filter-input" style={{ width: '100%' }} value={editPlatformForm.contactPerson ?? ''} onChange={e => setEditPlatformForm(prev => prev ? { ...prev, contactPerson: e.target.value } : prev)} /></Field>
                     <Field label="联系人职务"><input className="filter-input" style={{ width: '100%' }} value={editPlatformForm.contactPosition ?? ''} onChange={e => setEditPlatformForm(prev => prev ? { ...prev, contactPosition: e.target.value } : prev)} /></Field>
-                    <Field label="拓客人" full>
-                      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                        <select className="filter-select" style={{ width: 120 }} value={editPlatformForm.developerType ?? ''} onChange={(e) => { setEditPlatformForm(prev => prev ? { ...prev, developerType: (e.target.value || undefined) as PersonRoleType | undefined, developerId: undefined, developerName: undefined } : prev); }}>
-                          <option value="">请选择</option>
-                          {Object.entries(PERSON_TYPE_LABELS).map(([type, label]) => (
-                            <option key={type} value={type}>{label}</option>
-                          ))}
-                        </select>
-                        {editPlatformForm.developerType ? (
-                          <select className="filter-select" style={{ flex: 1 }} value={editPlatformForm.developerId ?? ''} onChange={(e) => {
-                            const person = getAllPersonOptions().find(p => p.id === e.target.value);
-                            setEditPlatformForm(prev => prev ? { ...prev, developerId: e.target.value || undefined, developerName: person?.name || undefined } : prev);
-                          }}>
-                            <option value="">请选择</option>
-                            {getAllPersonOptions().filter(p => p.type === editPlatformForm.developerType).map(p => (
-                              <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div style={{ flex: 1, height: 34, display: 'flex', alignItems: 'center', padding: '0 var(--space-3)', border: '1px solid var(--color-border-primary)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-tertiary)', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>请先选择类型</div>
-                        )}
-                      </div>
-                    </Field>
+                    
                     <Field label="联系电话"><input className="filter-input" style={{ width: '100%' }} value={editPlatformForm.contactPhone ?? ''} onChange={e => setEditPlatformForm(prev => prev ? { ...prev, contactPhone: e.target.value } : prev)} /></Field>
                     <Field label="省份"><select className="filter-select" style={{ width: '100%' }} value={editPlatformForm.province ?? ''} onChange={e => setEditPlatformForm(prev => prev ? { ...prev, province: e.target.value, city: '', district: '' } : prev)}><option value="">请选择</option>{PROVINCE_NAMES.map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
                     <Field label="城市"><select className="filter-select" style={{ width: '100%' }} value={editPlatformForm.city ?? ''} disabled={!editPlatformForm.province} onChange={e => setEditPlatformForm(prev => prev ? { ...prev, city: e.target.value, district: '' } : prev)}><option value="">请选择</option>{(editPlatformForm.province ? getCityNames(editPlatformForm.province) : []).map(c => <option key={c} value={c}>{c}</option>)}</select></Field>
@@ -869,7 +1096,6 @@ export default function SalesCustomers() {
                     <InfoItem label="平台编号" emph mono>{detailPlatform.code}</InfoItem>
                     <InfoItem label="联系人">{detailPlatform.contactPerson || '—'}</InfoItem>
                     <InfoItem label="联系人职务">{detailPlatform.contactPosition || '—'}</InfoItem>
-                    <InfoItem label="拓客人">{getPersonDisplay(detailPlatform.developerId, detailPlatform.developerType, detailPlatform.developerName)}</InfoItem>
                     <InfoItem label="联系电话" mono>{detailPlatform.contactPhone || '—'}</InfoItem>
                     <InfoItem label="所在地区">{[detailPlatform.province, detailPlatform.city, detailPlatform.district].filter(Boolean).join(' / ') || '—'}</InfoItem>
                     <InfoItem label="合作日期">{detailPlatform.cooperationDate}</InfoItem>
@@ -1067,7 +1293,6 @@ function CreateDrawer({ customerType, platforms, sequence, onCancel, onSave, onQ
     contactPerson: '', contactPhone: '', contactEmail: '', contactAddress: '', level: 'B级', orders: 0, totalAmount: 0, platformIds: [],
     cooperationDate: new Date().toISOString().slice(0, 10), status: 'active', settlementMethod: '月结', taxNo: '', source: '', remark: '',
     bankAccounts: [], invoiceInfos: [], platformCommissionRates: {},
-    profitShare: { developerRatio: 50, maintainerRatio: 0, followerRatio: 40 },
     subOrganizations: [],
   });
   const [quickPlatformName, setQuickPlatformName] = useState('');
@@ -1076,7 +1301,6 @@ function CreateDrawer({ customerType, platforms, sequence, onCancel, onSave, onQ
   const [newBank, setNewBank] = useState<CustomerBankAccount>({ accountName: '', accountNo: '', bankName: '', bankNo: '' });
   const [newInvoice, setNewInvoice] = useState<CustomerInvoiceInfo>({ invoiceEntity: '', taxNo: '', taxRate: '' });
 
-  const personOptions = getAllPersonOptions();
 
   const update = <K extends keyof CustomerItem>(k: K, v: CustomerItem[K]) => setForm(prev => ({ ...prev, [k]: v }));
   const togglePlatform = (id: string) => setForm(prev => {
@@ -1161,111 +1385,7 @@ function CreateDrawer({ customerType, platforms, sequence, onCancel, onSave, onQ
             {customerType !== 'personal' && <div className="drawer-form-field"><label className="drawer-label">结算方式</label><select className="filter-select" style={{ width: '100%' }} value={form.settlementMethod || ''} onChange={e => update('settlementMethod', e.target.value)}><option value="月结">月结</option><option value="预付">预付</option><option value="季度">季度结算</option><option value="现款">现款</option></select></div>}
             <div className="drawer-form-field"><label className="drawer-label">客户来源</label><select className="filter-select" style={{ width: '100%' }} value={form.source || ''} onChange={e => update('source', e.target.value)}><option value="">请选择</option><option value="主动开发">主动开发</option><option value="展会拓客">展会拓客</option><option value="老客户转介">老客户转介</option><option value="平台引流">平台引流</option><option value="线上咨询">线上咨询</option><option value="其他">其他</option></select></div>
             {customerType !== 'personal' && <div className="drawer-form-field"><label className="drawer-label">税号</label><input className="filter-input" style={{ width: '100%' }} value={form.taxNo || ''} onChange={e => update('taxNo', e.target.value)} /></div>}
-            <div className="drawer-form-field" style={{ flex: 2 }}>
-              <label className="drawer-label">拓客人</label>
-              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                <select className="filter-select" style={{ width: 120 }} value={form.developerType ?? ''} onChange={(e) => { update('developerType', (e.target.value || undefined) as PersonRoleType | undefined); update('developerId', undefined); update('developerName', undefined); }}>
-                  <option value="">请选择</option>
-                  {Object.entries(PERSON_TYPE_LABELS).map(([type, label]) => (
-                    <option key={type} value={type}>{label}</option>
-                  ))}
-                </select>
-                {form.developerType ? (
-                  <select className="filter-select" style={{ flex: 1 }} value={form.developerId ?? ''} onChange={(e) => {
-                    const person = personOptions.find(p => p.id === e.target.value);
-                    update('developerId', e.target.value || undefined);
-                    update('developerName', person?.name || undefined);
-                  }}>
-                    <option value="">请选择</option>
-                    {personOptions.filter(p => p.type === form.developerType).map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <div style={{ flex: 1, height: 34, display: 'flex', alignItems: 'center', padding: '0 var(--space-3)', border: '1px solid var(--color-border-primary)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-tertiary)', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>请先选择类型</div>
-                )}
-              </div>
-            </div>
           </div>
-          {customerType !== 'personal' && (
-            <div className="drawer-form-row">
-              <div className="drawer-form-field">
-                <label className="drawer-label">维护人</label>
-                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                  <select className="filter-select" style={{ width: 120 }} value={form.maintainerType ?? ''} onChange={(e) => { update('maintainerType', (e.target.value || undefined) as PersonRoleType | undefined); update('maintainerId', undefined); update('maintainerName', undefined); }}>
-                    <option value="">请选择</option>
-                    {Object.entries(PERSON_TYPE_LABELS).map(([type, label]) => (
-                      <option key={type} value={type}>{label}</option>
-                    ))}
-                  </select>
-                  {form.maintainerType ? (
-                    <select className="filter-select" style={{ flex: 1 }} value={form.maintainerId ?? ''} onChange={(e) => {
-                      const person = personOptions.find(p => p.id === e.target.value);
-                      update('maintainerId', e.target.value || undefined);
-                      update('maintainerName', person?.name || undefined);
-                    }}>
-                      <option value="">请选择</option>
-                      {personOptions.filter(p => p.type === form.maintainerType).map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div style={{ flex: 1, height: 34, display: 'flex', alignItems: 'center', padding: '0 var(--space-3)', border: '1px solid var(--color-border-primary)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-tertiary)', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>请先选择类型</div>
-                  )}
-                </div>
-              </div>
-              <div className="drawer-form-field">
-                <label className="drawer-label">跟单人</label>
-                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                  <select className="filter-select" style={{ width: 120 }} value={form.followerType ?? ''} onChange={(e) => { update('followerType', (e.target.value || undefined) as PersonRoleType | undefined); update('followerId', undefined); update('followerName', undefined); }}>
-                    <option value="">请选择</option>
-                    {Object.entries(PERSON_TYPE_LABELS).map(([type, label]) => (
-                      <option key={type} value={type}>{label}</option>
-                    ))}
-                  </select>
-                  {form.followerType ? (
-                    <select className="filter-select" style={{ flex: 1 }} value={form.followerId ?? ''} onChange={(e) => {
-                      const person = personOptions.find(p => p.id === e.target.value);
-                      update('followerId', e.target.value || undefined);
-                      update('followerName', person?.name || undefined);
-                    }}>
-                      <option value="">请选择</option>
-                      {personOptions.filter(p => p.type === form.followerType).map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div style={{ flex: 1, height: 34, display: 'flex', alignItems: 'center', padding: '0 var(--space-3)', border: '1px solid var(--color-border-primary)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-tertiary)', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>请先选择类型</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-          {customerType !== 'personal' && (
-            <div className="drawer-section-title">分润比例</div>
-          )}
-          {customerType !== 'personal' && (
-            <div className="drawer-form-row">
-              <div className="drawer-form-field">
-                <label className="drawer-label">拓客人比例（%）</label>
-                <input type="number" min={0} max={100} className="filter-input" style={{ width: '100%' }} value={form.profitShare?.developerRatio ?? 0} onChange={e => update('profitShare', { ...(form.profitShare || { developerRatio: 0, maintainerRatio: 0, followerRatio: 0 }), developerRatio: Number(e.target.value) || 0 })} />
-              </div>
-              <div className="drawer-form-field">
-                <label className="drawer-label">维护人比例（%）</label>
-                <input type="number" min={0} max={100} className="filter-input" style={{ width: '100%' }} value={form.profitShare?.maintainerRatio ?? 0} onChange={e => update('profitShare', { ...(form.profitShare || { developerRatio: 0, maintainerRatio: 0, followerRatio: 0 }), maintainerRatio: Number(e.target.value) || 0 })} />
-              </div>
-              <div className="drawer-form-field">
-                <label className="drawer-label">跟单人比例（%）</label>
-                <input type="number" min={0} max={100} className="filter-input" style={{ width: '100%' }} value={form.profitShare?.followerRatio ?? 0} onChange={e => update('profitShare', { ...(form.profitShare || { developerRatio: 0, maintainerRatio: 0, followerRatio: 0 }), followerRatio: Number(e.target.value) || 0 })} />
-              </div>
-              <div className="drawer-form-field" style={{ display: 'flex', alignItems: 'flex-end' }}>
-                <div style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', background: (form.profitShare?.developerRatio ?? 0) + (form.profitShare?.maintainerRatio ?? 0) + (form.profitShare?.followerRatio ?? 0) > 100 ? '#FEF2F4' : '#EBF3FC', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: (form.profitShare?.developerRatio ?? 0) + (form.profitShare?.maintainerRatio ?? 0) + (form.profitShare?.followerRatio ?? 0) > 100 ? '#CB405D' : '#0F64B5' }}>
-                  合计：{(form.profitShare?.developerRatio ?? 0) + (form.profitShare?.maintainerRatio ?? 0) + (form.profitShare?.followerRatio ?? 0)}%
-                  {(form.profitShare?.developerRatio ?? 0) + (form.profitShare?.maintainerRatio ?? 0) + (form.profitShare?.followerRatio ?? 0) > 100 && '（超出100%）'}
-                </div>
-              </div>
-            </div>
-          )}
           <div className="drawer-form-row">
             <div className="drawer-form-field" style={{ flex: 1 }}><label className="drawer-label">备注</label><input className="filter-input" style={{ width: '100%' }} value={form.remark || ''} onChange={e => update('remark', e.target.value)} /></div>
             <div className="drawer-form-field"><label className="drawer-label">状态</label><select className="filter-select" style={{ width: '100%' }} value={form.status} onChange={e => update('status', e.target.value as CustomerItem['status'])}><option value="active">合作中</option><option value="inactive">已暂停</option></select></div>
@@ -1408,7 +1528,7 @@ function AddPlatformDrawer({ onCancel, onSave, sequence }: { onCancel: () => voi
       province: form.province ?? '', city: form.city ?? '', district: form.district ?? '',
       cooperationDate: form.cooperationDate ?? new Date().toISOString().slice(0, 10),
       deposit: form.deposit, depositDueDate: form.depositDueDate || undefined,
-      bankAccounts, invoiceInfos, status: 'active', remark: form.remark, developerId: form.developerId, developerType: form.developerType, developerName: form.developerName,
+      bankAccounts, invoiceInfos, status: 'active', remark: form.remark,
     } as PlatformItem);
   };
 
@@ -1427,30 +1547,7 @@ function AddPlatformDrawer({ onCancel, onSave, sequence }: { onCancel: () => voi
             <Field label="平台编号（自动生成）" full><input className="filter-input" style={{ width: '100%' }} value={previewCode} readOnly placeholder="输入平台简称后自动生成" /></Field>
             <Field label="联系人"><input className="filter-input" style={{ width: '100%' }} value={form.contactPerson ?? ''} onChange={e => update('contactPerson', e.target.value)} /></Field>
             <Field label="联系人职务"><input className="filter-input" style={{ width: '100%' }} value={form.contactPosition ?? ''} onChange={e => update('contactPosition', e.target.value)} placeholder="如：采购总监" /></Field>
-            <Field label="拓客人" full>
-              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                <select className="filter-select" style={{ width: 120 }} value={form.developerType ?? ''} onChange={(e) => { update('developerType', (e.target.value || undefined) as PersonRoleType | undefined); update('developerId', undefined); update('developerName', undefined); }}>
-                  <option value="">请选择</option>
-                  {Object.entries(PERSON_TYPE_LABELS).map(([type, label]) => (
-                    <option key={type} value={type}>{label}</option>
-                  ))}
-                </select>
-                {form.developerType ? (
-                  <select className="filter-select" style={{ flex: 1 }} value={form.developerId ?? ''} onChange={(e) => {
-                    const person = getAllPersonOptions().find(p => p.id === e.target.value);
-                    update('developerId', e.target.value || undefined);
-                    update('developerName', person?.name || undefined);
-                  }}>
-                    <option value="">请选择</option>
-                    {getAllPersonOptions().filter(p => p.type === form.developerType).map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <div style={{ flex: 1, height: 34, display: 'flex', alignItems: 'center', padding: '0 var(--space-3)', border: '1px solid var(--color-border-primary)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-tertiary)', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>请先选择类型</div>
-                )}
-              </div>
-            </Field>
+            
             <Field label="联系电话"><input className="filter-input" style={{ width: '100%' }} value={form.contactPhone ?? ''} onChange={e => update('contactPhone', e.target.value)} /></Field>
           </div>
 

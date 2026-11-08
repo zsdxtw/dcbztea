@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
@@ -11,7 +10,6 @@ import {
 } from '../../data/teaProfessionals';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
 import type { TeaProfessional, TeaProfessionalType } from '../../types';
-import type { StatCardData } from '../../types';
 
 /* ── 茶人类型配置 ── */
 const TYPE_INFO: Record<TeaProfessionalType, { label: string; desc: string; color: string; icon: string }> = {
@@ -41,7 +39,6 @@ const emptyForm = {
   introduction: '',
   type: [] as TeaProfessionalType[],
   settlement: { accountName: '', accountNo: '', bankName: '', bankNo: '' },
-  isStreamer: false,
 };
 
 export default function PersonnelTeaProfessional() {
@@ -65,32 +62,6 @@ export default function PersonnelTeaProfessional() {
     });
   }, [activeType, keyword]);
 
-  // 统计卡片
-  const stats: StatCardData[] = useMemo(() => {
-    const countByType = (t: TeaProfessionalType) => teaProfessionals.filter(p => p.type.includes(t));
-    return [
-      {
-        label: '茶艺师', value: String(countByType('tea_artist').length), unit: '人',
-        trend: { direction: 'up', value: `在册 ${countByType('tea_artist').filter(p => p.status === 'active').length} 人` },
-        icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2c2.5 0 4.5 2 4.5 4.5S11.5 11 9 11 4.5 9 4.5 6.5 6.5 2 9 2z" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a7 7 0 0114 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
-      },
-      {
-        label: '评茶师', value: String(countByType('tea_evaluator').length), unit: '人',
-        trend: { direction: 'up', value: `在册 ${countByType('tea_evaluator').filter(p => p.status === 'active').length} 人` },
-        icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v3l2 1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
-      },
-      {
-        label: '制茶师', value: String(countByType('tea_maker').length), unit: '人',
-        trend: { direction: 'up', value: `在册 ${countByType('tea_maker').filter(p => p.status === 'active').length} 人` },
-        icon: <svg viewBox="0 0 18 18" fill="none"><path d="M4 12l2-6h6l2 6" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M6 6V4h6v2" stroke="currentColor" strokeWidth="1.3"/></svg>,
-      },
-      {
-        label: '茶会策划师', value: String(countByType('tea_sommelier').length), unit: '人',
-        trend: { direction: 'up', value: `在册 ${countByType('tea_sommelier').filter(p => p.status === 'active').length} 人` },
-        icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
-      },
-    ];
-  }, []);
 
   // 删除相关
   const handleEnterDeleteMode = () => { setDeleteMode(true); setSelectedForDelete(new Set()); };
@@ -139,36 +110,6 @@ export default function PersonnelTeaProfessional() {
     <div>
       <ContentHeader title="茶人管理" breadcrumbs={['人员', '茶人管理']} />
 
-      {/* 统计卡片 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-5)' }}>
-        {stats.map((s, i) => (
-          <StatCard key={i} data={s} />
-        ))}
-      </div>
-
-      {/* 茶人类型分类卡片 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-5)' }}>
-        {(Object.entries(TYPE_INFO) as [TeaProfessionalType, typeof TYPE_INFO[TeaProfessionalType]][]).map(([key, info]) => {
-          const count = teaProfessionals.filter(p => p.type.includes(key)).length;
-          const isActive = activeType === key;
-          return (
-            <div key={key} style={{ cursor: 'pointer', border: isActive ? `2px solid ${info.color}` : '1px solid var(--color-border-primary)', background: isActive ? `${info.color}08` : 'var(--color-bg-primary)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', boxShadow: 'var(--shadow-sm)' }} onClick={() => setActiveType(isActive ? 'all' : key)}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
-                <div style={{ width: 44, height: 44, borderRadius: 'var(--radius-lg)', background: `${info.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
-                  {info.icon}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontWeight: 'var(--font-semibold)', fontSize: 'var(--text-base)', color: 'var(--color-text-primary)' }}>{info.label}</span>
-                    <span style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-bold)', color: info.color }}>{count}</span>
-                  </div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', lineHeight: 1.4 }}>{info.desc}</div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
 
       {/* 工具栏 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
@@ -411,20 +352,9 @@ export default function PersonnelTeaProfessional() {
               </>
             )}
 
-            {/* 是否带货 & 结算信息 */}
-            <h4 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-3)', color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border-primary)', paddingBottom: 'var(--space-2)' }}>带货 & 结算信息</h4>
+            {/* 结算信息 */}
+            <h4 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-3)', color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border-primary)', paddingBottom: 'var(--space-2)' }}>结算信息</h4>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-3)', marginBottom: 'var(--space-5)' }}>
-              <div key="isStreamer" style={{ fontSize: 'var(--text-sm)' }}>
-                <span style={{ color: 'var(--color-text-tertiary)' }}>是否带货：</span>
-                <span style={{
-                  padding: '2px 8px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)',
-                  background: selectedPerson.isStreamer ? '#9D73BD15' : 'var(--color-bg-tertiary)',
-                  color: selectedPerson.isStreamer ? '#9D73BD' : 'var(--color-text-secondary)',
-                  border: selectedPerson.isStreamer ? '1px solid #9D73BD30' : '1px solid var(--color-border-primary)',
-                }}>
-                  {selectedPerson.isStreamer ? '是' : '否'}
-                </span>
-              </div>
               {[
                 ['户名', selectedPerson.settlement?.accountName],
                 ['卡号', selectedPerson.settlement?.accountNo],
@@ -512,18 +442,10 @@ export default function PersonnelTeaProfessional() {
                 <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 4, color: 'var(--color-text-secondary)' }}>简介</label>
                 <textarea className="filter-input" placeholder="请输入茶人简介" style={{ width: '100%', minHeight: 80, resize: 'vertical' }} />
               </div>
-              {/* 是否带货 */}
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 4, color: 'var(--color-text-secondary)' }}>是否带货</label>
-                <select className="filter-select" style={{ width: '100%' }} value={form.isStreamer ? 'yes' : 'no'} onChange={e => setForm({ ...form, isStreamer: e.target.value === 'yes' })}>
-                  <option value="no">否</option>
-                  <option value="yes">是</option>
-                </select>
-              </div>
-              {/* 结算信息（是否带货为"是"时必填） */}
+              {/* 结算信息 */}
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 4, color: 'var(--color-text-secondary)' }}>
-                  结算信息{form.isStreamer ? ' *' : ''}
+                  结算信息
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-2)' }}>
                   <input className="filter-input" placeholder="户名" style={{ width: '100%' }} value={form.settlement.accountName} onChange={e => setForm({ ...form, settlement: { ...form.settlement, accountName: e.target.value } })} />
@@ -531,11 +453,6 @@ export default function PersonnelTeaProfessional() {
                   <input className="filter-input" placeholder="开户银行" style={{ width: '100%' }} value={form.settlement.bankName} onChange={e => setForm({ ...form, settlement: { ...form.settlement, bankName: e.target.value } })} />
                   <input className="filter-input" placeholder="开户行号" style={{ width: '100%' }} value={form.settlement.bankNo} onChange={e => setForm({ ...form, settlement: { ...form.settlement, bankNo: e.target.value } })} />
                 </div>
-                {form.isStreamer && (
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-                    该茶人已开启带货，结算信息为必填项
-                  </div>
-                )}
               </div>
             </div>
 

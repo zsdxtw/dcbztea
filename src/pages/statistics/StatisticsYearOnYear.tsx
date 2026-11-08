@@ -1,17 +1,10 @@
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import LineChart from '../../components/charts/LineChart';
 import Button from '../../components/common/Button';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
-const stats: StatCardData[] = [
-  { label: '同比增长率', value: '24.5', unit: '%', trend: { direction: 'up', value: '5.2%' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '环比增长率', value: '8.3', unit: '%', trend: { direction: 'up', value: '2.1%' }, icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="10" width="4" height="7" rx="0.5" stroke="currentColor" strokeWidth="1.3"/><rect x="8" y="6" width="4" height="11" rx="0.5" stroke="currentColor" strokeWidth="1.3"/><rect x="13" y="3" width="4" height="14" rx="0.5" stroke="currentColor" strokeWidth="1.3"/></svg> },
-  { label: '最大增幅茶类', value: '白茶', unit: '+38.2%', icon: <svg viewBox="0 0 18 18" fill="none"><path d="M7 3v8M3 7l4 4 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '最大降幅茶类', value: '黑茶', unit: '-12.5%', icon: <svg viewBox="0 0 18 18" fill="none"><path d="M7 15V7M3 11l4-4 4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-];
 
 const yearOnYearData = {
   labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月'],
@@ -35,9 +28,6 @@ export default function StatisticsYearOnYear() {
     <>
       <ContentHeader title="同比环比" breadcrumbs={['统计', '同比环比']} actions={<Button variant="ghost">导出报表</Button>} />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
         <Card title="销售额同比对比（今年 vs 去年）">
           <LineChart data={yearOnYearData} />
         </Card>

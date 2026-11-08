@@ -47,6 +47,7 @@ export default function CustomerLayout() {
 
   // 客户终端使用翡翠绿主题（商品模块色）；卸载时恢复主系统当前模块主题
   useEffect(() => {
+    document.title = '淡茶半盏 — 客户采买平台';
     document.body.dataset.module = 'product';
     return () => {
       document.body.dataset.module = useAppStore.getState().currentModule;
@@ -74,7 +75,7 @@ export default function CustomerLayout() {
           <div className="pk-brand-mark"><BrandLogo /></div>
           <div className="pk-brand-text">
             <div className="pk-brand-name">淡茶半盏</div>
-            <div className="pk-brand-sub">客户终端</div>
+            <div className="pk-brand-sub">客户采买平台</div>
           </div>
         </div>
 

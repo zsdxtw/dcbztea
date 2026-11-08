@@ -55,6 +55,11 @@
   --color-module-inventory-base: #eb5c20; --color-module-inventory-dark: #D34A12;
   --color-module-inventory-darkest: #AE3707;
   --color-module-inventory-secondary: #01795D; --color-module-inventory-secondary-light: #EDFAF5;
+  /* 合作商模块(继承原仓储一级菜单主辅色调) */
+  --color-module-partner-lightest: #FFF3EB; --color-module-partner-light: #FEDCC4;
+  --color-module-partner-base: #eb5c20; --color-module-partner-dark: #D34A12;
+  --color-module-partner-darkest: #AE3707;
+  --color-module-partner-secondary: #01795D; --color-module-partner-secondary-light: #EDFAF5;
 
   /* ── 模块色（商品）主色 #01795D + 辅色 #eb5c20 ── */
   --color-module-product-lightest: #EDFAF5; --color-module-product-light: #D0F4E6;
@@ -179,6 +184,14 @@
   --color-module-current-dark: var(--color-module-inventory-dark);
   --color-module-current-darkest: var(--color-module-inventory-darkest);
   --color-module-current-secondary: var(--color-module-inventory-secondary);
+}
+[data-module="partner"] {
+  --color-module-current-base: var(--color-module-partner-base);
+  --color-module-current-lightest: var(--color-module-partner-lightest);
+  --color-module-current-light: var(--color-module-partner-light);
+  --color-module-current-dark: var(--color-module-partner-dark);
+  --color-module-current-darkest: var(--color-module-partner-darkest);
+  --color-module-current-secondary: var(--color-module-partner-secondary);
 }
 [data-module="product"] {
   --color-module-current-base: var(--color-module-product-base);
@@ -407,6 +420,9 @@ body {
 .btn-ghost { background: transparent; color: var(--color-neutral-600); }
 .btn-ghost:hover { background: var(--color-neutral-100); }
 .btn-sm { height: 28px; padding: 0 var(--space-3); font-size: var(--text-sm); }
+
+/* ── 列表筛选标签(筛选项名称) ── */
+.so-f-label { font-size: var(--text-sm); color: var(--color-neutral-500); white-space: nowrap; flex-shrink: 0; }
 
 /* ── 卡片 ── */
 .card {

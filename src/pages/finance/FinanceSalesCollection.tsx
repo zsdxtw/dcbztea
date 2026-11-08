@@ -1,20 +1,13 @@
 import { useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import StatusTag from '../../components/common/StatusTag';
 import Button from '../../components/common/Button';
 import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
-const stats: StatCardData[] = [
-  { label: '待回款', value: '586,200', unit: '¥', icon: <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 8h2M5 11h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-  { label: '本月已收', value: '698,500', unit: '¥', trend: { direction: 'up', value: '22.3%' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '回款单数', value: '22', unit: '笔', icon: <svg viewBox="0 0 18 18" fill="none"><rect x="4" y="2" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h4M7 9h4M7 12h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
-  { label: '逾期', value: '3', unit: '笔', icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v4M9 12.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-];
 
 interface CollectionRecord {
   code: string;
@@ -71,11 +64,8 @@ export default function FinanceSalesCollection() {
 
   return (
     <>
-      <ContentHeader title="销售回款" breadcrumbs={['财务', '结算管理', '销售回款']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建回款</Button></>} />
+      <ContentHeader title="收款管理" breadcrumbs={['财务', '应收应付', '收款管理']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建回款</Button></>} />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
         <FilterBar>
           <FilterInput placeholder="搜索回款单号、客户..." />
           <FilterSelect options={['全部状态', '待回款', '回款中', '已回款', '已逾期']} />

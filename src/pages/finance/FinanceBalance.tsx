@@ -1,19 +1,12 @@
 import { useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import StatusTag from '../../components/common/StatusTag';
 import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
-const stats: StatCardData[] = [
-  { label: '总余额', value: '2,568,300', unit: '¥', icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '银行存款', value: '2,156,800', unit: '¥', icon: <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 8h2M5 11h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-  { label: '现金', value: '12,500', unit: '¥', icon: <svg viewBox="0 0 18 18" fill="none"><rect x="4" y="2" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h4M7 9h4M7 12h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
-  { label: '其他', value: '399,000', unit: '¥', icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M7 10l2 2 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-];
 
 interface AccountRecord {
   name: string;
@@ -124,9 +117,6 @@ export default function FinanceBalance() {
     <>
       <ContentHeader title="余额管理" breadcrumbs={['财务', '余额管理']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新增账户</Button></>} />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
         <Card>
           <Table
             headers={['账户名称', '账户类型', '开户行', '账号', '余额', '状态', '操作']}

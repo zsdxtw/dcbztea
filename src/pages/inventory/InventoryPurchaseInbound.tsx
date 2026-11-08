@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
@@ -9,15 +8,9 @@ import StatusTag from '../../components/common/StatusTag';
 import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { TeaCategory } from '../../types';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
 /* ── 统计数据 ── */
-const stats: StatCardData[] = [
-  { label: '入库单数', value: '23', unit: '单', trend: { direction: 'up', value: '+3单' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2v10M5 8l4 4 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 14h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-  { label: '入库总量', value: '15,200', unit: 'kg', trend: { direction: 'up', value: '+8.5%' }, icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M3 9h12" stroke="currentColor" strokeWidth="1.3"/></svg> },
-  { label: '待入库', value: '4', unit: '单', icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v3l2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '今日入库', value: '3', unit: '单', icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="3" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v6M6 9h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-];
 
 /* ── 模拟数据 ── */
 interface InboundOrder {
@@ -150,11 +143,8 @@ export default function InventoryPurchaseInbound() {
 
   return (
     <>
-      <ContentHeader title="采购入库" breadcrumbs={['仓储', '采购入库']} actions={<Button variant="ghost">导出</Button>} />
+      <ContentHeader title="采购入库" breadcrumbs={['采购&仓储', '采购入库']} actions={<Button variant="ghost">导出</Button>} />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
         <FilterBar>
           <FilterInput placeholder="搜索入库单号、采购单号..." />
           <FilterSelect options={['全部状态', '待入库', '入库中', '已完成']} />

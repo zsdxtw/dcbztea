@@ -4,7 +4,6 @@ import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Table from '../../components/common/Table';
 import StatusTag from '../../components/common/StatusTag';
-import StatCard from '../../components/common/StatCard';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import FilterBar from '../../components/business/FilterBar';
 import IdCardUpload, { parseIdCardNo, type IdCardOcrResult } from '../../components/business/IdCardUpload';
@@ -23,7 +22,6 @@ import type {
   EmployeePerformance,
   EmployeeStatus,
   EducationRecord,
-  StatCardData,
   StatusVariant,
 } from '../../types';
 
@@ -77,42 +75,6 @@ export default function PersonnelEmployee() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [detailEmployee, setDetailEmployee] = useState<Employee | null>(null);
 
-  const stats: StatCardData[] = useMemo(() => {
-    const total = employeeList.length;
-    const active = employeeList.filter((e) => e.status === 'active').length;
-    const probation = employeeList.filter((e) => e.status === 'probation').length;
-    const inactive = employeeList.filter((e) => e.status === 'inactive').length;
-    return [
-      {
-        label: '员工总数',
-        value: String(total),
-        unit: '人',
-        trend: { direction: 'up', value: `在职 ${active} 人` },
-        icon: <IconUsers />,
-      },
-      {
-        label: '在职员工',
-        value: String(active),
-        unit: '人',
-        trend: { direction: 'up', value: `占比 ${total ? Math.round((active / total) * 100) : 0}%` },
-        icon: <IconActive />,
-      },
-      {
-        label: '试用期员工',
-        value: String(probation),
-        unit: '人',
-        trend: { direction: 'up', value: '待转正' },
-        icon: <IconManager />,
-      },
-      {
-        label: '离职员工',
-        value: String(inactive),
-        unit: '人',
-        trend: { direction: 'down', value: '已离职' },
-        icon: <IconFollower />,
-      },
-    ];
-  }, [employeeList]);
 
   const handleAdd = () => {
     setEditingEmployee(null);
@@ -159,38 +121,6 @@ export default function PersonnelEmployee() {
     <div>
       <ContentHeader title="员工管理" breadcrumbs={['人员', '员工管理']} />
 
-      {/* 统计卡片 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-5)' }}>
-        {stats.map((s, i) => (
-          <StatCard key={i} data={s} />
-        ))}
-      </div>
-
-      {/* Tab 切换 */}
-      <div style={{ display: 'flex', gap: 'var(--space-1)', borderBottom: '1px solid var(--color-border-primary)', marginBottom: 'var(--space-4)' }}>
-        {(['list', 'performance'] as const).map((tab) => {
-          const isActive = activeTab === tab;
-          return (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                padding: 'var(--space-3) var(--space-5)',
-                background: 'none',
-                border: 'none',
-                borderBottom: isActive ? '2px solid var(--color-module-current-base)' : '2px solid transparent',
-                color: isActive ? 'var(--color-module-current-base)' : 'var(--color-text-secondary)',
-                fontWeight: isActive ? 'var(--font-semibold)' : 'var(--font-medium)',
-                fontSize: 'var(--text-sm)',
-                cursor: 'pointer',
-                marginBottom: '-1px',
-              }}
-            >
-              {tab === 'list' ? '员工列表' : '员工绩效'}
-            </button>
-          );
-        })}
-      </div>
 
       {/* 内容区 */}
       {activeTab === 'list' ? (

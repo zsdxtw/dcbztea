@@ -5,8 +5,14 @@ import { useAppStore } from './stores/appStore';
 import { ModuleKey } from './types';
 
 /** 根据 URL 路径首段推断当前模块 */
+/** 合作商一级菜单页面(/cooperation/* 前缀,映射到 partner 模块;终端 /partner 不受影响) */
+const PARTNER_MODULE_PATHS = ['/cooperation'];
+
 function inferModuleFromPath(): ModuleKey {
   const path = window.location.pathname;
+  if (PARTNER_MODULE_PATHS.some((p) => path.startsWith(p))) return ModuleKey.PARTNER;
+  // 仓储已并入采购&仓储:原 /inventory 路径归入 purchase 模块
+  if (path.startsWith('/inventory')) return ModuleKey.PURCHASE;
   const segments = path.split('/').filter(Boolean);
   const first = segments[0] ?? '';
   const validKeys: string[] = Object.values(ModuleKey);

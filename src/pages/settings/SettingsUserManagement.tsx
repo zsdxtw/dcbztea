@@ -1,18 +1,11 @@
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import StatusTag from '../../components/common/StatusTag';
 import Button from '../../components/common/Button';
 import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
-import type { StatCardData } from '../../types';
+import type {} from '../../types';
 
-const stats: StatCardData[] = [
-  { label: '用户总数', value: '45', trend: { direction: 'up', value: '+5 人' }, icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a5 5 0 0110 0M14 10h4M16 8v4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-  { label: '在线用户', value: '18', icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><circle cx="9" cy="9" r="2.5" fill="var(--color-semantic-success)" /></svg> },
-  { label: '本月新增', value: '5', trend: { direction: 'up', value: '+2 人' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
-  { label: '管理员数', value: '3', icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><rect x="12" y="5" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/></svg> },
-];
 
 const userItems = [
   { username: 'admin', name: '系统管理员', role: '超级管理员', department: '信息部', phone: '138****8001', lastLogin: '2025-07-15 14:30', status: 'active' as const },
@@ -50,9 +43,6 @@ export default function SettingsUserManagement() {
     <>
       <ContentHeader title="用户管理" breadcrumbs={['系统', '用户管理']} actions={<Button><PlusIcon />新增用户</Button>} />
       <div className="content-body">
-        <div className="stat-cards">
-          {stats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
         <FilterBar>
           <FilterInput placeholder="搜索用户名、姓名..." />
           <FilterSelect options={['全部状态', '正常', '停用']} />

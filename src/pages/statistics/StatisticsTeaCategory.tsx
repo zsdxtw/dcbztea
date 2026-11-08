@@ -1,5 +1,4 @@
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import LineChart from '../../components/charts/LineChart';
 import PieChart from '../../components/charts/PieChart';
@@ -21,16 +20,6 @@ export default function StatisticsTeaCategory() {
     <>
       <ContentHeader title="茶类分析" breadcrumbs={['统计', '茶类分析']} />
       <div className="content-body">
-        <div className="stat-cards" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-          {teaCategoryStats.map((s, i) => (
-            <StatCard key={i} data={{
-              label: s.label + '销售额',
-              value: s.value,
-              unit: s.unit,
-              icon: s.icon,
-            }} />
-          ))}
-        </div>
 
         <div className="grid-2">
           <Card title="茶类销售占比">

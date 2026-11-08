@@ -6,7 +6,7 @@ import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { useScoreStore, getScoreSummary } from '../../stores/scoreStore';
-import { EXTERNAL_PLATFORM_LABELS, compareFloorAmount } from '../../data/externalOrders';
+import { EXTERNAL_PLATFORM_LABELS, compareFloorAmount, platformLabelOf } from '../../data/externalOrders';
 import type { ExternalOrder } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
@@ -53,8 +53,8 @@ export default function CompareManage() {
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           比单为<strong>公开报名制</strong>：发起时设定底价（折扣或具体价格），全部合作商可在期限内报名；报名报价默认带出其系统报价（可调但不低于底价）。
-          截止后按 <strong>报价 {wq}0% + 积分 {ws}0%</strong> 综合评分，最高分中单进入转派待接单；也可在「订单分发-报名情况」中直接选定合作商（转为指定转派）。
-          发起入口：订单分发 → 分发处理 → 分发 · 比单。
+          截止后按 <strong>报价 {wq}0% + 积分 {ws}0%</strong> 综合评分，最高分中单进入转派待接单；也可在「销售单分发-报名情况」中直接选定合作商（转为指定转派）。
+          发起入口：销售单分发 → 分发处理 → 分发 · 比单。
         </div>
 
         {msg && (
@@ -96,7 +96,7 @@ export default function CompareManage() {
           />
           {compareOrders.length === 0 && (
             <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>
-              暂无比单会话。在「订单分发」分发处理中选择「分发 · 比单」发起。
+              暂无比单会话。在「销售单分发」分发处理中选择「分发 · 比单」发起。
             </div>
           )}
         </Card>
@@ -109,7 +109,7 @@ export default function CompareManage() {
         badge="BD"
         title={current?.code ?? ''}
         statusTag={current?.compare?.scored ? pill('#E8F5E9', '#01795D', '已定标') : pill('#F3E5F5', '#7B1FA2', '报名中')}
-        subtitle={current ? `${EXTERNAL_PLATFORM_LABELS[current.platform]} · ${current.customerName} · 订单金额 ${money(current.totalAmount)}` : ''}
+        subtitle={current ? `${platformLabelOf(current)} · ${current.customerName} · 订单金额 ${money(current.totalAmount)}` : ''}
         hideFooter
         footer={
           <>

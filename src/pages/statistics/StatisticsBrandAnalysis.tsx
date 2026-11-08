@@ -1,39 +1,15 @@
 import { useState, useMemo } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
-import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import Tag from '../../components/common/Tag';
 import LineChart from '../../components/charts/LineChart';
 import PieChart from '../../components/charts/PieChart';
-import type { StatCardData, BrandItem } from '../../types';
+import type {BrandItem} from '../../types';
 import { TeaCategory } from '../../types';
 import { brandItems } from '../../data/brands';
 
-/* ── 概览统计 ── */
-const brandStats: StatCardData[] = [
-  {
-    label: '合作品牌数', value: String(brandItems.length), unit: '个',
-    trend: { direction: 'up', value: '3 同比' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2l6 3.5v7L9 16 3 12.5v-7L9 2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
-  },
-  {
-    label: '品牌总销售额', value: '286.4', unit: '万',
-    trend: { direction: 'up', value: '18.2% 同比' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  },
-  {
-    label: '品牌总利润', value: '82.6', unit: '万',
-    trend: { direction: 'up', value: '12.5% 同比' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/></svg>,
-  },
-  {
-    label: '平均毛利率', value: '28.9%', unit: '',
-    trend: { direction: 'down', value: '1.3% 同比' },
-    icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M9 6v3l2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
-  },
-];
 
 /* ── 品牌排名数据 ── */
 type RankPeriod = 'month' | 'year' | 'oneYear';
@@ -219,9 +195,6 @@ export default function StatisticsBrandAnalysis() {
       <ContentHeader title="品牌分析" breadcrumbs={['统计', '品牌分析']} actions={<Button variant="ghost">导出报表</Button>} />
       <div className="content-body">
         {/* 概览统计 */}
-        <div className="stat-cards">
-          {brandStats.map((s, i) => <StatCard key={i} data={s} />)}
-        </div>
 
         {/* 品牌排名 TOP5 */}
         <div className="rank-section">
