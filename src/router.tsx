@@ -14,6 +14,7 @@ import PurchasePricing from './pages/purchase/PurchasePricing';
 import PurchaseDemand from './pages/purchase/PurchaseDemand';
 import PurchaseInbound from './pages/purchase/PurchaseInbound';
 import DirectDeliveryConfirm from './pages/purchase/DirectDeliveryConfirm';
+import CooperationOverview from './pages/cooperation/CooperationOverview';
 import CooperationPartners from './pages/cooperation/CooperationPartners';
 import CooperationApprovals from './pages/cooperation/CooperationApprovals';
 import PurchaseStoreOverview from './pages/purchase/PurchaseStoreOverview';
@@ -155,12 +156,13 @@ export const router = createBrowserRouter([
       { path: 'purchase/purchase-partner-scores', element: <Navigate to="/cooperation/cooperation-scores" replace /> },
       { path: 'purchase/partner-reports', element: <Navigate to="/cooperation/cooperation-reports" replace /> },
       /* ── 合作商一级菜单(cooperation 前缀路由) ── */
+      { path: 'cooperation/cooperation-overview', element: <CooperationOverview /> },
       { path: 'cooperation/cooperation-partners', element: <CooperationPartners /> },
       { path: 'cooperation/cooperation-approvals', element: <CooperationApprovals /> },
       { path: 'cooperation/cooperation-stores', element: <CooperationStores /> },
       { path: 'cooperation/cooperation-scores', element: <CooperationScores /> },
       { path: 'cooperation/cooperation-reports', element: <SalesReports /> },
-      { path: 'cooperation', element: <Navigate to="/cooperation/cooperation-partners" replace /> },
+      { path: 'cooperation', element: <Navigate to="/cooperation/cooperation-overview" replace /> },
       { path: 'purchase/purchase-store-overview', element: <PurchaseStoreOverview /> },
       { path: 'purchase/purchase-reconciliation', element: <Navigate to="/finance/finance-supplier-reconciliation" replace /> },
       { path: 'purchase/direct-delivery-confirm', element: <DirectDeliveryConfirm /> },

@@ -272,6 +272,7 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
     key: ModuleKey.PARTNER,
     label: '合作商',
     menus: [
+      { key: 'cooperation-overview', label: '合作商概览', icon: <OverviewIcon /> },
       { key: 'cooperation-partners', label: '合作商列表', icon: <SupplierListIcon /> },
       { key: 'cooperation-approvals', label: '注册审批', icon: <SupplierApprovalIcon /> },
       { key: 'cooperation-stores', label: '合作商门店', icon: <StoreIcon /> },
@@ -427,7 +428,7 @@ export const moduleMenuPath = (module: ModuleKey, menuKey: string): string => {
 export const MODULE_HOME_PATH: Record<ModuleKey, string> = {
   [ModuleKey.DASHBOARD]: '/dashboard/overview',
   [ModuleKey.PURCHASE]: '/purchase/purchase-overview',
-  [ModuleKey.PARTNER]: '/cooperation/cooperation-partners',
+  [ModuleKey.PARTNER]: '/cooperation/cooperation-overview',
   [ModuleKey.SALES]: '/sales/sales-overview',
   [ModuleKey.PRODUCT]: '/product/product-overview',
   [ModuleKey.FINANCE]: '/finance/finance-overview',
