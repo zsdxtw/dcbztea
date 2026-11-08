@@ -14,6 +14,7 @@ const directNoPlatform: CustomerItem[] = [
       { id: 'sub-c1-1', name: '华茗堂·朝阳分店', contactPerson: '王经理', contactPhone: '010-6543****', province: '北京', city: '北京市', district: '朝阳区', address: '建国路88号SOHO现代城', developerId: 'emp-6', developerType: 'employee', developerName: '周丽华', maintainerId: 'emp-8', maintainerType: 'employee', maintainerName: '王强', remark: 'CBD核心区门店' },
       { id: 'sub-c1-2', name: '华茗堂·海淀分店', contactPerson: '刘店长', contactPhone: '010-8234****', province: '北京', city: '北京市', district: '海淀区', address: '中关村大街1号', developerId: 'emp-7', developerType: 'employee', developerName: '李娜', maintainerId: 'emp-9', maintainerType: 'employee', maintainerName: '张伟', remark: '高校周边门店' },
     ],
+    terminal: { enabled: true, username: 'hmt001', password: '123456', status: 'active', openTime: '2026-08-01' },
   },
   { id: 'c2', name: '清心茶坊', shortName: '清心茶坊', type: 'direct', viaPlatform: false, region: '杭州', province: '浙江', city: '杭州市', district: '西湖区', contactPerson: '李雅芳', contactPhone: '0571-8612****', level: 'S级', orders: 45, totalAmount: 512400, platformIds: [], developerId: 'emp-6', developerType: 'employee', developerName: '周丽华', maintainerId: 'emp-7', maintainerType: 'employee', maintainerName: '李娜', profitShare: { developerRatio: 50, maintainerRatio: 30, followerRatio: 20 }, cooperationDate: '2022-08-10', status: 'active', settlementMethod: '月结', source: '老客户转介', remark: '核心客户，高端茶品需求大',
     bankAccounts: [{ accountName: '杭州清心茶坊有限公司', accountNo: '1202 **** **** 5567', bankName: '中国建设银行杭州西湖支行', bankNo: '10533100XXX' }],

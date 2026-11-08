@@ -35,7 +35,6 @@ import SalesCustomers from './pages/sales/SalesCustomers';
 import SalesStores from './pages/sales/SalesStores';
 import SalesReturn from './pages/sales/SalesReturn';
 import SalesReports from './pages/sales/SalesReports';
-import SalesCustomerAccounts from './pages/sales/SalesCustomerAccounts';
 
 import InventoryOverview from './pages/inventory/InventoryOverview';
 import InventoryPurchaseInbound from './pages/inventory/InventoryPurchaseInbound';
@@ -177,7 +176,7 @@ export const router = createBrowserRouter([
       { path: 'sales/sales-reports', element: <Navigate to="/purchase/partner-reports" replace /> },
       { path: 'sales/sales-pricing', element: <SalesPricing /> },
       { path: 'sales/sales-customers', element: <SalesCustomers /> },
-      { path: 'sales/sales-customer-accounts', element: <SalesCustomerAccounts /> },
+      { path: 'sales/sales-customer-accounts', element: <Navigate to="/sales/sales-customers" replace /> },
       { path: 'sales/sales-platforms', element: <Navigate to="/sales/sales-customers" replace /> },
       { path: 'sales/sales-reconciliation', element: <SalesReconciliation /> },
       { path: 'sales/sales-return', element: <SalesReturn /> },

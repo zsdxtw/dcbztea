@@ -39,6 +39,30 @@ export interface CustomerQuoteConfig {
 /** customerId / platformId → 报价配置 */
 export type CustomerQuoteMap = Record<string, CustomerQuoteConfig>;
 
+/** 客户×商品 维度库存（报品报（调）价按客户设置，不联动商品全局库存） */
+export interface CustomerProductStock {
+  /** 可售库存 */
+  stock: number;
+  /** 预占数量 */
+  reserved: number;
+  /** 已售数量 */
+  sold: number;
+}
+
+/** 客户×商品 库存缺省值（按 key 确定性派生，未手动设置时的展示值） */
+export function defaultCustomerStock(key: string): CustomerProductStock {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return { stock: 20 + (h % 180), reserved: h % 12, sold: 5 + (h % 60) };
+}
+
+/** 读取客户×商品库存（未手动设置过时返回确定性缺省值） */
+export function getCustomerStock(map: Record<string, number>, customerId: string, productId: string): CustomerProductStock {
+  const key = `${customerId}:${productId}`;
+  const d = defaultCustomerStock(key);
+  return { stock: map[key] ?? d.stock, reserved: d.reserved, sold: d.sold };
+}
+
 /** 客户报价配置（缺省空配置） */
 export function getQuoteConfig(map: CustomerQuoteMap, customerId: string): CustomerQuoteConfig {
   return map[customerId] ?? { brandDiscounts: {}, products: {} };
@@ -85,6 +109,11 @@ interface PriceStore {
   salesQuotations: SalesQuotationRule[];
   /** 客户商品报价配置（客户 → 商品 → 报价/平台报价） */
   customerQuotes: CustomerQuoteMap;
+  /** 客户×商品 库存覆盖值（键=customerId:productId；未设置的键用 defaultCustomerStock 派生展示） */
+  customerStock: Record<string, number>;
+
+  /** 客户×商品：调整可售量（增加 delta>0 / 减少 delta<0；减少后不得低于 0） */
+  adjustCustomerStock: (customerId: string, productId: string, delta: number) => { ok: boolean; msg: string };
 
   /** 新增商品（商品管理新增时调用） */
   addProduct: (p: TeaProduct) => void;
@@ -139,11 +168,22 @@ function seedCustomerQuotes(): CustomerQuoteMap {
   };
 }
 
-export const usePriceStore = create<PriceStore>((set) => ({
+export const usePriceStore = create<PriceStore>((set, get) => ({
   products: teaProducts,
   purchaseRules: purchasePriceRules,
   salesQuotations: salesQuotationRules,
   customerQuotes: seedCustomerQuotes(),
+  customerStock: {},
+
+  /** 客户×商品：调整可售量（该客户的独立可售量，不联动商品全局库存） */
+  adjustCustomerStock: (customerId, productId, delta) => {
+    const key = `${customerId}:${productId}`;
+    const current = getCustomerStock(get().customerStock, customerId, productId).stock;
+    const next = current + delta;
+    if (next < 0) return { ok: false, msg: `减少后可售量不能低于 0（当前可售量 ${current}）` };
+    set((s) => ({ customerStock: { ...s.customerStock, [key]: next } }));
+    return { ok: true, msg: `可售量已${delta >= 0 ? '增加' : '减少'} ${Math.abs(delta)}（${current} → ${next}）` };
+  },
 
   addProduct: (p) => set((s) => ({ products: [...s.products, p] })),
 
@@ -151,6 +191,15 @@ export const usePriceStore = create<PriceStore>((set) => ({
 
   updateProduct: (id, patch) => set((s) => ({
     products: s.products.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    // 下架联动：商品在商品管理中设置为下架后，所有客户该商品是否报品均改为否
+    ...(patch.shelfStatus === 'off' ? {
+      customerQuotes: Object.fromEntries(Object.entries(s.customerQuotes).map(([cid, cfg]) => [
+        cid,
+        cfg.products[id]
+          ? { ...cfg, products: { ...cfg.products, [id]: { ...cfg.products[id], reported: false } } }
+          : cfg,
+      ])),
+    } : {}),
   })),
 
   updateProductPrices: (id, patch) => set((s) => {

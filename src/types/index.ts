@@ -635,6 +635,24 @@ export interface BankAccount {
 /** 客户类型 */
 export type CustomerType = 'direct' | 'channel' | 'personal' | 'platform' | 'guest';
 
+/** 客户采购端（客户采买平台）终端：开通后客户可登录采购端按报品报（调）价选品下单 */
+export interface CustomerTerminal {
+  /** 是否开通 */
+  enabled: boolean;
+  /** 管理员登录账号 */
+  username: string;
+  /** 登录密码（演示环境明文） */
+  password?: string;
+  /** 账号状态 */
+  status: 'active' | 'inactive';
+  /** 开通时间 */
+  openTime?: string;
+  /** 最近登录 */
+  lastLogin?: string;
+  /** 备注 */
+  remark?: string;
+}
+
 /** 客户分组 */
 export type CustomerGroup = 'enterprise' | 'personal';
 
@@ -822,6 +840,8 @@ export interface CustomerItem {
   orderContacts?: OrderContact[];
   /** 分子机构列表（仅 type='direct' 时有效） */
   subOrganizations?: CustomerSubOrganization[];
+  /** 客户采购端终端（开通后客户可登录采购端选品下单） */
+  terminal?: CustomerTerminal;
 }
 
 /** 门店（线下茶叶店） */

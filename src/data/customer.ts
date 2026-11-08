@@ -52,13 +52,13 @@ export const CATALOG_BRANDS = [...new Set(customerCatalog.map((p) => p.brand))];
 export const customerAccounts: CustomerAccount[] = [
   {
     id: 'ca1', username: 'hmt001', password: '123456',
-    name: '张明华', customerName: '华茗堂茶庄', customerCode: 'KHZY-00001',
+    name: '张明华', customerName: '华茗堂茶庄', customerCode: 'KHZY-0001',
     phone: '010-8234****', status: 'active', createTime: '2026-08-01',
     lastLogin: '2026-10-16 09:30', remark: '主联系人账号，月结客户',
   },
   {
     id: 'ca2', username: 'qxf001', password: '123456',
-    name: '李雅芳', customerName: '清心茶坊', customerCode: 'KHZY-00002',
+    name: '李雅芳', customerName: '清心茶坊', customerCode: 'KHZY-0002',
     phone: '0571-8612****', status: 'active', createTime: '2026-09-05',
     lastLogin: '2026-10-15 16:42', remark: 'S 级客户，高端茶品需求大',
   },

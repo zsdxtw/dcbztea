@@ -12,6 +12,29 @@ import { generateCustomerCode } from '../../utils/customerCode';
 import { useDrawerWidth } from '../../hooks/useDrawerWidth';
 import DeptEmployeeSelect from '../../components/business/DeptEmployeeSelect';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
+import { useCustomerStore } from '../../stores/customerStore';
+
+/** 客户档案操作记录（页面会话级） */
+interface CustomerOpRecord {
+  id: string;
+  customerCode: string;
+  time: string;
+  action: string;
+  detail?: string;
+  operator: string;
+}
+
+/** 操作记录种子（近两条演示流水） */
+const seedOpRecords: CustomerOpRecord[] = [
+  { id: 'op1', customerCode: 'KHZY-0001', time: '2026-10-20 14:30', action: '开通客户采购端', detail: '管理员账号 hmt001 开通，商品与报价由报品报（调）价统一控制', operator: '管理员' },
+  { id: 'op2', customerCode: 'KHZY-0006', time: '2026-10-18 10:15', action: '新增经平台销售', detail: '关联平台：京东慧采（扣点 8%）', operator: '管理员' },
+];
+
+const nowStamp = () => {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
 
 const PRIMARY = '#0F64B5';
 const PRIMARY_LIGHT = '#EBF3FC';
@@ -42,8 +65,32 @@ export default function SalesCustomers() {
   const [selectedForDelete, setSelectedForDelete] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [detailCustomer, setDetailCustomer] = useState<CustomerItem | null>(null);
+  /** 详情抽屉当前 Tab（参照合作商档案的分页设计） */
+  const [detailTab, setDetailTab] = useState<'basic' | 'finance' | 'viaPlatform' | 'procurement' | 'contacts' | 'suborg' | 'ops'>('basic');
+  /** 客户档案操作记录 */
+  const [opRecords, setOpRecords] = useState<CustomerOpRecord[]>(seedOpRecords);
+  /** 基本信息 / 结算开票 编辑态 */
+  const [editBasic, setEditBasic] = useState<Record<string, string> | null>(null);
+  const [editFinance, setEditFinance] = useState<Record<string, string> | null>(null);
+  /** 经平台销售：新增/修改平台关联表单 */
+  const [platformForm, setPlatformForm] = useState<{ editingId: string | null; platformId: string; rate: string } | null>(null);
+  /** 采购端管理：开通表单 */
+  const [procOpenForm, setProcOpenForm] = useState<{ username: string; password: string; name: string; phone: string } | null>(null);
+
+  /** 写入操作记录 */
+  const addOpRecord = (customerCode: string, action: string, detail?: string) => {
+    setOpRecords(prev => [{ id: `op_${Date.now()}`, customerCode, time: nowStamp(), action, detail, operator: '管理员' }, ...prev]);
+  };
+
+  /** 客户采购端账号（关联当前详情客户） */
+  const customerAccounts = useCustomerStore(s => s.accounts);
+  const csOpenAccount = useCustomerStore(s => s.openAccount);
+  const csSetAccountStatus = useCustomerStore(s => s.setAccountStatus);
+  const csResetPassword = useCustomerStore(s => s.resetPassword);
+  /** 采购端管理：当前详情客户的终端与管理员账号 */
+  const procTerm = detailCustomer?.terminal;
+  const procAdmin = customerAccounts.find(a => a.customerCode === detailCustomer?.customerCode);
   const [showAddDrawer, setShowAddDrawer] = useState(false);
-  const [showPendingMaintain, setShowPendingMaintain] = useState(false);
   const [showOrderContactDrawer, setShowOrderContactDrawer] = useState(false);
   const [currentCustomerForContacts, setCurrentCustomerForContacts] = useState<CustomerItem | null>(null);
   const [showConvertConfirm, setShowConvertConfirm] = useState(false);
@@ -69,16 +116,9 @@ export default function SalesCustomers() {
 
   const filtered = useMemo(() => {
     let result = tabCustomers;
-    if (showPendingMaintain) {
-      result = result.filter(c =>
-        !c.contactPerson || !c.contactPhone || !c.contactAddress ||
-        (c.type !== 'personal' && (c.bankAccounts ?? []).length === 0) ||
-        !c.province || !c.city
-      );
-    }
     if (!keyword) return result;
     return result.filter(c => c.name.includes(keyword) || c.contactPerson.includes(keyword) || c.region.includes(keyword) || c.contactPhone.includes(keyword) || (c.shortName ?? '').includes(keyword) || (c.customerCode ?? '').includes(keyword));
-  }, [tabCustomers, keyword, showPendingMaintain]);
+  }, [tabCustomers, keyword]);
 
   const getPlatformName = (id: string) => platforms.find(p => p.id === id)?.shortName ?? id;
 
@@ -214,6 +254,7 @@ export default function SalesCustomers() {
 
   const handleViewCustomer = (c: CustomerItem) => {
     setDetailCustomer(c);
+    setDetailTab('basic');
   };
 
   const handleOpenOrderContacts = (c: CustomerItem) => {
@@ -277,19 +318,9 @@ export default function SalesCustomers() {
     }
   };
 
-  const handleToggleViaPlatform = (customerId: string, viaPlatform: boolean) => {
-    setData(prev => prev.map(c => {
-      if (c.id !== customerId) return c;
-      return { ...c, viaPlatform };
-    }));
-    if (detailCustomer?.id === customerId) {
-      setDetailCustomer(prev => prev ? { ...prev, viaPlatform } : prev);
-    }
-  };
-
   return (
     <>
-      <ContentHeader title="客户管理" breadcrumbs={['销售', '客户管理']} />
+      <ContentHeader title="客户列表" breadcrumbs={['销售', '客户管理', '客户列表']} />
 
       <div className="content-body">
         {/* 4 个客户类型卡片并列展示，前 3 个属于企业客户板块，第 4 个为个人客户 */}
@@ -376,10 +407,6 @@ export default function SalesCustomers() {
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-5)' }}>
               <input className="filter-input" placeholder={`搜索${CUSTOMER_TYPE_LABELS[activeTab]}客户名称、简称、编号、联系人、地区...`} value={keyword} onChange={e => setKeyword(e.target.value)} style={{ width: 280 }} />
-              <Button variant={showPendingMaintain ? 'primary' : 'ghost'} onClick={() => setShowPendingMaintain(!showPendingMaintain)}>
-                <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14 }}><path d="M8 2v6M8 14v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.2"/></svg>
-                待维护
-              </Button>
               <Button onClick={() => setShowAddDrawer(true)}>
                 <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14 }}><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
                 新增
@@ -434,7 +461,6 @@ export default function SalesCustomers() {
                       {activeTab === 'personal' && (
                         <Button size="sm" variant="ghost" onClick={() => handleConvertPersonal(c)}>转直营</Button>
                       )}
-                      <Button size="sm" variant="ghost" onClick={() => handleViewCustomer(c)}>编辑</Button>
                     </div>,
                   );
                   return cells;
@@ -488,45 +514,139 @@ export default function SalesCustomers() {
         >
           {detailCustomer && (
             <>
-              <DrawerSection title="基本信息">
-                <InfoGrid cols={3}>
-                  <InfoItem label="客户编号" emph mono>{detailCustomer.customerCode || '—'}</InfoItem>
-                  <InfoItem label="客户简称" emph>{detailCustomer.shortName || '—'}</InfoItem>
-                  <InfoItem label="客户名称" emph>{detailCustomer.name}</InfoItem>
-                  <InfoItem label="客户类型">{CUSTOMER_TYPE_LABELS[detailCustomer.type]}{detailCustomer.viaPlatform ? ' · 经平台' : ' · 无平台'}</InfoItem>
-                  {detailCustomer.type === 'direct' && (
-                    <InfoItem label="是否经平台">
-                      <select className="filter-select" style={{ width: '100%', height: 30, padding: '0 var(--space-2)' }} value={detailCustomer.viaPlatform ? 'true' : 'false'} onChange={(e) => handleToggleViaPlatform(detailCustomer.id, e.target.value === 'true')}>
-                        <option value="false">否（无平台）</option>
-                        <option value="true">是（经平台）</option>
-                      </select>
-                    </InfoItem>
-                  )}
-                  <InfoItem label="客户等级">{detailCustomer.level}</InfoItem>
-                  <InfoItem label="客户来源">{detailCustomer.source || '—'}</InfoItem>
-                  <InfoItem label="合作日期">{detailCustomer.cooperationDate}</InfoItem>
-                  <InfoItem label="累计金额" mono>{`¥${(detailCustomer.totalAmount / 10000).toFixed(1)}万`}</InfoItem>
-                  <InfoItem label="备注" span={3}>{detailCustomer.remark || '—'}</InfoItem>
-                </InfoGrid>
+            {/* Tab 栏：分区标题标签化展示于抽屉顶部（参照采购-合作商档案设计） */}
+            <div className="drawer-tab-bar">
+              {([
+                ['basic', '基本信息', true],
+                ['finance', '结算开票', detailCustomer.type !== 'personal'],
+                ['viaPlatform', '经平台销售', detailCustomer.type !== 'personal'],
+                ['procurement', '采购端管理', detailCustomer.type !== 'personal'],
+                ['contacts', '下单人', detailCustomer.type === 'direct'],
+                ['suborg', '分子机构', detailCustomer.type === 'direct'],
+                ['ops', '操作记录', true],
+              ] as ['basic' | 'finance' | 'viaPlatform' | 'procurement' | 'contacts' | 'suborg' | 'ops', string, boolean][]).map(([key, label, show]) => show ? (
+                <button key={key} type="button" className={`drawer-tab${detailTab === key ? ' active' : ''}`} onClick={() => setDetailTab(key)}>
+                  {label}
+                  {key === 'viaPlatform' && detailCustomer.platformIds.length > 0 && <span className="drawer-tab-count">{detailCustomer.platformIds.length}</span>}
+                  {key === 'contacts' && <span className="drawer-tab-count">{detailCustomer.orderContacts?.length || 0}</span>}
+                  {key === 'suborg' && <span className="drawer-tab-count">{detailCustomer.subOrganizations?.length || 0}</span>}
+                </button>
+              ) : null)}
+            </div>
+            <div className="drawer-tab-contents">
+            {detailTab === 'basic' && (<>
+              <DrawerSection
+                title="基本信息"
+                extra={editBasic === null && (
+                  <Button size="sm" variant="ghost" onClick={() => setEditBasic({
+                    shortName: detailCustomer.shortName ?? '',
+                    level: detailCustomer.level ?? '',
+                    source: detailCustomer.source ?? '',
+                    cooperationDate: detailCustomer.cooperationDate ?? '',
+                    contactPerson: detailCustomer.contactPerson ?? '',
+                    contactPhone: detailCustomer.contactPhone ?? '',
+                    contactEmail: detailCustomer.contactEmail ?? '',
+                    contactAddress: detailCustomer.contactAddress ?? '',
+                    remark: detailCustomer.remark ?? '',
+                  })}>编辑</Button>
+                )}
+              >
+                {editBasic === null ? (
+                  <InfoGrid cols={3}>
+                    <InfoItem label="客户编号" emph mono>{detailCustomer.customerCode || '—'}</InfoItem>
+                    <InfoItem label="客户简称" emph>{detailCustomer.shortName || '—'}</InfoItem>
+                    <InfoItem label="客户名称" emph>{detailCustomer.name}</InfoItem>
+                    <InfoItem label="客户类型">{CUSTOMER_TYPE_LABELS[detailCustomer.type]}</InfoItem>
+                    <InfoItem label="客户等级">{detailCustomer.level}</InfoItem>
+                    <InfoItem label="客户来源">{detailCustomer.source || '—'}</InfoItem>
+                    <InfoItem label="合作日期">{detailCustomer.cooperationDate}</InfoItem>
+                    <InfoItem label="累计金额" mono>{`¥${(detailCustomer.totalAmount / 10000).toFixed(1)}万`}</InfoItem>
+                    <InfoItem label="备注">{detailCustomer.remark || '—'}</InfoItem>
+                  </InfoGrid>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
+                    {([['客户简称 *', 'shortName'], ['客户等级', 'level'], ['客户来源', 'source'], ['合作日期', 'cooperationDate'], ['联系人', 'contactPerson'], ['联系电话', 'contactPhone'], ['联系邮箱', 'contactEmail'], ['备注', 'remark']] as [string, string][]).map(([label, key]) => (
+                      <div key={key}>
+                        <label className="drawer-label">{label}</label>
+                        <input className="filter-input" style={{ width: '100%' }} value={editBasic[key] ?? ''} onChange={e => setEditBasic(f => f ? { ...f, [key]: e.target.value } : f)} />
+                      </div>
+                    ))}
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <label className="drawer-label">联系地址</label>
+                      <input className="filter-input" style={{ width: '100%' }} value={editBasic['contactAddress'] ?? ''} onChange={e => setEditBasic(f => f ? { ...f, contactAddress: e.target.value } : f)} />
+                    </div>
+                  </div>
+                )}
               </DrawerSection>
 
               <DrawerSection title="联系信息">
-                <InfoGrid cols={3}>
-                  <InfoItem label="联系人">{detailCustomer.contactPerson || '—'}</InfoItem>
-                  <InfoItem label="联系电话" mono>{detailCustomer.contactPhone || '—'}</InfoItem>
-                  <InfoItem label="联系邮箱">{detailCustomer.contactEmail || '—'}</InfoItem>
-                  <InfoItem label="所在地区">{[detailCustomer.province, detailCustomer.city, detailCustomer.district].filter(Boolean).join(' / ') || detailCustomer.region || '—'}</InfoItem>
-                  <InfoItem label="联系地址" span={2}>{detailCustomer.contactAddress || '—'}</InfoItem>
-                </InfoGrid>
-              </DrawerSection>
-
-              {detailCustomer.type !== 'personal' && (
-                <DrawerSection title="财务信息">
+                {editBasic === null ? (
                   <InfoGrid cols={3}>
-                    <InfoItem label="结算方式">{detailCustomer.settlementMethod || '—'}</InfoItem>
-                    <InfoItem label="税号" mono>{detailCustomer.taxNo || '—'}</InfoItem>
+                    <InfoItem label="联系人">{detailCustomer.contactPerson || '—'}</InfoItem>
+                    <InfoItem label="联系电话" mono>{detailCustomer.contactPhone || '—'}</InfoItem>
+                    <InfoItem label="联系邮箱">{detailCustomer.contactEmail || '—'}</InfoItem>
+                    <InfoItem label="所在地区">{[detailCustomer.province, detailCustomer.city, detailCustomer.district].filter(Boolean).join(' / ') || detailCustomer.region || '—'}</InfoItem>
+                    <InfoItem label="联系地址" span={2}>{detailCustomer.contactAddress || '—'}</InfoItem>
                   </InfoGrid>
-                  <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-700)', marginBottom: 'var(--space-2)' }}>结算账户（{(detailCustomer.bankAccounts ?? []).length}）</div>
+                ) : (
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>联系人 / 联系电话 / 邮箱 / 地址已在上方编辑表单中，所在地区由省市区选择器维护（本次不在编辑范围）。</div>
+                )}
+              </DrawerSection>
+              {editBasic !== null && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+                  <Button variant="ghost" onClick={() => setEditBasic(null)}>取消</Button>
+                  <Button onClick={() => {
+                    if (!editBasic) return;
+                    const updated: CustomerItem = {
+                      ...detailCustomer,
+                      shortName: editBasic.shortName?.trim() || detailCustomer.shortName,
+                      level: editBasic.level ?? detailCustomer.level,
+                      source: editBasic.source ?? detailCustomer.source,
+                      cooperationDate: editBasic.cooperationDate ?? detailCustomer.cooperationDate,
+                      contactPerson: editBasic.contactPerson?.trim() || detailCustomer.contactPerson,
+                      contactPhone: editBasic.contactPhone?.trim() || detailCustomer.contactPhone,
+                      contactEmail: editBasic.contactEmail?.trim() || detailCustomer.contactEmail,
+                      contactAddress: editBasic.contactAddress?.trim() || detailCustomer.contactAddress,
+                      remark: editBasic.remark?.trim() || undefined,
+                    };
+                    setData(prev => prev.map(c => c.id === updated.id ? updated : c));
+                    setDetailCustomer(updated);
+                    setEditBasic(null);
+                    addOpRecord(updated.customerCode || '—', '修改基本信息', '管理后台编辑客户基本信息');
+                  }}>保存</Button>
+                </div>
+              )}
+            </>)}
+
+              {detailTab === 'finance' && detailCustomer.type !== 'personal' && (<>
+                <DrawerSection
+                  title="财务信息"
+                  extra={editFinance === null && (
+                    <Button size="sm" variant="ghost" onClick={() => setEditFinance({
+                      settlementMethod: detailCustomer.settlementMethod ?? '',
+                      taxNo: detailCustomer.taxNo ?? '',
+                    })}>编辑</Button>
+                  )}
+                >
+                  {editFinance === null ? (
+                    <InfoGrid cols={3}>
+                      <InfoItem label="结算方式">{detailCustomer.settlementMethod || '—'}</InfoItem>
+                      <InfoItem label="税号" mono>{detailCustomer.taxNo || '—'}</InfoItem>
+                    </InfoGrid>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
+                      <div>
+                        <label className="drawer-label">结算方式</label>
+                        <input className="filter-input" style={{ width: '100%' }} value={editFinance.settlementMethod ?? ''} onChange={e => setEditFinance(f => f ? { ...f, settlementMethod: e.target.value } : f)} />
+                      </div>
+                      <div>
+                        <label className="drawer-label">税号</label>
+                        <input className="filter-input mono" style={{ width: '100%' }} value={editFinance.taxNo ?? ''} onChange={e => setEditFinance(f => f ? { ...f, taxNo: e.target.value } : f)} />
+                      </div>
+                    </div>
+                  )}
+                </DrawerSection>
+                <DrawerSection title={`结算账户（${(detailCustomer.bankAccounts ?? []).length}）`}>
                   {(detailCustomer.bankAccounts ?? []).length === 0 ? (
                     <EmptyText>暂无结算账户</EmptyText>
                   ) : (
@@ -552,9 +672,7 @@ export default function SalesCustomers() {
                     </table>
                   )}
                 </DrawerSection>
-              )}
 
-              {detailCustomer.type !== 'personal' && (
                 <DrawerSection title="开票信息">
                   {(detailCustomer.invoiceInfos ?? []).length === 0 ? (
                     <EmptyText>暂无发票信息</EmptyText>
@@ -579,45 +697,274 @@ export default function SalesCustomers() {
                     </table>
                   )}
                 </DrawerSection>
-              )}
+                {editFinance !== null && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+                    <Button variant="ghost" onClick={() => setEditFinance(null)}>取消</Button>
+                    <Button onClick={() => {
+                      if (!editFinance) return;
+                      const updated: CustomerItem = {
+                        ...detailCustomer,
+                        settlementMethod: editFinance.settlementMethod?.trim() || detailCustomer.settlementMethod,
+                        taxNo: editFinance.taxNo?.trim() || detailCustomer.taxNo,
+                      };
+                      setData(prev => prev.map(c => c.id === updated.id ? updated : c));
+                      setDetailCustomer(updated);
+                      setEditFinance(null);
+                      addOpRecord(updated.customerCode || '—', '修改结算开票', `结算方式：${updated.settlementMethod || '—'} · 税号：${updated.taxNo || '—'}`);
+                    }}>保存</Button>
+                  </div>
+                )}
+              </>)}
 
 
-              {detailCustomer.type === 'direct' && detailCustomer.platformIds.length > 0 && (
-                <DrawerSection title={`平台关联（${detailCustomer.platformIds.length}）`}>
-                  <table className="detail-inline-table">
-                    <thead>
-                      <tr>
-                        <th>平台名称</th>
-                        <th>编码</th>
-                        <th>简称</th>
-                        <th>扣点</th>
-                        <th>联系人</th>
-                        <th>联系电话</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detailCustomer.platformIds.map(id => {
-                        const p = platforms.find(x => x.id === id);
-                        const rate = detailCustomer.platformCommissionRates?.[id];
-                        return p ? (
-                          <tr key={id}>
-                            <td style={{ fontWeight: 'var(--font-medium)' }}>{p.name}</td>
-                            <td className="mono">{p.code}</td>
-                            <td>{p.shortName}</td>
-                            <td style={{ color: SECONDARY, fontWeight: 'var(--font-medium)' }}>{rate || '—'}</td>
-                            <td>{p.contactPerson}</td>
-                            <td className="mono">{p.contactPhone}</td>
-                          </tr>
-                        ) : (
-                          <tr key={id}><td>未知平台</td></tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+              {detailTab === 'viaPlatform' && detailCustomer.type !== 'personal' && (
+                <DrawerSection
+                  title={`经平台销售（${detailCustomer.platformIds.length}）`}
+                  extra={platformForm === null && (
+                    <Button size="sm" variant="ghost" onClick={() => setPlatformForm({ editingId: null, platformId: '', rate: '' })}>+ 新增平台</Button>
+                  )}
+                >
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
+                    已设置平台的客户既可<strong>经平台销售</strong>，也可<strong>直接销售</strong>；未设置平台则仅直接销售。
+                  </div>
+                  {platformForm !== null ? (
+                    <div style={{ padding: 'var(--space-3)', border: '1px solid var(--color-module-current-light)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-3)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-3)' }}>
+                        <div>
+                          <label className="drawer-label">选择平台 *</label>
+                          <select className="filter-input" style={{ width: '100%' }} value={platformForm.platformId} onChange={e => setPlatformForm(f => f ? { ...f, platformId: e.target.value } : f)}>
+                            <option value="">请选择平台</option>
+                            {platforms.filter(p => platformForm.editingId === p.id || !detailCustomer.platformIds.includes(p.id)).map(p => (
+                              <option key={p.id} value={p.id}>{p.name}（{p.code}）</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="drawer-label">平台扣点</label>
+                          <input className="filter-input mono" placeholder="如 8%" style={{ width: '100%' }} value={platformForm.rate} onChange={e => setPlatformForm(f => f ? { ...f, rate: e.target.value } : f)} />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+                        <Button variant="ghost" onClick={() => setPlatformForm(null)}>取消</Button>
+                        <Button
+                          disabled={!platformForm.platformId}
+                          onClick={() => {
+                            const p = platforms.find(x => x.id === platformForm.platformId);
+                            if (!p) return;
+                            if (platformForm.editingId) {
+                              // 修改：替换原平台关联（平台与扣点均可改）
+                              const ids = detailCustomer.platformIds.map(id => id === platformForm.editingId ? p.id : id);
+                              const rates = { ...(detailCustomer.platformCommissionRates ?? {}) };
+                              delete rates[platformForm.editingId];
+                              if (platformForm.rate.trim()) rates[p.id] = platformForm.rate.trim();
+                              const updated = { ...detailCustomer, platformIds: ids, platformCommissionRates: rates, viaPlatform: ids.length > 0 };
+                              setData(prev => prev.map(c => c.id === updated.id ? updated : c));
+                              setDetailCustomer(updated);
+                              addOpRecord(updated.customerCode || '—', '修改经平台销售', `平台改为 ${p.name}${platformForm.rate.trim() ? `（扣点 ${platformForm.rate.trim()}）` : ''}`);
+                            } else {
+                              const rates = { ...(detailCustomer.platformCommissionRates ?? {}) };
+                              if (platformForm.rate.trim()) rates[p.id] = platformForm.rate.trim();
+                              const updated = { ...detailCustomer, platformIds: [...detailCustomer.platformIds, p.id], platformCommissionRates: rates, viaPlatform: true };
+                              setData(prev => prev.map(c => c.id === updated.id ? updated : c));
+                              setDetailCustomer(updated);
+                              addOpRecord(updated.customerCode || '—', '新增经平台销售', `关联平台：${p.name}${platformForm.rate.trim() ? `（扣点 ${platformForm.rate.trim()}）` : ''}`);
+                            }
+                            setPlatformForm(null);
+                          }}
+                        >保存</Button>
+                      </div>
+                    </div>
+                  ) : (detailCustomer.platformIds ?? []).length === 0 ? (
+                    <EmptyText>暂未设置经平台销售，点击右上角「+ 新增平台」关联平台后，该客户即可经平台销售</EmptyText>
+                  ) : (
+                    <table className="detail-inline-table">
+                      <thead>
+                        <tr>
+                          <th>平台名称</th>
+                          <th>编码</th>
+                          <th>简称</th>
+                          <th>扣点</th>
+                          <th>联系人</th>
+                          <th>联系电话</th>
+                          <th style={{ width: 120 }}>操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detailCustomer.platformIds.map(id => {
+                          const p = platforms.find(x => x.id === id);
+                          const rate = detailCustomer.platformCommissionRates?.[id];
+                          return p ? (
+                            <tr key={id}>
+                              <td style={{ fontWeight: 'var(--font-medium)' }}>{p.name}</td>
+                              <td className="mono">{p.code}</td>
+                              <td>{p.shortName}</td>
+                              <td style={{ color: SECONDARY, fontWeight: 'var(--font-medium)' }}>{rate || '—'}</td>
+                              <td>{p.contactPerson}</td>
+                              <td className="mono">{p.contactPhone}</td>
+                              <td>
+                                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                  <Button size="sm" variant="ghost" onClick={() => setPlatformForm({ editingId: id, platformId: id, rate: rate || '' })}>修改</Button>
+                                  <Button size="sm" variant="ghost" style={{ color: 'var(--color-module-current-secondary)' }} onClick={() => {
+                                    const updated = {
+                                      ...detailCustomer,
+                                      platformIds: detailCustomer.platformIds.filter(x => x !== id),
+                                      platformCommissionRates: Object.fromEntries(Object.entries(detailCustomer.platformCommissionRates ?? {}).filter(([k]) => k !== id)),
+                                      viaPlatform: detailCustomer.platformIds.filter(x => x !== id).length > 0,
+                                    };
+                                    setData(prev => prev.map(c => c.id === updated.id ? updated : c));
+                                    setDetailCustomer(updated);
+                                    addOpRecord(updated.customerCode || '—', '删除经平台销售', `移除平台：${p.name}`);
+                                  }}>删除</Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : (
+                            <tr key={id}><td>未知平台</td></tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
                 </DrawerSection>
               )}
 
-              {detailCustomer.type === 'direct' && (
+              {detailTab === 'procurement' && detailCustomer.type !== 'personal' && (
+                  <DrawerSection title="采购端管理">
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
+                      开通后该客户即可登录<strong>客户采购端</strong>（客户采买平台）在线选品下单；采购端内可见的<strong>商品与报价统一由「报品报（调）价」菜单设置</strong>。
+                      管理员账号也可由客户在采购端注册页自行注册。
+                    </div>
+                    {!procTerm?.enabled ? (
+                      procOpenForm === null ? (
+                        <div style={{ padding: 'var(--space-3)', background: '#FFF8E1', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                          <span style={{ fontSize: 'var(--text-sm)', color: '#B26A00', flex: 1 }}>该客户尚未开通客户采购端，开通后可凭管理员账号登录采购端选品下单。</span>
+                          <Button onClick={() => setProcOpenForm({ username: `cg${(detailCustomer.customerCode || '').replace(/\D/g, '').slice(-4) || '001'}`, password: '123456', name: detailCustomer.contactPerson || '', phone: detailCustomer.contactPhone || '' })}>开通客户采购端</Button>
+                        </div>
+                      ) : (
+                        <div style={{ padding: 'var(--space-3)', border: '1px solid var(--color-module-current-light)', borderRadius: 'var(--radius-md)' }}>
+                          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-3)' }}>开通客户采购端（创建管理员账号）</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
+                            <div>
+                              <label className="drawer-label">登录账号 *</label>
+                              <input className="filter-input mono" style={{ width: '100%' }} value={procOpenForm.username} onChange={e => setProcOpenForm(f => f ? { ...f, username: e.target.value } : f)} />
+                            </div>
+                            <div>
+                              <label className="drawer-label">初始密码 *</label>
+                              <input className="filter-input mono" style={{ width: '100%' }} value={procOpenForm.password} onChange={e => setProcOpenForm(f => f ? { ...f, password: e.target.value } : f)} />
+                            </div>
+                            <div>
+                              <label className="drawer-label">账号名称 *</label>
+                              <input className="filter-input" style={{ width: '100%' }} value={procOpenForm.name} onChange={e => setProcOpenForm(f => f ? { ...f, name: e.target.value } : f)} />
+                            </div>
+                            <div>
+                              <label className="drawer-label">联系手机</label>
+                              <input className="filter-input mono" style={{ width: '100%' }} value={procOpenForm.phone} onChange={e => setProcOpenForm(f => f ? { ...f, phone: e.target.value } : f)} />
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+                            <Button variant="ghost" onClick={() => setProcOpenForm(null)}>取消</Button>
+                            <Button
+                              disabled={!procOpenForm.username.trim() || !procOpenForm.password.trim() || !procOpenForm.name.trim()}
+                              onClick={() => {
+                                const acc = {
+                                  id: `ca_${Date.now()}`,
+                                  username: procOpenForm.username.trim(),
+                                  password: procOpenForm.password.trim(),
+                                  name: procOpenForm.name.trim(),
+                                  customerName: detailCustomer.name,
+                                  customerCode: detailCustomer.customerCode || '—',
+                                  phone: procOpenForm.phone.trim() || '—',
+                                  status: 'active' as const,
+                                  createTime: new Date().toISOString().slice(0, 10),
+                                  remark: '采购端管理员（客户详情开通）',
+                                };
+                                csOpenAccount(acc);
+                                const updated: CustomerItem = {
+                                  ...detailCustomer,
+                                  terminal: { enabled: true, username: acc.username, password: acc.password, status: 'active', openTime: new Date().toISOString().slice(0, 10) },
+                                };
+                                setData(prev => prev.map(c => c.id === updated.id ? updated : c));
+                                setDetailCustomer(updated);
+                                setProcOpenForm(null);
+                                addOpRecord(updated.customerCode || '—', '开通客户采购端', `管理员账号 ${acc.username} 开通，商品与报价由报品报（调）价统一控制`);
+                              }}
+                            >确认开通</Button>
+                          </div>
+                        </div>
+                      )
+                    ) : procOpenForm === null ? (
+                      <>
+                        <InfoGrid cols={3}>
+                          <InfoItem label="采购端状态">
+                            <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: procAdmin?.status === 'active' ? '#E8F5E9' : '#FFEBEE', color: procAdmin?.status === 'active' ? '#01795D' : '#C62828' }}>
+                              {procAdmin?.status === 'active' ? '已开通 · 启用中' : '已开通 · 已停用'}
+                            </span>
+                          </InfoItem>
+                          <InfoItem label="管理员账号" mono emph>{procAdmin?.username ?? procTerm?.username}</InfoItem>
+                          <InfoItem label="账号名称">{procAdmin?.name ?? '—'}</InfoItem>
+                          <InfoItem label="联系手机" mono>{procAdmin?.phone ?? '—'}</InfoItem>
+                          <InfoItem label="开通时间">{procTerm?.openTime ?? procAdmin?.createTime ?? '—'}</InfoItem>
+                          <InfoItem label="最近登录" mono>{procAdmin?.lastLogin ?? '—'}</InfoItem>
+                        </InfoGrid>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+                          {procAdmin && (
+                            <>
+                              <Button size="sm" variant="ghost" onClick={() => {
+                                csResetPassword(procAdmin.id, '123456');
+                                addOpRecord(detailCustomer.customerCode || '—', '重置采购端密码', `账号 ${procAdmin.username} 密码已重置为初始密码`);
+                              }}>重置密码</Button>
+                              {procAdmin.status === 'active' ? (
+                                <Button size="sm" variant="danger" onClick={() => {
+                                  csSetAccountStatus(procAdmin.id, 'disabled');
+                                  addOpRecord(detailCustomer.customerCode || '—', '停用客户采购端', `账号 ${procAdmin.username} 已停用，无法登录采购端`);
+                                }}>停用采购端</Button>
+                              ) : (
+                                <Button size="sm" onClick={() => {
+                                  csSetAccountStatus(procAdmin.id, 'active');
+                                  addOpRecord(detailCustomer.customerCode || '—', '启用客户采购端', `账号 ${procAdmin.username} 已启用`);
+                                }}>启用采购端</Button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', lineHeight: 1.7 }}>
+                          账号与客户采购端登录实时联动（登录地址 <span className="mono">/customer/login</span>）；采购端内可见商品与报价由「报品报（调）价」统一设置。
+                        </div>
+                      </>
+                    ) : null}
+                  </DrawerSection>
+                )}
+
+              {detailTab === 'ops' && (
+                <DrawerSection title="操作记录">
+                  {opRecords.filter(r => r.customerCode === (detailCustomer.customerCode || '—')).length === 0 ? (
+                    <EmptyText>暂无操作记录</EmptyText>
+                  ) : (
+                    <table className="detail-inline-table">
+                      <thead>
+                        <tr>
+                          <th>时间</th>
+                          <th>操作</th>
+                          <th>说明</th>
+                          <th>操作人</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {opRecords.filter(r => r.customerCode === (detailCustomer.customerCode || '—')).map(r => (
+                          <tr key={r.id}>
+                            <td className="mono" style={{ whiteSpace: 'nowrap' }}>{r.time}</td>
+                            <td style={{ fontWeight: 'var(--font-medium)', whiteSpace: 'nowrap' }}>{r.action}</td>
+                            <td style={{ color: 'var(--color-neutral-500)' }}>{r.detail || '—'}</td>
+                            <td>{r.operator}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </DrawerSection>
+              )}
+
+              {detailTab === 'contacts' && detailCustomer.type === 'direct' && (
                 <DrawerSection title={`下单人管理（${detailCustomer.orderContacts?.length || 0}）`}>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-3)' }}>
                     <Button size="sm" onClick={() => handleOpenOrderContacts(detailCustomer)}>管理下单人</Button>
@@ -651,7 +998,7 @@ export default function SalesCustomers() {
                 </DrawerSection>
               )}
 
-              {detailCustomer.type === 'direct' && (
+              {detailTab === 'suborg' && detailCustomer.type === 'direct' && (
                 <DrawerSection title={`分子机构（${detailCustomer.subOrganizations?.length || 0}）`}>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-3)' }}>
                     <Button size="sm" onClick={openAddSubOrg}>新增分子机构</Button>
@@ -691,6 +1038,7 @@ export default function SalesCustomers() {
                   )}
                 </DrawerSection>
               )}
+            </div>
             </>
           )}
         </DetailDrawer>

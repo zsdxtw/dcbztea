@@ -5,7 +5,8 @@ import Card from '../../components/common/Card';
 import StatusTag from '../../components/common/StatusTag';
 import Button from '../../components/common/Button';
 import Tag from '../../components/common/Tag';
-import { teaProducts, getShelfStatusLabel, getPurchaseStatusLabel, getProductionStatusLabel } from '../../data/teaProducts';
+import { getShelfStatusLabel, getPurchaseStatusLabel, getProductionStatusLabel } from '../../data/teaProducts';
+import { usePriceStore } from '../../stores/priceStore';
 import { TeaCategory, TeaProduct } from '../../types';
 import { brandItems } from '../../data/brands';
 import { weightUnits, dimensionUnits, packageUnits } from '../../data/units';
@@ -92,7 +93,8 @@ export default function ProductTeaDetail() {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragType, setDragType] = useState<'main' | 'detail' | null>(null);
 
-  const product = teaProducts.find((p) => p.id === id);
+  const product = usePriceStore((s) => s.products.find((p) => p.id === id));
+  const storeUpdateProduct = usePriceStore((s) => s.updateProduct);
 
   if (!product) {
     return (
@@ -190,8 +192,8 @@ export default function ProductTeaDetail() {
       syncSeriesToBrand(form.brand, finalSeries);
       form.series = finalSeries;
     }
-    // 更新商品数据（实际项目中应调用API）
-    Object.assign(product, form);
+    // 更新商品数据（走 priceStore：下架时自动联动所有客户的报品状态为否）
+    storeUpdateProduct(product.id, { ...form });
     setEditMode(false);
     setForm({});
   };
