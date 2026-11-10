@@ -9,6 +9,7 @@ import type {
   NewArrivalReminder, PartnerQuoteSetting,
 } from '../types';
 import { supplierItems, genSupplierCode } from '../data/suppliers';
+import { teaProducts } from '../data/teaProducts';
 
 const now = () => new Date().toISOString().slice(0, 10);
 
@@ -136,18 +137,25 @@ const seedReminders: NewArrivalReminder[] = [
   },
 ];
 
-/** 演示种子报价设置：3（八马）、8（竹叶青）、11（云茶供应链，多品牌） */
+/** 按品牌集合生成供货商品表（品牌下全部商品供货） */
+function supplyByBrands(...brands: string[]): Record<string, boolean> {
+  return Object.fromEntries(teaProducts.filter(p => brands.includes(p.brand)).map(p => [p.id, true]));
+}
+
+/** 演示种子报价设置：3（八马）、8（竹叶青）、11（云茶供应链，多品牌）；供货=其报价品牌下全部商品（云茶八马仅首品） */
 const seedQuoteSettings: Record<string, PartnerQuoteSetting> = {
   '3': {
     supplierId: '3',
     brandDiscounts: { 八马: 86 },
     productOverrides: {},
+    supplyProducts: supplyByBrands('八马'),
     updateTime: '2026-10-08',
   },
   '8': {
     supplierId: '8',
     brandDiscounts: { 竹叶青: 90 },
     productOverrides: {},
+    supplyProducts: supplyByBrands('竹叶青'),
     updateTime: '2026-09-20',
   },
   '11': {
@@ -156,6 +164,7 @@ const seedQuoteSettings: Record<string, PartnerQuoteSetting> = {
     productOverrides: {
       '1': { type: 'price', value: 448 },
     },
+    supplyProducts: { ...supplyByBrands('西湖牌', '正山堂', '大益', '品品香'), ...Object.fromEntries(teaProducts.filter(p => p.brand === '八马').slice(0, 1).map(p => [p.id, true])) },
     updateTime: '2026-10-12',
   },
 };

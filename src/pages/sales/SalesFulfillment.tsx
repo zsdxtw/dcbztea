@@ -30,7 +30,7 @@ const STAGE_CHAIN: { key: StageKey; label: string }[] = [
 
 function stageOf(o: ExternalOrder): { idx: number; label: string } {
   // 阶段 1：分发中
-  if (['pending', 'report_match_pending', 'grabbing', 'comparing'].includes(o.processStatus)) return { idx: 0, label: '分发中' };
+  if (['pending', 'report_match_pending', 'comparing'].includes(o.processStatus)) return { idx: 0, label: '分发中' };
   // 阶段 2：待接单
   if (['self_pending', 'distribute_pending'].includes(o.processStatus)) return { idx: 1, label: '待接单' };
   // 阶段 4：运输中

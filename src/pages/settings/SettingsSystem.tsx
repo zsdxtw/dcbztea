@@ -22,17 +22,6 @@ export default function SettingsSystem() {
           </SettingsSection>
           <SettingsSection title="履约分配设置">
             <SettingsRow
-              label="抢单时长"
-              description={`发布抢单后合作商可抢的时间窗口（当前 ${settings.grabMinutes} 分钟），超时无人抢自动退回待处理`}
-              action={
-                <input
-                  className="filter-input mono" type="number" min={1} style={{ width: 90 }}
-                  value={settings.grabMinutes}
-                  onChange={(e) => updateSettings({ grabMinutes: Math.max(1, Number(e.target.value) || 30) })}
-                />
-              }
-            />
-            <SettingsRow
               label="比单报名时长"
               description={`发起比单后合作商报名窗口（当前 ${settings.compareMinutes} 分钟）`}
               action={

@@ -41,7 +41,6 @@ function pathLabel(o: ExternalOrder): string {
   if (o.processStatus === 'report_match_pending') return '转派-报备';
   if (o.path === 'self') return '自营';
   if (o.transferSource) return TRANSFER_SOURCE_LABELS[o.transferSource];
-  if (o.distributeMode === 'grab') return '转派-抢单';
   if (o.distributeMode === 'compare') return '转派-比单';
   return '—';
 }

@@ -43,7 +43,6 @@ function pathLabel(o: ExternalOrder): string {
   if (o.processStatus === 'report_match_pending') return '转派-报备';
   if (o.path === 'self') return '自营';
   if (o.transferSource) return TRANSFER_SOURCE_LABELS[o.transferSource];
-  if (o.distributeMode === 'grab') return '转派-抢单';
   if (o.distributeMode === 'compare') return '转派-比单';
   return '—';
 }
@@ -53,7 +52,6 @@ function pathKey(o: ExternalOrder): string {
   if (o.processStatus === 'report_match_pending') return 'report';
   if (o.path === 'self') return 'self';
   if (o.transferSource) return o.transferSource;
-  if (o.distributeMode === 'grab') return 'grab';
   if (o.distributeMode === 'compare') return 'compare';
   return 'none';
 }
@@ -116,7 +114,7 @@ export default function ExternalOrders() {
   const [awardReason, setAwardReason] = useState('');
   /** 销售单分发弹窗（待处理订单独立处理页：直接进入分发方式选择，含转自营） */
   const [flowingId, setFlowingId] = useState<string | null>(null);
-  const [flowMode, setFlowMode] = useState<'self' | 'assign' | 'report' | 'grab' | 'compare'>('assign');
+  const [flowMode, setFlowMode] = useState<'self' | 'assign' | 'report' | 'compare'>('assign');
   /** 转派-指定：合作商选择 + 省市县筛选 + 搜索 + 分页 */
   const [flowSupplier, setFlowSupplier] = useState('');
   const [supplierProv, setSupplierProv] = useState('');
@@ -131,7 +129,7 @@ export default function ExternalOrders() {
   const [reportPage, setReportPage] = useState(1);
   /** 转派-报备：选中的报备编号（多选，一笔订单可对应多条报备） */
   const [pickReportCodes, setPickReportCodes] = useState<string[]>([]);
-  /** 抢单/比单地区范围（省市县，可选） */
+  /** 比单地区范围（省市县，可选） */
   const [scopeProv, setScopeProv] = useState('');
   const [scopeCity, setScopeCity] = useState('');
   const [scopeDist, setScopeDist] = useState('');
@@ -140,14 +138,12 @@ export default function ExternalOrders() {
   const [floorValue, setFloorValue] = useState('88');
   /** 确认报备匹配弹窗（报备-匹配待确认状态订单） */
   const [matchConfirming, setMatchConfirming] = useState<ExternalOrder | null>(null);
-  /** 管理弹窗：报备清单 / 抢单管理 / 比单管理 */
+  /** 管理弹窗：报备清单 / 比单管理 */
   const [reportListOpen, setReportListOpen] = useState(false);
-  const [grabMgmtOpen, setGrabMgmtOpen] = useState(false);
   const [compareMgmtOpen, setCompareMgmtOpen] = useState(false);
   /** 报备管理筛选 */
   const [reportStatusFilter, setReportStatusFilter] = useState('');
   const [reportKw, setReportKw] = useState('');
-  const [grabMsg, setGrabMsg] = useState('');
   const [compareMsg, setCompareMsg] = useState('');
 
   /** 修改抽屉编辑态 */
@@ -158,10 +154,6 @@ export default function ExternalOrders() {
     const t = setInterval(() => setTick(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
-  useEffect(() => {
-    store.getState().expireGrabs();
-  }, [store]);
-
   const activeSuppliers = useMemo(() => suppliers.filter((s) => s.status === 'active'), [suppliers]);
   const scoreOf = (id: string, name: string) => getScoreSummary(scoreEntries, id, name);
 
@@ -188,7 +180,7 @@ export default function ExternalOrders() {
   const reportCityOpts = reportProv ? getCities(reportProv).map((c) => c.name) : [];
   const reportDistOpts = reportProv && reportCity ? getDistricts(reportProv, reportCity) : [];
 
-  /** 抢单/比单地区范围（未选则为全部地区） */
+  /** 比单地区范围（未选则为全部地区） */
   const flowScope: RegionScope | undefined = scopeProv || scopeCity || scopeDist
     ? { province: scopeProv || undefined, city: scopeCity || undefined, district: scopeDist || undefined }
     : undefined;
@@ -234,8 +226,7 @@ export default function ExternalOrders() {
     flowMode === 'self' ? '确认'
       : flowMode === 'assign' ? '指定并转出'
         : flowMode === 'report' ? '匹配并转出'
-          : flowMode === 'grab' ? '发起抢单'
-            : '发起比单';
+          : '发起比单';
   const flowConfirmDisabled =
     (flowMode === 'assign' && !flowSupplier)
     || (flowMode === 'report' && pickReportCodes.length === 0)
@@ -250,8 +241,6 @@ export default function ExternalOrders() {
       if (s) store.getState().assignPartner(flowing.id, s.id, s.name);
     } else if (flowMode === 'report') {
       if (pickReportCodes.length > 0) store.getState().matchReportManual(flowing.id, pickReportCodes);
-    } else if (flowMode === 'grab') {
-      store.getState().publishGrab(flowing.id, flowScope);
     } else {
       const v = Number(floorValue);
       if (v > 0) store.getState().startCompare(flowing.id, { type: floorType, value: v }, flowScope);
@@ -373,7 +362,7 @@ export default function ExternalOrders() {
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           销售单分发决定<strong>销售订单由谁来供货发货</strong>（自营仓发货 / 合作商采购直发），均<strong>逐个展示子单</strong>（母单聚合总览请前往「销售单管理 → 销售订单」）。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>，保存后均自动与审批通过的报备比对。
-          命中报备的订单先进入<strong>报备-匹配待确认</strong>，人工确认匹配后分发给报备合作商；其余订单点击「分发」在弹窗中选择：转自营（在销售单自营/自营工作台接单，接单时填跟单人）、转派-指定、转派-报备、转派-抢单（时间有限）、转派-比单（积分优先）；抢单与比单可限定合作商地区。
+          命中报备的订单先进入<strong>报备-匹配待确认</strong>，人工确认匹配后分发给报备合作商；其余订单点击「分发」在弹窗中选择：转自营（在销售单自营/自营工作台接单，接单时填跟单人）、转派-指定、转派-报备、转派-比单（积分优先）；比单可限定合作商地区。
           待接单订单可「重新分发」回待处理重新选择路径；已接单的重新分发需二次确认。
         </div>
 
@@ -408,7 +397,7 @@ export default function ExternalOrders() {
           .eop-botrow { height: 84px; display: flex; align-items: center; }
           .eop-grow { flex: 1; min-width: 12px; height: 2px; background: var(--color-neutral-300); }
           .eop-hln { position: relative; width: 18px; height: 2px; background: var(--color-neutral-300); flex: none; }
-          /* 虚线框：报备·指定·抢单中·比单中 一行并列 */
+          /* 虚线框：报备·指定·比单中 一行并列 */
           .eop-box { display: flex; gap: 12px; padding: 9px 12px; align-items: center; border: 1.5px dashed var(--color-neutral-300); border-radius: 12px; flex: none; }
           .eop-box .tab-card-simple { justify-content: center; }
           .eop-dim { opacity: .45; cursor: not-allowed; }
@@ -450,7 +439,7 @@ export default function ExternalOrders() {
                 </button>
               </div>
               <div className="eop-midgap" />
-              {/* 下路：分发方式（报备-匹配待确认 / 指定 / 抢单中 / 比单中）→ 转派待接单 */}
+              {/* 下路：分发方式（报备-匹配待确认 / 指定 / 比单中）→ 转派待接单 */}
               <div className="eop-botrow">
                 <div className="eop-box">
                   <button
@@ -462,10 +451,6 @@ export default function ExternalOrders() {
                     <span className="tab-card-simple-count">{countOf('report_match_pending')}</span>
                   </button>
                   <button className="tab-card-simple eop-dim" disabled title="指定转派即时转出，无中间状态">指定</button>
-                  <button className={`tab-card-simple${filterStatus === 'grabbing' ? ' active' : ''}`} onClick={() => setFilterStatus('grabbing')}>
-                    抢单中
-                    <span className="tab-card-simple-count">{countOf('grabbing')}</span>
-                  </button>
                   <button className={`tab-card-simple${filterStatus === 'comparing' ? ' active' : ''}`} onClick={() => setFilterStatus('comparing')}>
                     比单中
                     <span className="tab-card-simple-count">{countOf('comparing')}</span>
@@ -513,7 +498,6 @@ export default function ExternalOrders() {
                 <option value="self">自营</option>
                 <option value="report">转派-报备</option>
                 <option value="assign">转派-指定</option>
-                <option value="grab">转派-抢单</option>
                 <option value="compare">转派-比单</option>
                 <option value="none">未选择</option>
               </select>
@@ -523,7 +507,6 @@ export default function ExternalOrders() {
             <Button onClick={() => navigate('/sales/order-entry')}>+ 新建销售单</Button>
             {/* 管理按钮仅在对应状态页面展示 */}
             {filterStatus === 'report_match_pending' && <Button onClick={() => setReportListOpen(true)}>报备管理</Button>}
-            {filterStatus === 'grabbing' && <Button onClick={() => setGrabMgmtOpen(true)}>抢单管理</Button>}
             {filterStatus === 'comparing' && <Button onClick={() => setCompareMgmtOpen(true)}>比单管理</Button>}
           </span>
         </div>
@@ -603,9 +586,6 @@ export default function ExternalOrders() {
                     <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
                     <Button size="sm" variant="danger" onClick={() => startReflow(o)}>重新分发</Button>
                   </>
-                )}
-                {o.processStatus === 'grabbing' && (
-                  <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
                 )}
                 {o.processStatus === 'comparing' && (
                   <>
@@ -791,7 +771,7 @@ export default function ExternalOrders() {
             {current.processStatus === 'pending' && (
               <DrawerSection title="分发处理">
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
-                  订单待分发：请点击列表行操作「<strong>分发</strong>」按钮，在<strong>销售单分发弹窗</strong>中选择自营或分发（指定 / 报备匹配 / 抢单 / 比单）路径完成分发。
+                  订单待分发：请点击列表行操作「<strong>分发</strong>」按钮，在<strong>销售单分发弹窗</strong>中选择自营或分发（指定 / 报备匹配 / 比单）路径完成分发。
                   本抽屉用于查看订单信息与处理轨迹，不做分发操作。
                 </div>
               </DrawerSection>
@@ -823,24 +803,6 @@ export default function ExternalOrders() {
                   接单后可拆单，并通过「采购&amp;发货」按仓库分仓直发（各仓快递单号）+ 缺口以销定采。
                 </div>
                 <Button onClick={() => navigate('/selfop/orders')}>前往自营工作台处理</Button>
-              </DrawerSection>
-            )}
-
-            {/* ── 抢单中 ── */}
-            {current.processStatus === 'grabbing' && current.grabDeadline && (
-              <DrawerSection title="抢单进行中（时间优先）">
-                <div style={{ fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)' }}>
-                  剩余时间：
-                  <strong className="mono" style={{ color: (current.grabDeadline - tick) > 0 ? '#E65100' : '#C62828' }}>
-                    {Math.max(0, Math.floor((current.grabDeadline - tick) / 60000))} 分 {Math.max(0, Math.floor(((current.grabDeadline - tick) % 60000) / 1000))} 秒
-                  </strong>
-                  <Button size="sm" variant="ghost" style={{ marginLeft: 12 }} onClick={() => store.getState().extendGrab(current.id, 10)}>延长 10 分钟</Button>
-                </div>
-                {(current.grabRecords?.length ?? 0) > 0 ? (
-                  <div style={{ fontSize: 'var(--text-sm)' }}>中单合作商：<strong>{current.grabRecords![0].supplierName}</strong>（{current.grabRecords![0].grabTime}）</div>
-                ) : (
-                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>暂无合作商抢单，可等待或在合作商终端「抢单大厅」演示抢单；超时后自动退回待处理</div>
-                )}
               </DrawerSection>
             )}
 
@@ -1053,8 +1015,8 @@ export default function ExternalOrders() {
             </div>
 
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
-              {/* 分发方式：转自营（辅色调，内联实现激活态） + 转派-指定 / 转派-报备 / 转派-抢单（时间有限） / 转派-比单（积分优先） */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+              {/* 分发方式：转自营（辅色调，内联实现激活态） + 转派-指定 / 转派-报备 / 转派-比单（积分优先） */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
                 <button
                   className="tab-card-simple eop-mode-card"
                   style={flowMode === 'self'
@@ -1077,14 +1039,6 @@ export default function ExternalOrders() {
                   onClick={() => setFlowMode('report')}
                 >
                   <strong style={flowMode === 'report' ? { color: 'var(--color-module-current-base)' } : undefined}>转派-报备</strong>
-                </button>
-                <button
-                  className="tab-card-simple eop-mode-card"
-                  style={flowMode === 'grab' ? { borderColor: 'var(--color-module-current-base)', background: 'var(--color-module-current-lightest)' } : undefined}
-                  onClick={() => setFlowMode('grab')}
-                >
-                  <strong style={flowMode === 'grab' ? { color: 'var(--color-module-current-base)' } : undefined}>转派-抢单</strong>
-                  <span className="eop-mode-sub">（时间优先）</span>
                 </button>
                 <button
                   className="tab-card-simple eop-mode-card"
@@ -1191,41 +1145,6 @@ export default function ExternalOrders() {
                     </tbody>
                   </table>
                   {flowReports.length > 10 && pager(reportPage, reportPages, flowReports.length, setReportPage)}
-                </div>
-              )}
-
-              {/* 转派-抢单：说明 + 地区范围 + 抢单时长设置 */}
-              {flowMode === 'grab' && (
-                <div>
-                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)', lineHeight: 1.7 }}>
-                    发布后推送合作商终端「抢单大厅」，{settings.grabMinutes} 分钟内<strong>先到先得</strong>，超时自动退回待处理。可选择限定参与合作商的地区范围（不选则全部地区）。
-                  </div>
-                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>参与地区：</span>
-                    <select className="filter-select" value={scopeProv} onChange={(e) => { setScopeProv(e.target.value); setScopeCity(''); setScopeDist(''); }}>
-                      <option value="">全部省份</option>
-                      {PROVINCE_OPTS.map((p) => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                    <select className="filter-select" disabled={!scopeProv} value={scopeCity} onChange={(e) => { setScopeCity(e.target.value); setScopeDist(''); }}>
-                      <option value="">全部城市</option>
-                      {scopeCityOpts.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <select className="filter-select" disabled={!scopeCity} value={scopeDist} onChange={(e) => setScopeDist(e.target.value)}>
-                      <option value="">全部区县</option>
-                      {scopeDistOpts.map((d) => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>抢单时长（分钟）</label>
-                      <input
-                        className="filter-input mono" type="number" min={1} value={settings.grabMinutes}
-                        onChange={(e) => store.getState().updateSettings({ grabMinutes: Math.max(1, Number(e.target.value) || 30) })}
-                        style={{ width: 120 }}
-                      />
-                    </div>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', paddingBottom: 10 }}>发布后合作商可抢的时间窗口，调整后立即生效</span>
-                  </div>
                 </div>
               )}
 
@@ -1485,65 +1404,6 @@ export default function ExternalOrders() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-3)', flexShrink: 0 }}>
               <Button variant="ghost" onClick={() => setReportListOpen(false)}>关闭</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 抢单管理弹窗（抢单中节点） ── */}
-      {grabMgmtOpen && (
-        <div className="category-dialog-overlay" onClick={() => setGrabMgmtOpen(false)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 860, maxWidth: '94vw', maxHeight: '85vh', overflowY: 'auto' }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>抢单管理</div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
-              全部<strong>抢单中</strong>订单：查看各单抢单记录（合作商按商品抢、时间优先），可<strong>延长抢单时间</strong>或<strong>立即定案</strong>
-              （有记录按合作商分拆转出，未抢商品退回分发-待处理；无记录整体退回·抢单未成）。合作商在终端「抢单大厅」参与抢单。
-            </div>
-            {orders.filter((o) => o.processStatus === 'grabbing').length === 0 && (
-              <div style={{ padding: 'var(--space-5)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>当前无抢单中的订单（在订单「分配」中选择「转派-抢单」发起）</div>
-            )}
-            {orders.filter((o) => o.processStatus === 'grabbing').map((o) => {
-              const taken = new Set((o.grabRecords ?? []).flatMap((g) => g.items ?? []));
-              const remain = o.items.filter((i) => !taken.has(i.productName));
-              return (
-                <div key={o.id} style={{ border: '1px solid var(--color-neutral-100)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
-                    <span className="cell-mono-emph">{o.code}</span>
-                    <span className="cell-emph">{o.customerName}</span>
-                    <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>{o.items.map((i) => `${i.productName}×${i.quantity}`).join('、')}</span>
-                    {o.grabRegion && pill('#E0F7FA', '#00838F', `限 ${[o.grabRegion.province, o.grabRegion.city, o.grabRegion.district].filter(Boolean).join(' ')}`)}
-                    <span style={{ marginLeft: 'auto', fontSize: 'var(--text-sm)' }}>
-                      剩余 <strong className="mono" style={{ color: (o.grabDeadline ?? 0) - tick > 0 ? '#E65100' : '#C62828' }}>
-                        {Math.max(0, Math.floor(((o.grabDeadline ?? 0) - tick) / 60000))} 分 {Math.max(0, Math.floor((((o.grabDeadline ?? 0) - tick) % 60000) / 1000))} 秒
-                      </strong>
-                    </span>
-                  </div>
-                  <table className="detail-inline-table" style={{ marginBottom: 'var(--space-2)' }}>
-                    <thead><tr><th>抢单合作商</th><th>抢到商品</th><th>抢单时间</th></tr></thead>
-                    <tbody>
-                      {(o.grabRecords ?? []).length === 0 && <tr><td colSpan={3} style={{ color: 'var(--color-neutral-400)', textAlign: 'center', padding: 'var(--space-2)' }}>暂无合作商抢单</td></tr>}
-                      {(o.grabRecords ?? []).map((g, i) => (
-                        <tr key={i}>
-                          <td style={{ fontWeight: 'var(--font-medium)' }}>{g.supplierName}</td>
-                          <td>{(g.items ?? []).join('、')}</td>
-                          <td className="mono">{g.grabTime}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {remain.length > 0 && (o.grabRecords ?? []).length > 0 && (
-                    <div style={{ fontSize: 'var(--text-xs)', color: '#B26A00', marginBottom: 'var(--space-2)' }}>未抢商品：{remain.map((i) => i.productName).join('、')}（定案后退回分发-待处理）</div>
-                  )}
-                  <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                    <Button size="sm" variant="ghost" onClick={() => store.getState().extendGrab(o.id, 10)}>延长 10 分钟</Button>
-                    <Button size="sm" onClick={() => { const r = store.getState().forceFinalizeGrab(o.id); window.setTimeout(() => setGrabMsg(r.msg), 0); }}>立即定案</Button>
-                  </div>
-                </div>
-              );
-            })}
-            {grabMsg && <div style={{ padding: '8px 12px', background: '#E8F5E9', color: '#01795D', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)' }}>{grabMsg}</div>}
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button variant="ghost" onClick={() => { setGrabMgmtOpen(false); setGrabMsg(''); }}>关闭</Button>
             </div>
           </div>
         </div>

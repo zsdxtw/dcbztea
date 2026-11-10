@@ -24,7 +24,6 @@ const TRANSFER_TONE: Record<string, 'green' | 'gray' | 'purple' | 'amber' | 'blu
   product: 'purple',
   customer: 'amber',
   assign: 'blue',
-  grab: 'green',
   compare: 'purple',
 };
 
@@ -39,7 +38,7 @@ const STATUS_TABS: { key: PartnerOrderStatus | ''; label: string; icon: ReactNod
   { key: 'rejected', label: '已驳回', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 7.5l5 5M12.5 7.5l-5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
 ];
 
-/** 合作商订单管理：平台转派订单 + 报备审批通过后自动转入的订单 + 外部订单分发转入（报备/指定/抢单/比单） */
+/** 合作商订单管理：平台转派订单 + 报备审批通过后自动转入的订单 + 外部订单分发转入（报备/指定/比单） */
 export default function PartnerOrders() {
   const reports = useReportStore((s) => s.reports);
   /** 报备规则自动转入的订单（商机订单由平台履约） */

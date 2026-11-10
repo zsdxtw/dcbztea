@@ -248,7 +248,7 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
       { key: 'purchase-manage', label: '采购管理', icon: <OrdersIcon />, children: [
         { key: 'purchase-demand', label: '采购申请', icon: <PriceIcon /> },
         { key: 'purchase-orders', label: '采购订单', icon: <OrdersIcon /> },
-        { key: 'purchase-pricing', label: '采购报（调）价', icon: <PriceIcon /> },
+        { key: 'purchase-pricing', label: '采购报价', icon: <PriceIcon /> },
         { key: 'purchase-return', label: '采购退货', icon: <ReturnIcon /> },
       ] },
       { key: 'warehouse-io', label: '入库出库', icon: <InboundIcon />, children: [
