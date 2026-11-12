@@ -20,6 +20,7 @@ import CooperationApprovals from './pages/cooperation/CooperationApprovals';
 import PurchaseStoreOverview from './pages/purchase/PurchaseStoreOverview';
 import CooperationStores from './pages/cooperation/CooperationStores';
 import CooperationScores from './pages/cooperation/CooperationScores';
+import CooperationNotices from './pages/cooperation/CooperationNotices';
 import PurchaseReconciliation from './pages/purchase/PurchaseReconciliation';
 import PurchaseReturn from './pages/purchase/PurchaseReturn';
 
@@ -162,6 +163,7 @@ export const router = createBrowserRouter([
       { path: 'cooperation/cooperation-stores', element: <CooperationStores /> },
       { path: 'cooperation/cooperation-scores', element: <CooperationScores /> },
       { path: 'cooperation/cooperation-reports', element: <SalesReports /> },
+      { path: 'cooperation/cooperation-notices', element: <CooperationNotices /> },
       { path: 'cooperation', element: <Navigate to="/cooperation/cooperation-overview" replace /> },
       { path: 'purchase/purchase-store-overview', element: <PurchaseStoreOverview /> },
       { path: 'purchase/purchase-reconciliation', element: <Navigate to="/finance/finance-supplier-reconciliation" replace /> },

@@ -17,6 +17,7 @@ import type {
   CompareFloorRule, ExternalOrder, ExternalOrderItem, ExternalPlatform, FlowSettings, PartnerOrder,
   PartnerOrderStatus, PartnerReport, PlatformOrder, RegionScope, ReportMatchInfo, TransferSource,
 } from '../types';
+import { partnerInRegion } from '../types';
 import { externalOrderSeeds } from '../data/externalOrders';
 import { matchesReport, useReportStore } from './reportStore';
 import { useSupplierStore } from './supplierStore';
@@ -816,6 +817,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       const actionLabels: Partial<Record<PartnerOrderStatus, string>> = {
         accepted: '合作商接单',
         shipping: '合作商发货',
+        transit: '物流妥投',
         delivered: '客户签收',
         settled: '结算完成',
       };
@@ -859,30 +861,56 @@ const TRANSFER_KIND_MAP: Record<string, 'order-self' | 'product' | 'customer' | 
   compare: 'compare',
 };
 
-/** 某合作商名下的订单分发分发订单（映射为合作商订单结构，合作商终端展示/接单） */
+/** 某合作商名下的订单分发订单（映射为合作商订单结构，合作商终端展示/接单/报名） */
 export function getPartnerFlowOrders(supplierId: string): PartnerOrder[] {
-  return useOrderFlowStore
-    .getState()
-    .orders.filter((o) => o.partnerId === supplierId && ['distribute_pending', 'processed', 'completed'].includes(o.processStatus))
-    .map((o) => ({
-      id: `ext_${o.id}`,
-      code: o.code,
-      customerName: o.customerName,
-      customerType: o.customerType,
-      items: o.items.map((it) => ({ productName: it.productName, spec: it.spec, quantity: it.quantity, price: it.price })),
-      totalAmount: o.totalAmount,
-      deliveryMode: 'direct' as const,
-      coopMode: 'supplier' as const,
-      status: o.processStatus === 'distribute_pending' ? ('pending' as const) : (o.partnerStatus ?? ('pending' as const)),
-      orderDate: o.entryTime,
-      expectedShipDate: o.entryTime,
-      receiver: o.receiver,
-      receiverPhone: o.receiverPhone,
-      receiverAddress: o.receiverAddress,
-      remark: o.remark,
-      sourceReport: o.transferSource === 'report' ? o.reportMatches?.[0]?.reportCode : undefined,
-      transferKind: o.transferSource ? TRANSFER_KIND_MAP[o.transferSource] : undefined,
-    }));
+  const state = useOrderFlowStore.getState();
+  const supplier = useSupplierStore.getState().suppliers.find((x) => x.id === supplierId);
+  const base = (o: ExternalOrder, over: Partial<PartnerOrder> = {}): PartnerOrder => ({
+    id: `ext_${o.id}`,
+    code: o.code,
+    customerName: o.customerName,
+    customerType: o.customerType,
+    items: o.items.map((it) => ({ productName: it.productName, spec: it.spec, quantity: it.quantity, price: it.price })),
+    totalAmount: o.totalAmount,
+    deliveryMode: 'direct' as const,
+    coopMode: 'supplier' as const,
+    status: o.processStatus === 'distribute_pending' ? ('pending' as const) : (o.partnerStatus ?? ('pending' as const)),
+    orderDate: o.entryTime,
+    expectedShipDate: o.entryTime,
+    receiver: o.receiver,
+    receiverPhone: o.receiverPhone,
+    receiverAddress: o.receiverAddress,
+    remark: o.remark,
+    sourceReport: o.transferSource === 'report' ? o.reportMatches?.[0]?.reportCode : undefined,
+    transferKind: o.transferSource ? TRANSFER_KIND_MAP[o.transferSource] : undefined,
+    ...over,
+  });
+  const mine = state.orders.filter((o) => o.partnerId === supplierId && ['distribute_pending', 'processed', 'completed'].includes(o.processStatus));
+  const mapped = mine.map((o) => {
+    // 比单中单的订单（转派待接单、未接单时）直接进入「已接单」；已推进的状态以 partnerStatus 为准
+    if (o.transferSource === 'compare' && o.processStatus === 'distribute_pending' && !o.partnerStatus) {
+      return base(o, { status: 'accepted' as const });
+    }
+    return base(o);
+  });
+  // 进行中的比单（公开报名，地区范围内）：截止后自动从待接单抽走
+  const now = Date.now();
+  const openCompares = state.orders
+    .filter((o) => o.processStatus === 'comparing' && o.compare && o.compare.deadline > now)
+    .filter((o) => partnerInRegion(supplier, o.compare?.region))
+    .map((o) => {
+      const myQuote = o.compare!.quotes.find((q) => q.supplierId === supplierId);
+      return base(o, {
+        status: 'pending' as const,
+        transferKind: 'compare' as const,
+        compareSigned: !!myQuote,
+        compareDeadline: o.compare!.deadline,
+        compareFloorNote: o.compare!.floorNote,
+        compareQuoteCount: o.compare!.quotes.length,
+        compareMyQuote: myQuote?.amount,
+      });
+    });
+  return [...openCompares, ...mapped];
 }
 
 /** 合作商系统报价（比单报名默认带出：按品牌折扣计算整单报价） */

@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import Pagination from '../../components/common/Pagination';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
@@ -48,6 +49,8 @@ export default function PartnerReports() {
   const reports = useReportStore((s) => s.reports);
   const submitReportAction = useReportStore((s) => s.submitReport);
   const [activeTab, setActiveTab] = useState<PartnerReportType | 'all'>('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [keyword, setKeyword] = useState('');
   const [selected, setSelected] = useState<PartnerReport | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -58,6 +61,8 @@ export default function PartnerReports() {
     if (keyword && !r.code.includes(keyword) && !r.title.includes(keyword) && !r.summary.includes(keyword)) return false;
     return true;
   }), [reports, activeTab, keyword]);
+  const pagedRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => { setPage(1); }, [keyword, pageSize]);
 
   const tabCount = (key: PartnerReportType | 'all') => key === 'all' ? reports.length : reports.filter(r => r.type === key).length;
 
@@ -188,7 +193,7 @@ export default function PartnerReports() {
       <div className="pk-table-panel">
         <Table
           headers={['报备编号', '类型', '标题', '报备对象', '预计金额', '状态', '提交时间', '操作']}
-          rows={filtered.map(r => [
+          rows={pagedRows.map(r => [
             <span key="code" className="cell-mono-emph">{r.code}</span>,
             <div key="type" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <Pill tone={REPORT_TYPE_TONE[r.type]}>{PARTNER_REPORT_TYPE_LABELS[r.type]}</Pill>
@@ -206,6 +211,9 @@ export default function PartnerReports() {
             </div>,
           ])}
         />
+        {(filtered.length > 0) && (
+          <Pagination total={filtered.length} page={page} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} label="条报备" />
+        )}
       </div>
 
       {/* 报备详情抽屉 */}

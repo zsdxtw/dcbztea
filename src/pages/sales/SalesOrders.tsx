@@ -152,7 +152,7 @@ export default function SalesOrders() {
 
   
   /* 列表网格列定义（母单行 + 表头共用，保证对齐） */
-  const GRID = '28px 168px 104px 130px 110px 116px 104px 88px 112px 100px 100px 96px 64px';
+  const GRID = '34px 24px 168px 104px 130px 110px 116px 104px 88px 112px 100px 100px 96px 64px';
 
   const pageBtn = (n: number) => (
     <button
@@ -269,6 +269,7 @@ export default function SalesOrders() {
               <div style={{ minWidth: 1320 }}>
                 {/* 表头 */}
                 <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-neutral-100)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-500)', background: 'var(--color-neutral-50)' }}>
+                  <span>序号</span>
                   <span />
                   <span>母销售单号</span>
                   <span>来源</span>
@@ -284,7 +285,7 @@ export default function SalesOrders() {
                   <span style={{ textAlign: 'center' }}>操作</span>
                 </div>
 
-                {pagedFamilies.map((f) => {
+                {pagedFamilies.map((f, famIdx) => {
                   const open = expanded.has(f.rootCode);
                   const st = familyStatesOf(f);
                   const amount = (f.children.length > 0 ? f.children : f.all).reduce((s, o) => s + o.totalAmount, 0);
@@ -295,6 +296,7 @@ export default function SalesOrders() {
                         style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', alignItems: 'center', padding: 'var(--space-3) var(--space-4)', cursor: 'pointer', background: open ? 'var(--color-neutral-50)' : 'transparent' }}
                         onClick={() => toggleExpand(f.rootCode)}
                       >
+                        <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{(page - 1) * pageSize + famIdx + 1}</span>
                         <svg viewBox="0 0 16 16" fill="none" style={{ width: 12, height: 12, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s', color: 'var(--color-neutral-400)' }}><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         <span className="cell-mono-emph">{f.rootCode}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{f.mother.externalOrderNo}</span></span>
                         <span style={{ fontSize: 'var(--text-sm)' }}>

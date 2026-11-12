@@ -339,15 +339,16 @@ export const partnerAccounts: PartnerAccount[] = [
 ];
 
 /* ── 标签配置 ── */
-export const PARTNER_DELIVERY_LABELS: Record<string, string> = { direct: '直送订单', warehouse: '入库订单' };
-export const PARTNER_COOP_LABELS: Record<string, string> = { supplier: '供应商模式', service: '服务商模式' };
+export const PARTNER_DELIVERY_LABELS: Record<string, string> = { direct: '直送订单', warehouse: '入仓订单' };
+export const PARTNER_COOP_LABELS: Record<string, string> = { supplier: '差价模式', service: '扣点模式' };
 export const PARTNER_ORDER_STATUS_LABELS: Record<string, string> = {
-  pending: '待接单', accepted: '已接单', shipping: '发货中', delivered: '已签收', settled: '已结算', rejected: '已驳回',
+  pending: '待接单', accepted: '已接单', shipping: '发货中', transit: '妥投', delivered: '已签收', settled: '已结算', rejected: '已驳回',
 };
 export const PARTNER_ORDER_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   pending: { bg: '#FFF3E0', color: '#E65100' },
   accepted: { bg: '#E3F2FD', color: '#0F64B5' },
   shipping: { bg: '#E8EAF6', color: '#3949AB' },
+  transit: { bg: '#E0F2F1', color: '#00695C' },
   delivered: { bg: '#E8F5E9', color: '#01795D' },
   settled: { bg: '#F3E5F5', color: '#7B1FA2' },
   rejected: { bg: '#FFEBEE', color: '#C62828' },

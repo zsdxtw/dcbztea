@@ -278,6 +278,7 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
       { key: 'cooperation-stores', label: '合作商门店', icon: <StoreIcon /> },
       { key: 'cooperation-scores', label: '合作商积分', icon: <SupplierApprovalIcon /> },
       { key: 'cooperation-reports', label: '报备管理', icon: <ReportMgmtIcon /> },
+      { key: 'cooperation-notices', label: '通知公告', icon: <NotificationIcon /> },
     ],
   },
   [ModuleKey.SALES]: {

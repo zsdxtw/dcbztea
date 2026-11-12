@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import Pagination from '../../components/common/Pagination';
 import { PageHead } from './PartnerUI';
 import { getPartnerAuth } from './PartnerLayout';
 import { useSupplierStore } from '../../stores/supplierStore';
@@ -60,6 +61,8 @@ export default function PartnerQuotes() {
   const [reminderForm, setReminderForm] = useState({ brand: '', productName: '', productUrl: '' });
   const [reminderMsg, setReminderMsg] = useState('');
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   /** 右侧商品列表：默认全部品牌的全部商品，选中品牌后仅展示该品牌商品；支持搜索与是否供货筛选 */
   const products = useMemo(() => teaProducts.filter(p => {
     if (selectedBrand && p.brand !== selectedBrand) return false;
@@ -75,6 +78,8 @@ export default function PartnerQuotes() {
     }
     return true;
   }), [selectedBrand, keyword, supplyFilter, modeFilter, supplyMap, setting]);
+  const pagedProducts = products.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => { setPage(1); }, [keyword, supplyFilter, modeFilter, selectedBrand, pageSize]);
 
   /** 切换某商品是否供货（写入共享 quoteSettings，管理后台采购报价页同步可见） */
   const toggleSupply = (productId: string) => {
@@ -272,7 +277,7 @@ export default function PartnerQuotes() {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map(p => {
+                  {pagedProducts.map(p => {
                     const mq = getMedianQuote(p.id);
                     const ms = getMedianSalesPrice(p.id);
                     const mine = getMyQuote(p);
@@ -343,6 +348,9 @@ export default function PartnerQuotes() {
                 </tbody>
               </table>
             </div>
+            {(products.length > 0) && (
+              <Pagination total={products.length} page={page} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} label="个商品" />
+            )}
             <div style={{ fontSize: 12, color: 'var(--pk-ink3)', marginTop: 10, lineHeight: 1.7 }}>
               中位数报价：去除品牌商报价外，其余合作商报价的平均数；中位数售价：所有客户售价的平均数。两项数据均来源于管理后台价格体系。我的报价优先级：单品单独价格 / 单独折扣 &gt; 品牌整体折扣 &gt; 市场价；<strong>已选择供货但未单独报价的商品，供货价按市场价计算</strong>。供货状态与管理后台「采购&仓储 → 采购报价」实时同步。
             </div>

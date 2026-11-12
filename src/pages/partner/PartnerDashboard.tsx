@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHead, Pill, ORDER_STATUS_TONE } from './PartnerUI';
 import { getPartnerAuth } from './PartnerLayout';
@@ -7,6 +7,8 @@ import { useOrderFlowStore, getPartnerFlowOrders } from '../../stores/orderFlowS
 import { useSupplierStore } from '../../stores/supplierStore';
 import { useScoreStore, getScoreSummary } from '../../stores/scoreStore';
 import { partnerOrders, partnerCustomers, partnerSettlements, PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
+import { useNoticeStore, getPublishedNotices } from '../../stores/noticeStore';
+import type { PartnerNotice } from '../../types';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -23,6 +25,12 @@ export default function PartnerDashboard() {
   const flowVersion = useOrderFlowStore((s) => s.orders);
   const compareWeight = useOrderFlowStore((s) => s.settings.compareWeights.score);
   const scoreEntries = useScoreStore((s) => s.entries);
+
+  const notices = useNoticeStore((s) => s.notices);
+  /** 已发布公告（置顶优先，再按发布时间倒序，工作台取前 5 条） */
+  const publishedNotices = useMemo(() => getPublishedNotices(notices), [notices]);
+  const topNotices = publishedNotices.slice(0, 5);
+  const [noticeDetail, setNoticeDetail] = useState<PartnerNotice | null>(null);
 
   const myId = auth?.supplierId ?? suppliers.find((s) => s.terminal.enabled && s.terminal.username === auth?.username)?.id;
   const myName = suppliers.find((s) => s.id === myId)?.name ?? auth?.name ?? '';
@@ -101,6 +109,38 @@ export default function PartnerDashboard() {
         ))}
       </div>
 
+      {/* 通知公告（管理后台「合作商 → 通知公告」发布，置顶优先） */}
+      <div className="pk-panel">
+        <div className="pk-panel-head">
+          <span className="pk-panel-title">通知公告</span>
+          <span style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>{publishedNotices.length} 条 · 来自平台发布</span>
+        </div>
+        <div className="pk-rows">
+          {topNotices.map(n => (
+            <div
+              key={n.id}
+              className="pk-row"
+              style={{ cursor: 'pointer' }}
+              onClick={() => setNoticeDetail(n)}
+              title="点击查看公告详情"
+            >
+              {n.pinned && <span style={{ fontSize: 11, fontWeight: 600, color: '#01795D', background: '#E6F2ED', borderRadius: 999, padding: '1px 7px', flexShrink: 0 }}>置顶</span>}
+              <span style={{
+                fontSize: 11, fontWeight: 600, borderRadius: 999, padding: '1px 7px', flexShrink: 0,
+                background: n.level === 'important' ? '#FDECEF' : '#F0F2F1',
+                color: n.level === 'important' ? '#CB405D' : 'var(--pk-ink3)',
+              }}>{n.level === 'important' ? '重要' : '普通'}</span>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--pk-ink)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</span>
+              <span className="cell-muted" style={{ fontSize: 12, flexShrink: 0 }}>{n.publishTime}</span>
+              <svg className="pk-row-arrow" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+          ))}
+          {topNotices.length === 0 && (
+            <div style={{ padding: '14px 0', fontSize: 13, color: 'var(--pk-ink3)', textAlign: 'center' }}>暂无公告</div>
+          )}
+        </div>
+      </div>
+
       <div className="pk-grid pk-grid-32">
         {/* 待办事项 */}
         <div className="pk-panel">
@@ -143,6 +183,30 @@ export default function PartnerDashboard() {
           </div>
         </div>
       </div>
+
+      {/* 公告详情弹窗 */}
+      {noticeDetail && (
+        <div className="category-dialog-overlay" onClick={() => setNoticeDetail(null)}>
+          <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 560, maxWidth: '94vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <h3 style={{ fontSize: 17, fontWeight: 600, marginBottom: 6 }}>
+              {noticeDetail.pinned && <span style={{ color: '#01795D', marginRight: 4 }}>[置顶]</span>}
+              {noticeDetail.title}
+            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, borderRadius: 999, padding: '1px 8px', background: noticeDetail.level === 'important' ? '#FDECEF' : '#F0F2F1', color: noticeDetail.level === 'important' ? '#CB405D' : 'var(--pk-ink3)' }}>
+                {noticeDetail.level === 'important' ? '重要' : '普通'}
+              </span>
+              <span className="cell-muted" style={{ fontSize: 12 }}>{noticeDetail.code} · {noticeDetail.publishTime} · {noticeDetail.publisher}</span>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', fontSize: 13.5, color: 'var(--pk-ink2)', lineHeight: 2, whiteSpace: 'pre-wrap', background: '#F7F9F8', borderRadius: 10, padding: 16 }}>
+              {noticeDetail.content}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+              <button className="pk-reg-cancel" style={{ height: 34, padding: '0 16px', fontSize: 13 }} onClick={() => setNoticeDetail(null)}>关闭</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 最新订单 */}
       <div className="pk-panel">

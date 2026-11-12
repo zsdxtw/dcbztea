@@ -1,4 +1,5 @@
-import { useState, useMemo, type ReactNode } from 'react';
+import { useState, useMemo, useEffect, type ReactNode } from 'react';
+import Pagination from '../../components/common/Pagination';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
@@ -83,6 +84,8 @@ const EMPTY_ADD_DRAFT: SupplierItem = {
 
 export default function PurchaseSuppliers() {
   const [activeType, setActiveType] = useState<SupplierType | 'all'>('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [keyword, setKeyword] = useState('');
   const [filterGrade, setFilterGrade] = useState('');
   const [deleteMode, setDeleteMode] = useState(false);
@@ -126,6 +129,9 @@ export default function PurchaseSuppliers() {
       return true;
     });
   }, [list, activeType, keyword, filterGrade]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pagedRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => { setPage(1); }, [keyword, filterGrade, activeType, pageSize]);
 
 
   // 删除
@@ -409,10 +415,11 @@ export default function PurchaseSuppliers() {
         <Table
           headers={[
             ...(deleteMode ? [<input key="chk" type="checkbox" checked={selectedForDelete.size === filtered.length && filtered.length > 0} onChange={e => { if (e.target.checked) setSelectedForDelete(new Set(filtered.map(s => s.id))); else setSelectedForDelete(new Set()); }} />] : []),
-            '编号', '合作商名称', '类型', '渠道来源', '评价等级', '主营品类', '联系人', '联系电话', '仓库', '门店', '一件代发', '状态', '操作',
+            '序号', '编号', '合作商名称', '类型', '渠道来源', '评价等级', '主营品类', '联系人', '联系电话', '仓库', '门店', '一件代发', '状态', '操作',
           ]}
-          rows={filtered.map(s => [
+          rows={pagedRows.map((s, idx) => [
             ...(deleteMode ? [<input key="chk" type="checkbox" checked={selectedForDelete.has(s.id)} onChange={() => handleToggleSelect(s.id)} />] : []),
+            <span key="idx" className="mono" style={{ color: 'var(--color-neutral-500)' }}>{(page - 1) * pageSize + idx + 1}</span>,
             <span key="code" className="cell-mono-emph">{s.code ?? '—'}</span>,
             <span key="name" className="cell-emph">{s.name}</span>,
             <span key="type" style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
@@ -435,6 +442,9 @@ export default function PurchaseSuppliers() {
             </div>,
           ])}
         />
+        {(filtered.length > 0) && (
+          <Pagination total={filtered.length} page={page} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} label="家合作商" />
+        )}
       </Card>
 
       {/* 删除确认 */}

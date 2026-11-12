@@ -772,10 +772,50 @@ export interface PlatformItem {
   bankAccounts: PlatformBankAccount[];
   invoiceInfos: PlatformInvoiceInfo[];
   status: 'active' | 'inactive';
+  /** 客户采买平台终端（开通后可登录采买平台选品下单） */
+  terminal?: CustomerTerminal;
   remark?: string;
 }
 
 /** 客户 */
+/** 客户入池配置（管理台维护，合作商终端「客户池」读取） */
+export interface CustomerPoolConfig {
+  /** 入池状态：true=入池（合作商按地区可见） */
+  enabled: boolean;
+  /** 全国（勾选后全部地区可见，优先于省市县） */
+  nationwide: boolean;
+  /** 全省范围（省份名） */
+  provinces: string[];
+  /** 全市范围（'省/市' 路径） */
+  cities: string[];
+  /** 区县范围（'省/市/县' 路径） */
+  districts: string[];
+  /** 合作规则（合作商与该客户合作的规则说明，展示于合作商终端客户池） */
+  coopRule?: {
+    /** 客户要求（品质、包装、售后等要求） */
+    requirements?: string;
+    /** 下单流程（订货方式、确认流程等） */
+    orderProcess?: string;
+    /** 结算规则（账期、开票、对账等） */
+    settlement?: string;
+  };
+}
+
+/** 入池范围匹配：入池开 + (全国 或 选中省/市/县 命中任一范围) 才对合作商展示 */
+export function matchPoolScope(
+  cfg: CustomerPoolConfig | undefined,
+  prov?: string,
+  city?: string,
+  district?: string,
+): boolean {
+  if (!cfg?.enabled) return false;
+  if (cfg.nationwide) return true;
+  if (prov && cfg.provinces.includes(prov)) return true;
+  if (prov && city && cfg.cities.includes(`${prov}/${city}`)) return true;
+  if (prov && city && district && cfg.districts.includes(`${prov}/${city}/${district}`)) return true;
+  return false;
+}
+
 export interface CustomerItem {
   id: string;
   name: string;
@@ -972,6 +1012,36 @@ export interface SupplierApproval {
 }
 
 /* ─────────────────────────── 新品提醒 / 合作商报价 ─────────────────────────── */
+
+/* ─────────────────────────── 合作商通知公告 ─────────────────────────── */
+
+/** 公告级别：normal=普通 / important=重要 */
+export type NoticeLevel = 'normal' | 'important';
+/** 公告状态：draft=草稿 / published=已发布 / withdrawn=已撤回 */
+export type NoticeStatus = 'draft' | 'published' | 'withdrawn';
+
+/** 合作商通知公告（管理后台发布，合作商工作台展示） */
+export interface PartnerNotice {
+  id: string;
+  /** 公告编号（TZGG-0001 顺序号） */
+  code: string;
+  /** 公告标题 */
+  title: string;
+  /** 公告正文（多行文本） */
+  content: string;
+  /** 级别：普通 / 重要 */
+  level: NoticeLevel;
+  /** 是否置顶（仅已发布可置顶，工作台置顶优先展示） */
+  pinned: boolean;
+  /** 状态：草稿 / 已发布 / 已撤回 */
+  status: NoticeStatus;
+  /** 发布时间（首次发布时固化） */
+  publishTime?: string;
+  /** 发布人（管理后台操作员） */
+  publisher: string;
+  /** 创建时间 */
+  createTime: string;
+}
 
 /** 新品提醒处理状态：pending=待处理 / listed=已上架 / dismissed=已忽略 */
 export type NewArrivalStatus = 'pending' | 'listed' | 'dismissed';
@@ -1292,7 +1362,7 @@ export type PartnerDeliveryMode = 'direct' | 'warehouse';
 export type PartnerCoopMode = 'supplier' | 'service';
 
 /** 合作商订单状态 */
-export type PartnerOrderStatus = 'pending' | 'accepted' | 'shipping' | 'delivered' | 'settled' | 'rejected';
+export type PartnerOrderStatus = 'pending' | 'accepted' | 'shipping' | 'transit' | 'delivered' | 'settled' | 'rejected';
 
 /** 合作商订单 */
 export interface PartnerOrder {
@@ -1319,6 +1389,16 @@ export interface PartnerOrder {
   sourceReport?: string;
   /** 报备转入类型：order-self=自营订单报备 / order-opportunity=商机订单报备（平台履约）/ product=商品报备 / customer=客户报备 / assign=指定分发 / compare=比单中单 */
   transferKind?: 'order-self' | 'order-opportunity' | 'product' | 'customer' | 'assign' | 'compare';
+  /** 比单订单：我是否已报名（待接单展示「待接单-比单中」） */
+  compareSigned?: boolean;
+  /** 比单报名截止时间戳（毫秒，仅进行中比单） */
+  compareDeadline?: number;
+  /** 比单底价说明 */
+  compareFloorNote?: string;
+  /** 比单当前报名家数 */
+  compareQuoteCount?: number;
+  /** 比单我的报价（已报名时） */
+  compareMyQuote?: number;
 }
 
 /** 合作商报备类型：order=订单报备 / product=商品报备 / customer=客户报备 */

@@ -30,7 +30,7 @@ export function Pill({ tone = 'gray', children }: { tone?: PillTone; children: R
 
 /* ── 状态 → 色调映射 ── */
 export const ORDER_STATUS_TONE: Record<string, PillTone> = {
-  pending: 'amber', accepted: 'blue', shipping: 'purple',
+  pending: 'amber', accepted: 'blue', shipping: 'purple', transit: 'green',
   delivered: 'green', settled: 'gray', rejected: 'red',
 };
 export const REPORT_STATUS_TONE: Record<string, PillTone> = {
