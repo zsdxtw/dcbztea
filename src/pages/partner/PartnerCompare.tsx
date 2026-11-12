@@ -12,8 +12,8 @@ import './partner.css';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
-/** 合作商终端 · 抢单大厅：抢单（时间优先）/ 比单报价 / 客户拜访打卡 */
-export default function PartnerGrab() {
+/** 合作商终端 · 比单大厅：比单报价 / 客户拜访打卡 */
+export default function PartnerCompare() {
   const auth = getPartnerAuth();
   const orders = useOrderFlowStore((s) => s.orders);
   const store = useOrderFlowStore;
@@ -21,15 +21,14 @@ export default function PartnerGrab() {
   const scoreEntries = useScoreStore((s) => s.entries);
   const addScoreEntry = useScoreStore((s) => s.addEntry);
 
-  const [tab, setTab] = useState<'grab' | 'compare' | 'visit'>('grab');
+  const [tab, setTab] = useState<'compare' | 'visit'>('compare');
   const [tick, setTick] = useState(Date.now());
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   /** 比单报价表单 */
   const [quoteOf, setQuoteOf] = useState<string | null>(null);
   const [quoteAmount, setQuoteAmount] = useState('');
-  /** 按商品抢单/比单报名：各订单勾选的商品（缺省=全部可选商品） */
-  const [grabSel, setGrabSel] = useState<Record<string, string[]>>({});
+  /** 比单报名：各订单勾选的商品（缺省=全部商品） */
   const [quoteSel, setQuoteSel] = useState<Record<string, string[]>>({});
 
   /** 拜访表单 */
@@ -41,23 +40,14 @@ export default function PartnerGrab() {
     const t = setInterval(() => setTick(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
-  useEffect(() => {
-    store.getState().expireGrabs();
-  }, [store]);
-
   const partner = auth?.supplierId
     ? suppliers.find((s) => s.id === auth.supplierId)
     : undefined;
   const myId = partner?.id ?? '';
   const myName = partner?.name ?? '';
 
-  /** 地区范围命中：抢单/比单可限定省市县，范围外合作商不可见 */
-  const inMyRegion = (o: ExternalOrder) => partnerInRegion(partner, o.grabRegion ?? o.compare?.region as RegionScope | undefined);
-
-  const grabbing = useMemo(
-    () => orders.filter((o) => o.processStatus === 'grabbing' && inMyRegion(o)),
-    [orders, partner],
-  );
+  /** 地区范围命中：比单可限定省市县，范围外合作商不可见 */
+  const inMyRegion = (o: ExternalOrder) => partnerInRegion(partner, o.compare?.region as RegionScope | undefined);
 
   /** 比单：公开报名制，地区范围内的进行中比单均可报名 */
   const myCompares = useMemo(
@@ -70,11 +60,6 @@ export default function PartnerGrab() {
     const text = scope ? [scope.province, scope.city, scope.district].filter(Boolean).join(' ') : '';
     return text ? `限 ${text} 地区合作商` : '';
   };
-
-  const myGrabs = useMemo(
-    () => orders.filter((o) => o.grabRecords?.some((g) => g.supplierId === myId) || (o.partnerId === myId && o.transferSource === 'grab')),
-    [orders, myId],
-  );
 
   const myVisits = useMemo(
     () => scoreEntries.filter((e) => e.supplierId === myId && e.dimension === 'visit'),
@@ -92,11 +77,6 @@ export default function PartnerGrab() {
     const m = Math.floor(remain / 60000);
     const s = Math.floor((remain % 60000) / 1000);
     return `${m} 分 ${String(s).padStart(2, '0')} 秒`;
-  };
-
-  const doGrab = (orderId: string, itemNames: string[]) => {
-    const res = store.getState().tryGrab(orderId, myId, myName, itemNames);
-    flash(res.ok, res.msg);
   };
 
   const submitMyQuote = () => {
@@ -139,7 +119,7 @@ export default function PartnerGrab() {
   if (!auth || !partner) {
     return (
       <div className="pk-page">
-        <PageHead eyebrow="合作商终端" title="抢单大厅" desc="请先登录合作商终端后使用抢单大厅。" />
+        <PageHead eyebrow="合作商终端" title="比单大厅" desc="请先登录合作商终端后使用比单大厅。" />
       </div>
     );
   }
@@ -148,8 +128,8 @@ export default function PartnerGrab() {
     <div className="pk-page">
       <PageHead
         eyebrow="合作商终端 · 商机"
-        title="抢单大厅"
-        desc="平台外部订单分发中心：抢单按商品先到先得，已被抢商品不再展示；比单按商品报名、按积分排名定标；拜访客户可累积积分，积分影响比单排名。"
+        title="比单大厅"
+        desc="平台外部订单分发中心：比单按商品报名、按积分排名定标；拜访客户可累积积分，积分影响比单排名。"
       />
 
       {msg && (
@@ -160,10 +140,6 @@ export default function PartnerGrab() {
 
       {/* Tab */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        <button className={`tab-card-simple${tab === 'grab' ? ' active' : ''}`} onClick={() => setTab('grab')}>
-          可抢订单
-          <span className="tab-card-simple-count">{grabbing.length} 单</span>
-        </button>
         <button className={`tab-card-simple${tab === 'compare' ? ' active' : ''}`} onClick={() => setTab('compare')}>
           比单报价
           <span className="tab-card-simple-count">{myCompares.length} 单</span>
@@ -173,83 +149,6 @@ export default function PartnerGrab() {
           <span className="tab-card-simple-count">+2 分 / 次</span>
         </button>
       </div>
-
-      {/* ── 抢单 ── */}
-      {tab === 'grab' && (
-        <>
-          {grabbing.length === 0 && (
-            <div style={{ padding: '40px 20px', textAlign: 'center', color: '#9E9E9E', fontSize: 13, background: '#fff', borderRadius: 12 }}>
-              当前没有可抢订单。平台发布抢单后会第一时间出现在这里。
-            </div>
-          )}
-          {grabbing.map((o) => {
-            const remain = (o.grabDeadline ?? 0) - tick;
-            const takenNames = new Set((o.grabRecords ?? []).flatMap((g) => g.items ?? []));
-            const avail = o.items.filter((it) => !takenNames.has(it.productName));
-            const sel = (grabSel[o.id] ?? avail.map((it) => it.productName)).filter((n) => avail.some((it) => it.productName === n));
-            const grabbedCount = o.items.length - avail.length;
-            const done = avail.length === 0;
-            return (
-              <div key={o.id} style={{ background: '#fff', borderRadius: 14, padding: 18, marginBottom: 14, border: '1px solid rgba(1,121,93,0.10)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-                  <div style={{ flex: 1, minWidth: 260 }}>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span className="mono" style={{ fontWeight: 700, fontSize: 14 }}>{o.code}</span>
-                      <Pill tone="amber">{platformLabelOf(o)}</Pill>
-                      <Pill tone={done ? 'gray' : 'green'}>{done ? '已抢完' : '抢单中'}</Pill>
-                      {grabbedCount > 0 && <Pill tone="gray">已有 {grabbedCount} 种商品被抢</Pill>}
-                    </div>
-                    <div style={{ fontSize: 13, color: '#6f6f6f', marginTop: 6, lineHeight: 1.8 }}>
-                      客户：{o.customerName}（{o.customerRegion}）<br />
-                      收货：{o.receiverAddress}
-                      {scopeNote(o.grabRegion) && <><br /><span style={{ color: '#00838F' }}>参与范围：{scopeNote(o.grabRegion)}</span></>}
-                    </div>
-                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {avail.length === 0
-                        ? <span style={{ fontSize: 13, color: '#99A29D' }}>商品已全部被抢，订单将按合作商分拆转出。</span>
-                        : avail.map((it) => (
-                          <label key={it.productName} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#1E2622', cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={sel.includes(it.productName)}
-                              onChange={() => setGrabSel((prev) => ({ ...prev, [o.id]: sel.includes(it.productName) ? sel.filter((n) => n !== it.productName) : [...sel, it.productName] }))}
-                            />
-                            {it.productName}（{it.spec}）× {it.quantity} · <span className="mono">{money(it.price * it.quantity)}</span>
-                          </label>
-                        ))}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 20, color: '#01795D' }}>{money(o.totalAmount)}</div>
-                    <div className="mono" style={{ fontSize: 13, color: remain > 0 ? '#E65100' : '#C62828', fontWeight: 600, margin: '4px 0 10px' }}>
-                      {countdown(o.grabDeadline ?? 0)}
-                    </div>
-                    <Button size="sm" disabled={done || remain <= 0 || sel.length === 0} onClick={() => doGrab(o.id, sel)}>
-                      {done ? '已抢完' : sel.length === 0 ? '请选择商品' : `立即抢单（${sel.length} 种）`}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {myGrabs.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 14 }}>我抢到的订单</div>
-              <Table
-                headers={['订单编号', '客户', '金额', '抢单时间', '当前状态']}
-                rows={myGrabs.map((o) => [
-                  <span key="c" className="mono" style={{ fontWeight: 600 }}>{o.code}</span>,
-                  <span key="cu">{o.customerName}</span>,
-                  <span key="a" className="mono">{money(o.totalAmount)}</span>,
-                  <span key="t" className="mono">{o.grabRecords?.find((g) => g.supplierId === myId)?.grabTime ?? o.transferTime}</span>,
-                  <span key="s">{o.partnerStatus === 'pending' ? '待接单' : o.partnerStatus === 'accepted' ? '已接单' : o.partnerStatus === 'shipping' ? '发货中' : o.partnerStatus === 'delivered' ? '已签收' : '已结算'}</span>,
-                ])}
-              />
-            </div>
-          )}
-        </>
-      )}
 
       {/* ── 比单报价 ── */}
       {tab === 'compare' && (

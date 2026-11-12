@@ -29,7 +29,6 @@ const FLOW_BRIEF: { key: string; label: string }[] = [
   { key: 'report_match_pending', label: '报备-匹配待确认' },
   { key: 'self_pending', label: '自营待接单' },
   { key: 'self_doing', label: '自营执行中' },
-  { key: 'grabbing', label: '抢单中' },
   { key: 'comparing', label: '比单中' },
   { key: 'distribute_pending', label: '转派待接单' },
   { key: 'handled', label: '分发-已完成' },
@@ -46,11 +45,10 @@ const statusPill = (status: string, label?: string) => {
   );
 };
 
-/** 路径标签（与销售单分发页口径一致：自营 / 转派-报备·指定·抢单·比单） */
+/** 路径标签（与销售单分发页口径一致：自营 / 转派-报备·指定·比单） */
 const pathLabel = (o: ExternalOrder): string => {
   if (o.path === 'self') return '自营';
   if (o.transferSource) return TRANSFER_SOURCE_LABELS[o.transferSource];
-  if (o.distributeMode === 'grab') return '转派-抢单';
   if (o.distributeMode === 'compare') return '转派-比单';
   return '—';
 };
@@ -129,7 +127,7 @@ export default function SalesOverview() {
   /* ── 待办事项：由销售单分发状态实时派生 ── */
   const todoItems = [
     (statusCount.pending ?? 0) > 0 && {
-      text: `${statusCount.pending} 单外部订单待分流（自营 / 指定 · 抢单 · 比单）`, tag: '待处理', color: EXTERNAL_STATUS_COLORS.pending, to: '/sales/order-distribute',
+      text: `${statusCount.pending} 单外部订单待分流（自营 / 指定 · 比单）`, tag: '待处理', color: EXTERNAL_STATUS_COLORS.pending, to: '/sales/order-distribute',
     },
     (statusCount.report_match_pending ?? 0) > 0 && {
       text: `${statusCount.report_match_pending} 单命中报备待确认匹配（确认后分发报备合作商）`, tag: '报备', color: EXTERNAL_STATUS_COLORS.report_match_pending, to: '/sales/order-distribute',
@@ -142,9 +140,6 @@ export default function SalesOverview() {
     },
     (statusCount.comparing ?? 0) > 0 && {
       text: `${statusCount.comparing} 单比单报名中 · 已报名 ${compareQuotes} 家`, tag: '比单', color: EXTERNAL_STATUS_COLORS.comparing, to: '/sales/order-distribute',
-    },
-    (statusCount.grabbing ?? 0) > 0 && {
-      text: `${statusCount.grabbing} 单抢单进行中（合作商大厅先到先得）`, tag: '抢单', color: EXTERNAL_STATUS_COLORS.grabbing, to: '/sales/order-distribute',
     },
     (statusCount.distribute_pending ?? 0) > 0 && {
       text: `${statusCount.distribute_pending} 单已分发待合作商接单`, tag: '分发', color: EXTERNAL_STATUS_COLORS.distribute_pending, to: '/sales/order-distribute',

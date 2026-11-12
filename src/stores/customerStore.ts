@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CartItem, CustomerAccount, CustomerOrder, CustomerOrderStatus } from '../types';
+import type { CartItem, CustomerAccount, CustomerOrder, CustomerOrderStatus, CustomerPoolConfig } from '../types';
 import { customerAccounts, customerOrders } from '../data/customer';
 
 /* ── 共享客户终端 Store（管理台开通账号/推进订单 ↔ 客户终端登录/下单，同一运行时互通） ── */
@@ -24,6 +24,12 @@ interface CustomerState {
   setAccountStatus: (id: string, status: 'active' | 'disabled') => void;
   /** 管理台重置密码 */
   resetPassword: (id: string, newPassword: string) => void;
+
+  /* ── 客户入池（管理台「客户列表-入池范围」维护 ↔ 合作商终端「客户池」展示，同一运行时互通） ── */
+  /** 入池配置（键=客户 ID） */
+  poolConfigs: Record<string, CustomerPoolConfig>;
+  /** 管理台设置某客户入池配置（即时生效） */
+  setPoolConfig: (customerId: string, cfg: CustomerPoolConfig) => void;
 
   /* ── 购物车 ── */
   addToCart: (item: CartItem) => void;
@@ -69,9 +75,27 @@ const genOrderCode = (orders: CustomerOrder[]): string => {
   return `KHD${dateKey}${String(seq).padStart(3, '0')}`;
 };
 
+/** 入池演示种子：华茗堂(北京全省)、浦发银行(全国)、品茗轩(广州市) */
+const seedPoolConfigs: Record<string, CustomerPoolConfig> = {
+  c1: {
+    enabled: true, nationwide: false, provinces: ['北京'], cities: [], districts: [],
+    coopRule: {
+      requirements: '客户为连锁茶庄，要求供货商品提供当季检测报告；礼盒类需带品牌礼袋；拒收破损包装，破损包退换。',
+      orderProcess: '每周三前汇总需求向平台下单，订单经客户采购部邮件确认后生效；紧急补货可电话下单后补单。',
+      settlement: '月结 30 天，次月 10 日前对账开票（增值税专用发票），月底前付款；超期按合同约定计滞纳金。',
+    },
+  },
+  c6: { enabled: true, nationwide: true, provinces: [], cities: [], districts: [] },
+  c3: { enabled: true, nationwide: false, provinces: [], cities: ['广东/广州市'], districts: [] },
+};
+
 export const useCustomerStore = create<CustomerState>((set, get) => ({
   accounts: customerAccounts,
   orders: customerOrders,
+  poolConfigs: seedPoolConfigs,
+  setPoolConfig: (customerId, cfg) => set({
+    poolConfigs: { ...get().poolConfigs, [customerId]: cfg },
+  }),
   cart: [],
 
   /* ── 登录 / 账号 ── */

@@ -12,6 +12,7 @@ export const platformItems: PlatformItem[] = [
     province: '北京', city: '北京市', district: '大兴区',
     cooperationDate: '2022-05-10', developerId: 'emp-7', developerType: 'employee', developerName: '李娜',
     deposit: 50000, depositDueDate: '2025-09-10',
+    terminal: { enabled: true, username: 'jdhc001', password: '123456', status: 'active', openTime: '2026-09-01' },
     bankAccounts: [
       { accountName: '北京京东世纪贸易有限公司', accountNo: '1100 **** ****', bankName: '中国工商银行北京亦庄支行', bankNo: '102100000XXX' },
     ],

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHead, Pill, ORDER_STATUS_TONE } from './PartnerUI';
 import { getPartnerAuth } from './PartnerLayout';
@@ -7,6 +7,8 @@ import { useOrderFlowStore, getPartnerFlowOrders } from '../../stores/orderFlowS
 import { useSupplierStore } from '../../stores/supplierStore';
 import { useScoreStore, getScoreSummary } from '../../stores/scoreStore';
 import { partnerOrders, partnerCustomers, partnerSettlements, PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
+import { useNoticeStore, getPublishedNotices } from '../../stores/noticeStore';
+import type { PartnerNotice } from '../../types';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -18,11 +20,17 @@ export default function PartnerDashboard() {
   /** 报备审批通过后自动转入的订单 */
   const transferred = getTransferredOrders(reports);
 
-  /** 订单处理流转中心：我的流转订单 + 商机大厅（抢单/比单） */
+  /** 订单处理流转中心：我的流转订单 + 商机大厅（比单） */
   const suppliers = useSupplierStore((s) => s.suppliers);
   const flowVersion = useOrderFlowStore((s) => s.orders);
   const compareWeight = useOrderFlowStore((s) => s.settings.compareWeights.score);
   const scoreEntries = useScoreStore((s) => s.entries);
+
+  const notices = useNoticeStore((s) => s.notices);
+  /** 已发布公告（置顶优先，再按发布时间倒序，工作台取前 5 条） */
+  const publishedNotices = useMemo(() => getPublishedNotices(notices), [notices]);
+  const topNotices = publishedNotices.slice(0, 5);
+  const [noticeDetail, setNoticeDetail] = useState<PartnerNotice | null>(null);
 
   const myId = auth?.supplierId ?? suppliers.find((s) => s.terminal.enabled && s.terminal.username === auth?.username)?.id;
   const myName = suppliers.find((s) => s.id === myId)?.name ?? auth?.name ?? '';
@@ -30,8 +38,7 @@ export default function PartnerDashboard() {
     () => (myId ? getPartnerFlowOrders(myId) : []),
     [flowVersion, myId],
   );
-  /** 商机大厅：全部进行中的抢单与比单（公开报名制，所有人可参与） */
-  const hallGrabbing = useMemo(() => flowVersion.filter((o) => o.processStatus === 'grabbing'), [flowVersion]);
+  /** 商机大厅：全部进行中的比单（公开报名制，所有人可参与） */
   const hallComparing = useMemo(() => flowVersion.filter((o) => o.processStatus === 'comparing'), [flowVersion]);
   const myScore = getScoreSummary(scoreEntries, myId ?? '', myName);
 
@@ -43,7 +50,7 @@ export default function PartnerDashboard() {
   const shippingCount = flowDoing
     + transferred.filter(o => o.status === 'accepted' || o.status === 'shipping').length
     + partnerOrders.filter(o => o.status === 'accepted' || o.status === 'shipping').length;
-  const hallCount = hallGrabbing.length + hallComparing.length;
+  const hallCount = hallComparing.length;
   const unsettled = partnerSettlements.find(s => s.status === 'unsettled');
   const waitSettleAmount = (unsettled?.settleAmount ?? 0) + flowDelivered.reduce((sum, o) => sum + o.totalAmount, 0);
   const waitSettleCount = (unsettled?.orderCount ?? 0) + flowDelivered.length;
@@ -56,7 +63,7 @@ export default function PartnerDashboard() {
   const stats = [
     { label: '待接单', value: String(pendingCount), unit: '单', sub: '需尽快确认接单', accent: false },
     { label: '履约中', value: String(shippingCount), unit: '单', sub: '接单 / 发货进行中', accent: false },
-    { label: '商机大厅', value: String(hallCount), unit: '单', sub: `可抢 ${hallGrabbing.length} · 比单 ${hallComparing.length}`, accent: false },
+    { label: '商机大厅', value: String(hallCount), unit: '单', sub: `比单 ${hallComparing.length}`, accent: false },
     { label: '我的积分', value: String(myScore.total), unit: '分', sub: `比单评分权重 ${compareWeight}0%`, accent: false },
     { label: '本月待结算', value: waitSettleAmount.toLocaleString(), unit: '元', sub: `${waitSettleCount} 笔订单待结算`, accent: true },
     { label: '合作客户', value: String(customerCount), unit: '家', sub: '本地营销进行中', accent: false },
@@ -65,13 +72,12 @@ export default function PartnerDashboard() {
   const todos = [
     { label: '待接单订单', count: pendingCount, path: '/partner/orders', desc: '请尽快确认接单并安排发货' },
     { label: '履约中订单', count: shippingCount, path: '/partner/orders', desc: '跟进物流并确认客户签收' },
-    { label: '可抢订单', count: hallGrabbing.length, path: '/partner/grab', desc: '抢单大厅 · 先到先得' },
-    { label: '比单报名中', count: hallComparing.length, path: '/partner/grab', desc: '按「报价 + 积分」综合评分定标' },
+    { label: '比单报名中', count: hallComparing.length, path: '/partner/compare', desc: '按「报价 + 积分」综合评分定标' },
     { label: '审核中报备', count: reportPending, path: '/partner/reports', desc: '报备审核中，请留意审核结果' },
   ];
 
   const shortcuts = [
-    { label: '抢单大厅', path: '/partner/grab', desc: '抢单 / 比单报价 / 客户拜访' },
+    { label: '比单大厅', path: '/partner/compare', desc: '比单报价 / 客户拜访' },
     { label: '订单管理', path: '/partner/orders', desc: '处理平台分发的订单' },
     { label: '新增报备', path: '/partner/reports', desc: '报备订单 / 商品 / 客户' },
     { label: '合作客户', path: '/partner/customers', desc: '查看客户与可下单商品' },
@@ -101,6 +107,38 @@ export default function PartnerDashboard() {
             <div className="pk-stat-sub">{s.sub}</div>
           </div>
         ))}
+      </div>
+
+      {/* 通知公告（管理后台「合作商 → 通知公告」发布，置顶优先） */}
+      <div className="pk-panel">
+        <div className="pk-panel-head">
+          <span className="pk-panel-title">通知公告</span>
+          <span style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>{publishedNotices.length} 条 · 来自平台发布</span>
+        </div>
+        <div className="pk-rows">
+          {topNotices.map(n => (
+            <div
+              key={n.id}
+              className="pk-row"
+              style={{ cursor: 'pointer' }}
+              onClick={() => setNoticeDetail(n)}
+              title="点击查看公告详情"
+            >
+              {n.pinned && <span style={{ fontSize: 11, fontWeight: 600, color: '#01795D', background: '#E6F2ED', borderRadius: 999, padding: '1px 7px', flexShrink: 0 }}>置顶</span>}
+              <span style={{
+                fontSize: 11, fontWeight: 600, borderRadius: 999, padding: '1px 7px', flexShrink: 0,
+                background: n.level === 'important' ? '#FDECEF' : '#F0F2F1',
+                color: n.level === 'important' ? '#CB405D' : 'var(--pk-ink3)',
+              }}>{n.level === 'important' ? '重要' : '普通'}</span>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--pk-ink)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</span>
+              <span className="cell-muted" style={{ fontSize: 12, flexShrink: 0 }}>{n.publishTime}</span>
+              <svg className="pk-row-arrow" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+          ))}
+          {topNotices.length === 0 && (
+            <div style={{ padding: '14px 0', fontSize: 13, color: 'var(--pk-ink3)', textAlign: 'center' }}>暂无公告</div>
+          )}
+        </div>
       </div>
 
       <div className="pk-grid pk-grid-32">
@@ -145,6 +183,30 @@ export default function PartnerDashboard() {
           </div>
         </div>
       </div>
+
+      {/* 公告详情弹窗 */}
+      {noticeDetail && (
+        <div className="category-dialog-overlay" onClick={() => setNoticeDetail(null)}>
+          <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 560, maxWidth: '94vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <h3 style={{ fontSize: 17, fontWeight: 600, marginBottom: 6 }}>
+              {noticeDetail.pinned && <span style={{ color: '#01795D', marginRight: 4 }}>[置顶]</span>}
+              {noticeDetail.title}
+            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, borderRadius: 999, padding: '1px 8px', background: noticeDetail.level === 'important' ? '#FDECEF' : '#F0F2F1', color: noticeDetail.level === 'important' ? '#CB405D' : 'var(--pk-ink3)' }}>
+                {noticeDetail.level === 'important' ? '重要' : '普通'}
+              </span>
+              <span className="cell-muted" style={{ fontSize: 12 }}>{noticeDetail.code} · {noticeDetail.publishTime} · {noticeDetail.publisher}</span>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', fontSize: 13.5, color: 'var(--pk-ink2)', lineHeight: 2, whiteSpace: 'pre-wrap', background: '#F7F9F8', borderRadius: 10, padding: 16 }}>
+              {noticeDetail.content}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+              <button className="pk-reg-cancel" style={{ height: 34, padding: '0 16px', fontSize: 13 }} onClick={() => setNoticeDetail(null)}>关闭</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 最新订单 */}
       <div className="pk-panel">

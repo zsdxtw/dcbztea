@@ -54,7 +54,7 @@ const baseSeeds: ExternalOrder[] = [
     ],
   },
 
-  /* ── 抢单中（演示：发布后 25 分钟内可抢） ── */
+  /* ── 转派待接单（指定转派：直播渠道大单指定合作商履约） ── */
   {
     id: 'eo5', code: 'DXS202610250005', platform: 'pdd', externalOrderNo: 'PDD-2093184-1',
     customerName: '茗香阁直播', customerType: '带货客户', customerRegion: '广东广州',
@@ -63,13 +63,13 @@ const baseSeeds: ExternalOrder[] = [
     receiver: '茗香阁仓储', receiverPhone: '137****0912', receiverAddress: '广东广州市白云区黄石东路288号',
     remark: '直播间爆单，今晚 8 点前须发出',
     entryTime: '2026-10-25', operator: '运营小周', sourceChannel: 'manual',
-    processStatus: 'grabbing',
-    path: 'distribute', distributeMode: 'grab',
-    grabDeadline: minutesLater(25),
-    grabRecords: [],
+    processStatus: 'distribute_pending',
+    path: 'distribute', distributeMode: 'assign',
+    partnerId: '3', partnerName: '八马茶业股份有限公司',
+    transferSource: 'assign', transferTime: '2026-10-25',
     history: [
       { time: '2026-10-25', action: '手工录入订单', detail: '拼多多平台' },
-      { time: '2026-10-25', action: '发布抢单', detail: '已推送合作商抢单大厅 · 时间优先' },
+      { time: '2026-10-25', action: '指定转派', detail: '指定八马茶业股份有限公司 → 等待合作商接单' },
     ],
   },
 
@@ -256,7 +256,7 @@ const baseSeeds: ExternalOrder[] = [
 
 /* ═══════════════════════════════════════════════════════════════
  * 演示数据生成器：48 条随机状态订单（确定性索引驱动，覆盖状态机全貌）
- * 含拆单家族（母/子订单、抢单未成/比单未成标签）、按商品抢单/比单中间态
+ * 含拆单家族（母/子订单、比单未成标签）、按商品比单中间态
  * ═══════════════════════════════════════════════════════════════ */
 
 /** 客户池：名称 / 类型 / 省 / 市(简称) / 市(全称) / 区 / 街道 */
@@ -431,24 +431,20 @@ function buildDemoOrders(): ExternalOrder[] {
     }));
   }
 
-  /* ── 抢单中 ×4（其中 2 笔已有按商品部分抢记录） ── */
+  /* ── 转派待接单 ×4（报备/指定来源循环） ── */
   for (let i = 0; i < 4; i++) {
     const s = next();
-    const items = pickItems(s);
-    const partial = i < 2;
-    const grabber = DEMO_PARTNERS[(i + 1) % DEMO_PARTNERS.length];
+    const p = DEMO_PARTNERS[(i + 1) % DEMO_PARTNERS.length];
+    const src = i % 2 === 0 ? 'report' : 'assign';
     orders.push(buildOne(s, {
-      items,
-      processStatus: 'grabbing',
-      history: [
-        { time: D(s), action: '发布抢单', detail: `已推送合作商抢单大厅 · 30 分钟内先到先得${i === 3 ? ' · 限 江苏 地区合作商' : ''}` },
-        ...(partial ? [{ time: D(s), action: '合作商按商品抢单', detail: `${grabber.name} 抢到 ${items[0].productName}` }] : []),
-      ],
+      items: pickItems(s),
+      processStatus: 'distribute_pending',
+      history: [{ time: D(s), action: src === 'report' ? '报备匹配确认转出' : '指定转派', detail: `→ ${p.name} · 等待合作商接单` }],
       extra: {
-        path: 'distribute', distributeMode: 'grab',
-        grabDeadline: minutesLater(8 + i * 6),
-        grabRecords: partial ? [{ supplierId: grabber.id, supplierName: grabber.name, grabTime: '09:20', ts: Date.now() - 600000, items: [items[0].productName] }] : [],
-        ...(i === 3 ? { grabRegion: { province: '江苏' } } : {}),
+        path: 'distribute', distributeMode: 'assign',
+        partnerId: p.id, partnerName: p.name,
+        transferSource: src, transferTime: D(s),
+        ...(src === 'report' ? { reportMatches: [{ reportCode: 'BB20260901006', reportType: 'product', partnerId: p.id, partnerName: p.name }] } : {}),
       },
     }));
   }
@@ -483,15 +479,15 @@ function buildDemoOrders(): ExternalOrder[] {
   }
 
   /* ── 转派待接单 ×8（来源循环；含比单分拆家族 C：-1 积分中单子单 + -2 比单未成） ── */
-  const sources = ['report', 'assign', 'grab', 'compare'] as const;
+  const sources = ['report', 'assign', 'compare'] as const;
   for (let i = 0; i < 8; i++) {
     const s = next();
     const p = DEMO_PARTNERS[i % DEMO_PARTNERS.length];
-    const src = sources[i % 4];
+    const src = sources[i % sources.length];
     orders.push(buildOne(s, {
       items: pickItems(s),
       processStatus: 'distribute_pending',
-      history: [{ time: D(s), action: { report: '报备匹配确认转出', assign: '指定转派', grab: '抢单转派（按商品）', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name} · 等待合作商接单` }],
+      history: [{ time: D(s), action: { report: '报备匹配确认转出', assign: '指定转派', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name} · 等待合作商接单` }],
       extra: {
         path: 'distribute', distributeMode: 'assign',
         partnerId: p.id, partnerName: p.name,
@@ -527,13 +523,13 @@ function buildDemoOrders(): ExternalOrder[] {
     ],
   });
 
-  // 抢单未成孤儿子单（挂于不存在的母编号，演示「抢单未成」标签）：取分发-待处理组第 5 笔改造
+  // 比单未成孤儿子单（挂于不存在的母编号，演示「比单未成」标签）：取分发-待处理组第 5 笔改造
   const orphan = orders[7];
   const orphanMother = orphan.code.replace(/9\d$/, '60');
   orphan.parentCode = orphanMother;
   orphan.code = `${orphanMother}LY01`;
-  orphan.sourceTag = 'grab_failed';
-  orphan.history = [{ time: D(9), action: '拆单生成子订单', detail: '抢单分拆定案' }, { time: D(9), action: '抢单未成退回', detail: '未被抢购商品形成子订单，重新进入分发-待处理' }];
+  orphan.sourceTag = 'compare_failed';
+  orphan.history = [{ time: D(9), action: '拆单生成子订单', detail: '比单定标分拆' }, { time: D(9), action: '比单未成退回', detail: '无报名商品形成子订单，重新进入分发-待处理' }];
   // 孤儿家族的母销售单容器
   orders.push({
     ...orphan, id: 'eo_orphan_mother', code: orphanMother, parentCode: undefined,
@@ -542,8 +538,8 @@ function buildDemoOrders(): ExternalOrder[] {
     processStatus: 'completed',
     history: [
       { time: D(9), action: '手工录入订单', detail: '母销售单' },
-      { time: D(9), action: '发布抢单', detail: '按商品先到先得' },
-      { time: D(9), action: '整单分拆定案完成', detail: '未被抢购商品形成子履约单退回，母销售单保持不变' },
+      { time: D(9), action: '发起比单', detail: '公开报名 · 按商品积分排名定标' },
+      { time: D(9), action: '整单分拆定案完成', detail: '无报名商品形成子履约单退回，母销售单保持不变' },
     ],
   });
 
@@ -609,13 +605,13 @@ function buildDemoOrders(): ExternalOrder[] {
   for (let i = 0; i < 6; i++) {
     const s = next();
     const p = DEMO_PARTNERS[(i + 5) % DEMO_PARTNERS.length];
-    const src = sources[i % 4];
+    const src = sources[i % sources.length];
     const ps = psList[i];
     orders.push(buildOne(s, {
       items: pickItems(s),
       processStatus: 'processed',
       history: [
-        { time: D(s), action: { report: '报备匹配确认转出', assign: '指定转派', grab: '抢单转派（按商品）', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name}` },
+        { time: D(s), action: { report: '报备匹配确认转出', assign: '指定转派', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name}` },
         { time: D(s), action: psLabel[ps], detail: ps === 'accepted' ? '合作商终端接单 → 分发-已完成' : undefined },
       ],
       extra: {
@@ -631,13 +627,13 @@ function buildDemoOrders(): ExternalOrder[] {
   for (let i = 0; i < 6; i++) {
     const s = next();
     const p = DEMO_PARTNERS[(i + 2) % DEMO_PARTNERS.length];
-    const src = sources[i % 4];
+    const src = sources[i % sources.length];
     const onTime = i % 3 !== 0;
     orders.push(buildOne(s, {
       items: pickItems(s),
       processStatus: 'completed',
       history: [
-        { time: D(s), action: { report: '报备匹配确认转出', assign: '指定转派', grab: '抢单转派（按商品）', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name}` },
+        { time: D(s), action: { report: '报备匹配确认转出', assign: '指定转派', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name}` },
         { time: D(s), action: '结算完成', detail: onTime ? '按时履约 · 积分 +5' : '超时发货 · 积分 -5' },
       ],
       extra: {
@@ -674,7 +670,6 @@ export const EXTERNAL_STATUS_LABELS: Record<string, string> = {
   self_accepted: '已接单（自营）',
   self_shipped: '已发货运输中',
   self_delivered: '妥投',
-  grabbing: '抢单中',
   comparing: '比单中',
   distribute_pending: '转派待接单',
   processed: '分发-已完成',
@@ -683,7 +678,6 @@ export const EXTERNAL_STATUS_LABELS: Record<string, string> = {
 
 /** 来源附加标签（拆单后未成交商品子订单 / 自营退回） */
 export const SOURCE_TAG_LABELS: Record<string, { label: string; bg: string; color: string }> = {
-  grab_failed: { label: '抢单未成', bg: '#FBEDEF', color: '#C13A54' },
   compare_failed: { label: '比单未成', bg: '#FBF3E2', color: '#9A7A1C' },
   self_returned: { label: '自营退回', bg: '#F3E5F5', color: '#7B1FA2' },
 };
@@ -695,7 +689,6 @@ export const EXTERNAL_STATUS_COLORS: Record<string, { bg: string; color: string 
   self_accepted: { bg: '#E8EAF6', color: '#3949AB' },
   self_shipped: { bg: '#E1F5FE', color: '#0277BD' },
   self_delivered: { bg: '#E0F2F1', color: '#00695C' },
-  grabbing: { bg: '#FFF8E1', color: '#B26A00' },
   comparing: { bg: '#F3E5F5', color: '#7B1FA2' },
   distribute_pending: { bg: '#E0F2F1', color: '#00695C' },
   processed: { bg: '#E8F5E9', color: '#01795D' },
@@ -705,7 +698,6 @@ export const EXTERNAL_STATUS_COLORS: Record<string, { bg: string; color: string 
 /** 分发路径标签（转派待接单/已处理展示） */
 export const TRANSFER_SOURCE_LABELS: Record<string, string> = {
   report: '转派-报备',
-  grab: '转派-抢单',
   assign: '转派-指定',
   compare: '转派-比单',
 };

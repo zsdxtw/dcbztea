@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import Pagination from '../../components/common/Pagination';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
@@ -29,6 +30,8 @@ export default function SalesReports() {
   const reports = useReportStore((s) => s.reports);
   const reviewReport = useReportStore((s) => s.reviewReport);
   const [keyword, setKeyword] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [filterType, setFilterType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [selected, setSelected] = useState<PartnerReport | null>(null);
@@ -42,6 +45,8 @@ export default function SalesReports() {
     if (keyword && !r.code.includes(keyword) && !r.title.includes(keyword) && !r.partnerName.includes(keyword)) return false;
     return true;
   }), [reports, keyword, filterType, filterStatus]);
+  const pagedRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => { setPage(1); }, [keyword, filterType, filterStatus, pageSize]);
 
   const pendingCount = reports.filter((r) => r.status === 'pending').length;
 
@@ -102,8 +107,9 @@ export default function SalesReports() {
 
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['报备编号', '类型', '合作商', '标题', '报备对象', '预计金额', '状态', '提交时间', '操作']}
-            rows={filtered.map(r => [
+            headers={['序号', '报备编号', '类型', '合作商', '标题', '报备对象', '预计金额', '状态', '提交时间', '操作']}
+            rows={pagedRows.map((r, idx) => [
+              <span key="idx" className="mono" style={{ color: 'var(--color-neutral-500)' }}>{(page - 1) * pageSize + idx + 1}</span>,
               <span key="code" className="cell-mono-emph">{r.code}</span>,
               <div key="type" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 {pill(TYPE_STYLE[r.type].bg, TYPE_STYLE[r.type].color, PARTNER_REPORT_TYPE_LABELS[r.type])}
@@ -129,6 +135,9 @@ export default function SalesReports() {
               </div>,
             ])}
           />
+          {(filtered.length > 0) && (
+            <Pagination total={filtered.length} page={page} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} label="条报备" />
+          )}
         </Card>
       </div>
 

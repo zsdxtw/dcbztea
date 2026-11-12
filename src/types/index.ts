@@ -772,10 +772,50 @@ export interface PlatformItem {
   bankAccounts: PlatformBankAccount[];
   invoiceInfos: PlatformInvoiceInfo[];
   status: 'active' | 'inactive';
+  /** 客户采买平台终端（开通后可登录采买平台选品下单） */
+  terminal?: CustomerTerminal;
   remark?: string;
 }
 
 /** 客户 */
+/** 客户入池配置（管理台维护，合作商终端「客户池」读取） */
+export interface CustomerPoolConfig {
+  /** 入池状态：true=入池（合作商按地区可见） */
+  enabled: boolean;
+  /** 全国（勾选后全部地区可见，优先于省市县） */
+  nationwide: boolean;
+  /** 全省范围（省份名） */
+  provinces: string[];
+  /** 全市范围（'省/市' 路径） */
+  cities: string[];
+  /** 区县范围（'省/市/县' 路径） */
+  districts: string[];
+  /** 合作规则（合作商与该客户合作的规则说明，展示于合作商终端客户池） */
+  coopRule?: {
+    /** 客户要求（品质、包装、售后等要求） */
+    requirements?: string;
+    /** 下单流程（订货方式、确认流程等） */
+    orderProcess?: string;
+    /** 结算规则（账期、开票、对账等） */
+    settlement?: string;
+  };
+}
+
+/** 入池范围匹配：入池开 + (全国 或 选中省/市/县 命中任一范围) 才对合作商展示 */
+export function matchPoolScope(
+  cfg: CustomerPoolConfig | undefined,
+  prov?: string,
+  city?: string,
+  district?: string,
+): boolean {
+  if (!cfg?.enabled) return false;
+  if (cfg.nationwide) return true;
+  if (prov && cfg.provinces.includes(prov)) return true;
+  if (prov && city && cfg.cities.includes(`${prov}/${city}`)) return true;
+  if (prov && city && district && cfg.districts.includes(`${prov}/${city}/${district}`)) return true;
+  return false;
+}
+
 export interface CustomerItem {
   id: string;
   name: string;
@@ -973,6 +1013,36 @@ export interface SupplierApproval {
 
 /* ─────────────────────────── 新品提醒 / 合作商报价 ─────────────────────────── */
 
+/* ─────────────────────────── 合作商通知公告 ─────────────────────────── */
+
+/** 公告级别：normal=普通 / important=重要 */
+export type NoticeLevel = 'normal' | 'important';
+/** 公告状态：draft=草稿 / published=已发布 / withdrawn=已撤回 */
+export type NoticeStatus = 'draft' | 'published' | 'withdrawn';
+
+/** 合作商通知公告（管理后台发布，合作商工作台展示） */
+export interface PartnerNotice {
+  id: string;
+  /** 公告编号（TZGG-0001 顺序号） */
+  code: string;
+  /** 公告标题 */
+  title: string;
+  /** 公告正文（多行文本） */
+  content: string;
+  /** 级别：普通 / 重要 */
+  level: NoticeLevel;
+  /** 是否置顶（仅已发布可置顶，工作台置顶优先展示） */
+  pinned: boolean;
+  /** 状态：草稿 / 已发布 / 已撤回 */
+  status: NoticeStatus;
+  /** 发布时间（首次发布时固化） */
+  publishTime?: string;
+  /** 发布人（管理后台操作员） */
+  publisher: string;
+  /** 创建时间 */
+  createTime: string;
+}
+
 /** 新品提醒处理状态：pending=待处理 / listed=已上架 / dismissed=已忽略 */
 export type NewArrivalStatus = 'pending' | 'listed' | 'dismissed';
 
@@ -1010,7 +1080,7 @@ export interface PartnerQuoteOverride {
   value: number;
 }
 
-/** 合作商报价设置（按合作商维度：品牌整体折扣 + 单品覆盖） */
+/** 合作商报价设置（按合作商维度：品牌整体折扣 + 单品覆盖 + 是否供货） */
 export interface PartnerQuoteSetting {
   /** 合作商（供应商）ID */
   supplierId: string;
@@ -1018,6 +1088,8 @@ export interface PartnerQuoteSetting {
   brandDiscounts: Record<string, number>;
   /** 单品报价覆盖（键=商品 ID；优先于品牌整体折扣） */
   productOverrides: Record<string, PartnerQuoteOverride>;
+  /** 是否供货（键=商品 ID；true=该合作商向淡茶半盏供应该商品；缺省=不供货） */
+  supplyProducts?: Record<string, boolean>;
   /** 最近更新时间 */
   updateTime?: string;
 }
@@ -1290,7 +1362,7 @@ export type PartnerDeliveryMode = 'direct' | 'warehouse';
 export type PartnerCoopMode = 'supplier' | 'service';
 
 /** 合作商订单状态 */
-export type PartnerOrderStatus = 'pending' | 'accepted' | 'shipping' | 'delivered' | 'settled' | 'rejected';
+export type PartnerOrderStatus = 'pending' | 'accepted' | 'shipping' | 'transit' | 'delivered' | 'settled' | 'rejected';
 
 /** 合作商订单 */
 export interface PartnerOrder {
@@ -1315,8 +1387,18 @@ export interface PartnerOrder {
   remark?: string;
   /** 报备转入来源（报备编号），由平台报备规则自动转入的订单才有 */
   sourceReport?: string;
-  /** 报备转入类型：order-self=自营订单报备 / order-opportunity=商机订单报备（平台履约）/ product=商品报备 / customer=客户报备 / assign=指定分发 / grab=抢单中单 / compare=比单中单 */
-  transferKind?: 'order-self' | 'order-opportunity' | 'product' | 'customer' | 'assign' | 'grab' | 'compare';
+  /** 报备转入类型：order-self=自营订单报备 / order-opportunity=商机订单报备（平台履约）/ product=商品报备 / customer=客户报备 / assign=指定分发 / compare=比单中单 */
+  transferKind?: 'order-self' | 'order-opportunity' | 'product' | 'customer' | 'assign' | 'compare';
+  /** 比单订单：我是否已报名（待接单展示「待接单-比单中」） */
+  compareSigned?: boolean;
+  /** 比单报名截止时间戳（毫秒，仅进行中比单） */
+  compareDeadline?: number;
+  /** 比单底价说明 */
+  compareFloorNote?: string;
+  /** 比单当前报名家数 */
+  compareQuoteCount?: number;
+  /** 比单我的报价（已报名时） */
+  compareMyQuote?: number;
 }
 
 /** 合作商报备类型：order=订单报备 / product=商品报备 / customer=客户报备 */
@@ -1513,8 +1595,8 @@ export interface CartItem {
 /** 外部订单来源平台 */
 export type ExternalPlatform = 'tmall' | 'jd' | 'douyin' | 'pdd' | 'other';
 
-/** 分发方式：指定 / 抢单（时间优先） / 比单（综合评分） */
-export type DistributeMode = 'assign' | 'grab' | 'compare';
+/** 分发方式：指定 / 比单（综合评分） */
+export type DistributeMode = 'assign' | 'compare';
 
 /**
  * 订单处理状态（状态机）
@@ -1524,7 +1606,7 @@ export type DistributeMode = 'assign' | 'grab' | 'compare';
  *   │     self_pending 可「退回」pending（来源标注自营退回）
  *   └ 分发：
  *       报备命中（录入/直连推送自动匹配）→ report_match_pending 报备-匹配待确认（人工确认）→ distribute_pending
- *       指定 / 报备匹配（人工选择）→ distribute_pending；抢单 grabbing / 比单 comparing 结束 → distribute_pending
+ *       指定 / 报备匹配（人工选择）→ distribute_pending；比单 comparing 结束 → distribute_pending
  * distribute_pending 分发待接单（合作商终端接单）→ processed → completed
  */
 export type ExternalProcessStatus =
@@ -1534,7 +1616,6 @@ export type ExternalProcessStatus =
   | 'self_accepted'
   | 'self_shipped'
   | 'self_delivered'
-  | 'grabbing'
   | 'comparing'
   | 'distribute_pending'
   | 'processed'
@@ -1543,7 +1624,7 @@ export type ExternalProcessStatus =
 /** 外部订单来源渠道：手工录入 / 平台直连推送 */
 export type ExternalChannel = 'manual' | 'push';
 
-/** 转出来源：报备命中 / 指定 / 抢单 / 比单 */
+/** 转出来源：报备命中 / 指定 / 比单 */
 export type TransferSource = 'report' | DistributeMode;
 
 /** 报备命中信息（录入时自动匹配审批通过的报备） */
@@ -1641,7 +1722,7 @@ export interface CompareSession {
   region?: RegionScope;
 }
 
-/** 地区范围（省/市/县三级，均可选；用于抢单/比单限定合作商地区） */
+/** 地区范围（省/市/县三级，均可选；用于比单限定合作商地区） */
 export interface RegionScope {
   province?: string;
   city?: string;
@@ -1660,16 +1741,6 @@ export function partnerInRegion(
     (!scope.city || supplier.registeredCity === scope.city || supplier.contactCity === scope.city) &&
     (!scope.district || supplier.registeredDistrict === scope.district || supplier.contactDistrict === scope.district)
   );
-}
-
-/** 抢单记录（按商品维度：一次可抢订单内 1 个或多个商品） */
-export interface GrabRecord {
-  supplierId: string;
-  supplierName: string;
-  grabTime: string;
-  ts: number;
-  /** 本次抢到的商品名称 */
-  items?: string[];
 }
 
 /** 外部订单（运营手工录入，分流处理） */
@@ -1704,8 +1775,8 @@ export interface ExternalOrder {
   /** 来源渠道：manual=手工录入 / push=平台直连推送 */
   sourceChannel: ExternalChannel;
   processStatus: ExternalProcessStatus;
-  /** 来源附加标签：抢单未成 / 比单未成（分拆后未成交商品形成的子订单）/ 自营退回 */
-  sourceTag?: 'grab_failed' | 'compare_failed' | 'self_returned';
+  /** 来源附加标签：比单未成（分拆后未成交商品形成的子订单）/ 自营退回 */
+  sourceTag?: 'compare_failed' | 'self_returned';
   /** 母销售单编号（拆单生成的子订单指向母销售单；详情页按母子 Tab 展示） */
   parentCode?: string;
   /** 报备命中列表（命中即自动转出，列表用于展示「报备分发」来源） */
@@ -1726,11 +1797,6 @@ export interface ExternalOrder {
   selfPo?: SelfPurchase;
   /** 自营发货包裹（分仓发货 / 到货出库生成，按物流单号跟踪妥投） */
   selfShipments?: SelfShipment[];
-  /** 抢单截止时间戳（毫秒） */
-  grabDeadline?: number;
-  /** 抢单合作商地区范围（可选，省市县） */
-  grabRegion?: RegionScope;
-  grabRecords?: GrabRecord[];
   compare?: CompareSession;
   /** 处理轨迹 */
   history: { time: string; action: string; detail?: string }[];
@@ -1738,8 +1804,6 @@ export interface ExternalOrder {
 
 /** 订单流转设置 */
 export interface FlowSettings {
-  /** 抢单时长（分钟） */
-  grabMinutes: number;
   /** 比单报名时长（分钟） */
   compareMinutes: number;
   /** 比单评分权重（报价 / 积分） */

@@ -18,7 +18,7 @@ export default function PartnerSettlement() {
   const [filterStatus, setFilterStatus] = useState('');
   const [selected, setSelected] = useState<PartnerSettlement | null>(null);
 
-  /** 订单分发流转中心转入我名下的订单（报备 / 指定 / 抢单 / 比单） */
+  /** 订单分发流转中心转入我名下的订单（报备 / 指定 / 比单） */
   const auth = getPartnerAuth();
   const suppliers = useSupplierStore((s) => s.suppliers);
   const flowVersion = useOrderFlowStore((s) => s.orders);
@@ -108,7 +108,7 @@ export default function PartnerSettlement() {
       <div className="pk-panel">
         <div className="pk-panel-head">
           <span className="pk-panel-title">订单分发 · 分发订单结算</span>
-          <span style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>报备 / 指定 / 抢单 / 比单中单的订单，履约签收后进入结算</span>
+          <span style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>报备 / 指定 / 比单中单的订单，履约签收后进入结算</span>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', padding: '0 22px 14px' }}>
           <span style={{ padding: '4px 12px', borderRadius: 999, fontSize: 12.5, fontWeight: 600, background: '#FFF3E0', color: '#E65100' }}>
@@ -141,7 +141,7 @@ export default function PartnerSettlement() {
           </div>
         ) : (
           <div style={{ padding: '6px 22px 20px', fontSize: 13, color: 'var(--pk-ink3)' }}>
-            暂无分发订单。在抢单大厅抢单、比单报名中单或收到平台指定转派后，订单履约与结算进度会显示在这里。
+            暂无分发订单。在比单大厅报名中单或收到平台指定转派后，订单履约与结算进度会显示在这里。
           </div>
         )}
       </div>

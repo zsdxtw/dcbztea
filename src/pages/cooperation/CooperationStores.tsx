@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import Pagination from '../../components/common/Pagination';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
@@ -44,6 +45,8 @@ export default function PurchasePartnerStores() {
   const [filterProvince, setFilterProvince] = useState('');
   const [filterBrand, setFilterBrand] = useState('');
   const [detailStore, setDetailStore] = useState<PartnerStoreRow | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [showMap, setShowMap] = useState(false);
 
   /** 地区（省份）筛选选项：现有门店涉及的省份 */
@@ -74,6 +77,8 @@ export default function PurchasePartnerStores() {
       return true;
     });
   }, [rows, keyword, filterSupplier, filterProvince, filterBrand]);
+  const pagedRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => { setPage(1); }, [keyword, filterSupplier, filterProvince, filterBrand, pageSize]);
 
   return (
     <>
@@ -109,10 +114,11 @@ export default function PurchasePartnerStores() {
               {rows.length === 0 ? '暂无合作商门店，请在合作商列表详情中维护门店' : '未找到符合条件的门店'}
             </div>
           ) : (
+            <>
             <Table
               headers={['序号', '门店名称', '归属合作商', '所在地区', '详细地址', '负责人', '联系电话', '主营品牌', '面积', '状态', '操作']}
-              rows={filtered.map((st, idx) => [
-                <span key="idx" className="mono">{idx + 1}</span>,
+              rows={pagedRows.map((st, idx) => [
+                <span key="idx" className="mono">{(page - 1) * pageSize + idx + 1}</span>,
                 <span key="name" className="cell-emph">{st.name || '（未命名门店）'}</span>,
                 <span key="sup" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{st.supplierName}</span>,
                 <span key="region" style={{ fontSize: 'var(--text-sm)' }}>{[st.province, st.city, st.district].filter(Boolean).join(' / ') || '—'}</span>,
@@ -131,6 +137,10 @@ export default function PurchasePartnerStores() {
                 </div>,
               ])}
             />
+            {(filtered.length > 0) && (
+              <Pagination total={filtered.length} page={page} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} label="家门店" />
+            )}
+            </>
           )}
         </Card>
       </div>

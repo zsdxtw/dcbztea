@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TeaLeafMark } from './PartnerLayout';
+import PartnerAgreement from './PartnerAgreement';
 import { useSupplierStore } from '../../stores/supplierStore';
 import { BrandMultiSelect } from '../../components/common/BrandPicker';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
@@ -31,6 +32,8 @@ export default function PartnerRegister() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollTop = (smooth = true) => scrollRef.current?.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' });
 
+  /** 注册流程：agreement 阅读协议 → form 填写注册信息 */
+  const [step, setStep] = useState<'agreement' | 'form'>('agreement');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<{ code: string; username: string } | null>(null);
   /** 展示用合作商编号（注册提交时分配，审批通过后随档案生效） */
@@ -197,6 +200,11 @@ export default function PartnerRegister() {
   /** 省市区联动只读展示 */
   const regionText = [registeredProvince, registeredCity, registeredDistrict].filter(Boolean).join(' ');
 
+  // 第一步：协议阅读与同意（勾选同意后进入注册表单）
+  if (step === 'agreement') {
+    return <PartnerAgreement onAgree={() => { setStep('form'); scrollTop(false); }} />;
+  }
+
   if (success) {
     return (
       <div className="pk-register" ref={scrollRef}>
@@ -252,6 +260,30 @@ export default function PartnerRegister() {
           </button>
         </div>
 
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          {[
+            ['1', '阅读协议', 'done'],
+            ['2', '填写注册信息', 'active'],
+            ['3', '提交平台审批', 'todo'],
+          ].map(([n, label, st], i) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {i > 0 && <span style={{ width: 40, height: 1, background: 'rgba(1,121,93,0.25)' }} />}
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                fontSize: 12.5, fontWeight: st === 'active' ? 600 : 400,
+                color: st === 'active' ? '#01795D' : st === 'done' ? '#3D6660' : '#88948E',
+              }}>
+                <span style={{
+                  width: 20, height: 20, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 600,
+                  background: st === 'active' ? '#01795D' : st === 'done' ? 'rgba(1,121,93,0.18)' : 'rgba(1,121,93,0.1)',
+                  color: st === 'active' ? '#fff' : st === 'done' ? '#01795D' : '#88948E',
+                }}>{st === 'done' ? '✓' : n}</span>
+                {label}
+              </span>
+            </div>
+          ))}
+        </div>
         <h1 className="pk-register-title">合作商入驻注册</h1>
         <p className="pk-register-desc">
           填写企业信息提交入驻申请，平台审批通过后即可承接订单分发、客户经营与月度结算。

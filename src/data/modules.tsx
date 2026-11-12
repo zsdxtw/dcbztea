@@ -248,7 +248,7 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
       { key: 'purchase-manage', label: '采购管理', icon: <OrdersIcon />, children: [
         { key: 'purchase-demand', label: '采购申请', icon: <PriceIcon /> },
         { key: 'purchase-orders', label: '采购订单', icon: <OrdersIcon /> },
-        { key: 'purchase-pricing', label: '采购报（调）价', icon: <PriceIcon /> },
+        { key: 'purchase-pricing', label: '采购报价', icon: <PriceIcon /> },
         { key: 'purchase-return', label: '采购退货', icon: <ReturnIcon /> },
       ] },
       { key: 'warehouse-io', label: '入库出库', icon: <InboundIcon />, children: [
@@ -272,11 +272,13 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
     key: ModuleKey.PARTNER,
     label: '合作商',
     menus: [
+      { key: 'cooperation-overview', label: '合作商概览', icon: <OverviewIcon /> },
       { key: 'cooperation-partners', label: '合作商列表', icon: <SupplierListIcon /> },
       { key: 'cooperation-approvals', label: '注册审批', icon: <SupplierApprovalIcon /> },
       { key: 'cooperation-stores', label: '合作商门店', icon: <StoreIcon /> },
       { key: 'cooperation-scores', label: '合作商积分', icon: <SupplierApprovalIcon /> },
       { key: 'cooperation-reports', label: '报备管理', icon: <ReportMgmtIcon /> },
+      { key: 'cooperation-notices', label: '通知公告', icon: <NotificationIcon /> },
     ],
   },
   [ModuleKey.SALES]: {
@@ -427,7 +429,7 @@ export const moduleMenuPath = (module: ModuleKey, menuKey: string): string => {
 export const MODULE_HOME_PATH: Record<ModuleKey, string> = {
   [ModuleKey.DASHBOARD]: '/dashboard/overview',
   [ModuleKey.PURCHASE]: '/purchase/purchase-overview',
-  [ModuleKey.PARTNER]: '/cooperation/cooperation-partners',
+  [ModuleKey.PARTNER]: '/cooperation/cooperation-overview',
   [ModuleKey.SALES]: '/sales/sales-overview',
   [ModuleKey.PRODUCT]: '/product/product-overview',
   [ModuleKey.FINANCE]: '/finance/finance-overview',

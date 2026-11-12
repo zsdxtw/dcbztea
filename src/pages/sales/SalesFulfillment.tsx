@@ -30,12 +30,12 @@ const STAGE_CHAIN: { key: StageKey; label: string }[] = [
 
 function stageOf(o: ExternalOrder): { idx: number; label: string } {
   // 阶段 1：分发中
-  if (['pending', 'report_match_pending', 'grabbing', 'comparing'].includes(o.processStatus)) return { idx: 0, label: '分发中' };
+  if (['pending', 'report_match_pending', 'comparing'].includes(o.processStatus)) return { idx: 0, label: '分发中' };
   // 阶段 2：待接单
   if (['self_pending', 'distribute_pending'].includes(o.processStatus)) return { idx: 1, label: '待接单' };
   // 阶段 4：运输中
   if (o.processStatus === 'self_shipped') return { idx: 3, label: '运输中' };
-  if (o.path === 'distribute' && o.partnerStatus === 'shipping') return { idx: 3, label: '运输中' };
+  if (o.path === 'distribute' && (o.partnerStatus === 'shipping' || o.partnerStatus === 'transit')) return { idx: 3, label: o.partnerStatus === 'transit' ? '妥投待签收' : '运输中' };
   // 阶段 5：妥投 / 完成
   if (o.processStatus === 'self_delivered' || o.processStatus === 'completed') return { idx: 4, label: o.processStatus === 'completed' ? '已结算' : '已妥投' };
   if (o.path === 'distribute' && ['delivered', 'settled'].includes(o.partnerStatus ?? '')) return { idx: 4, label: o.partnerStatus === 'settled' ? '已结算' : '已妥投' };

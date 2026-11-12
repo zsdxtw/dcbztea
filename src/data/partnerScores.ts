@@ -51,7 +51,7 @@ export const SCORE_DIMENSION_LABELS: Record<string, string> = {
 
 /** 积分规则说明（页面展示用） */
 export const SCORE_RULES: { dimension: string; add: string; sub: string; hook: string }[] = [
-  { dimension: '客户拜访', add: '拜访 +2 / 次（终端提交，管理台确认）', sub: '—', hook: '合作商终端 · 抢单大厅-拜访记录' },
+  { dimension: '客户拜访', add: '拜访 +2 / 次（终端提交，管理台确认）', sub: '—', hook: '合作商终端 · 比单大厅-拜访记录' },
   { dimension: '报备情况', add: '报备审批通过 +5；转单并完成 +10', sub: '虚假报备 −10', hook: '报备审批（销售 · 报备管理）' },
   { dimension: '履约情况', add: '按时发货 +3；结算完成 +5', sub: '超时发货 −5', hook: '外部订单履约推进 / 合作商订单结算' },
   { dimension: '处罚情况', add: '—', sub: '客户投诉 −10；严重违约 −20', hook: '合作商积分页 · 手动登记' },

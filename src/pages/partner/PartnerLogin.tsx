@@ -114,7 +114,7 @@ export default function PartnerLogin() {
         <div className="pk-login-form">
           <div className="pk-login-form-eyebrow">合作商终端</div>
           <h2 className="pk-login-form-title">欢迎登录</h2>
-          <div className="pk-login-form-sub">登录合作商工作台，处理订单、报价、抢单与结算事务</div>
+          <div className="pk-login-form-sub">登录合作商工作台，处理订单、报价、比单与结算事务</div>
 
           <div className="pk-login-field">
             <label className="pk-login-label">账号</label>

@@ -34,30 +34,30 @@ export function clearPartnerAuth() {
   localStorage.removeItem('partnerAuth');
 }
 
-/** 一级菜单配置 */
-const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode; children?: { label: string; path: string }[] }[] = [
+/** 一级菜单配置（serviceOnly=true 的菜单仅服务商类型合作商可见） */
+const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode; serviceOnly?: boolean; children?: { label: string; path: string }[] }[] = [
   {
     key: 'dashboard', label: '工作台', path: '/partner/dashboard',
     icon: <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><rect x="11" y="3" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><rect x="3" y="11" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><rect x="11" y="11" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.3"/></svg>,
   },
   {
-    key: 'orders', label: '订单', path: '/partner/orders',
+    key: 'orders', label: '订单管理', path: '/partner/orders',
     icon: <svg viewBox="0 0 20 20" fill="none"><rect x="4" y="2" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h6M7 9h6M7 12h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
-    children: [
-      { label: '订单管理', path: '/partner/orders' },
-      { label: '报备管理', path: '/partner/reports' },
-    ],
   },
   {
-    key: 'quotes', label: '报价', path: '/partner/quotes',
+    key: 'reports', label: '报备', path: '/partner/reports', serviceOnly: true,
+    icon: <svg viewBox="0 0 20 20" fill="none"><path d="M6 3h8a1 1 0 011 1v12l-5-2.5L5 16V4a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M8 7h4M8 10h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
+  },
+  {
+    key: 'quotes', label: '报价', path: '/partner/quotes', serviceOnly: true,
     icon: <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v10M10 13l4-4M10 13l-4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16.5h14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M13 3.5h4v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   },
   {
-    key: 'grab', label: '抢单大厅', path: '/partner/grab',
+    key: 'compare', label: '比单大厅', path: '/partner/compare',
     icon: <svg viewBox="0 0 20 20" fill="none"><path d="M11 2.5L5 11h4l-1 6.5L14 9h-4l1-6.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
   },
   {
-    key: 'customers', label: '客户', path: '/partner/customers',
+    key: 'customers', label: '客户池', path: '/partner/customers',
     icon: <svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="15" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.2"/></svg>,
   },
   {
@@ -133,7 +133,7 @@ export default function PartnerLayout() {
         {/* 菜单 */}
         <nav className="pk-nav">
           <div className="pk-nav-label">MENU</div>
-          {PARTNER_MENUS.map(menu => {
+          {PARTNER_MENUS.filter(menu => !menu.serviceOnly || partner?.types.includes('service')).map(menu => {
             const isActive = activeKey === menu.key;
             return (
               <div key={menu.key}>
