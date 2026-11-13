@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, type ReactNode } from 'react';
-import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { PageHead, Pill, ORDER_STATUS_TONE } from './PartnerUI';
@@ -8,6 +7,7 @@ import { useReportStore, getTransferredOrders } from '../../stores/reportStore';
 import { useOrderFlowStore, getPartnerFlowOrders, getPartnerSystemQuote } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { useSupplierStore } from '../../stores/supplierStore';
+import { PROVINCE_NAMES, getCities, getDistricts } from '../../data/regions';
 import Pagination from '../../components/common/Pagination';
 import type { PartnerOrder, PartnerOrderStatus } from '../../types';
 import {
@@ -358,6 +358,13 @@ export default function PartnerOrders() {
   const [filterDelivery, setFilterDelivery] = useState('');
   const [filterCoop, setFilterCoop] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  /** 全部状态下的附加筛选：客户 / 收件地区（省/市/县三联）/ 下单日期范围 */
+  const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterProv, setFilterProv] = useState('');
+  const [filterCity, setFilterCity] = useState('');
+  const [filterDist, setFilterDist] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   /** 分页 */
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -376,12 +383,33 @@ export default function PartnerOrders() {
   ], [flowOrders, transferred, transferOverrides, manualOrders]);
 
   /** 应用搜索/配送/合作模式筛选（不含状态）后的订单：供状态 Tab 计数与状态过滤复用 */
+  /** 客户下拉选项（当前状态下订单客户去重） */
+  const customerOptions = useMemo(() => {
+    const scope = allOrders.filter(o => {
+      if (filterDelivery && o.deliveryMode !== filterDelivery) return false;
+      if (filterCoop && o.coopMode !== filterCoop) return false;
+      return true;
+    });
+    return [...new Set(scope.map((o) => o.customerName))];
+  }, [allOrders, filterDelivery, filterCoop]);
+
   const baseOrders = useMemo(() => allOrders.filter(o => {
     if (keyword && !o.code.includes(keyword) && !o.customerName.includes(keyword) && !o.receiver.includes(keyword)) return false;
     if (filterDelivery && o.deliveryMode !== filterDelivery) return false;
     if (filterCoop && o.coopMode !== filterCoop) return false;
+    if (filterCustomer && o.customerName !== filterCustomer) return false;
+    // 收件地区三联（省市县，兼容"南京/南京市"写法）
+    if (filterProv) {
+      const region = o.customerRegion ?? '';
+      if (!region.includes(filterProv)) return false;
+      if (filterCity && !region.includes(filterCity.replace(/市$/, ''))) return false;
+      if (filterDist && !region.includes(filterDist) && !(o.receiverAddress ?? '').includes(filterDist)) return false;
+    }
+    // 下单日期范围（含当日）
+    if (dateFrom && o.orderDate < dateFrom) return false;
+    if (dateTo && o.orderDate > dateTo) return false;
     return true;
-  }), [allOrders, keyword, filterDelivery, filterCoop]);
+  }), [allOrders, keyword, filterDelivery, filterCoop, filterCustomer, filterProv, filterCity, filterDist, dateFrom, dateTo]);
 
   /** 各状态 Tab 的订单数（已发货 = 发货中 + 妥投 两态） */
   const statusCounts = useMemo(() => {
@@ -401,7 +429,7 @@ export default function PartnerOrders() {
     [baseOrders, filterStatus],
   );
   const pagedRows = filtered.slice((page - 1) * pageSize, page * pageSize);
-  useEffect(() => { setPage(1); }, [keyword, filterDelivery, filterCoop, filterStatus, pageSize]);
+  useEffect(() => { setPage(1); }, [keyword, filterDelivery, filterCoop, filterStatus, pageSize, filterCustomer, filterProv, filterCity, filterDist, dateFrom, dateTo]);
 
   const transferCount = transferred.length;
   /** 当前登录合作商 ID / 名称（比单报名用） */
@@ -500,54 +528,104 @@ export default function PartnerOrders() {
       </div>
 
       {/* 筛选 + 比单管理 */}
-      <div className="pk-toolbar">
-        <input className="filter-input" placeholder="搜索订单号、客户、收货人..." value={keyword} onChange={e => setKeyword(e.target.value)} />
-        <Button variant="ghost" onClick={() => setCompareMgmtOpen(true)}>比单管理</Button>
-        <select className="filter-select" value={filterDelivery} onChange={e => setFilterDelivery(e.target.value)}>
-          <option value="">全部配送方式</option>
-          <option value="direct">直送订单</option>
-          <option value="warehouse">入仓订单</option>
-        </select>
-        <select className="filter-select" value={filterCoop} onChange={e => setFilterCoop(e.target.value)}>
-          <option value="">全部合作模式</option>
-          <option value="supplier">差价模式</option>
-          <option value="service">扣点模式</option>
-        </select>
-        <span className="pk-count">共 {filtered.length} 单{transferCount > 0 ? ` · 含报备转入 ${transferCount} 单` : ''}</span>
-      </div>
-
       {msg && <div style={{ marginBottom: 'var(--space-3)', padding: '8px 14px', background: '#E8F5E9', color: '#01795D', borderRadius: 10, fontSize: 13, fontWeight: 500 }}>{msg}</div>}
 
-      <div className="pk-table-panel">
-        <Table
-          headers={['序号', '订单编号', '客户', '商品数', '总金额', '配送方式', '合作模式', '来源类型', '状态', '下单日期', '操作']}
-          rows={pagedRows.map((o, idx) => {
-            /** 商机报备订单：平台履约，合作商不可操作 */
-            const platformHandled = o.transferKind === 'order-opportunity';
-            return [
-              <span key="idx" className="mono" style={{ color: 'var(--pk-ink3)' }}>{(page - 1) * pageSize + idx + 1}</span>,
-              <div key="code" style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-                <span className="cell-mono-emph">{o.code}</span>
-                {platformHandled && <Pill tone="blue">平台履约</Pill>}
-              </div>,
-              <span key="cust" className="cell-emph">{o.customerName}</span>,
-              <span key="cnt" className="mono">{o.items.length} 种</span>,
-              <span key="amt" className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--pk-accent)' }}>{money(o.totalAmount)}</span>,
-              <Pill key="dm" tone={o.deliveryMode === 'direct' ? 'green' : 'blue'}>{PARTNER_DELIVERY_LABELS[o.deliveryMode]}</Pill>,
-              <Pill key="cm" tone={o.coopMode === 'supplier' ? 'amber' : 'purple'}>{PARTNER_COOP_LABELS[o.coopMode]}</Pill>,
-              <span key="src">{o.transferKind ? <Pill tone={SOURCE_TONE[o.transferKind]}>{SOURCE_TYPE_LABELS[o.transferKind]}</Pill> : <span style={{ color: 'var(--pk-ink3)' }}>—</span>}</span>,
-              // 状态：待接单的比单已报名订单展示「待接单-比单中」
-              o.status === 'pending' && o.compareSigned
-                ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Pill tone="amber">待接单</Pill><span style={{ color: 'var(--pk-ink3)', fontSize: 12 }}>-</span><Pill tone="purple">比单中</Pill></span>
-                : statusPill(o.status),
-              <span key="date" className="cell-muted">{o.orderDate}</span>,
-              <div key="act" className="row-actions">{rowActions(o)}</div>,
-            ];
-          })}
-        />
+      <div className="pk-panel">
+        <div className="pk-panel-head" style={{ flexWrap: 'wrap', gap: 10, justifyContent: 'flex-start' }}>
+          <input className="filter-input" placeholder="搜索订单号、客户、收货人..." value={keyword} onChange={e => setKeyword(e.target.value)} style={{ width: 190, height: 32, fontSize: 13 }} />
+          <span style={{ fontSize: 13, color: 'var(--pk-ink2)', fontWeight: 500 }}>配送方式：</span>
+          <select className="filter-select" value={filterDelivery} onChange={e => setFilterDelivery(e.target.value)} style={{ height: 32, fontSize: 13 }}>
+            <option value="">全部</option>
+            <option value="direct">直送订单</option>
+            <option value="warehouse">入仓订单</option>
+          </select>
+          <span style={{ fontSize: 13, color: 'var(--pk-ink2)', fontWeight: 500 }}>合作模式：</span>
+          <select className="filter-select" value={filterCoop} onChange={e => setFilterCoop(e.target.value)} style={{ height: 32, fontSize: 13 }}>
+            <option value="">全部</option>
+            <option value="supplier">差价模式</option>
+            <option value="service">扣点模式</option>
+          </select>
+          {filterStatus === '' && (
+            <>
+              <span style={{ fontSize: 13, color: 'var(--pk-ink2)', fontWeight: 500 }}>客户：</span>
+              <select className="filter-select" value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)} style={{ height: 32, fontSize: 13, maxWidth: 170 }}>
+                <option value="">全部</option>
+                {customerOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <span style={{ fontSize: 13, color: 'var(--pk-ink2)', fontWeight: 500 }}>收件地区：</span>
+              <select className="filter-select" value={filterProv} onChange={e => { setFilterProv(e.target.value); setFilterCity(''); setFilterDist(''); }} style={{ height: 32, fontSize: 13 }}>
+                <option value="">省份</option>
+                {PROVINCE_NAMES.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+              <select className="filter-select" disabled={!filterProv} value={filterCity} onChange={e => { setFilterCity(e.target.value); setFilterDist(''); }} style={{ height: 32, fontSize: 13 }}>
+                <option value="">地市</option>
+                {(filterProv ? getCities(filterProv).map((c) => c.name) : []).map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select className="filter-select" disabled={!filterCity} value={filterDist} onChange={e => setFilterDist(e.target.value)} style={{ height: 32, fontSize: 13 }}>
+                <option value="">区县</option>
+                {(filterProv && filterCity ? getDistricts(filterProv, filterCity) : []).map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <span style={{ fontSize: 13, color: 'var(--pk-ink2)', fontWeight: 500 }}>下单日期：</span>
+              <input className="filter-input" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ height: 32, fontSize: 13 }} title="开始日期（含当日）" />
+              <span style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>至</span>
+              <input className="filter-input" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ height: 32, fontSize: 13 }} title="结束日期（含当日）" />
+            </>
+          )}
+          <Button style={{ marginLeft: 'auto' }} onClick={() => setCompareMgmtOpen(true)}>比单管理</Button>
+        </div>
+        <div className="pk-panel-body">
+        <div className="pk-table-panel" style={{ margin: 0 }}>
+        <table>
+          <thead>
+            <tr>
+              <th>序号</th><th>订单编号</th><th>客户</th><th>商品数</th><th>总金额</th>
+              <th>收件人</th><th>收件电话</th><th>收件地区</th>
+              <th>配送方式</th><th>合作模式</th><th>来源类型</th><th>状态</th><th>下单日期</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pagedRows.map((o, idx) => {
+              /** 商机报备订单：平台履约，合作商不可操作 */
+              const platformHandled = o.transferKind === 'order-opportunity';
+              return (
+                <tr key={o.id}>
+                  <td className="mono" style={{ color: 'var(--pk-ink3)' }}>{(page - 1) * pageSize + idx + 1}</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+                      <span className="cell-mono-emph">{o.code}</span>
+                      {platformHandled && <Pill tone="blue">平台履约</Pill>}
+                    </div>
+                  </td>
+                  <td className="cell-emph">{o.customerName}</td>
+                  <td className="mono">{o.items.length} 种</td>
+                  <td className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--pk-accent)' }}>{money(o.totalAmount)}</td>
+                  <td>{o.receiver}</td>
+                  <td className="mono" style={{ fontSize: 13 }}>{o.receiverPhone}</td>
+                  <td style={{ fontSize: 13 }}>{o.customerRegion ?? '—'}</td>
+                  <td><Pill tone={o.deliveryMode === 'direct' ? 'green' : 'blue'}>{PARTNER_DELIVERY_LABELS[o.deliveryMode]}</Pill></td>
+                  <td><Pill tone={o.coopMode === 'supplier' ? 'amber' : 'purple'}>{PARTNER_COOP_LABELS[o.coopMode]}</Pill></td>
+                  <td>{o.transferKind ? <Pill tone={SOURCE_TONE[o.transferKind]}>{SOURCE_TYPE_LABELS[o.transferKind]}</Pill> : <span style={{ color: 'var(--pk-ink3)' }}>—</span>}</td>
+                  {/* 状态：待接单的比单已报名订单展示「待接单-比单中」 */}
+                  <td>
+                    {o.status === 'pending' && o.compareSigned
+                      ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Pill tone="amber">待接单</Pill><span style={{ color: 'var(--pk-ink3)', fontSize: 12 }}>-</span><Pill tone="purple">比单中</Pill></span>
+                      : statusPill(o.status)}
+                  </td>
+                  <td className="cell-muted">{o.orderDate}</td>
+                  <td><div className="row-actions">{rowActions(o)}</div></td>
+                </tr>
+              );
+            })}
+            {filtered.length === 0 && (
+              <tr><td colSpan={14} style={{ textAlign: 'center', color: 'var(--pk-ink3)', padding: '28px 0' }}>暂无订单</td></tr>
+            )}
+          </tbody>
+        </table>
+        </div>
         {(filtered.length > 0) && (
           <Pagination total={filtered.length} page={page} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} label="单订单" />
         )}
+        </div>
       </div>
 
       {/* 订单详情抽屉 */}

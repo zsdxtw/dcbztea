@@ -103,8 +103,8 @@ import PartnerRegister from './pages/partner/PartnerRegister';
 import PartnerLayout from './pages/partner/PartnerLayout';
 import PartnerDashboard from './pages/partner/PartnerDashboard';
 import PartnerOrders from './pages/partner/PartnerOrders';
+import PartnerReturns from './pages/partner/PartnerReturns';
 import PartnerQuotes from './pages/partner/PartnerQuotes';
-import PartnerCompare from './pages/partner/PartnerCompare';
 import PartnerReports from './pages/partner/PartnerReports';
 import PartnerCustomers from './pages/partner/PartnerCustomers';
 import PartnerSettlement from './pages/partner/PartnerSettlement';
@@ -274,8 +274,8 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/partner/dashboard" replace /> },
       { path: 'dashboard', element: <PartnerDashboard /> },
       { path: 'orders', element: <PartnerOrders /> },
+      { path: 'returns', element: <PartnerReturns /> },
       { path: 'quotes', element: <PartnerQuotes /> },
-      { path: 'compare', element: <PartnerCompare /> },
       { path: 'reports', element: <PartnerReports /> },
       { path: 'customers', element: <PartnerCustomers /> },
       { path: 'settlement', element: <PartnerSettlement /> },

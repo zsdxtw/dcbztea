@@ -467,7 +467,7 @@ export default function SalesCustomers() {
                 <option value="C级">C级</option>
               </select>
               {activeTab === 'direct' && (
-                <select className="filter-select" value={filterPool} onChange={(e) => setFilterPool(e.target.value as 'all' | 'yes' | 'no')} title="按是否入池筛选">
+                <select className="filter-select" value={filterPool} onChange={(e) => setFilterPool(e.target.value as 'all' | 'yes' | 'no')} title="按是否入客户池筛选">
                   <option value="all">是否入池：全部</option>
                   <option value="yes">是否入池：是</option>
                   <option value="no">是否入池：否</option>
@@ -483,7 +483,7 @@ export default function SalesCustomers() {
 
             <Card style={{ padding: 0 }}>
               <Table
-                headers={[...(deleteMode ? ['选择'] : ['序号']), '客户简称', '客户编号', '客户名称', ...(activeTab === 'direct' ? ['是否经平台'] : []), ...(activeTab === 'personal' ? ['下单人'] : []), '地区', '联系人', '联系电话', '客户来源', '等级', '采买平台', ...(activeTab === 'direct' ? ['入池'] : []), '状态', '操作']}
+                headers={[...(deleteMode ? ['选择'] : ['序号']), '客户简称', '客户编号', '客户名称', ...(activeTab === 'direct' ? ['是否经平台'] : []), ...(activeTab === 'personal' ? ['下单人'] : []), '地区', '联系人', '联系电话', '客户来源', '等级', '采买平台', ...(activeTab === 'direct' ? ['入客户池'] : []), '状态', '操作']}
                 rows={pagedRows.map((c, idx) => {
                   const cells: React.ReactNode[] = [
                     deleteMode ? <input key="chk" type="checkbox" checked={selectedForDelete.has(c.id)} onChange={() => toggleSelect(c.id)} /> : <span key="idx" className="mono">{(page - 1) * pageSize + idx + 1}</span>,

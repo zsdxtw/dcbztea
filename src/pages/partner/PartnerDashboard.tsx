@@ -38,8 +38,6 @@ export default function PartnerDashboard() {
     () => (myId ? getPartnerFlowOrders(myId) : []),
     [flowVersion, myId],
   );
-  /** 商机大厅：全部进行中的比单（公开报名制，所有人可参与） */
-  const hallComparing = useMemo(() => flowVersion.filter((o) => o.processStatus === 'comparing'), [flowVersion]);
   const myScore = getScoreSummary(scoreEntries, myId ?? '', myName);
 
   const flowPending = flowOrders.filter((o) => o.status === 'pending').length;
@@ -50,7 +48,7 @@ export default function PartnerDashboard() {
   const shippingCount = flowDoing
     + transferred.filter(o => o.status === 'accepted' || o.status === 'shipping').length
     + partnerOrders.filter(o => o.status === 'accepted' || o.status === 'shipping').length;
-  const hallCount = hallComparing.length;
+  const hallCount = flowVersion.filter((o) => o.processStatus === 'comparing').length;
   const unsettled = partnerSettlements.find(s => s.status === 'unsettled');
   const waitSettleAmount = (unsettled?.settleAmount ?? 0) + flowDelivered.reduce((sum, o) => sum + o.totalAmount, 0);
   const waitSettleCount = (unsettled?.orderCount ?? 0) + flowDelivered.length;
@@ -63,8 +61,8 @@ export default function PartnerDashboard() {
   const stats = [
     { label: '待接单', value: String(pendingCount), unit: '单', sub: '需尽快确认接单', accent: false },
     { label: '履约中', value: String(shippingCount), unit: '单', sub: '接单 / 发货进行中', accent: false },
-    { label: '商机大厅', value: String(hallCount), unit: '单', sub: `比单 ${hallComparing.length}`, accent: false },
-    { label: '我的积分', value: String(myScore.total), unit: '分', sub: `比单评分权重 ${compareWeight}0%`, accent: false },
+    { label: '商机大厅', value: String(hallCount), unit: '单', sub: '比单报名中', accent: false },
+    { label: '我的积分', value: String(myScore.total), unit: '分', sub: '积分影响比单评分', accent: false },
     { label: '本月待结算', value: waitSettleAmount.toLocaleString(), unit: '元', sub: `${waitSettleCount} 笔订单待结算`, accent: true },
     { label: '合作客户', value: String(customerCount), unit: '家', sub: '本地营销进行中', accent: false },
   ];
@@ -72,12 +70,10 @@ export default function PartnerDashboard() {
   const todos = [
     { label: '待接单订单', count: pendingCount, path: '/partner/orders', desc: '请尽快确认接单并安排发货' },
     { label: '履约中订单', count: shippingCount, path: '/partner/orders', desc: '跟进物流并确认客户签收' },
-    { label: '比单报名中', count: hallComparing.length, path: '/partner/compare', desc: '按「报价 + 积分」综合评分定标' },
     { label: '审核中报备', count: reportPending, path: '/partner/reports', desc: '报备审核中，请留意审核结果' },
   ];
 
   const shortcuts = [
-    { label: '比单大厅', path: '/partner/compare', desc: '比单报价 / 客户拜访' },
     { label: '订单管理', path: '/partner/orders', desc: '处理平台分发的订单' },
     { label: '新增报备', path: '/partner/reports', desc: '报备订单 / 商品 / 客户' },
     { label: '合作客户', path: '/partner/customers', desc: '查看客户与可下单商品' },

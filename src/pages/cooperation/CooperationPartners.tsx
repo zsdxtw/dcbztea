@@ -522,6 +522,7 @@ export default function PurchaseSuppliers() {
                   ['联系人职务', 'contactPosition', 'text'],
                   ['联系电话', 'contactPhone', 'text'],
                   ['联系邮箱', 'contactEmail', 'text'],
+                  ['短信通知手机号', 'smsNotifyPhone', 'text'],
                   ['联系地址', 'contactAddress', 'text'],
                   ['合作时间', 'cooperationDate', 'text'],
                   ['主营品类', 'mainCategories', 'text'],
@@ -1017,6 +1018,7 @@ export default function PurchaseSuppliers() {
                 <InfoItem label="联系人职务">{selectedSupplier.contactPosition || '—'}</InfoItem>
                 <InfoItem label="联系电话">{selectedSupplier.contactPhone || '—'}</InfoItem>
                 <InfoItem label="联系邮箱">{selectedSupplier.contactEmail || '—'}</InfoItem>
+                <InfoItem label="短信通知手机号" mono>{selectedSupplier.smsNotifyPhone || '—'}</InfoItem>
                 <InfoItem label="主营品类">{selectedSupplier.mainCategories.join('、') || '—'}</InfoItem>
                 <InfoItem label="资质状态">{String(selectedSupplier.qualificationStatus ?? '—')}</InfoItem>
                 <InfoItem label="公司主营品牌" span={3}>

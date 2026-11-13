@@ -198,6 +198,7 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
           <InfoItem label="联系人职务">{supplier.contactPosition || '—'}</InfoItem>
           <InfoItem label="联系电话" mono>{supplier.contactPhone}</InfoItem>
           <InfoItem label="联系邮箱" mono>{supplier.contactEmail || '—'}</InfoItem>
+          <InfoItem label="短信通知手机号" mono>{supplier.smsNotifyPhone || '—'}</InfoItem>
           <InfoItem label="联系地址" span={3}>{[supplier.contactProvince, supplier.contactCity, supplier.contactDistrict, supplier.contactAddress].filter(Boolean).join(' ')}</InfoItem>
         </InfoGrid>
       </div>
@@ -331,6 +332,10 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
           <div>
             <label className="pk-reg-label">联系邮箱</label>
             <input className="pk-reg-input" value={form.contactEmail} onChange={e => patch({ contactEmail: e.target.value })} />
+          </div>
+          <div>
+            <label className="pk-reg-label">短信通知手机号</label>
+            <input className="pk-reg-input mono" placeholder="接收订单/审批通知短信" value={form.smsNotifyPhone ?? ''} onChange={e => patch({ smsNotifyPhone: e.target.value })} />
           </div>
           <div>
             <label className="pk-reg-label">联系省份</label>

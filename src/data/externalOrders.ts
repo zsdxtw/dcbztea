@@ -167,7 +167,7 @@ const baseSeeds: ExternalOrder[] = [
     receiver: '翠竹茶行采购部', receiverPhone: '025-8463****', receiverAddress: '江苏南京市玄武区中山东路198号',
     entryTime: '2026-10-21', operator: '运营老陈', sourceChannel: 'push',
     processStatus: 'processed',
-    reportMatches: [{ reportCode: 'BB20261013004', reportType: 'customer', partnerId: '11', partnerName: '杭州云茶供应链管理有限公司' }],
+    reportMatches: [{ reportCode: 'BB20261013004', reportType: 'region', partnerId: '11', partnerName: '杭州云茶供应链管理有限公司' }],
     path: 'distribute',
     partnerId: '11', partnerName: '杭州云茶供应链管理有限公司',
     transferSource: 'report', transferTime: '2026-10-21',

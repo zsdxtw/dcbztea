@@ -18,7 +18,7 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
 const TYPE_STYLE: Record<string, { bg: string; color: string }> = {
   order: { bg: '#E3F2FD', color: '#0F64B5' },
   product: { bg: '#FFF8E1', color: '#B8860B' },
-  customer: { bg: '#F3E5F5', color: '#7B1FA2' },
+  region: { bg: '#F3E5F5', color: '#7B1FA2' },
 };
 
 const pill = (bg: string, color: string, text: string) => (
@@ -52,11 +52,13 @@ export default function SalesReports() {
 
   const statusTag = (status: string) => pill(STATUS_STYLE[status].bg, STATUS_STYLE[status].color, STATUS_LABELS[status]);
 
+  /** 地区文本 */
+  const regionOf = (r: PartnerReport) => r.regions?.length ? r.regions.join('、') : '不限地区';
   /** 报备对象摘要（列表展示） */
   const targetText = (r: PartnerReport) => {
-    if (r.type === 'order') return `订单 ${r.relatedOrderCode ?? '—'}`;
-    if (r.type === 'product') return `${r.productName} · ${r.region} · ${r.customer}`;
-    return r.targetCustomer ?? '—';
+    if (r.type === 'order') return `${r.customerName ?? '—'} · ${r.expectOrderDate ?? '—'} 下单 · ${r.contactPhone ?? '—'}`;
+    if (r.type === 'product') return `${r.productNames?.join('、') ?? '—'} · ${regionOf(r)}`;
+    return regionOf(r);
   };
 
   /** 打开审批弹窗 */
@@ -175,6 +177,7 @@ export default function SalesReports() {
                   {selected.type === 'order' && <InfoItem label="报备模式">{PARTNER_ORDER_KIND_LABELS[selected.orderKind ?? 'self']}</InfoItem>}
                   <InfoItem label="发起合作商" span={2}>{selected.partnerName}</InfoItem>
                   <InfoItem label="提交时间">{selected.submitTime}</InfoItem>
+                  <InfoItem label="有效日期" mono>{selected.validUntil ? `${selected.validUntil}（含当日）` : '长期'}</InfoItem>
                   <InfoItem label="审批状态">{STATUS_LABELS[selected.status]}</InfoItem>
                   {selected.amount != null && <InfoItem label="预计金额" mono>¥{selected.amount.toLocaleString()}</InfoItem>}
                   <InfoItem label="审批时间">{selected.reviewTime || '—'}</InfoItem>
@@ -183,19 +186,27 @@ export default function SalesReports() {
 
               <DrawerSection title="报备对象">
                 <InfoGrid>
+                  <InfoItem label="报备客户" emph span={3}>{selected.customerName ?? '—'}</InfoItem>
                   {selected.type === 'order' && (
-                    <InfoItem label="关联订单编号" mono emph span={3}>{selected.relatedOrderCode}</InfoItem>
+                    <>
+                      <InfoItem label="货源模式">{PARTNER_ORDER_KIND_LABELS[selected.orderKind ?? 'self']}</InfoItem>
+                      <InfoItem label="预计下单日期">{selected.expectOrderDate ?? '—'}</InfoItem>
+                      <InfoItem label="下单地区">{regionOf(selected)}</InfoItem>
+                      <InfoItem label="下单\收件人">{selected.contactName ?? '—'}</InfoItem>
+                      <InfoItem label="下单\收件电话" mono>{selected.contactPhone ?? '—'}</InfoItem>
+                      <InfoItem label="下单商品（多选）" span={3}>{selected.productNames?.length ? selected.productNames.join('、') : '—（未填）'}</InfoItem>
+                      <InfoItem label="内部 SKU" mono>{selected.sku ?? '—（未填）'}</InfoItem>
+                      <InfoItem label="内部下单编号" mono>{selected.internalOrderNo ?? '—（未填）'}</InfoItem>
+                    </>
                   )}
                   {selected.type === 'product' && (
                     <>
-                      <InfoItem label="报备商品" emph>{selected.productName}</InfoItem>
-                      <InfoItem label="商品规格">{selected.productSpec}</InfoItem>
-                      <InfoItem label="报备区域">{selected.region}</InfoItem>
-                      <InfoItem label="报备客户范围" span={3}>{selected.customer}</InfoItem>
+                      <InfoItem label="报备商品（多选）" emph span={3}>{selected.productNames?.join('、') ?? '—'}</InfoItem>
+                      <InfoItem label="报备地区" span={3}>{regionOf(selected)}</InfoItem>
                     </>
                   )}
-                  {selected.type === 'customer' && (
-                    <InfoItem label="报备客户" emph span={3}>{selected.targetCustomer}</InfoItem>
+                  {selected.type === 'region' && (
+                    <InfoItem label="报备地区" span={3}>{regionOf(selected)}（含合作商未经营品牌）</InfoItem>
                   )}
                   <InfoItem label="报备标题" span={3}>{selected.title}</InfoItem>
                   <InfoItem label="报备内容" span={3}>{selected.summary}</InfoItem>
@@ -226,10 +237,11 @@ export default function SalesReports() {
                   </div>
                 )}
                 <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>
-                  {selected.type === 'order' && selected.orderKind === 'self' && '自营报备：审批通过后，命中订单自动转入该合作商名下，由合作商履约。'}
-                  {selected.type === 'order' && selected.orderKind === 'opportunity' && '商机报备：审批通过后，命中订单同步至合作商终端展示，由平台进货发货处理。'}
-                  {selected.type === 'product' && '商品报备：审批通过后，报备商品在报备区域与客户范围内的新订单自动转给该合作商履约。'}
-                  {selected.type === 'customer' && '客户报备：审批通过后，该客户新订单自动转给该合作商履约。'}
+                  {selected.type === 'order' && selected.orderKind === 'self' && '有货源订单报备：审批通过后，命中订单（客户+收件电话/商品/内部单号匹配）自动转入该合作商名下，由合作商供货履约。'}
+                  {selected.type === 'order' && selected.orderKind === 'no_supply' && '无货源订单报备：审批通过后，命中订单进入「报备-匹配待确认」，确认后退回分发-待处理，由平台自营或转派供货商（可指定 / 可比单）履约，合作商终端同步可见。'}
+                  {selected.type === 'product' && '商品报备：审批通过后，该客户在报备地区内命中报备商品的新订单自动转给该合作商履约。'}
+                  {selected.type === 'region' && '地区报备：审批通过后，该客户在报备地区内的新订单（含合作商未经营品牌）自动转给该合作商。'}
+                  匹配优先级：订单报备 &gt; 商品报备 &gt; 地区报备。
                 </div>
               </DrawerSection>
 

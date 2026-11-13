@@ -1382,7 +1382,7 @@ export default function ExternalOrders() {
                           <td>{PARTNER_REPORT_TYPE_LABELS[r.type]}</td>
                           <td style={{ fontSize: 'var(--text-sm)' }}>{r.title}</td>
                           <td style={{ fontSize: 'var(--text-sm)' }}>{r.partnerName}</td>
-                          <td style={{ fontSize: 'var(--text-sm)' }}>{r.productName ? `${r.productName}${r.productSpec ? `（${r.productSpec}）` : ''}` : r.relatedOrderCode ? `订单 ${r.relatedOrderCode}` : '—'}</td>
+                          <td style={{ fontSize: 'var(--text-sm)' }}>{r.productNames?.length ? r.productNames.join('、') : r.type === 'order' ? `预计 ${r.expectOrderDate ?? '—'} 下单 · ${r.contactName ?? ''} ${r.contactPhone ?? ''}`.trim() : (r.regions?.join('、') ?? '—')}</td>
                           <td>{pill(
                             r.status === 'approved' ? '#E8F5E9' : r.status === 'pending' ? '#FBF3E2' : '#FBEDEF',
                             r.status === 'approved' ? '#01795D' : r.status === 'pending' ? '#9A7A1C' : '#C13A54',

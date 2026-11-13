@@ -37,7 +37,7 @@ export const REPORT_STATUS_TONE: Record<string, PillTone> = {
   pending: 'amber', approved: 'green', rejected: 'red',
 };
 export const REPORT_TYPE_TONE: Record<string, PillTone> = {
-  order: 'blue', product: 'amber', customer: 'purple',
+  order: 'blue', product: 'amber', region: 'purple',
 };
 export const SETTLE_STATUS_TONE: Record<string, PillTone> = {
   unsettled: 'amber', pending: 'blue', settled: 'green',

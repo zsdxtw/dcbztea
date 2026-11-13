@@ -958,6 +958,8 @@ export interface SupplierItem {
   contactAddress: string;
   contactPhone: string;
   contactEmail: string;
+  /** 短信通知手机号（接收订单/审批等通知短信） */
+  smsNotifyPhone?: string;
   warehouses: SupplierWarehouse[];
   /** 主营品牌（品牌名称，来源于商品-品牌管理，支持多选） */
   mainBrands?: string[];
@@ -1012,6 +1014,46 @@ export interface SupplierApproval {
 }
 
 /* ─────────────────────────── 新品提醒 / 合作商报价 ─────────────────────────── */
+
+/* ─────────────────────────── 合作商退货管理 ─────────────────────────── */
+
+/** 退货单状态：pending=待受理 / accepted=已受理(待客户寄回) / rejected=已拒绝 / shipped=客户已寄回(待收货) / received=已收货(待处理) / completed=已完成(退款/换货) */
+export type PartnerReturnStatus = 'pending' | 'accepted' | 'rejected' | 'shipped' | 'received' | 'completed';
+
+/** 处理方案：refund=退款 / exchange=换货 */
+export type PartnerReturnSolution = 'refund' | 'exchange';
+
+/** 客户退货单（合作商终端处理） */
+export interface PartnerReturn {
+  id: string;
+  /** 退货编号（TH+日期+3位序号） */
+  code: string;
+  /** 处理合作商 */
+  supplierId: string;
+  supplierName: string;
+  /** 关联销售单号 */
+  sourceOrderCode: string;
+  /** 客户名称 */
+  customerName: string;
+  /** 退货商品（数量为退货数量） */
+  items: { productName: string; spec: string; price: number; quantity: number }[];
+  /** 退货原因 */
+  reason: string;
+  /** 处理方案：退款 / 换货 */
+  solution: PartnerReturnSolution;
+  /** 退款金额（换货时为商品金额） */
+  refundAmount: number;
+  /** 状态 */
+  status: PartnerReturnStatus;
+  /** 客户申请/登记时间 */
+  applyTime: string;
+  /** 受理时间 */
+  acceptTime?: string;
+  /** 完成时间 */
+  finishTime?: string;
+  /** 处理轨迹 */
+  history: { time: string; action: string; detail?: string }[];
+}
 
 /* ─────────────────────────── 合作商通知公告 ─────────────────────────── */
 
@@ -1371,6 +1413,8 @@ export interface PartnerOrder {
   code: string;
   customerName: string;
   customerType: string;
+  /** 收件地区（省+市，如"江苏南京"） */
+  customerRegion?: string;
   items: { productName: string; spec: string; quantity: number; price: number }[];
   /** 订单总金额 */
   totalAmount: number;
@@ -1388,7 +1432,7 @@ export interface PartnerOrder {
   /** 报备转入来源（报备编号），由平台报备规则自动转入的订单才有 */
   sourceReport?: string;
   /** 报备转入类型：order-self=自营订单报备 / order-opportunity=商机订单报备（平台履约）/ product=商品报备 / customer=客户报备 / assign=指定分发 / compare=比单中单 */
-  transferKind?: 'order-self' | 'order-opportunity' | 'product' | 'customer' | 'assign' | 'compare';
+  transferKind?: 'order-self' | 'order-opportunity' | 'product' | 'region' | 'assign' | 'compare';
   /** 比单订单：我是否已报名（待接单展示「待接单-比单中」） */
   compareSigned?: boolean;
   /** 比单报名截止时间戳（毫秒，仅进行中比单） */
@@ -1402,10 +1446,13 @@ export interface PartnerOrder {
 }
 
 /** 合作商报备类型：order=订单报备 / product=商品报备 / customer=客户报备 */
-export type PartnerReportType = 'order' | 'product' | 'customer';
+export type PartnerReportType = 'order' | 'product' | 'region';
 
-/** 订单报备模式：self=自营报备（订单转合作商履约）/ opportunity=商机报备（订单同步展示，由平台进货发货处理） */
-export type PartnerOrderReportKind = 'self' | 'opportunity';
+/**
+ * 订单报备货源：self=有货源（合作商自己供货，订单转合作商履约）/
+ * no_supply=无货源（淡茶半盏自营或转派供货商：可指定、可比单，订单回平台分发）
+ */
+export type PartnerOrderReportKind = 'self' | 'no_supply';
 
 /** 合作商报备状态 */
 export type PartnerReportStatus = 'pending' | 'approved' | 'rejected';
@@ -1426,20 +1473,29 @@ export interface PartnerReport {
   partnerName: string;
   /** 审批时间（管理台审批后） */
   reviewTime?: string;
-  /** 订单报备模式：self=自营报备 / opportunity=商机报备 */
+  /** 报备客户（三类报备均先选客户；"全部客户" 表示不限） */
+  customerName?: string;
+  /** 订单报备货源：self=有货源 / no_supply=无货源 */
   orderKind?: PartnerOrderReportKind;
-  /** 订单报备：关联的平台订单编号 */
-  relatedOrderCode?: string;
-  /** 商品报备：报备商品名称 */
-  productName?: string;
-  /** 商品报备：报备商品规格 */
-  productSpec?: string;
-  /** 商品报备：报备区域（"全部地区" 或具体区域如"江苏"） */
-  region?: string;
-  /** 商品报备：报备客户（"全部客户" 或具体客户名） */
-  customer?: string;
-  /** 客户报备：报备的客户名称 */
-  targetCustomer?: string;
+  /** 订单报备：预计下单日期 */
+  expectOrderDate?: string;
+  /** 订单报备：下单\收件人 */
+  contactName?: string;
+  /** 订单报备：下单\收件电话（匹配订单收件电话） */
+  contactPhone?: string;
+  /** 报备商品（多选）：订单报备非必输（辅助匹配）；商品报备必选（限合作商经营品牌） */
+  productNames?: string[];
+  /** 订单报备：内部 SKU（非必输） */
+  sku?: string;
+  /** 订单报备：内部下单编号（非必输） */
+  internalOrderNo?: string;
+  /**
+   * 报备地区（路径数组）：'全国' | '省' | '省/市' | '省/市/县'；
+   * 订单报备为单地区（数组仅一条），商品/地区报备支持复选多条
+   */
+  regions?: string[];
+  /** 有效日期（含当日；超过该日期的报备失效，不再参与匹配） */
+  validUntil?: string;
 }
 
 /** 平台待分发订单（管理台创建，可被报备规则匹配后自动转入合作商名下） */

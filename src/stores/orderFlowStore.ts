@@ -19,7 +19,7 @@ import type {
 } from '../types';
 import { partnerInRegion } from '../types';
 import { externalOrderSeeds } from '../data/externalOrders';
-import { matchesReport, useReportStore } from './reportStore';
+import { matchesReport, reportPriority, useReportStore } from './reportStore';
 import { useSupplierStore } from './supplierStore';
 import { usePriceStore } from './priceStore';
 import { useScoreStore, getScoreSummary } from './scoreStore';
@@ -67,6 +67,8 @@ export function matchExternalOrder(order: ExternalOrder): ReportMatchInfo[] {
   const suppliers = useSupplierStore.getState().suppliers;
   return reports
     .filter((r) => matchesReport(toPlatformOrder(order), r))
+    // 优先级：订单报备 > 商品报备 > 地区报备（首个匹配即自动分发对象）
+    .sort((a, b) => reportPriority(a) - reportPriority(b))
     .map((r) => ({
       reportCode: r.code,
       reportType: r.type,
@@ -316,6 +318,18 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       if (order.processStatus !== 'report_match_pending') return { ok: false, msg: '订单不在报备-匹配待确认状态' };
       const match = order.reportMatches?.find((m) => m.partnerId && m.partnerName);
       if (!match?.partnerId || !match.partnerName) return { ok: false, msg: '未找到可分发的报备匹配合作商' };
+      // 无货源订单报备：不转合作商履约，退回分发-待处理由平台选择自营 / 指定 / 比单
+      const matchReport = useReportStore.getState().reports.find((r) => r.code === match.reportCode);
+      if (matchReport?.type === 'order' && matchReport.orderKind === 'no_supply') {
+        patchOrder(id, {
+          processStatus: 'pending', reportMatches: undefined,
+          partnerId: undefined, partnerName: undefined, path: undefined, distributeMode: undefined,
+        }, {
+          action: '确认报备匹配（无货源）',
+          detail: `命中 ${match.partnerName} 的无货源订单报备 ${match.reportCode} → 退回分发-待处理，由平台自营或转派供货商（可指定 / 可比单）`,
+        });
+        return { ok: true, msg: `已确认匹配（无货源报备），订单退回分发-待处理由平台分发` };
+      }
       transfer(id, match.partnerId, match.partnerName, 'report', `确认报备匹配 ${match.reportCode}`);
       return { ok: true, msg: `已确认匹配并转出 ${match.partnerName}，等待合作商接单` };
     },
@@ -336,8 +350,19 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         partnerName: r.partnerName,
       })).filter((m) => m.partnerId);
       if (matches.length === 0) return { ok: false, msg: '报备合作商不在合作商档案中' };
-      // 一笔订单可对应多条报备：全部记录为匹配信息，转出给首家报备合作商
+      // 一笔订单可对应多条报备：全部记录为匹配信息，转出给首家勾选报备的合作商
       patchOrder(id, { reportMatches: matches });
+      // 无货源订单报备：退回分发-待处理，由平台自营或转派供货商（可指定 / 可比单）
+      if (reports[0].type === 'order' && reports[0].orderKind === 'no_supply') {
+        patchOrder(id, {
+          processStatus: 'pending', reportMatches: matches,
+          partnerId: undefined, partnerName: undefined, path: undefined, distributeMode: undefined,
+        }, {
+          action: '人工匹配报备（无货源）',
+          detail: `命中 ${matches[0].partnerName} 的无货源订单报备 → 退回分发-待处理，由平台自营或转派供货商（可指定 / 可比单）`,
+        });
+        return { ok: true, msg: `已匹配无货源报备（${matches[0].partnerName}），订单退回分发-待处理由平台分发` };
+      }
       transfer(id, matches[0].partnerId!, matches[0].partnerName, 'report', `人工匹配报备 ${matches.map((m) => m.reportCode).join('、')}`);
       return { ok: true, msg: `已匹配 ${matches.length} 条报备并转出 ${matches[0].partnerName}，等待合作商接单` };
     },
@@ -840,7 +865,8 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       }
       patchOrder(id, {
         partnerStatus: status,
-        ...(status === 'accepted' ? { processStatus: 'processed' as const } : {}),
+        // 接单、或比单中单订单首次推进（跳过接单直入已接单）时，同步流转为已处理
+        ...(status === 'accepted' || order.processStatus === 'distribute_pending' ? { processStatus: 'processed' as const } : {}),
       }, { action: actionLabels[status] ?? '履约推进', detail: status === 'accepted' ? '合作商终端接单 → 已处理' : undefined });
       // PO 状态联动：接单→已确认；签收→全部包裹签收；结算→已结算
       const po = usePurchaseStore.getState();
@@ -855,7 +881,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
 
 /* ── 合作商终端视图 ── */
 
-const TRANSFER_KIND_MAP: Record<string, 'order-self' | 'product' | 'customer' | 'assign' | 'compare'> = {
+const TRANSFER_KIND_MAP: Record<string, 'order-self' | 'product' | 'region' | 'assign' | 'compare'> = {
   report: 'order-self',
   assign: 'assign',
   compare: 'compare',
@@ -870,6 +896,7 @@ export function getPartnerFlowOrders(supplierId: string): PartnerOrder[] {
     code: o.code,
     customerName: o.customerName,
     customerType: o.customerType,
+    customerRegion: o.customerRegion,
     items: o.items.map((it) => ({ productName: it.productName, spec: it.spec, quantity: it.quantity, price: it.price })),
     totalAmount: o.totalAmount,
     deliveryMode: 'direct' as const,
