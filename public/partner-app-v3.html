@@ -1,0 +1,1036 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>淡茶 · 合作商 App v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+ * V3.1 · 清新工具风：冷灰 / 纯白 / 翡翠绿
+ * ═══════════════════════════════════════════════ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: 'Noto Sans SC', 'PingFang SC', sans-serif;
+  background: #E8ECEF; color: #1A1D21; overflow: hidden;
+}
+button, input, select, textarea { font: inherit; }
+button { -webkit-tap-highlight-color: transparent; }
+.stage {
+  height: 100vh; display: flex; align-items: center; justify-content: center;
+  gap: 76px; padding: 20px;
+  background:
+    linear-gradient(rgba(26,29,33,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(26,29,33,.03) 1px, transparent 1px),
+    #EEF1F4;
+  background-size: 44px 44px;
+}
+
+/* 左侧设计说明 */
+.spec { width: 360px; flex-shrink: 0; }
+.spec-brand { display: flex; align-items: center; gap: 11px; margin-bottom: 54px; }
+.spec-logo {
+  width: 38px; height: 38px; border-radius: 10px; background: var(--accent); color: #fff;
+  display: grid; place-items: center; font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 600;
+}
+.spec-brand-name { font-size: 14px; font-weight: 700; letter-spacing: .08em; }
+.spec-brand-sub { font-family: 'Outfit', sans-serif; font-size: 9px; letter-spacing: .22em; color: #94A3B8; margin-top: 3px; }
+.spec-kicker { font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 600; letter-spacing: .25em; color: var(--accent); margin-bottom: 16px; }
+.spec-title { font-size: 38px; line-height: 1.25; letter-spacing: -.04em; font-weight: 700; margin-bottom: 18px; }
+.spec-desc { font-size: 13px; color: #64748B; line-height: 1.9; margin-bottom: 34px; }
+.spec-line { height: 1px; background: #D7DEE6; margin-bottom: 6px; }
+.spec-row { display: flex; gap: 14px; padding: 12px 0; border-bottom: 1px solid #E8ECF0; align-items: baseline; }
+.spec-row b { width: 42px; flex-shrink: 0; font-size: 13px; color: #1A1D21; }
+.spec-row span { font-size: 11.5px; line-height: 1.65; color: #64748B; }
+.spec-palette { display: flex; gap: 8px; margin-top: 26px; }
+.spec-palette i { width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(0,0,0,.08); }
+.spec-note { margin-top: 16px; font-size: 10px; letter-spacing: .08em; color: #94A3B8; }
+
+/* 手机 */
+.phone {
+  width: 375px; height: 812px; flex-shrink: 0; position: relative;
+  padding: 10px; border-radius: 48px; background: #1D201E;
+  box-shadow: 0 34px 80px rgba(30,33,30,.28), 0 0 0 1px rgba(0,0,0,.12);
+}
+.phone::before {
+  content: ''; position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+  width: 104px; height: 27px; border-radius: 20px; background: #1D201E; z-index: 95;
+}
+.screen {
+  width: 100%; height: 100%; border-radius: 38px; overflow: hidden; position: relative;
+  --bg: #F2F5F8; --surface: #FFFFFF; --ink: #1A1D21; --sub: #64748B; --muted: #94A3B8;
+  --line: #E8ECF0; --soft: #F4F6F8; --accent: #16A34A; --accent-soft: #DCFCE7; --accent-dark: #15803D; --dark: #1A1D21;
+  background: var(--bg);
+}
+.statusbar {
+  position: absolute; top: 0; left: 0; right: 0; height: 48px; z-index: 90;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 27px 0; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600;
+  color: var(--ink); pointer-events: none;
+}
+.status-icons { display: flex; align-items: center; gap: 5px; }
+.status-icons svg { width: 15px; height: 15px; }
+
+.pages { position: absolute; inset: 0; }
+.page {
+  position: absolute; inset: 0; bottom: 80px; overflow-y: auto; overflow-x: hidden;
+  display: none; scrollbar-width: none;
+}
+.page::-webkit-scrollbar, .sheet-body::-webkit-scrollbar, .sub-body::-webkit-scrollbar { display: none; }
+.page.active { display: block; animation: enter .25s ease both; }
+@keyframes enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+/* App 页头 */
+.app-head { padding: 62px 20px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.app-head h1 { font-size: 28px; line-height: 1.2; letter-spacing: -.035em; font-weight: 700; }
+.app-head p { font-size: 11px; color: var(--sub); margin-top: 6px; letter-spacing: .01em; }
+.head-actions { display: flex; gap: 8px; }
+.icon-btn {
+  width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); cursor: pointer; position: relative;
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.icon-btn:active { background: var(--soft); }
+.icon-btn svg { width: 17px; height: 17px; }
+.icon-badge {
+  position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; border-radius: 50%;
+  background: #EF4444; border: 2px solid var(--surface);
+}
+.plus-btn {
+  height: 36px; padding: 0 15px; border-radius: 10px; border: none; background: var(--accent);
+  color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px;
+}
+.plus-btn svg { width: 13px; height: 13px; }
+
+/* 通用 */
+.num { font-family: 'Outfit', sans-serif; font-variant-numeric: tabular-nums; }
+.btn {
+  height: 32px; padding: 0 14px; border-radius: 8px; border: none; cursor: pointer;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.btn-dark { background: var(--accent); color: #fff; }
+.btn-dark:active { background: var(--accent-dark); }
+.btn-light { background: var(--soft); color: var(--ink); }
+.btn-brown { background: var(--accent); color: #fff; }
+.status { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 600; white-space: nowrap; }
+.status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.st-amber { color: #D97706; }
+.st-blue { color: #2563EB; }
+.st-purple { color: #7C3AED; }
+.st-green { color: #16A34A; }
+.st-red { color: #DC2626; }
+.st-gray { color: #94A3B8; }
+.tag {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 8px;
+  border-radius: 6px; background: var(--soft); color: var(--sub); font-size: 9.5px; font-weight: 500; white-space: nowrap;
+}
+.tag-brown { background: var(--accent-soft); color: var(--accent-dark); }
+.cards { padding: 0 16px 24px; display: flex; flex-direction: column; gap: 10px; }
+.card {
+  background: var(--surface); border-radius: 12px; padding: 15px;
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(16,24,40,.04);
+  animation: cardIn .25s ease both;
+}
+@keyframes cardIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.code { font-family: 'Outfit', sans-serif; font-size: 10.5px; letter-spacing: .035em; color: var(--muted); }
+.card-name { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.card-title-row { display: flex; align-items: center; gap: 7px; margin-top: 11px; flex-wrap: wrap; }
+.card-desc { font-size: 11.5px; color: var(--sub); line-height: 1.65; margin-top: 8px; }
+.card-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.amount { font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 600; letter-spacing: -.02em; }
+.amount small { font-family: 'Noto Sans SC', sans-serif; font-size: 9.5px; font-weight: 400; color: var(--muted); margin-left: 5px; }
+.date { font-size: 10px; color: var(--muted); margin-top: 3px; }
+.chevron { color: var(--muted); transition: transform .2s ease; display: flex; }
+.card.open .chevron { transform: rotate(180deg); }
+.chevron svg { width: 14px; height: 14px; }
+.actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.expand { margin-top: 12px; padding-top: 11px; border-top: 1px dashed var(--line); animation: enter .2s ease; }
+.exp-label { font-size: 9.5px; font-weight: 700; color: var(--muted); letter-spacing: .12em; margin: 4px 0 7px; }
+.exp-row { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: 11.5px; }
+.exp-row b { color: var(--sub); font-weight: 400; flex-shrink: 0; }
+.exp-row span { text-align: right; color: var(--ink); }
+.product-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 6px 0; font-size: 11.5px; }
+.product-row + .product-row { border-top: 1px dashed var(--line); }
+.product-row .pn { font-weight: 500; }
+.product-row .pn small { color: var(--muted); margin-left: 4px; font-weight: 400; }
+.product-row .pp { font-family: 'Outfit', sans-serif; font-weight: 600; white-space: nowrap; }
+.product-row .pp small { color: var(--muted); font-weight: 400; }
+
+/* 订单概览 */
+.overview { margin: 2px 16px 14px; background: var(--surface); border-radius: 14px; padding: 18px; border: 1px solid var(--line); box-shadow: 0 1px 3px rgba(16,24,40,.04); }
+.ov-top { display: flex; align-items: flex-start; justify-content: space-between; }
+.ov-label { font-size: 11px; color: var(--sub); letter-spacing: .04em; }
+.ov-main { display: flex; align-items: baseline; gap: 7px; margin-top: 7px; }
+.ov-number { font-family: 'Outfit', sans-serif; font-size: 36px; line-height: 1; font-weight: 700; letter-spacing: -.04em; color: var(--accent); }
+.ov-unit { font-size: 12px; color: var(--sub); }
+.ov-go { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--soft); color: var(--accent); display: grid; place-items: center; cursor: pointer; }
+.ov-go svg { width: 17px; height: 17px; }
+.ov-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.ov-cell + .ov-cell { border-left: 1px solid var(--line); padding-left: 14px; }
+.ov-cell .v { font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 600; color: var(--ink); }
+.ov-cell .l { font-size: 9.5px; color: var(--muted); margin-top: 3px; }
+
+/* 订单/退货分段 */
+.segment { display: flex; margin: 0 16px 14px; padding: 4px; border-radius: 10px; background: var(--soft); border: 1px solid var(--line); }
+.segment button {
+  flex: 1; height: 34px; border: none; border-radius: 7px; background: transparent;
+  color: var(--sub); font-size: 12px; font-weight: 500; cursor: pointer;
+}
+.segment button.active { background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: 0 1px 2px rgba(16,24,40,.06); }
+.segment button i { font-style: normal; font-family: 'Outfit', sans-serif; margin-left: 4px; font-size: 10px; color: var(--muted); }
+
+/* 横向筛选 */
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 0 16px 13px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  height: 31px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line);
+  background: transparent; color: var(--sub); font-size: 11px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+.chip i { font-style: normal; font-family: 'Outfit', sans-serif; font-size: 10px; margin-left: 4px; color: var(--muted); }
+.chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chip.active i { color: #BBF7D0; }
+
+/* 报备统计 */
+.mini-stats { display: flex; padding: 3px 20px 18px; }
+.mini-stat { flex: 1; }
+.mini-stat + .mini-stat { border-left: 1px solid var(--line); padding-left: 18px; }
+.mini-stat .v { font-family: 'Outfit', sans-serif; font-size: 25px; font-weight: 600; letter-spacing: -.03em; }
+.mini-stat .l { font-size: 10px; color: var(--sub); margin-top: 2px; }
+.report-card { position: relative; overflow: hidden; }
+.report-card::before { content: ''; position: absolute; left: 0; top: 16px; bottom: 16px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+.report-card.product::before { background: #2563EB; }
+.report-card.region::before { background: #7C3AED; }
+.report-title { font-size: 13.5px; font-weight: 600; line-height: 1.55; margin-top: 10px; }
+.meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 12px; margin-top: 11px; }
+.meta-item .l { font-size: 9.5px; color: var(--muted); }
+.meta-item .v { font-size: 11.5px; font-weight: 500; margin-top: 2px; }
+.review { margin-top: 10px; padding: 9px 11px; border-radius: 10px; background: var(--soft); font-size: 11px; color: var(--sub); line-height: 1.65; }
+.review b { color: var(--ink); font-weight: 600; }
+
+/* 客户池 */
+.search {
+  margin: 0 16px 12px; height: 40px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line);
+  display: flex; align-items: center; gap: 8px; padding: 0 12px;
+}
+.search svg { width: 16px; height: 16px; color: var(--muted); flex-shrink: 0; }
+.search input { flex: 1; border: none; outline: none; background: transparent; font-size: 12px; color: var(--ink); }
+.search input::placeholder { color: var(--muted); }
+.pool-note { padding: 0 20px 12px; font-size: 10.5px; color: var(--sub); }
+.pool-note b { color: var(--ink); font-family: 'Outfit', sans-serif; font-size: 12px; }
+.customer-head { display: flex; align-items: center; gap: 11px; }
+.avatar {
+  width: 42px; height: 42px; border-radius: 10px; background: var(--accent-soft); color: var(--accent-dark);
+  display: grid; place-items: center; font-size: 15px; font-weight: 700; flex-shrink: 0;
+}
+.customer-name { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.customer-region { font-size: 10.5px; color: var(--muted); margin-top: 4px; }
+.customer-contact { display: flex; align-items: center; gap: 6px; margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); font-size: 11px; color: var(--sub); }
+.call {
+  margin-left: auto; width: 31px; height: 31px; border-radius: 8px; border: none;
+  background: var(--accent); color: #fff; display: grid; place-items: center; cursor: pointer;
+}
+.call svg { width: 14px; height: 14px; }
+.customer-meta { display: flex; gap: 15px; margin-top: 9px; font-size: 10px; color: var(--muted); }
+.customer-meta b { color: var(--sub); font-weight: 600; }
+
+/* 结算 */
+.balance {
+  margin: 2px 16px 15px; padding: 19px; border-radius: 14px; background: var(--surface);
+  border: 1px solid var(--line); box-shadow: 0 1px 3px rgba(16,24,40,.04);
+}
+.balance-label { font-size: 11px; color: var(--sub); }
+.balance-value { font-family: 'Outfit', sans-serif; font-size: 31px; font-weight: 700; letter-spacing: -.035em; margin-top: 6px; color: var(--accent); }
+.balance-note { font-size: 10px; color: var(--muted); margin-top: 5px; }
+.balance-grid { display: grid; grid-template-columns: 1fr 1fr; margin-top: 17px; padding-top: 14px; border-top: 1px solid var(--line); }
+.balance-grid > div + div { border-left: 1px solid var(--line); padding-left: 17px; }
+.balance-grid .v { font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 600; }
+.balance-grid .l { font-size: 9.5px; color: var(--muted); margin-top: 3px; }
+.settle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.settle-cell .l { font-size: 9.5px; color: var(--muted); }
+.settle-cell .v { font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600; margin-top: 3px; }
+.settle-cell.big { grid-column: span 2; }
+.settle-cell.big .v { font-size: 21px; color: var(--accent); }
+.fee { color: #DC2626 !important; }
+.settle-progress { margin-top: 11px; padding: 10px; border-radius: 10px; background: var(--soft); }
+.progress-row { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--sub); padding: 3px 0; }
+.progress-row b { color: var(--accent-dark); font-weight: 600; }
+.progress-row span:last-child { margin-left: auto; font-family: 'Outfit', sans-serif; }
+
+/* 我的 */
+.profile { margin: 2px 16px 13px; padding: 17px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 1px 3px rgba(16,24,40,.04); }
+.profile-main { display: flex; align-items: center; gap: 12px; }
+.profile-avatar { width: 49px; height: 49px; border-radius: 12px; background: var(--accent-soft); color: var(--accent-dark); display: grid; place-items: center; font-size: 18px; font-weight: 700; flex-shrink: 0; }
+.profile-name { font-size: 14px; font-weight: 700; line-height: 1.45; color: var(--ink); }
+.profile-code { font-family: 'Outfit', sans-serif; font-size: 10px; color: var(--muted); margin-top: 4px; letter-spacing: .04em; }
+.profile-tags { display: flex; gap: 5px; margin-top: 7px; }
+.profile-tag { font-size: 9px; color: var(--sub); border: 1px solid var(--line); border-radius: 5px; padding: 2px 6px; background: var(--soft); }
+.profile-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.profile-stats > div + div { border-left: 1px solid var(--line); padding-left: 12px; }
+.profile-stats .v { font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600; white-space: nowrap; color: var(--ink); }
+.profile-stats .l { font-size: 9px; color: var(--muted); margin-top: 3px; }
+.section-head { display: flex; align-items: center; justify-content: space-between; padding: 5px 20px 10px; }
+.section-head h3 { font-size: 13px; font-weight: 700; }
+.section-head button { border: none; background: none; color: var(--sub); font-size: 10.5px; cursor: pointer; }
+.quote-preview { margin: 0 16px 14px; padding: 4px 15px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.quote-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; }
+.quote-row + .quote-row { border-top: 1px solid var(--line); }
+.quote-row .qn { flex: 1; min-width: 0; font-size: 11.5px; font-weight: 600; }
+.quote-row .qn small { display: block; font-size: 9.5px; font-weight: 400; color: var(--muted); margin-top: 3px; }
+.quote-row .qp { font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600; }
+.quote-row .qp small { font-size: 9px; color: var(--muted); font-weight: 400; }
+.menu { margin: 0 16px 12px; border-radius: 12px; background: var(--surface); overflow: hidden; border: 1px solid var(--line); }
+.menu-row { display: flex; align-items: center; gap: 11px; padding: 12px 14px; cursor: pointer; }
+.menu-row:active { background: var(--soft); }
+.menu-row + .menu-row { border-top: 1px solid var(--line); }
+.menu-icon { width: 29px; height: 29px; border-radius: 8px; background: var(--soft); display: grid; place-items: center; color: var(--accent-dark); flex-shrink: 0; }
+.menu-icon svg { width: 15px; height: 15px; }
+.menu-label { flex: 1; font-size: 12.5px; font-weight: 500; }
+.menu-extra { font-size: 10px; color: var(--muted); }
+.menu-row > svg { width: 13px; height: 13px; color: var(--muted); }
+.logout { display: block; width: calc(100% - 32px); height: 42px; margin: 3px 16px 10px; border-radius: 10px; border: 1px solid #FECACA; background: transparent; color: #DC2626; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.version { text-align: center; font-family: 'Outfit', sans-serif; font-size: 9px; color: var(--muted); letter-spacing: .06em; padding-bottom: 20px; }
+
+/* 底部导航 */
+.tabbar {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 80px; z-index: 60;
+  display: flex; padding: 8px 5px 23px; background: rgba(255,255,255,.97);
+  border-top: 1px solid var(--line); backdrop-filter: blur(16px);
+}
+.tab {
+  flex: 1; border: none; background: none; color: var(--muted); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+}
+.tab svg { width: 21px; height: 21px; }
+.tab span { font-size: 9.5px; font-weight: 500; }
+.tab.active { color: var(--accent); }
+.tab.active span { font-weight: 700; }
+.tab.active::after { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); margin-top: -1px; }
+
+/* 子页 */
+.subpage {
+  position: absolute; inset: 0; z-index: 75; background: var(--bg);
+  transform: translateX(100%); transition: transform .26s cubic-bezier(.32,.72,.35,1);
+  display: flex; flex-direction: column;
+}
+.subpage.show { transform: none; }
+.sub-head { padding: 58px 16px 13px; display: flex; align-items: center; gap: 10px; background: var(--bg); }
+.back { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; cursor: pointer; }
+.back svg { width: 16px; height: 16px; }
+.sub-head h2 { font-size: 18px; letter-spacing: -.02em; flex: 1; }
+.sub-body { flex: 1; overflow-y: auto; }
+
+/* 底部弹层 */
+.mask { position: absolute; inset: 0; z-index: 100; background: rgba(16,24,40,.35); opacity: 0; pointer-events: none; transition: opacity .2s ease; backdrop-filter: blur(2px); }
+.mask.show { opacity: 1; pointer-events: auto; }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; max-height: 78%; z-index: 110;
+  border-radius: 18px 18px 0 0; background: var(--surface); transform: translateY(102%);
+  transition: transform .28s cubic-bezier(.32,.72,.35,1); display: flex; flex-direction: column;
+  box-shadow: 0 -12px 40px rgba(16,24,40,.12);
+}
+.sheet.show { transform: none; }
+.sheet-handle { width: 36px; height: 4px; border-radius: 4px; background: #E2E8F0; margin: 9px auto 2px; flex-shrink: 0; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 19px 11px; }
+.sheet-title { font-size: 16px; font-weight: 700; letter-spacing: -.02em; }
+.sheet-close { width: 27px; height: 27px; border-radius: 7px; border: none; background: var(--soft); color: var(--sub); cursor: pointer; }
+.sheet-body { overflow-y: auto; padding: 0 19px 30px; }
+.form-row { margin-bottom: 12px; }
+.form-label { display: block; font-size: 11px; font-weight: 600; color: var(--sub); margin-bottom: 6px; }
+.form-label em { color: #DC2626; font-style: normal; }
+.input, .select, .textarea {
+  width: 100%; height: 40px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface); color: var(--ink); outline: none; padding: 0 12px; font-size: 12.5px;
+}
+.textarea { height: 70px; padding: 10px 12px; resize: none; line-height: 1.6; }
+.input:focus, .select:focus, .textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(22,163,74,.12); background: #fff; }
+.select-chips { display: flex; gap: 7px; flex-wrap: wrap; }
+.select-chips button { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--sub); font-size: 11px; cursor: pointer; }
+.select-chips button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.sheet-section { font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: .1em; margin: 15px 0 7px; }
+.info { display: flex; gap: 10px; padding: 8px 0; font-size: 12px; }
+.info + .info { border-top: 1px dashed var(--line); }
+.info b { width: 5em; color: var(--muted); font-weight: 400; flex-shrink: 0; }
+.info span { flex: 1; font-weight: 500; }
+.sheet-foot { display: flex; gap: 9px; padding-top: 15px; }
+.sheet-foot .btn { flex: 1; height: 43px; border-radius: 10px; font-size: 13px; }
+.sheet-foot .btn.primary { flex: 1.7; }
+.file-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; }
+.file-row + .file-row { border-top: 1px solid var(--line); }
+.file-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--accent-soft); color: var(--accent-dark); display: grid; place-items: center; flex-shrink: 0; }
+.file-icon svg { width: 15px; height: 15px; }
+.file-main { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; }
+.file-main small { display: block; font-size: 9.5px; color: var(--muted); font-weight: 400; margin-top: 3px; }
+.notice { padding: 11px 0; }
+.notice + .notice { border-top: 1px solid var(--line); }
+.notice-title { font-size: 12.5px; font-weight: 700; display: flex; gap: 6px; align-items: center; }
+.notice-desc { font-size: 11px; color: var(--sub); line-height: 1.7; margin-top: 6px; }
+.notice-date { font-family: 'Outfit', sans-serif; font-size: 9.5px; color: var(--muted); margin-top: 5px; }
+
+/* Toast & 空态 */
+.toast {
+  position: absolute; top: 60px; left: 50%; transform: translate(-50%,-7px); z-index: 200;
+  max-width: 310px; padding: 10px 16px; border-radius: 10px; background: rgba(26,29,33,.92);
+  color: #fff; font-size: 11.5px; line-height: 1.5; text-align: center;
+  opacity: 0; pointer-events: none; transition: all .23s ease; box-shadow: 0 8px 25px rgba(0,0,0,.18);
+}
+.toast.show { opacity: 1; transform: translate(-50%,0); }
+.empty { text-align: center; padding: 50px 0; color: var(--muted); font-size: 11.5px; }
+.empty::before { content: '—'; display: block; font-family: 'Outfit', sans-serif; font-size: 28px; margin-bottom: 8px; }
+
+@media (max-width: 900px) {
+  .spec { display: none; }
+  .stage { padding: 0; background: var(--bg); }
+  .phone { width: 100vw; height: 100vh; padding: 0; border-radius: 0; box-shadow: none; background: none; }
+  .phone::before { display: none; }
+  .screen { border-radius: 0; }
+}
+</style>
+</head>
+<body>
+<div class="stage">
+  <aside class="spec">
+    <div class="spec-brand">
+      <div class="spec-logo">D</div>
+      <div>
+        <div class="spec-brand-name">淡茶 · 合作商</div>
+        <div class="spec-brand-sub">MOBILE CONCEPT / 03</div>
+      </div>
+    </div>
+    <div class="spec-kicker">CLEAN & FRESH</div>
+    <h1 class="spec-title">轻，<br>是一种清晰。</h1>
+    <p class="spec-desc">以原生 App 的使用习惯重组合作商业务。冷灰背景、纯白卡片、翡翠绿点缀，去掉深色重块与大圆角，让订单、报备与结算回到清爽的信息层级。</p>
+    <div class="spec-line"></div>
+    <div class="spec-row"><b>订单</b><span>待办概览、状态流转、发货、比单与退货统一管理</span></div>
+    <div class="spec-row"><b>报备</b><span>订单 / 商品 / 地区报备，随时提交与追踪审核</span></div>
+    <div class="spec-row"><b>客户池</b><span>按地区发现入池客户，查看报品与联系客户</span></div>
+    <div class="spec-row"><b>结算</b><span>应结金额优先呈现，对账进度清晰可追踪</span></div>
+    <div class="spec-row"><b>我的</b><span>企业档案与经营工具，供货报价集中在这里</span></div>
+    <div class="spec-palette">
+      <i style="background:#F2F5F8"></i><i style="background:#FFFFFF"></i><i style="background:#16A34A"></i><i style="background:#1A1D21"></i>
+    </div>
+    <div class="spec-note">INTERACTIVE PROTOTYPE · FIVE TABS</div>
+  </aside>
+
+  <div class="phone">
+    <div class="screen" id="screen">
+      <div class="statusbar">
+        <span id="clock">9:41</span>
+        <span class="status-icons">
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="14" width="3" height="6" rx="1"/><rect x="7" y="10" width="3" height="10" rx="1"/><rect x="12" y="6" width="3" height="14" rx="1"/><rect x="17" y="3" width="3" height="17" rx="1" opacity=".35"/></svg>
+          <svg viewBox="0 0 24 24" fill="none"><rect x="2" y="7.5" width="17" height="9" rx="2.5" stroke="currentColor" stroke-width="1.4"/><rect x="4" y="9.5" width="10" height="5" rx="1" fill="currentColor"/><path d="M21 11v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </span>
+      </div>
+
+      <main class="pages">
+        <!-- 订单 -->
+        <section class="page" id="page-orders">
+          <header class="app-head">
+            <div><h1>订单</h1><p>处理履约，跟进每一笔交付</p></div>
+            <div class="head-actions">
+              <button class="icon-btn" onclick="openNotices()" aria-label="通知">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 3a4.5 4.5 0 00-4.5 4.5c0 3.5-1.5 4.5-1.5 4.5h12s-1.5-1-1.5-4.5A4.5 4.5 0 0010 3zM8 14.5a2 2 0 004 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg><i class="icon-badge"></i>
+              </button>
+              <button class="icon-btn" onclick="openFilter()" aria-label="筛选">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M3 5h14M6 10h8M8.5 15h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </header>
+          <div class="overview">
+            <div class="ov-top">
+              <div>
+                <div class="ov-label">当前待办</div>
+                <div class="ov-main"><span class="ov-number" id="ovPending">0</span><span class="ov-unit">笔订单待接单</span></div>
+              </div>
+              <button class="ov-go" onclick="goPending()"><svg viewBox="0 0 20 20" fill="none"><path d="M5 15L15 5M7 5h8v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="ov-grid" id="ovGrid"></div>
+          </div>
+          <div class="segment">
+            <button id="modeOrders" class="active" onclick="setOrderMode('orders')">订单管理<i id="ordersCount">0</i></button>
+            <button id="modeReturns" onclick="setOrderMode('returns')">退货管理<i id="returnsCount">0</i></button>
+          </div>
+          <div id="ordersView">
+            <div class="chips" id="orderChips"></div>
+            <div class="cards" id="orderCards"></div>
+          </div>
+          <div id="returnsView" style="display:none">
+            <div class="chips" id="returnChips"></div>
+            <div class="cards" id="returnCards"></div>
+          </div>
+        </section>
+
+        <!-- 报备 -->
+        <section class="page" id="page-reports">
+          <header class="app-head">
+            <div><h1>报备</h1><p>提交业务线索，跟踪平台审核</p></div>
+            <button class="plus-btn" onclick="openNewReport()"><svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>新增报备</button>
+          </header>
+          <div class="mini-stats" id="reportStats"></div>
+          <div class="chips" id="reportChips"></div>
+          <div class="cards" id="reportCards"></div>
+        </section>
+
+        <!-- 客户池 -->
+        <section class="page" id="page-customers">
+          <header class="app-head">
+            <div><h1>客户池</h1><p>发现平台开放给贵司的入池客户</p></div>
+            <span class="tag tag-brown" id="customerCount">0 家</span>
+          </header>
+          <div class="search">
+            <svg viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <input id="customerQuery" placeholder="搜索客户、简称或联系人" oninput="renderCustomers()" />
+          </div>
+          <div class="chips" id="regionChips" style="padding-bottom:10px"></div>
+          <div class="pool-note" id="poolNote"></div>
+          <div class="cards" id="customerCards"></div>
+        </section>
+
+        <!-- 结算 -->
+        <section class="page" id="page-settlement">
+          <header class="app-head">
+            <div><h1>结算</h1><p>订单金额扣除 5% 平台服务费后结算</p></div>
+          </header>
+          <div class="balance" id="balanceCard"></div>
+          <div class="chips" id="settleChips"></div>
+          <div class="cards" id="settleCards"></div>
+        </section>
+
+        <!-- 我的 -->
+        <section class="page" id="page-mine">
+          <header class="app-head">
+            <div><h1>我的</h1><p>企业档案与经营工具</p></div>
+            <button class="icon-btn" onclick="openSettings()" aria-label="设置"><svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.4"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+          </header>
+          <div class="profile">
+            <div class="profile-main">
+              <div class="profile-avatar">云</div>
+              <div>
+                <div class="profile-name">杭州云茶供应链管理有限公司</div>
+                <div class="profile-code">CO-2025-0016</div>
+                <div class="profile-tags"><span class="profile-tag">服务商</span><span class="profile-tag">供货商</span><span class="profile-tag">积分 86</span></div>
+              </div>
+            </div>
+            <div class="profile-stats" id="profileStats"></div>
+          </div>
+          <div class="section-head"><h3>供货报价</h3><button onclick="openQuotes()">全部 4 款 ›</button></div>
+          <div class="quote-preview" id="quotePreview"></div>
+          <div class="section-head"><h3>档案与账号</h3></div>
+          <div class="menu" id="mineMenu1"></div>
+          <div class="section-head"><h3>服务与支持</h3></div>
+          <div class="menu" id="mineMenu2"></div>
+          <button class="logout" onclick="toast('已退出登录（原型演示）')">退出登录</button>
+          <div class="version">DANCHA PARTNER · V1.0.0</div>
+        </section>
+      </main>
+
+      <nav class="tabbar" id="tabbar"></nav>
+
+      <!-- 供货报价子页 -->
+      <div class="subpage" id="quotesPage">
+        <div class="sub-head">
+          <button class="back" onclick="closeQuotes()"><svg viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <h2>供货报价</h2><span class="tag">4 款商品</span>
+        </div>
+        <div class="sub-body">
+          <div class="pool-note" style="padding-top:3px">报价由平台采购报价统一维护，调价需进入采购报（调）价流程。</div>
+          <div class="cards" id="quoteCards"></div>
+        </div>
+      </div>
+
+      <div class="mask" id="mask" onclick="closeSheet()"></div>
+      <div class="sheet" id="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head"><div class="sheet-title" id="sheetTitle"></div><button class="sheet-close" onclick="closeSheet()">✕</button></div>
+        <div class="sheet-body" id="sheetBody"></div>
+      </div>
+      <div class="toast" id="toast"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+ * 业务数据
+ * ═══════════════════════════════════════════════ */
+const ORDERS = [
+  { id:'o1', code:'HHSO20260912001', customer:'华茗堂茶庄', type:'直营客户', items:[{n:'西湖龙井·明前特级',spec:'50g/罐',q:20,p:452},{n:'碧螺春·一级',spec:'100g/袋',q:15,p:328}], amount:13940, delivery:'direct', coop:'supplier', status:'pending', source:'报备转入（有货源）', date:'2026-09-12', ship:'2026-09-15', province:'江苏', receiver:'林掌柜', phone:'138****6677', address:'江苏南京市秦淮区夫子庙街道贡院街12号', remark:'客户周年庆活动，请优先安排发货' },
+  { id:'o2', code:'HHSO20260911002', customer:'清心茶坊', type:'直营客户', items:[{n:'正山小种·特级',spec:'100g/罐',q:30,p:384}], amount:11520, delivery:'warehouse', coop:'supplier', status:'accepted', source:'指定转入', date:'2026-09-11', ship:'2026-09-14', province:'浙江', receiver:'清心茶坊收发部', phone:'139****2210', address:'浙江宁波市鄞州区中山东路2001号' },
+  { id:'o3', code:'HHSO20260910003', customer:'浦发银行', type:'平台客户', items:[{n:'金骏眉·特级',spec:'50g/罐',q:12,p:1024},{n:'白毫银针·特级',spec:'50g/罐',q:8,p:768}], amount:18432, delivery:'direct', coop:'service', status:'shipping', source:'比单转入', date:'2026-09-10', ship:'2026-09-12', province:'上海', receiver:'浦发银行采购中心', phone:'021-5888****', address:'上海市浦东新区浦东南路500号', remark:'走京东慧采平台，需提供随货同行单', logistics:{company:'顺丰速运',no:'SF1234567890123'} },
+  { id:'o4', code:'HHSO20260908004', customer:'天福茗茶', type:'渠道客户', items:[{n:'铁观音·清香一级',spec:'250g/罐',q:40,p:208}], amount:8320, delivery:'warehouse', coop:'service', status:'transit', source:'报备转入（有货源）', date:'2026-09-08', ship:'2026-09-10', province:'福建', receiver:'天福物流部', phone:'0592-566****', address:'福建厦门市思明区莲前西路209号' },
+  { id:'o5', code:'HHSO20260905005', customer:'交通银行', type:'平台客户', items:[{n:'滇红·金芽特级',spec:'100g/罐',q:25,p:224},{n:'祁门红茶·特级',spec:'100g/罐',q:18,p:368}], amount:12224, delivery:'direct', coop:'supplier', status:'delivered', source:'平台分发', date:'2026-09-05', ship:'2026-09-08', province:'上海', receiver:'交通银行总务处', phone:'021-3138****', address:'上海市浦东新区银城中路188号' },
+  { id:'o6', code:'HHSO20260901006', customer:'茗香阁直播', type:'带货客户', items:[{n:'凤凰单丛·蜜兰香',spec:'100g/袋',q:50,p:374}], amount:18700, delivery:'direct', coop:'service', status:'settled', source:'指定转入', date:'2026-09-01', ship:'2026-09-03', province:'广东', receiver:'茗香阁仓储', phone:'137****0912', address:'广东广州市白云区黄石东路288号' },
+  { id:'o7', code:'HHSO20260828007', customer:'八马茶业', type:'渠道客户', items:[{n:'大红袍·特级',spec:'150g/盒',q:22,p:494}], amount:10868, delivery:'warehouse', coop:'supplier', status:'rejected', source:'报备转入（无货源）', date:'2026-08-28', ship:'2026-08-30', province:'福建', receiver:'八马供应链', phone:'0595-266****', address:'福建泉州市安溪县凤城镇工业路1号', remark:'库存不足驳回，已与平台沟通改期' },
+  { id:'o8', code:'HHSO20260825008', customer:'品茗轩', type:'直营客户', items:[{n:'太平猴魁·特级',spec:'100g/盒',q:16,p:530}], amount:8480, delivery:'direct', coop:'supplier', status:'settled', source:'平台分发', date:'2026-08-25', ship:'2026-08-27', province:'安徽', receiver:'品茗轩前厅', phone:'136****3345', address:'安徽合肥市蜀山区长江西路888号' },
+  { id:'o9', code:'HHSO20260913009', customer:'南京翠竹茶行', type:'渠道客户', compare:true, deadline:'02:15:30', items:[{n:'雨花茶·特级',spec:'100g/罐',q:30,p:268}], amount:8040, delivery:'warehouse', coop:'supplier', status:'pending', source:'比单订单', date:'2026-09-13', ship:'2026-09-16', province:'江苏', receiver:'翠竹茶行采购部', phone:'025-8463****', address:'江苏南京市玄武区中山东路198号' }
+];
+const ORDER_STATUS = { pending:['待接单','amber'], accepted:['已接单','blue'], shipping:['发货中','purple'], transit:['妥投','green'], delivered:['已签收','green'], settled:['已结算','gray'], rejected:['已驳回','red'] };
+const ORDER_TABS = [['all','全部'],['pending','待接单'],['accepted','已接单'],['shipping','已发货'],['delivered','已签收'],['settled','已结算'],['rejected','已驳回']];
+
+const REPORTS = [
+  { id:'r1', code:'BB20261013001', type:'order', kind:'self', title:'华茗堂茶庄中秋团购订单报备（有货源）', customer:'华茗堂茶庄', object:'西湖龙井·明前特级', region:'江苏/南京市', valid:'2026-12-31', amount:27120, status:'pending', submit:'2026-10-13 10:30', summary:'中秋福利团购西湖龙井·明前特级约 60 罐，由我方供货履约，申请有货源订单报备', expect:'2026-10-20' },
+  { id:'r2', code:'BB20261012002', type:'order', kind:'no_supply', title:'清心茶坊金骏眉订单报备（无货源）', customer:'清心茶坊', object:'金骏眉·特级', region:'浙江/杭州市', valid:'2026-12-31', amount:10240, status:'pending', submit:'2026-10-12 16:20', summary:'金骏眉采购需求由本合作商推介达成，我方无该货源，申请无货源报备', expect:'2026-10-25' },
+  { id:'r3', code:'BB20260910003', type:'product', title:'武夷岩茶·水金龟商品报备（江苏 · 全部客户）', customer:'全部客户', object:'武夷岩茶·水金龟', region:'江苏', valid:'2027-06-30', amount:null, status:'approved', submit:'2026-09-10 09:15', summary:'我方已在江苏区域重点推广，申请该区域该商品订单自动匹配转给我方', review:'商品资质齐全，同意江苏区域报备', reviewTime:'2026-09-11 14:20' },
+  { id:'r4', code:'BB20261013004', type:'region', title:'南京翠竹茶行地区报备（江苏·南京市）', customer:'南京翠竹茶行', object:'全部商品', region:'江苏/南京市', valid:'2027-03-31', amount:null, status:'pending', submit:'2026-10-13 11:40', summary:'该客户在南京地区的全部订单申请报备匹配转给我方，含未经营品牌' },
+  { id:'r5', code:'BB20260905005', type:'region', title:'苏州吴门茶事地区报备（江苏·苏州市）', customer:'苏州吴门茶事', object:'全部商品', region:'江苏/苏州市', valid:'2026-10-31', amount:null, status:'rejected', submit:'2026-09-05 11:40', summary:'个人工作室客户，申请该客户苏州地区订单转给我方', review:'与现有渠道客户重合，建议并入天福茗茶渠道', reviewTime:'2026-09-06 09:30' }
+];
+const REPORT_TYPE = { order:'订单报备', product:'商品报备', region:'地区报备' };
+const REPORT_STATUS = { pending:['待审核','amber'], approved:['已通过','green'], rejected:['已驳回','red'] };
+const REPORT_TABS = [['all','全部'],['order','订单报备'],['product','商品报备'],['region','地区报备']];
+
+const CUSTOMERS = [
+  { id:'c1', name:'华茗堂茶庄', type:'直营客户', level:'A', province:'江苏', city:'南京市', district:'秦淮区', person:'林掌柜', phone:'138****6677', active:true, scope:'江苏 / 南京市', products:[{n:'西湖龙井·明前特级',spec:'50g/罐',price:452,market:580},{n:'碧螺春·一级',spec:'100g/袋',price:328,market:420},{n:'黄山毛峰·特级',spec:'50g/罐',price:359,market:460}] },
+  { id:'c2', name:'清心茶坊', type:'直营客户', level:'B', province:'浙江', city:'宁波市', district:'鄞州区', person:'王坊主', phone:'139****2210', active:true, scope:'浙江 / 宁波市', products:[{n:'正山小种·特级',spec:'100g/罐',price:384,market:480},{n:'金骏眉·特级',spec:'50g/罐',price:1024,market:1280}] },
+  { id:'c3', name:'浦发银行', type:'平台客户', level:'A', province:'上海', city:'浦东新区', district:'', person:'浦发采购中心', phone:'021-5888****', active:true, scope:'全国', products:[{n:'金骏眉·特级',spec:'50g/罐',price:1024,market:1280},{n:'白毫银针·特级',spec:'50g/罐',price:768,market:960},{n:'滇红·金芽特级',spec:'100g/罐',price:224,market:320}] },
+  { id:'c4', name:'天福茗茶', type:'渠道客户', level:'B', province:'福建', city:'厦门市', district:'思明区', person:'天福采购部', phone:'0592-566****', active:true, scope:'福建 / 厦门市', products:[{n:'铁观音·清香一级',spec:'250g/罐',price:208,market:320},{n:'大红袍·特级',spec:'150g/盒',price:494,market:720}] },
+  { id:'c5', name:'茗香阁直播', type:'带货客户', level:'C', province:'广东', city:'广州市', district:'白云区', person:'阁主', phone:'137****0912', active:false, scope:'广东 / 广州市', products:[{n:'凤凰单丛·蜜兰香',spec:'100g/袋',price:374,market:560},{n:'寿眉·2019年陈',spec:'350g/饼',price:158,market:220}] },
+  { id:'c6', name:'南京翠竹茶行', type:'渠道客户', level:'B', province:'江苏', city:'南京市', district:'玄武区', person:'周掌柜', phone:'025-8463****', active:true, scope:'江苏 / 南京市', products:[{n:'雨花茶·特级',spec:'100g/罐',price:238,market:328},{n:'碧螺春·一级',spec:'100g/袋',price:328,market:420}] }
+];
+const PROVINCES = ['全部地区','江苏','浙江','上海','福建','广东','安徽'];
+const CITIES = { '江苏':['南京市','苏州市'], '浙江':['杭州市','宁波市'], '上海':['浦东新区','黄浦区'], '福建':['厦门市','泉州市'], '广东':['广州市','深圳市'], '安徽':['合肥市'] };
+
+const SETTLEMENTS = [
+  { id:'s1', code:'JS2026090001', period:'2026-09', count:3, orderAmount:43896, fee:2194.8, amount:41701.2, method:'对公转账', status:'unsettled', created:'2026-09-12', orders:['HHSO20260912001','HHSO20260911002','HHSO20260910003'] },
+  { id:'s2', code:'JS2026080002', period:'2026-08', count:2, orderAmount:32168, fee:1608.4, amount:30559.6, method:'对公转账', status:'pending', created:'2026-09-02', orders:['HHSO20260828007','HHSO20260825008'] },
+  { id:'s3', code:'JS2026070003', period:'2026-07', count:2, orderAmount:30924, fee:1546.2, amount:29377.8, method:'对公转账', status:'settled', created:'2026-08-02', paid:'2026-08-09', orders:['HHSO20260718009','HHSO20260710010'] }
+];
+const SETTLE_STATUS = { unsettled:['待结算','amber'], pending:['结算中','blue'], settled:['已结算','green'] };
+const SETTLE_TABS = [['unsettled','待结算'],['pending','结算中'],['settled','已结算'],['all','全部']];
+
+const RETURNS = [
+  { id:'t1', code:'TH20260901001', order:'HHSO20260828007', customer:'华茗堂茶庄', product:'西湖龙井·明前特级 × 2', reason:'外罐运输破损', amount:904, solution:'refund', status:'pending', time:'2026-09-13 09:20' },
+  { id:'t2', code:'TH20260912002', order:'HHSO20260901006', customer:'茗香阁直播', product:'凤凰单丛·蜜兰香 × 1', reason:'客户改单', amount:374, solution:'exchange', status:'accepted', time:'2026-09-12 15:40' },
+  { id:'t3', code:'TH20260910003', order:'HHSO20260905005', customer:'交通银行', product:'滇红·金芽特级 × 3', reason:'包装受潮', amount:672, solution:'refund', status:'shipped', time:'2026-09-10 11:05' },
+  { id:'t4', code:'TH20260908004', order:'HHSO20260908004', customer:'天福茗茶', product:'铁观音·清香一级 × 1', reason:'规格不符', amount:208, solution:'exchange', status:'received', time:'2026-09-08 16:30' },
+  { id:'t5', code:'TH20260815008', order:'HHSO20260825008', customer:'品茗轩', product:'太平猴魁·特级 × 1', reason:'临期换货', amount:530, solution:'exchange', status:'completed', time:'2026-08-15 10:10' },
+  { id:'t6', code:'TH20260812007', order:'HHSO20260825008', customer:'八马茶业', product:'大红袍·特级 × 2', reason:'客户取消采购', amount:988, solution:'refund', status:'rejected', time:'2026-08-12 14:00' }
+];
+const RETURN_STATUS = { pending:['待受理','amber'], accepted:['待寄回','blue'], shipped:['待收货','purple'], received:['待处理','green'], completed:['已完成','gray'], rejected:['已拒绝','red'] };
+const RETURN_TABS = [['all','全部'],['pending','待受理'],['accepted','待寄回'],['shipped','待收货'],['received','待处理'],['completed','已完成'],['rejected','已拒绝']];
+
+const QUOTES = [
+  { name:'西湖龙井·明前特级', spec:'50g/罐', brand:'西湖牌', price:452, market:580, status:'已生效', date:'2026-08-20' },
+  { name:'碧螺春·一级', spec:'100g/袋', brand:'碧螺春', price:328, market:420, status:'已生效', date:'2026-08-20' },
+  { name:'正山小种·特级', spec:'100g/罐', brand:'正山堂', price:384, market:480, status:'待审核', date:'2026-09-12' },
+  { name:'凤凰单丛·蜜兰香', spec:'100g/袋', brand:'八马', price:374, market:560, status:'已生效', date:'2026-07-05' }
+];
+const NOTICES = [
+  { title:'中秋备货通知', top:true, desc:'中秋礼盒备货截止 9 月 18 日，请提前确认货源与物流运力。', date:'2026-09-01' },
+  { title:'结算周期调整公告', desc:'自 10 月起，结算周期由月结调整为半月结，请留意确认时限。', date:'2026-08-28' },
+  { title:'报备规则 v2 上线', desc:'新增地区报备类型，审核时效缩短至 1 个工作日。', date:'2026-08-15' }
+];
+
+/* ═══════════════════════════════════════════════
+ * 状态与工具
+ * ═══════════════════════════════════════════════ */
+const S = {
+  tab:'orders', orderMode:'orders', orderStatus:'all', orderDoingFilter:false, orderOpen:new Set(),
+  filter:{keyword:'',delivery:'',coop:'',customer:'',province:''},
+  reportType:'all', reportOpen:new Set(), customerProvince:'全部地区', customerCity:'', customerOpen:new Set(),
+  settleStatus:'unsettled', settleOpen:new Set(), returnStatus:'all', returnOpen:new Set()
+};
+const $ = id => document.getElementById(id);
+const esc = value => String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const money = value => '¥' + Number(value).toLocaleString('zh-CN',{minimumFractionDigits:Number.isInteger(value)?0:2,maximumFractionDigits:2});
+const statusHtml = (text,tone) => `<span class="status st-${tone}">${esc(text)}</span>`;
+const empty = text => `<div class="empty">${text}</div>`;
+let toastTimer;
+function toast(text){ const el=$('toast'); el.textContent=text; el.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),1900); }
+function toggle(set,id){ set.has(id)?set.delete(id):set.add(id); }
+function tick(){ const d=new Date(); $('clock').textContent=d.getHours()+':'+String(d.getMinutes()).padStart(2,'0'); }
+tick(); setInterval(tick,15000);
+
+/* ═══════════════════════════════════════════════
+ * 订单与退货
+ * ═══════════════════════════════════════════════ */
+function baseOrders(){
+  return ORDERS.filter(o=>{
+    const f=S.filter;
+    if(f.keyword){ const k=f.keyword; if(!(o.code.includes(k)||o.customer.includes(k)||o.items.some(i=>i.n.includes(k)))) return false; }
+    if(f.delivery&&o.delivery!==f.delivery) return false;
+    if(f.coop&&o.coop!==f.coop) return false;
+    if(f.customer&&o.customer!==f.customer) return false;
+    if(f.province&&o.province!==f.province) return false;
+    return true;
+  });
+}
+function orderCount(key){
+  const list=baseOrders();
+  if(key==='all') return list.length;
+  if(key==='shipping') return list.filter(o=>o.status==='shipping'||o.status==='transit').length;
+  return list.filter(o=>o.status===key).length;
+}
+function renderOrderSummary(){
+  const list=baseOrders();
+  const pending=list.filter(o=>o.status==='pending').length;
+  $('ovPending').textContent=pending;
+  const doing=list.filter(o=>['accepted','shipping'].includes(o.status)).length;
+  const sign=list.filter(o=>o.status==='transit').length;
+  const amount=list.filter(o=>o.status==='delivered').reduce((n,o)=>n+o.amount,0);
+  $('ovGrid').innerHTML=`
+    <div class="ov-cell" onclick="goFilter('doing')" style="cursor:pointer"><div class="v">${doing} 单</div><div class="l">履约中</div></div>
+    <div class="ov-cell" onclick="goFilter('transit')" style="cursor:pointer"><div class="v">${sign} 单</div><div class="l">待签收</div></div>
+    <div class="ov-cell"><div class="v">${money(amount)}</div><div class="l">待结算</div></div>`;
+  $('ordersCount').textContent=list.length;
+  $('returnsCount').textContent=RETURNS.filter(r=>['pending','shipped','received'].includes(r.status)).length;
+}
+function goFilter(status){ S.orderMode='orders'; setOrderMode('orders'); S.orderStatus=status==='doing'?'accepted':status; S.orderDoingFilter=status==='doing'; renderOrderChips(); renderOrders(); $('page-orders').scrollTop=0; }
+function renderOrderChips(){
+  $('orderChips').innerHTML=ORDER_TABS.map(([key,label])=>`<button class="chip${S.orderStatus===key?' active':''}" onclick="setOrderStatus('${key}')">${label}<i>${orderCount(key)}</i></button>`).join('');
+}
+function setOrderStatus(key){ S.orderStatus=key; S.orderDoingFilter=false; renderOrderChips(); renderOrders(); }
+function goPending(){ S.orderMode='orders'; setOrderMode('orders'); setOrderStatus('pending'); }
+function orderActions(o){
+  const detail=`<button class="btn btn-light" onclick="event.stopPropagation();toggle(S.orderOpen,'${o.id}');renderOrders()">${S.orderOpen.has(o.id)?'收起':'详情'}</button>`;
+  if(o.status==='pending'){
+    const main=o.compare?`<button class="btn btn-dark" onclick="event.stopPropagation();openCompare('${o.id}')">报名比单</button>`:`<button class="btn btn-dark" onclick="event.stopPropagation();acceptOrder('${o.id}')">接单</button>`;
+    return main+detail;
+  }
+  if(o.status==='accepted') return `<button class="btn btn-dark" onclick="event.stopPropagation();openShip('${o.id}')">发货</button>`+detail;
+  if(o.status==='shipping') return `<button class="btn btn-dark" onclick="event.stopPropagation();advanceOrder('${o.id}','transit','已确认妥投，等待客户签收')">确认妥投</button>`+detail;
+  if(o.status==='transit') return `<button class="btn btn-dark" onclick="event.stopPropagation();advanceOrder('${o.id}','delivered','客户已签收，订单进入结算')">确认签收</button>`+detail;
+  return detail;
+}
+function acceptOrder(id){ ORDERS.find(o=>o.id===id).status='accepted'; refreshOrders(); toast('已接单，请尽快安排发货'); }
+function advanceOrder(id,status,message){ ORDERS.find(o=>o.id===id).status=status; refreshOrders(); toast(message); }
+function refreshOrders(){ renderOrderSummary(); renderOrderChips(); renderOrders(); }
+function renderOrders(){
+  let list;
+  if(S.orderDoingFilter){ list=baseOrders().filter(o=>['accepted','shipping'].includes(o.status)); }
+  else if(S.orderStatus==='all'){ list=baseOrders(); }
+  else if(S.orderStatus==='shipping'){ list=baseOrders().filter(o=>o.status==='shipping'||o.status==='transit'); }
+  else { list=baseOrders().filter(o=>o.status===S.orderStatus); }
+  if(!list.length){ $('orderCards').innerHTML=empty('该状态下暂无订单'); return; }
+  $('orderCards').innerHTML=list.map(o=>{
+    const [label,tone]=ORDER_STATUS[o.status]; const open=S.orderOpen.has(o.id);
+    const quantity=o.items.reduce((n,i)=>n+i.q,0);
+    return `<article class="card${open?' open':''}">
+      <div class="card-top" onclick="toggle(S.orderOpen,'${o.id}');renderOrders()" style="cursor:pointer"><span class="code">${o.code}</span>${statusHtml(label,tone)}</div>
+      <div class="card-title-row"><span class="card-name">${esc(o.customer)}</span><span class="tag">${esc(o.type)}</span>${o.compare?'<span class="tag tag-brown">比单 '+esc(o.deadline)+'</span>':''}</div>
+      <div class="card-desc">${o.items.map(i=>esc(i.n)).join('、')} · 共 ${quantity} 件</div>
+      <div class="card-title-row" style="margin-top:7px"><span class="tag">${o.delivery==='direct'?'直送订单':'入仓订单'}</span><span class="tag">${o.coop==='supplier'?'差价模式':'扣点模式'}</span><span class="tag">${esc(o.source)}</span></div>
+      <div class="card-bottom">
+        <div><div class="amount">${money(o.amount)}<small>合计</small></div><div class="date">期望发货 ${o.ship} · 下单 ${o.date}</div></div>
+        <span class="chevron"><svg viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      </div>
+      ${open?`<div class="expand">
+        <div class="exp-label">商品明细</div>
+        ${o.items.map(i=>`<div class="product-row"><span class="pn">${esc(i.n)}<small>${esc(i.spec)}</small></span><span class="pp">×${i.q}<small> @ ${money(i.p)}</small></span></div>`).join('')}
+        <div class="exp-label" style="margin-top:11px">收货信息</div>
+        <div class="exp-row"><b>收件人</b><span>${esc(o.receiver)} ${esc(o.phone)}</span></div>
+        <div class="exp-row"><b>地址</b><span>${esc(o.address)}</span></div>
+        ${o.logistics?`<div class="exp-row"><b>物流</b><span>${esc(o.logistics.company)} ${esc(o.logistics.no)}</span></div>`:''}
+        ${o.remark?`<div class="exp-row"><b>备注</b><span>${esc(o.remark)}</span></div>`:''}
+      </div>`:''}
+      <div class="actions">${orderActions(o)}</div>
+    </article>`;
+  }).join('');
+}
+function setOrderMode(mode){
+  S.orderMode=mode;
+  $('modeOrders').classList.toggle('active',mode==='orders');
+  $('modeReturns').classList.toggle('active',mode==='returns');
+  $('ordersView').style.display=mode==='orders'?'':'none';
+  $('returnsView').style.display=mode==='returns'?'':'none';
+  if(mode==='returns'){ renderReturnChips(); renderReturns(); }
+}
+
+/* 发货 */
+function openShip(id){
+  const o=ORDERS.find(x=>x.id===id);
+  openSheet('确认发货',`
+    <div class="info"><b>订单</b><span class="num">${o.code}</span></div>
+    <div class="form-row" style="margin-top:12px"><label class="form-label">物流公司 <em>*</em></label><input class="input" id="shipCompany" placeholder="如 顺丰速运" /></div>
+    <div class="form-row"><label class="form-label">物流单号 <em>*</em></label><input class="input num" id="shipNo" placeholder="请输入运单号" /></div>
+    <div class="sheet-section">发货数量（支持按商品拆包）</div>
+    ${o.items.map((i,index)=>`<div class="product-row" style="align-items:center"><span class="pn">${esc(i.n)}<small>${esc(i.spec)} · 共 ${i.q} 件</small></span><input class="input num" id="shipQty${index}" value="${i.q}" style="width:64px;height:32px;text-align:center" /></div>`).join('')}
+    <div class="sheet-foot"><button class="btn btn-light" onclick="closeSheet()">取消</button><button class="btn btn-dark primary" onclick="submitShip('${id}')">确认发货</button></div>`);
+}
+function submitShip(id){
+  const company=$('shipCompany').value.trim(), no=$('shipNo').value.trim();
+  if(!company){ toast('请填写物流公司'); return; }
+  if(!no){ toast('请填写物流单号'); return; }
+  const o=ORDERS.find(x=>x.id===id); o.status='shipping'; o.logistics={company,no};
+  closeSheet(); refreshOrders(); toast('已发货，物流信息已同步客户');
+}
+function openCompare(id){
+  const o=ORDERS.find(x=>x.id===id);
+  openSheet('比单报名',`
+    <div class="info"><b>订单</b><span class="num">${o.code}</span></div>
+    <div class="info"><b>比单截止</b><span style="color:#DC2626">${esc(o.deadline)} 倒计时</span></div>
+    <div class="sheet-section">参与商品</div>
+    ${o.items.map(i=>`<div class="product-row"><span class="pn">${esc(i.n)}<small>${esc(i.spec)} × ${i.q}</small></span><span class="pp">底价 ${money(Math.round(i.p*.9))}</span></div>`).join('')}
+    <div class="form-row" style="margin-top:13px"><label class="form-label">我的报价（元）<em>*</em></label><input class="input num" id="compareAmount" value="${o.amount}" /></div>
+    <div class="sheet-foot"><button class="btn btn-dark primary" onclick="submitCompare('${id}')">提交报名</button></div>`);
+}
+function submitCompare(id){
+  const amount=Number($('compareAmount').value); if(!amount){ toast('请输入有效报价'); return; }
+  const o=ORDERS.find(x=>x.id===id); o.compareSigned=true; o.myQuote=amount;
+  closeSheet(); toast('报名已提交，中单后将自动转入已接单');
+}
+
+/* 多维筛选 */
+let draftFilter={};
+function openFilter(){
+  draftFilter={...S.filter};
+  const customers=[...new Set(ORDERS.map(o=>o.customer))];
+  const chips=(key,items)=>`<div class="select-chips">${items.map(([v,l])=>`<button class="${S.filter[key]===v?'on':''}" data-v="${esc(v)}" onclick="pickFilter(this,'${key}')">${esc(l)}</button>`).join('')}</div>`;
+  openSheet('筛选订单',`
+    <div class="form-row"><label class="form-label">关键词</label><input class="input" id="filterKeyword" value="${esc(S.filter.keyword)}" placeholder="订单编号 / 客户 / 商品" /></div>
+    <div class="sheet-section">配送方式</div>${chips('delivery',[['','不限'],['direct','直送订单'],['warehouse','入仓订单']])}
+    <div class="sheet-section">合作模式</div>${chips('coop',[['','不限'],['supplier','差价模式'],['service','扣点模式']])}
+    <div class="sheet-section">收单地区</div>${chips('province',[['','不限'],['江苏','江苏'],['浙江','浙江'],['上海','上海'],['福建','福建'],['广东','广东'],['安徽','安徽']])}
+    <div class="sheet-section">客户</div>${chips('customer',[['','不限'],...customers.map(c=>[c,c])])}
+    <div class="sheet-foot"><button class="btn btn-light" onclick="resetFilter()">重置</button><button class="btn btn-dark primary" onclick="applyFilter()">查看结果</button></div>`);
+}
+function pickFilter(button,key){ button.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on')); button.classList.add('on'); draftFilter[key]=button.dataset.v; }
+function resetFilter(){ S.filter={keyword:'',delivery:'',coop:'',customer:'',province:''}; closeSheet(); refreshOrders(); toast('筛选条件已重置'); }
+function applyFilter(){ draftFilter.keyword=$('filterKeyword').value.trim(); S.filter={...draftFilter}; closeSheet(); refreshOrders(); toast(`已筛选出 ${baseOrders().length} 笔订单`); }
+
+/* 退货 */
+function renderReturnChips(){
+  const count=key=>key==='all'?RETURNS.length:RETURNS.filter(r=>r.status===key).length;
+  $('returnChips').innerHTML=RETURN_TABS.map(([key,label])=>`<button class="chip${S.returnStatus===key?' active':''}" onclick="S.returnStatus='${key}';renderReturnChips();renderReturns()">${label}<i>${count(key)}</i></button>`).join('');
+}
+function renderReturns(){
+  renderOrderSummary();
+  const list=S.returnStatus==='all'?RETURNS:RETURNS.filter(r=>r.status===S.returnStatus);
+  if(!list.length){ $('returnCards').innerHTML=empty('暂无该状态退货单'); return; }
+  $('returnCards').innerHTML=list.map(r=>{
+    const [label,tone]=RETURN_STATUS[r.status]; const open=S.returnOpen.has(r.id); let main='';
+    if(r.status==='pending') main=`<button class="btn btn-dark" onclick="advanceReturn('${r.id}','accepted','已受理，请通知客户寄回商品')">受理</button>`;
+    if(r.status==='shipped') main=`<button class="btn btn-dark" onclick="advanceReturn('${r.id}','received','已确认收货，待质检处理')">确认收货</button>`;
+    if(r.status==='received') main=`<button class="btn btn-dark" onclick="advanceReturn('${r.id}','completed','退款/换货处理已完成')">完成处理</button>`;
+    return `<article class="card${open?' open':''}">
+      <div class="card-top" onclick="toggle(S.returnOpen,'${r.id}');renderReturns()" style="cursor:pointer"><span class="code">${r.code}</span>${statusHtml(label,tone)}</div>
+      <div class="card-title-row"><span class="card-name" style="font-size:14px">${esc(r.customer)}</span><span class="tag">${r.solution==='refund'?'退款':'换货'}</span></div>
+      <div class="card-desc">${esc(r.product)}</div>
+      <div class="card-bottom"><div><div class="amount" style="color:#DC2626">${money(r.amount)}<small>退款金额</small></div><div class="date">申请 ${r.time}</div></div><span class="chevron"><svg viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+      ${open?`<div class="expand"><div class="exp-row"><b>关联销售单</b><span class="num">${r.order}</span></div><div class="exp-row"><b>退货原因</b><span>${esc(r.reason)}</span></div><div class="exp-row"><b>处理方案</b><span>${r.solution==='refund'?'退款':'换货'}</span></div></div>`:''}
+      <div class="actions">${main}<button class="btn btn-light" onclick="toggle(S.returnOpen,'${r.id}');renderReturns()">${open?'收起':'详情'}</button></div>
+    </article>`;
+  }).join('');
+}
+function advanceReturn(id,status,message){ RETURNS.find(r=>r.id===id).status=status; renderReturnChips(); renderReturns(); toast(message); }
+
+/* ═══════════════════════════════════════════════
+ * 报备
+ * ═══════════════════════════════════════════════ */
+function renderReportStats(){
+  const count=status=>REPORTS.filter(r=>r.status===status).length;
+  $('reportStats').innerHTML=`
+    <div class="mini-stat" onclick="reportFilterStatus('pending')" style="cursor:pointer"><div class="v">${count('pending')}</div><div class="l">待审核</div></div>
+    <div class="mini-stat" onclick="reportFilterStatus('approved')" style="cursor:pointer"><div class="v">${count('approved')}</div><div class="l">已通过</div></div>
+    <div class="mini-stat" onclick="reportFilterStatus('rejected')" style="cursor:pointer"><div class="v">${count('rejected')}</div><div class="l">已驳回</div></div>`;
+}
+let reportStatusFilter='';
+function reportFilterStatus(status){ reportStatusFilter=status; renderReports(); toast('已筛选：'+(status==='pending'?'待审核':status==='approved'?'已通过':'已驳回')); }
+function renderReportChips(){
+  const count=key=>key==='all'?REPORTS.length:REPORTS.filter(r=>r.type===key).length;
+  $('reportChips').innerHTML=REPORT_TABS.map(([key,label])=>`<button class="chip${S.reportType===key?' active':''}" onclick="S.reportType='${key}';reportStatusFilter='';renderReportChips();renderReports()">${label}<i>${count(key)}</i></button>`).join('');
+}
+function renderReports(){
+  let list=S.reportType==='all'?REPORTS:REPORTS.filter(r=>r.type===S.reportType);
+  if(reportStatusFilter) list=list.filter(r=>r.status===reportStatusFilter);
+  if(!list.length){ $('reportCards').innerHTML=empty('暂无符合条件的报备'); return; }
+  $('reportCards').innerHTML=list.map(r=>{
+    const [label,tone]=REPORT_STATUS[r.status]; const open=S.reportOpen.has(r.id);
+    const kind=r.type==='order'?(r.kind==='self'?'有货源':'无货源'):(r.type==='product'?'商品 + 区域':'客户 + 地区');
+    return `<article class="card report-card ${r.type}${open?' open':''}">
+      <div class="card-top" onclick="toggle(S.reportOpen,'${r.id}');renderReports()" style="cursor:pointer"><span class="code">${r.code}</span>${statusHtml(label,tone)}</div>
+      <div class="report-title">${esc(r.title)}</div>
+      <div class="card-title-row" style="margin-top:8px"><span class="tag tag-brown">${REPORT_TYPE[r.type]}</span><span class="tag">${kind}</span><span class="tag">提交 ${r.submit.slice(5,10)}</span></div>
+      <div class="meta-grid">
+        <div class="meta-item"><div class="l">报备客户</div><div class="v">${esc(r.customer)}</div></div>
+        <div class="meta-item"><div class="l">报备区域</div><div class="v">${esc(r.region)}</div></div>
+        <div class="meta-item"><div class="l">${r.type==='order'?'下单商品':'报备对象'}</div><div class="v">${esc(r.object)}</div></div>
+        <div class="meta-item"><div class="l">有效期至</div><div class="v num">${r.valid}</div></div>
+        ${r.amount!==null?`<div class="meta-item"><div class="l">预计金额</div><div class="v num">${money(r.amount)}</div></div>`:''}
+      </div>
+      ${open?`<div class="expand"><div class="card-desc" style="margin-top:0">${esc(r.summary)}</div>${r.expect?`<div class="exp-row"><b>预计下单</b><span>${r.expect}</span></div>`:''}<div class="review"><b>${r.review?'平台审核意见':'审核进度'}</b><br>${esc(r.review||'平台审核中，审核时效一般 1 个工作日')}${r.reviewTime?`<div class="date">${r.reviewTime}</div>`:''}</div></div>`:''}
+      <div class="actions"><button class="btn btn-light" onclick="toggle(S.reportOpen,'${r.id}');renderReports()">${open?'收起':'查看详情'}</button></div>
+    </article>`;
+  }).join('');
+}
+let reportType='order',reportKind='self';
+function openNewReport(){
+  reportType='order'; reportKind='self';
+  openSheet('新增报备',`
+    <div class="form-row"><label class="form-label">报备类型</label><div class="select-chips" id="newReportTypes">
+      <button class="on" data-t="order" onclick="pickReportType('order',this)">订单报备</button><button data-t="product" onclick="pickReportType('product',this)">商品报备</button><button data-t="region" onclick="pickReportType('region',this)">地区报备</button>
+    </div></div>
+    <div class="form-row"><label class="form-label">报备客户 <em>*</em></label><select class="select" id="newReportCustomer">${CUSTOMERS.map(c=>`<option>${esc(c.name)}</option>`).join('')}</select></div>
+    <div id="orderReportFields">
+      <div class="form-row"><label class="form-label">货源类型</label><div class="select-chips"><button class="on" onclick="pickReportKind('self',this)">有货源</button><button onclick="pickReportKind('no_supply',this)">无货源</button></div></div>
+      <div class="form-row"><label class="form-label">预计下单日期 <em>*</em></label><input class="input" id="newReportExpect" type="date" value="2026-11-20" /></div>
+      <div class="form-row"><label class="form-label">下单商品</label><select class="select" id="newReportProduct">${['西湖龙井·明前特级','碧螺春·一级','正山小种·特级','金骏眉·特级','白毫银针·特级','雨花茶·特级'].map(p=>`<option>${p}</option>`).join('')}</select></div>
+    </div>
+    <div class="form-row"><label class="form-label">报备区域 <em>*</em></label><select class="select" id="newReportRegion">${['江苏/南京市','浙江/杭州市','上海','江苏','浙江','福建/厦门市','广东/广州市'].map(r=>`<option>${r}</option>`).join('')}</select></div>
+    <div class="form-row"><label class="form-label">有效期至 <em>*</em></label><input class="input" id="newReportValid" type="date" value="2027-06-30" /></div>
+    <div class="form-row"><label class="form-label">预计金额（元）</label><input class="input num" id="newReportAmount" placeholder="订单报备建议填写" /></div>
+    <div class="form-row"><label class="form-label">报备说明</label><textarea class="textarea" id="newReportSummary" placeholder="补充货源、履约方式与客户情况"></textarea></div>
+    <div class="sheet-foot"><button class="btn btn-dark primary" onclick="submitReport()">提交报备</button></div>`);
+}
+function pickReportType(type,button){ reportType=type; document.querySelectorAll('#newReportTypes button').forEach(b=>b.classList.remove('on')); button.classList.add('on'); $('orderReportFields').style.display=type==='order'?'':'none'; }
+function pickReportKind(kind,button){ reportKind=kind; button.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on')); button.classList.add('on'); }
+function submitReport(){
+  const customer=$('newReportCustomer').value, region=$('newReportRegion').value, valid=$('newReportValid').value;
+  const object=reportType==='order'?$('newReportProduct').value:reportType==='product'?'待选商品':'全部商品';
+  const titles={order:`${customer}${object}订单报备（${reportKind==='self'?'有货源':'无货源'}）`,product:`${object}商品报备（${region}）`,region:`${customer}地区报备（${region}）`};
+  const d=new Date(),pad=n=>String(n).padStart(2,'0'),ymd=`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+  REPORTS.unshift({id:'r'+Date.now(),code:'BB'+ymd+String(REPORTS.length+6).padStart(3,'0'),type:reportType,kind:reportType==='order'?reportKind:undefined,title:titles[reportType],customer,object,region,valid,amount:Number($('newReportAmount').value)||null,status:'pending',submit:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`,summary:$('newReportSummary').value.trim()||'（移动端提交）',expect:reportType==='order'?$('newReportExpect').value:undefined});
+  closeSheet(); S.reportType='all'; reportStatusFilter=''; renderReportStats(); renderReportChips(); renderReports(); $('page-reports').scrollTop=0; toast('报备已提交，等待平台审核');
+}
+
+/* ═══════════════════════════════════════════════
+ * 客户池
+ * ═══════════════════════════════════════════════ */
+function renderCustomers(){
+  const cities=S.customerProvince==='全部地区'?[]:(CITIES[S.customerProvince]||[]);
+  $('regionChips').innerHTML=PROVINCES.map(p=>`<button class="chip${S.customerProvince===p?' active':''}" onclick="pickProvince('${p}')">${p}</button>`).join('')+cities.map(c=>`<button class="chip${S.customerCity===c?' active':''}" onclick="pickCity('${c}')">${c}</button>`).join('');
+  const keyword=$('customerQuery').value.trim();
+  const list=CUSTOMERS.filter(c=>{
+    if(S.customerProvince!=='全部地区'&&c.province!==S.customerProvince) return false;
+    if(S.customerCity&&c.city!==S.customerCity) return false;
+    if(keyword&&!(c.name.includes(keyword)||c.person.includes(keyword))) return false;
+    return true;
+  });
+  const active=list.filter(c=>c.active).length, products=list.reduce((n,c)=>n+c.products.length,0);
+  $('customerCount').textContent=list.length+' 家';
+  $('poolNote').innerHTML=`当前地区入池 <b>${list.length}</b> 家 · 合作中 <b>${active}</b> 家 · 可下单商品 <b>${products}</b> 款`;
+  if(!list.length){ $('customerCards').innerHTML=empty('没有匹配的入池客户'); return; }
+  $('customerCards').innerHTML=list.map(c=>{
+    const open=S.customerOpen.has(c.id);
+    return `<article class="card${open?' open':''}">
+      <div class="customer-head" onclick="toggle(S.customerOpen,'${c.id}');renderCustomers()" style="cursor:pointer">
+        <div class="avatar">${esc(c.name.charAt(0))}</div>
+        <div style="flex:1;min-width:0"><div class="customer-name">${esc(c.name)}<span class="tag">${esc(c.type)}</span></div><div class="customer-region">${esc(c.province)} ${esc(c.city)} ${esc(c.district)} · ${c.level} 级客户</div></div>
+        ${statusHtml(c.active?'合作中':'已暂停',c.active?'green':'gray')}
+      </div>
+      <div class="customer-contact"><span>${esc(c.person)} · ${esc(c.phone)}</span><button class="call" onclick="event.stopPropagation();toast('正在呼叫 ${esc(c.phone)}（原型演示）')"><svg viewBox="0 0 16 16" fill="none"><path d="M3 3.5C3 3 3.5 2.5 4 2.5h1.6c.5 0 .9.3 1 .8l.6 2c.1.4 0 .8-.3 1l-.8.8a7.5 7.5 0 003.8 3.8l.8-.8c.3-.3.7-.4 1-.3l2 .6c.5.1.8.5.8 1V13c0 .6-.4 1-1 1h-.5C7.6 14 3 9.4 3 3.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg></button></div>
+      <div class="customer-meta"><span>可下单 <b>${c.products.length}</b> 款</span><span>入池范围 <b>${esc(c.scope)}</b></span></div>
+      ${open?`<div class="expand"><div class="exp-label">可下单商品 · 供货价 / 市场价</div>${c.products.map(p=>`<div class="product-row"><span class="pn">${esc(p.n)}<small>${esc(p.spec)}</small></span><span class="pp">${money(p.price)}<small> / ${money(p.market)}</small></span></div>`).join('')}</div>`:''}
+      <div class="actions"><button class="btn btn-light" onclick="toggle(S.customerOpen,'${c.id}');renderCustomers()">${open?'收起':'查看商品'}</button><button class="btn btn-dark" onclick="toast('为 ${esc(c.name)} 下单（原型演示）')">去下单</button></div>
+    </article>`;
+  }).join('');
+}
+function pickProvince(province){ S.customerProvince=province; S.customerCity=''; renderCustomers(); }
+function pickCity(city){ S.customerCity=S.customerCity===city?'':city; renderCustomers(); }
+
+/* ═══════════════════════════════════════════════
+ * 结算
+ * ═══════════════════════════════════════════════ */
+function renderBalance(){
+  const sum=status=>SETTLEMENTS.filter(s=>s.status===status).reduce((n,s)=>n+s.amount,0);
+  const waitCount=SETTLEMENTS.filter(s=>s.status==='unsettled').reduce((n,s)=>n+s.count,0);
+  $('balanceCard').innerHTML=`
+    <div class="balance-label">待结算金额</div>
+    <div class="balance-value">${money(sum('unsettled'))}</div>
+    <div class="balance-note">${waitCount} 笔订单 · 对公转账 · 款项汇入结算银行账户</div>
+    <div class="balance-grid"><div onclick="goSettle('pending')" style="cursor:pointer"><div class="v">${money(sum('pending'))}</div><div class="l">结算中</div></div><div onclick="goSettle('settled')" style="cursor:pointer"><div class="v">${money(sum('settled'))}</div><div class="l">已结算到账</div></div></div>`;
+}
+function goSettle(status){ S.settleStatus=status; renderSettleChips(); renderSettlements(); $('page-settlement').scrollTop=0; }
+function renderSettleChips(){
+  const count=key=>key==='all'?SETTLEMENTS.length:SETTLEMENTS.filter(s=>s.status===key).length;
+  $('settleChips').innerHTML=SETTLE_TABS.map(([key,label])=>`<button class="chip${S.settleStatus===key?' active':''}" onclick="S.settleStatus='${key}';renderSettleChips();renderSettlements()">${label}<i>${count(key)}</i></button>`).join('');
+}
+function renderSettlements(){
+  const list=S.settleStatus==='all'?SETTLEMENTS:SETTLEMENTS.filter(s=>s.status===S.settleStatus);
+  if(!list.length){ $('settleCards').innerHTML=empty('暂无该状态结算单'); return; }
+  $('settleCards').innerHTML=list.map(s=>{
+    const [label,tone]=SETTLE_STATUS[s.status],open=S.settleOpen.has(s.id);
+    return `<article class="card${open?' open':''}">
+      <div class="card-top" onclick="toggle(S.settleOpen,'${s.id}');renderSettlements()" style="cursor:pointer"><span class="code">${s.code}</span>${statusHtml(label,tone)}</div>
+      <div class="card-title-row"><span class="card-name" style="font-size:14px">${s.period} 结算单</span><span class="tag">${s.method}</span></div>
+      <div class="settle-grid">
+        <div class="settle-cell"><div class="l">订单数</div><div class="v">${s.count} 笔</div></div>
+        <div class="settle-cell"><div class="l">订单金额</div><div class="v">${money(s.orderAmount)}</div></div>
+        <div class="settle-cell"><div class="l">平台服务费（5%）</div><div class="v fee">-${money(s.fee)}</div></div>
+        <div class="settle-cell"><div class="l">创建日期</div><div class="v">${s.created}</div></div>
+        <div class="settle-cell big"><div class="l">应结金额</div><div class="v">${money(s.amount)}</div></div>
+      </div>
+      ${open?`<div class="expand"><div class="exp-label">结算进度</div><div class="settle-progress"><div class="progress-row"><b>按时 +5 分</b><span>订单已签收 · 按时确认</span><span>${s.count} 笔</span></div><div class="progress-row"><b>${s.status==='settled'?'已到账':'对账中'}</b><span>${s.status==='settled'?'款项已汇入结算账户':'等待平台结算'}</span><span>${s.paid||'—'}</span></div></div><div class="exp-label" style="margin-top:11px">包含订单</div>${s.orders.map(o=>`<div class="exp-row"><b class="num">${o}</b><span>—</span></div>`).join('')}</div>`:''}
+      <div class="actions"><button class="btn btn-light" onclick="toggle(S.settleOpen,'${s.id}');renderSettlements()">${open?'收起':'对账明细'}</button>${s.status==='unsettled'?`<button class="btn btn-dark" onclick="confirmSettlement('${s.id}')">确认对账</button>`:''}</div>
+    </article>`;
+  }).join('');
+}
+function confirmSettlement(id){ SETTLEMENTS.find(s=>s.id===id).status='pending'; renderBalance(); renderSettleChips(); renderSettlements(); renderProfileStats(); toast('对账已确认（+5 积分），等待平台结算'); }
+
+/* ═══════════════════════════════════════════════
+ * 我的 / 供货报价
+ * ═══════════════════════════════════════════════ */
+const ICONS={
+  user:'<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M4 16a6 6 0 0112 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  store:'<svg viewBox="0 0 20 20" fill="none"><path d="M3 8l1.5-4h11L17 8M3 8v8a1 1 0 001 1h12a1 1 0 001-1V8M3 8h14M8 17v-5h4v5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
+  warehouse:'<svg viewBox="0 0 20 20" fill="none"><path d="M3 17V7l7-4 7 4v10M3 17h14M7 17v-6h6v6" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
+  file:'<svg viewBox="0 0 20 20" fill="none"><path d="M5 3h7l3 3v11H5V3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M7 9h6M7 12h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  bank:'<svg viewBox="0 0 20 20" fill="none"><rect x="2.5" y="5" width="15" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 9h4M5.5 12h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  notice:'<svg viewBox="0 0 20 20" fill="none"><path d="M10 3a4.5 4.5 0 00-4.5 4.5c0 3.5-1.5 4.5-1.5 4.5h12s-1.5-1-1.5-4.5A4.5 4.5 0 0010 3zM8 14.5a2 2 0 004 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  rule:'<svg viewBox="0 0 20 20" fill="none"><path d="M6 3h8a1 1 0 011 1v12l-5-2.5L5 16V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 7h4M8 10h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  help:'<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M8 7.5a2 2 0 114 0c0 1.5-2 1.7-2 3M10 13.5v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>'
+};
+function renderProfileStats(){
+  const wait=SETTLEMENTS.filter(s=>s.status==='unsettled').reduce((n,s)=>n+s.amount,0);
+  $('profileStats').innerHTML=`<div><div class="v">${money(wait)}</div><div class="l">待结算</div></div><div><div class="v">${CUSTOMERS.filter(c=>c.active).length} 家</div><div class="l">合作客户</div></div><div><div class="v">${REPORTS.filter(r=>r.status==='pending').length} 条</div><div class="l">待审报备</div></div>`;
+}
+function renderMine(){
+  renderProfileStats();
+  $('quotePreview').innerHTML=QUOTES.slice(0,2).map(q=>`<div class="quote-row" onclick="openQuotes()" style="cursor:pointer"><div class="qn">${esc(q.name)}<small>${esc(q.brand)} · ${esc(q.spec)}</small></div><div class="qp">${money(q.price)}<small> 供货价</small></div>${statusHtml(q.status,q.status==='已生效'?'green':'amber')}</div>`).join('');
+  const row=([icon,label,extra,action])=>`<div class="menu-row" onclick="${action}"><div class="menu-icon">${ICONS[icon]}</div><div class="menu-label">${label}</div><span class="menu-extra">${extra}</span><svg viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`;
+  $('mineMenu1').innerHTML=[
+    ['user','账号管理','3 个子账号','openAccounts()'],['store','门店信息','滨江体验店','openStore()'],['warehouse','仓库信息','2 个仓库','openWarehouses()'],['file','资质文件','3 份已认证','openQualifications()'],['bank','结算信息','对公转账 · 月结','openFinance()']
+  ].map(row).join('');
+  $('mineMenu2').innerHTML=[['notice','通知公告','2 条未读','openNotices()'],['rule','报备规则说明','','openRules()'],['help','设置与帮助','','openSettings()']].map(row).join('');
+}
+function openQuotes(){ renderQuoteCards(); $('quotesPage').classList.add('show'); }
+function closeQuotes(){ $('quotesPage').classList.remove('show'); }
+function renderQuoteCards(){
+  $('quoteCards').innerHTML=QUOTES.map(q=>`<article class="card"><div class="card-top"><span class="code">${esc(q.brand)} · 供货报价</span>${statusHtml(q.status,q.status==='已生效'?'green':'amber')}</div><div class="card-title-row"><span class="card-name" style="font-size:14px">${esc(q.name)}</span><span class="tag">${esc(q.spec)}</span></div><div class="settle-grid" style="grid-template-columns:1fr 1fr 1fr"><div class="settle-cell"><div class="l">供货价</div><div class="v" style="color:var(--accent)">${money(q.price)}</div></div><div class="settle-cell"><div class="l">市场价</div><div class="v">${money(q.market)}</div></div><div class="settle-cell"><div class="l">毛利</div><div class="v">${((1-q.price/q.market)*100).toFixed(1)}%</div></div></div><div class="date" style="margin-top:10px">生效日期 ${q.date}</div></article>`).join('');
+}
+
+/* 我的菜单弹层 */
+const infoRows=rows=>rows.map(([key,value])=>`<div class="info"><b>${key}</b><span>${value}</span></div>`).join('');
+function openAccounts(){
+  const account=(name,sub,role,tone)=>`<div class="file-row"><div class="file-icon">${ICONS.user}</div><div class="file-main">${name}<small>${sub}</small></div>${statusHtml(role,tone)}</div>`;
+  openSheet('账号管理',account('陈建国','admin · 最近登录 09-12 09:00','管理员','purple')+account('李慧敏','sales01 · 最近登录 09-11 18:30','业务员','blue')+account('周仓管','wh01 · 已停用','仓管员','gray')+`<div class="sheet-foot"><button class="btn btn-dark primary" onclick="toast('新增子账号（原型演示）')">新增子账号</button></div>`);
+}
+function openStore(){ openSheet('门店信息',infoRows([['门店名称','云茶·滨江体验店'],['地址','浙江杭州市滨江区滨盛路1870号一层'],['负责人','陈建国'],['联系电话','0571-8899****'],['营业时间','09:00 – 21:00'],['状态','营业中']])+`<div class="review" style="margin-top:14px">门店照片与资料修改需平台审核后生效。</div>`); }
+function openWarehouses(){ openSheet('仓库信息',`<div class="sheet-section">云茶滨江中心仓</div>`+infoRows([['地址','浙江杭州市滨江区滨盛路1870号B2层'],['联系人','周仓管'],['电话','0571-8898****'],['状态','默认仓']])+`<div class="sheet-section">云茶宁波分仓</div>`+infoRows([['地址','浙江宁波市鄞州区首南街道泰康中路456号'],['联系人','吴仓管'],['电话','0574-5512****'],['状态','备用仓']])); }
+function openQualifications(){ const file=(name,date)=>`<div class="file-row"><div class="file-icon">${ICONS.file}</div><div class="file-main">${name}<small>${date} 上传</small></div>${statusHtml('已认证','green')}<button class="btn btn-light" onclick="toast('资质预览（原型演示）')">查看</button></div>`; openSheet('资质文件',file('营业执照.pdf','2025-03-01')+file('食品经营许可证.pdf','2025-03-01')+file('仓储服务资质.pdf','2025-06-20')); }
+function openFinance(){ openSheet('结算信息',`<div class="sheet-section">收款账户（对公）</div>`+infoRows([['户名','杭州云茶供应链管理有限公司'],['卡号','5719****8866'],['开户银行','招商银行杭州滨江支行'],['开户行号','308331000013'],['结算周期','按月汇总支付']])+`<div class="sheet-section">开票信息</div>`+infoRows([['发票抬头','杭州云茶供应链管理有限公司'],['税号','91330106MA2P8KQ3X7'],['税率','13%'],['开票内容','茶叶及茶制品']])); }
+function openNotices(){ openSheet('通知公告',NOTICES.map(n=>`<div class="notice"><div class="notice-title">${n.top?'<span class="tag tag-brown">置顶</span>':''}${esc(n.title)}</div><div class="notice-desc">${esc(n.desc)}</div><div class="notice-date">平台发布 · ${n.date}</div></div>`).join('')); }
+function openRules(){ openSheet('报备规则说明',`
+  <div class="notice"><div class="notice-title">订单报备</div><div class="notice-desc">审核通过后订单自动转入我的订单。有货源由合作商履约；无货源由平台自营或转派供货商。</div></div>
+  <div class="notice"><div class="notice-title">商品报备</div><div class="notice-desc">限贵司经营的品牌，命中「商品 + 区域」的新订单自动匹配转给我方。</div></div>
+  <div class="notice"><div class="notice-title">地区报备</div><div class="notice-desc">命中「客户 + 地区」的全部订单转给我方，含未经营品牌。</div></div>
+  <div class="notice"><div class="notice-title">匹配优先级</div><div class="notice-desc">订单报备 &gt; 商品报备 &gt; 地区报备；报备在有效日期内生效，过期自动失效。</div></div>
+  <div class="notice"><div class="notice-title">积分</div><div class="notice-desc">结算单按时确认 +5 分、超时 −5 分，积分影响比单评分与优先派单。</div></div>`); }
+function openSettings(){ openSheet('设置与帮助',infoRows([['消息通知','已开启'],['声音提醒','已关闭'],['清除缓存','点击清理'],['当前版本','v1.0.0 · 合作商端']])+`<div class="sheet-foot"><button class="btn btn-light primary" onclick="toast('已打开帮助中心（原型演示）')">帮助中心</button></div>`); }
+
+/* ═══════════════════════════════════════════════
+ * 弹层与底部导航
+ * ═══════════════════════════════════════════════ */
+function openSheet(title,html){ $('sheetTitle').textContent=title; $('sheetBody').innerHTML=html; $('mask').classList.add('show'); $('sheet').classList.add('show'); }
+function closeSheet(){ $('mask').classList.remove('show'); $('sheet').classList.remove('show'); }
+const TAB_ITEMS=[
+  ['orders','订单','<svg viewBox="0 0 20 20" fill="none"><rect x="4" y="2.5" width="12" height="15" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 6.5h6M7 10h6M7 13.5h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>'],
+  ['reports','报备','<svg viewBox="0 0 20 20" fill="none"><path d="M6 3h8a1 1 0 011 1v12l-5-2.5L5 16V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 7h4M8 10h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>'],
+  ['customers','客户池','<svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M2 16a5 5 0 0110 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="14.5" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3"/><path d="M13 15.5a4 4 0 015-3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>'],
+  ['settlement','结算','<svg viewBox="0 0 20 20" fill="none"><rect x="2.5" y="5" width="15" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 9h4M5.5 12h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="14" cy="10.5" r="1.6" stroke="currentColor" stroke-width="1.2"/></svg>'],
+  ['mine','我的','<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M4 16a6 6 0 0112 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>']
+];
+$('tabbar').innerHTML=TAB_ITEMS.map(([key,label,icon])=>`<button class="tab${key==='orders'?' active':''}" data-tab="${key}" onclick="switchTab('${key}')">${icon}<span>${label}</span></button>`).join('');
+function switchTab(tab){ S.tab=tab; document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab)); document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+tab)); closeQuotes(); }
+
+/* 初始化 */
+renderOrderSummary(); renderOrderChips(); renderOrders();
+renderReportStats(); renderReportChips(); renderReports();
+renderCustomers(); renderBalance(); renderSettleChips(); renderSettlements();
+renderMine(); renderReturnChips(); renderReturns(); switchTab('orders');
+</script>
+</body>
+</html>
