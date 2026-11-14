@@ -11,7 +11,7 @@ import type { SupplierItem, SupplierStore, SupplierWarehouse, BrandAuthFiles } f
 import './partner.css';
 
 /** 设置菜单下合作商信息子页键（联系信息已并入 basic；store 为终端一级菜单） */
-export type ProfileSectionKey = 'basic' | 'warehouse' | 'store' | 'qualification' | 'finance';
+export type ProfileSectionKey = 'basic' | 'contact' | 'warehouse' | 'store' | 'qualification' | 'finance';
 
 /** 可选资质文件（演示 mock 上传） */
 const QUALIFICATION_OPTIONS = ['营业执照.pdf', '食品生产许可证.pdf', '食品经营许可证.pdf', 'SC认证证书.pdf', '质量管理体系认证.pdf', '仓储服务资质.pdf'];
@@ -20,7 +20,12 @@ const QUALIFICATION_OPTIONS = ['营业执照.pdf', '食品生产许可证.pdf', 
 const SECTIONS: Record<ProfileSectionKey, { title: string; desc: string; direct: boolean }> = {
   basic: {
     title: '基本信息',
-    desc: '本页信息与淡茶半盏后台「采购 > 合作商管理」中的合作商档案保持一致。联系信息修改后直接生效；主营品牌、经营范围需提交申请，经平台注册审批通过后生效。',
+    desc: '本页信息与淡茶半盏后台「合作商 > 合作商列表」中的合作商档案保持一致。主营品牌、经营范围修改需提交申请，经平台注册审批通过后生效；联系信息请在「联系信息」子页维护。',
+    direct: false,
+  },
+  contact: {
+    title: '联系信息',
+    desc: '维护联系人、联系邮箱、短信通知手机号（最多 2 个）与联系地址。本页修改后直接生效，无需平台审批。',
     direct: false,
   },
   warehouse: {
@@ -136,19 +141,26 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
       window.scrollTo({ top: 0 });
       return;
     }
-    if (section === 'basic') {
+    if (section === 'contact') {
       updateSupplier({
         ...supplier,
         contactPerson: form.contactPerson,
         contactPosition: form.contactPosition,
         contactPhone: form.contactPhone,
         contactEmail: form.contactEmail,
+        smsNotifyPhones: (form.smsNotifyPhones ?? []).slice(0, 2),
         contactProvince: form.contactProvince,
         contactCity: form.contactCity,
         contactDistrict: form.contactDistrict,
         contactAddress: form.contactAddress,
       });
-      setFeedback({ kind: 'submitted', text: '联系信息已直接生效；主营品牌、经营范围的修改申请已提交，将在平台注册审批通过后生效。' });
+      setFeedback({ kind: 'saved', text: '联系信息已直接保存，无需平台审批。' });
+      setEditing(false);
+      window.scrollTo({ top: 0 });
+      return;
+    }
+    if (section === 'basic') {
+      setFeedback({ kind: 'submitted', text: '主营品牌、经营范围的修改申请已提交，将在平台注册审批通过后生效。' });
     } else {
       setFeedback({ kind: 'submitted', text: '修改申请已提交，将在平台注册审批通过后生效。' });
     }
@@ -190,19 +202,81 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
         <InfoItem label="注册地址" span={3}>{[supplier.registeredProvince, supplier.registeredCity, supplier.registeredDistrict, supplier.registeredAddress].filter(Boolean).join(' ')}</InfoItem>
         <InfoItem label="经营范围" span={3}>{supplier.businessScope || '—'}</InfoItem>
       </InfoGrid>
-      {/* 联系信息（已并入基本信息页） */}
-      <div className="pk-section" style={{ marginTop: 4 }}>
-        <h3 className="pk-section-title">联系信息</h3>
-        <InfoGrid>
-          <InfoItem label="联系人">{supplier.contactPerson}</InfoItem>
-          <InfoItem label="联系人职务">{supplier.contactPosition || '—'}</InfoItem>
-          <InfoItem label="联系电话" mono>{supplier.contactPhone}</InfoItem>
-          <InfoItem label="联系邮箱" mono>{supplier.contactEmail || '—'}</InfoItem>
-          <InfoItem label="短信通知手机号" mono>{supplier.smsNotifyPhone || '—'}</InfoItem>
-          <InfoItem label="联系地址" span={3}>{[supplier.contactProvince, supplier.contactCity, supplier.contactDistrict, supplier.contactAddress].filter(Boolean).join(' ')}</InfoItem>
-        </InfoGrid>
-      </div>
     </>
+  );
+
+  const contactView = (
+    <InfoGrid>
+      <InfoItem label="联系人">{supplier.contactPerson}</InfoItem>
+      <InfoItem label="联系人职务">{supplier.contactPosition || '—'}</InfoItem>
+      <InfoItem label="联系电话" mono>{supplier.contactPhone}</InfoItem>
+      <InfoItem label="联系邮箱" mono>{supplier.contactEmail || '—'}</InfoItem>
+      <InfoItem label="短信通知手机号" mono span={3}>
+        {(supplier.smsNotifyPhones ?? []).length > 0 ? supplier.smsNotifyPhones!.join('、') : '—'}
+      </InfoItem>
+      <InfoItem label="联系省份">{supplier.contactProvince || '—'}</InfoItem>
+      <InfoItem label="联系城市">{supplier.contactCity || '—'}</InfoItem>
+      <InfoItem label="联系区县">{supplier.contactDistrict || '—'}</InfoItem>
+      <InfoItem label="联系详细地址" span={3}>{supplier.contactAddress || '—'}</InfoItem>
+    </InfoGrid>
+  );
+
+  const contactEdit = form && (
+    <div className="pk-section">
+      <h3 className="pk-section-title">联系信息<span style={{ fontSize: 11, fontWeight: 400, color: '#01795D', marginLeft: 8 }}>保存后直接生效</span></h3>
+      <div className="pk-reg-grid">
+        <div>
+          <label className="pk-reg-label">联系人</label>
+          <input className="pk-reg-input" value={form.contactPerson} onChange={e => patch({ contactPerson: e.target.value })} />
+        </div>
+        <div>
+          <label className="pk-reg-label">联系人职务</label>
+          <input className="pk-reg-input" value={form.contactPosition} onChange={e => patch({ contactPosition: e.target.value })} />
+        </div>
+        <div>
+          <label className="pk-reg-label">联系电话</label>
+          <input className="pk-reg-input" value={form.contactPhone} onChange={e => patch({ contactPhone: e.target.value })} />
+        </div>
+        <div>
+          <label className="pk-reg-label">联系邮箱</label>
+          <input className="pk-reg-input" value={form.contactEmail} onChange={e => patch({ contactEmail: e.target.value })} />
+        </div>
+        <div>
+          <label className="pk-reg-label">短信通知手机号 1</label>
+          <input className="pk-reg-input mono" placeholder="接收订单/审批通知短信" value={form.smsNotifyPhones?.[0] ?? ''} onChange={e => patch({ smsNotifyPhones: [e.target.value, form.smsNotifyPhones?.[1] ?? ''].map(x => x.trim()).filter(Boolean) })} />
+        </div>
+        <div>
+          <label className="pk-reg-label">短信通知手机号 2（可选）</label>
+          <input className="pk-reg-input mono" placeholder="第 2 个通知手机号" value={form.smsNotifyPhones?.[1] ?? ''} onChange={e => patch({ smsNotifyPhones: [form.smsNotifyPhones?.[0] ?? '', e.target.value].map(x => x.trim()).filter(Boolean) })} />
+        </div>
+        <div>
+          <label className="pk-reg-label">联系省份</label>
+          <select className="pk-reg-select" value={form.contactProvince ?? ''} onChange={e => patch({ contactProvince: e.target.value, contactCity: '', contactDistrict: '' })}>
+            <option value="">请选择</option>
+            {PROVINCE_NAMES.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="pk-reg-label">联系城市</label>
+          <select className="pk-reg-select" value={form.contactCity ?? ''} disabled={!form.contactProvince} onChange={e => patch({ contactCity: e.target.value, contactDistrict: '' })}>
+            <option value="">请选择</option>
+            {form.contactProvince && getCityNames(form.contactProvince).map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="pk-reg-label">联系区县</label>
+          <select className="pk-reg-select" value={form.contactDistrict ?? ''} disabled={!form.contactCity} onChange={e => patch({ contactDistrict: e.target.value })}>
+            <option value="">请选择</option>
+            {form.contactProvince && form.contactCity && getDistricts(form.contactProvince, form.contactCity).map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </div>
+        <div className="span-3">
+          <label className="pk-reg-label">联系详细地址</label>
+          <input className="pk-reg-input" value={form.contactAddress} onChange={e => patch({ contactAddress: e.target.value })} />
+        </div>
+      </div>
+      <div style={{ fontSize: 12, color: '#99A29D', marginTop: 8 }}>短信通知手机号最多设置 2 个，用于接收订单、审批等通知短信。</div>
+    </div>
   );
 
   const warehouseView = (
@@ -311,56 +385,6 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
           <div>
             <label className="pk-reg-label">经营范围</label>
             <textarea className="pk-reg-textarea" value={form.businessScope} onChange={e => patch({ businessScope: e.target.value })} />
-          </div>
-        </div>
-      </div>
-      <div className="pk-section">
-        <h3 className="pk-section-title">联系信息<span style={{ fontSize: 11, fontWeight: 400, color: '#01795D', marginLeft: 8 }}>提交后直接生效</span></h3>
-        <div className="pk-reg-grid">
-          <div>
-            <label className="pk-reg-label">联系人</label>
-            <input className="pk-reg-input" value={form.contactPerson} onChange={e => patch({ contactPerson: e.target.value })} />
-          </div>
-          <div>
-            <label className="pk-reg-label">联系人职务</label>
-            <input className="pk-reg-input" value={form.contactPosition} onChange={e => patch({ contactPosition: e.target.value })} />
-          </div>
-          <div>
-            <label className="pk-reg-label">联系电话</label>
-            <input className="pk-reg-input" value={form.contactPhone} onChange={e => patch({ contactPhone: e.target.value })} />
-          </div>
-          <div>
-            <label className="pk-reg-label">联系邮箱</label>
-            <input className="pk-reg-input" value={form.contactEmail} onChange={e => patch({ contactEmail: e.target.value })} />
-          </div>
-          <div>
-            <label className="pk-reg-label">短信通知手机号</label>
-            <input className="pk-reg-input mono" placeholder="接收订单/审批通知短信" value={form.smsNotifyPhone ?? ''} onChange={e => patch({ smsNotifyPhone: e.target.value })} />
-          </div>
-          <div>
-            <label className="pk-reg-label">联系省份</label>
-            <select className="pk-reg-select" value={form.contactProvince ?? ''} onChange={e => patch({ contactProvince: e.target.value, contactCity: '', contactDistrict: '' })}>
-              <option value="">请选择</option>
-              {PROVINCE_NAMES.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="pk-reg-label">联系城市</label>
-            <select className="pk-reg-select" value={form.contactCity ?? ''} disabled={!form.contactProvince} onChange={e => patch({ contactCity: e.target.value, contactDistrict: '' })}>
-              <option value="">请选择</option>
-              {form.contactProvince && getCityNames(form.contactProvince).map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="pk-reg-label">联系区县</label>
-            <select className="pk-reg-select" value={form.contactDistrict ?? ''} disabled={!form.contactCity} onChange={e => patch({ contactDistrict: e.target.value })}>
-              <option value="">请选择</option>
-              {form.contactProvince && form.contactCity && getDistricts(form.contactProvince, form.contactCity).map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
-          <div className="span-3">
-            <label className="pk-reg-label">联系详细地址</label>
-            <input className="pk-reg-input" value={form.contactAddress} onChange={e => patch({ contactAddress: e.target.value })} />
           </div>
         </div>
       </div>
@@ -552,6 +576,7 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
 
         <div className="pk-panel">
           {section === 'basic' && basicEdit}
+          {section === 'contact' && contactEdit}
           {section === 'warehouse' && warehouseEdit}
           {section === 'store' && storeEdit}
           {section === 'qualification' && qualificationEdit}
@@ -603,6 +628,7 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
         <div className="pk-section">
           <h3 className="pk-section-title">{conf.title}</h3>
           {section === 'basic' && basicView}
+          {section === 'contact' && contactView}
           {section === 'warehouse' && warehouseView}
           {section === 'store' && storeView}
           {section === 'qualification' && qualificationView}

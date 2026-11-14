@@ -7,6 +7,8 @@ import type { CustomerItem, CustomerType, PlatformItem, PlatformBankAccount, Pla
 import { customerItems as initialCustomers, CUSTOMER_TYPE_LABELS, CUSTOMER_TYPE_DESC, LEVEL_COLORS, CUSTOMER_GROUP_MAP, generateOrderContactId, convertPersonalToDirect } from '../../data/customers';
 import { platformItems as globalPlatforms } from '../../data/platforms';
 import { PROVINCE_NAMES, getCityNames, getCities, getDistricts } from '../../data/regions';
+/** 入池范围可选省份（排除 台湾/香港/澳门） */
+const POOL_PROVINCES = PROVINCE_NAMES.filter((p) => !['台湾', '香港', '澳门'].includes(p));
 import { generateCustomerCode } from '../../utils/customerCode';
 import { useDrawerWidth } from '../../hooks/useDrawerWidth';
 import DeptEmployeeSelect from '../../components/business/DeptEmployeeSelect';
@@ -483,7 +485,7 @@ export default function SalesCustomers() {
 
             <Card style={{ padding: 0 }}>
               <Table
-                headers={[...(deleteMode ? ['选择'] : ['序号']), '客户简称', '客户编号', '客户名称', ...(activeTab === 'direct' ? ['是否经平台'] : []), ...(activeTab === 'personal' ? ['下单人'] : []), '地区', '联系人', '联系电话', '客户来源', '等级', '采买平台', ...(activeTab === 'direct' ? ['入客户池'] : []), '状态', '操作']}
+                headers={[...(deleteMode ? ['选择'] : ['序号']), '客户简称', '客户编号', '客户名称', ...(activeTab === 'direct' ? ['是否经平台'] : []), ...(activeTab === 'personal' ? ['下单人'] : []), '所在地区', '联系人', '联系电话', '客户来源', '等级', '采买平台', ...(activeTab === 'direct' ? ['入客户池'] : []), '状态', '操作']}
                 rows={pagedRows.map((c, idx) => {
                   const cells: React.ReactNode[] = [
                     deleteMode ? <input key="chk" type="checkbox" checked={selectedForDelete.has(c.id)} onChange={() => toggleSelect(c.id)} /> : <span key="idx" className="mono">{(page - 1) * pageSize + idx + 1}</span>,
@@ -1218,105 +1220,120 @@ export default function SalesCustomers() {
                     </DrawerSection>
 
                     <DrawerSection title="入池范围">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 'var(--space-3)' }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)', cursor: 'pointer', padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid ' + (cfg.nationwide ? 'var(--color-module-current-base)' : 'var(--color-neutral-200)'), background: cfg.nationwide ? 'var(--color-module-current-lightest)' : 'transparent', fontWeight: 500 }}>
-                          <input type="checkbox" checked={cfg.nationwide} onChange={(e) => update({ nationwide: e.target.checked })} />
-                          全国（全部地区可见）
-                        </label>
-                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
-                          直接勾选省（全省）/ 市（全市）/ 区县，支持多选
-                        </span>
-                      </div>
-                      {cfg.nationwide ? (
-                        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-2) 0' }}>已选择<strong>全国</strong>范围，全部地区合作商均可见。</div>
-                      ) : (
-                        <div style={{ border: '1px solid var(--color-neutral-100)', borderRadius: 'var(--radius-md)', maxHeight: 380, overflowY: 'auto' }}>
-                          {PROVINCE_NAMES.map((pv) => {
-                            const provOn = cfg.provinces.includes(pv);
-                            const provOpen = expandedProv === pv;
-                            const cities = getCities(pv);
-                            const provSelCount = cfg.cities.filter((x) => x.startsWith(pv + '/')).length + cfg.districts.filter((x) => x.startsWith(pv + '/')).length;
-                            return (
-                              <div key={pv} style={{ borderBottom: '1px solid var(--color-neutral-100)' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: provOpen ? 'var(--color-neutral-50)' : 'transparent' }}>
-                                  <button type="button" onClick={() => { setExpandedProv(provOpen ? '' : pv); setExpandedCity(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-neutral-400)', display: 'inline-flex', padding: 0, width: 16 }} title={provOpen ? '收起' : '展开市/区县'}>
-                                    <svg viewBox="0 0 16 16" fill="none" style={{ width: 12, height: 12, transform: provOpen ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                  </button>
-                                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)', cursor: 'pointer', flex: 1, fontWeight: provOn ? 600 : 400, color: provOn ? 'var(--color-module-current-base)' : 'inherit' }}>
-                                    <input type="checkbox" checked={provOn} onChange={() => update({
-                                      provinces: provOn ? cfg.provinces.filter((x) => x !== pv) : [...cfg.provinces, pv],
-                                      // 取消全省时一并清除该省下的市/县选择；勾选全省时其下市县冗余项一并清除
-                                      cities: cfg.cities.filter((x) => !x.startsWith(pv + '/')),
-                                      districts: cfg.districts.filter((x) => !x.startsWith(pv + '/')),
-                                    })} />
-                                    {pv}
-                                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', fontWeight: 400 }}>（全省）</span>
-                                    {!provOn && provSelCount > 0 && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-module-current-base)', fontWeight: 500 }}>已选 {provSelCount} 项</span>}
-                                  </label>
-                                </div>
-                                {provOpen && (
-                                  <div style={{ padding: '2px 0 8px', background: 'var(--color-neutral-50)' }}>
-                                    {cities.map((ct) => {
-                                      const cityKey = pv + '/' + ct.name;
-                                      const cityOn = cfg.cities.includes(cityKey);
-                                      const cityOpen = expandedCity === cityKey;
-                                      const districts = getDistricts(pv, ct.name);
-                                      const citySelCount = cfg.districts.filter((x) => x.startsWith(cityKey + '/')).length;
-                                      return (
-                                        <div key={cityKey}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 34px' }}>
-                                            <button type="button" onClick={() => setExpandedCity(cityOpen ? '' : cityKey)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-neutral-400)', display: 'inline-flex', padding: 0, width: 14 }} title={cityOpen ? '收起区县' : '展开区县'}>
-                                              <svg viewBox="0 0 16 16" fill="none" style={{ width: 11, height: 11, transform: cityOpen ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                            </button>
-                                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)', cursor: 'pointer', flex: 1, fontWeight: cityOn ? 600 : 400, color: cityOn ? 'var(--color-module-current-base)' : 'inherit' }}>
-                                              <input type="checkbox" checked={cityOn} disabled={provOn} onChange={() => update({
-                                                cities: cityOn ? cfg.cities.filter((x) => x !== cityKey) : [...cfg.cities, cityKey],
-                                                districts: cfg.districts.filter((x) => !x.startsWith(cityKey + '/')),
-                                              })} />
-                                              {ct.name}
-                                              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', fontWeight: 400 }}>（全市）</span>
-                                              {!cityOn && citySelCount > 0 && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-module-current-base)', fontWeight: 500 }}>已选 {citySelCount} 项</span>}
-                                              {provOn && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', fontWeight: 400 }}>（已含全省）</span>}
-                                            </label>
-                                          </div>
-                                          {cityOpen && (
-                                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '4px 12px 6px 56px' }}>
-                                              {districts.map((dt) => {
-                                                const distKey = cityKey + '/' + dt;
-                                                const distOn = cfg.districts.includes(distKey);
-                                                return (
-                                                  <label key={distKey} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--text-xs)', cursor: provOn || cityOn ? 'not-allowed' : 'pointer', color: distOn ? 'var(--color-module-current-base)' : 'var(--color-neutral-600)', fontWeight: distOn ? 600 : 400, opacity: provOn || cityOn ? 0.5 : 1 }}>
-                                                    <input type="checkbox" checked={distOn} disabled={provOn || cityOn} onChange={() => update({
-                                                      districts: distOn ? cfg.districts.filter((x) => x !== distKey) : [...cfg.districts, distKey],
-                                                    })} />
-                                                    {dt}
-                                                  </label>
-                                                );
-                                              })}
-                                              {districts.length === 0 && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>该市暂无区县数据</span>}
-                                            </div>
-                                          )}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {/* 已选范围摘要 */}
-                      {(cfg.provinces.length + cfg.cities.length + cfg.districts.length) > 0 && !cfg.nationwide && (
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 'var(--space-3)' }}>
+                      {/* 已选范围摘要（可删标签） */}
+                      {!cfg.nationwide && (cfg.provinces.length + cfg.cities.length + cfg.districts.length) > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8, paddingBottom: 8, borderBottom: '1px dashed var(--color-neutral-200)' }}>
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>已选（点击 × 删除）：</span>
                           {scopeChips.map((chip) => (
-                            <span key={chip.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, fontSize: 'var(--text-xs)', fontWeight: 500, background: 'var(--color-module-current-lightest)', color: 'var(--color-module-current-base)', border: '1px solid var(--color-module-current-light)' }}>
+                            <span key={chip.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 999, fontSize: 'var(--text-xs)', fontWeight: 500, background: 'var(--color-module-current-lightest)', color: 'var(--color-module-current-base)', border: '1px solid var(--color-module-current-light)' }}>
                               {chip.label}
-                              <button type="button" onClick={chip.onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', display: 'inline-flex', padding: 0, lineHeight: 1 }} title="取消该范围">
-                                <svg viewBox="0 0 12 12" fill="none" style={{ width: 10, height: 10 }}><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                              <button type="button" onClick={chip.onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', display: 'inline-flex', padding: 0, lineHeight: 1 }} title="删除">
+                                <svg viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9 }}><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
                               </button>
                             </span>
                           ))}
+                        </div>
+                      )}
+                      {cfg.nationwide && (
+                        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 8 }}>已选择<strong>全国</strong>范围，全部地区合作商均可见。</div>
+                      )}
+
+                      {/* 全国 + 省份 chips（点击勾选全省，▾ 展开市/区县） */}
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => update({ nationwide: !cfg.nationwide })}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8,
+                            fontSize: 12.5, cursor: 'pointer', userSelect: 'none', fontWeight: 600,
+                            border: `1px solid ${cfg.nationwide ? 'var(--color-module-current-base)' : 'var(--color-neutral-200)'}`,
+                            background: cfg.nationwide ? 'var(--color-module-current-lightest)' : 'var(--color-neutral-0)',
+                            color: cfg.nationwide ? 'var(--color-module-current-base)' : 'var(--color-neutral-700)',
+                          }}
+                        >
+                          全国
+                        </button>
+                        {POOL_PROVINCES.map((pv) => {
+                          const provOn = cfg.provinces.includes(pv);
+                          const provOpen = expandedProv === pv;
+                          const coveredBy = cfg.nationwide;
+                          const provSelCount = cfg.cities.filter((x) => x.startsWith(pv + '/')).length + cfg.districts.filter((x) => x.startsWith(pv + '/')).length;
+                          return (
+                            <span key={pv} style={{ display: 'inline-flex', overflow: 'hidden', borderRadius: 8, border: `1px solid ${provOn || provOpen ? 'var(--color-module-current-base)' : 'var(--color-neutral-200)'}`, background: provOn ? 'var(--color-module-current-lightest)' : 'var(--color-neutral-0)', opacity: coveredBy ? 0.45 : 1 }}>
+                              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 8px', cursor: 'pointer', color: provOn ? 'var(--color-module-current-base)' : 'var(--color-neutral-700)', fontWeight: provOn ? 600 : 400 }}>
+                                <input type="checkbox" checked={provOn} disabled={coveredBy} onChange={() => update({
+                                  provinces: provOn ? cfg.provinces.filter((x) => x !== pv) : [...cfg.provinces, pv],
+                                  cities: cfg.cities.filter((x) => !x.startsWith(pv + '/')),
+                                  districts: cfg.districts.filter((x) => !x.startsWith(pv + '/')),
+                                })} style={{ margin: 0, accentColor: 'var(--color-module-current-base)' }} />
+                                {pv}
+                                {!provOn && provSelCount > 0 && <span style={{ fontSize: 11, color: 'var(--color-module-current-base)' }}>{provSelCount}</span>}
+                              </label>
+                              <button
+                                type="button" title={provOpen ? '收起市/区县' : '展开市/区县'}
+                                onClick={() => { setExpandedProv(provOpen ? '' : pv); setExpandedCity(''); }}
+                                style={{ background: 'rgba(0,0,0,0.04)', border: 'none', borderLeft: '1px solid var(--color-neutral-200)', cursor: 'pointer', color: 'inherit', display: 'inline-flex', alignItems: 'center', padding: '0 5px' }}
+                              >
+                                <svg viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9, transform: provOpen ? 'rotate(180deg)' : 'none' }}><path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+
+                      {/* 内联展开：市/区县 chips */}
+                      {expandedProv && (
+                        <div style={{ marginTop: 8, padding: '8px 10px', background: 'var(--color-neutral-50)', borderRadius: 8, border: '1px solid var(--color-neutral-200)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-module-current-base)' }}>
+                              {expandedProv} · 市（勾选=全市，▾ 展开区县）
+                            </span>
+                            <button type="button" onClick={() => { setExpandedProv(''); setExpandedCity(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', padding: 0 }}>收起</button>
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {getCities(expandedProv).map((ct) => {
+                              const cityKey = expandedProv + '/' + ct.name;
+                              const cityOn = cfg.cities.includes(cityKey);
+                              const cityOpen = expandedCity === cityKey;
+                              const districts = getDistricts(expandedProv, ct.name);
+                              const provOn = cfg.provinces.includes(expandedProv);
+                              return (
+                                <span key={cityKey} style={{ display: 'inline-flex', flexWrap: 'wrap', overflow: 'hidden', borderRadius: 8, border: `1px solid ${cityOn ? 'var(--color-module-current-base)' : 'var(--color-neutral-200)'}`, background: cityOn ? 'var(--color-module-current-lightest)' : 'var(--color-neutral-0)', opacity: provOn ? 0.45 : 1 }}>
+                                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 8px', cursor: 'pointer', color: cityOn ? 'var(--color-module-current-base)' : 'var(--color-neutral-700)', fontWeight: cityOn ? 600 : 400 }}>
+                                    <input type="checkbox" checked={cityOn} disabled={provOn} onChange={() => update({
+                                      cities: cityOn ? cfg.cities.filter((x) => x !== cityKey) : [...cfg.cities, cityKey],
+                                      districts: cfg.districts.filter((x) => !x.startsWith(cityKey + '/')),
+                                    })} style={{ margin: 0, accentColor: 'var(--color-module-current-base)' }} />
+                                    {ct.name}
+                                  </label>
+                                  <button
+                                    type="button" title={cityOpen ? '收起区县' : '展开区县'}
+                                    onClick={() => setExpandedCity(cityOpen ? '' : cityKey)}
+                                    style={{ background: 'rgba(0,0,0,0.04)', border: 'none', borderLeft: '1px solid var(--color-neutral-200)', cursor: 'pointer', color: 'inherit', display: 'inline-flex', alignItems: 'center', padding: '0 5px' }}
+                                  >
+                                    <svg viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9, transform: cityOpen ? 'rotate(180deg)' : 'none' }}><path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                  </button>
+                                  {cityOpen && (
+                                    <span style={{ display: 'flex', gap: '4px 10px', flexWrap: 'wrap', alignItems: 'center', padding: '4px 8px', borderTop: '1px dashed var(--color-neutral-200)', width: '100%', background: 'var(--color-neutral-0)' }}>
+                                      {districts.map((dt) => {
+                                        const distKey = cityKey + '/' + dt;
+                                        const distOn = cfg.districts.includes(distKey);
+                                        return (
+                                          <label key={distKey} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--text-xs)', cursor: provOn || cityOn ? 'not-allowed' : 'pointer', opacity: provOn || cityOn ? 0.45 : 1, color: distOn ? 'var(--color-module-current-base)' : 'var(--color-neutral-700)', fontWeight: distOn ? 600 : 400 }}>
+                                            <input type="checkbox" checked={distOn} disabled={provOn || cityOn} onChange={() => update({
+                                              districts: distOn ? cfg.districts.filter((x) => x !== distKey) : [...cfg.districts, distKey],
+                                            })} style={{ margin: 0, accentColor: 'var(--color-module-current-base)' }} />
+                                            {dt}
+                                          </label>
+                                        );
+                                      })}
+                                      {districts.length === 0 && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>该市暂无区县数据</span>}
+                                    </span>
+                                  )}
+                                </span>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                       <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', lineHeight: 1.7 }}>

@@ -284,7 +284,7 @@ export const router = createBrowserRouter([
       { path: 'profile', element: <Navigate to="/partner/profile/basic" replace /> },
       { path: 'profile/basic', element: <PartnerProfile section="basic" /> },
       /* 联系信息已并入基本信息 */
-      { path: 'profile/contact', element: <Navigate to="/partner/profile/basic" replace /> },
+      { path: 'profile/contact', element: <PartnerProfile section="contact" /> },
       { path: 'profile/warehouse', element: <PartnerProfile section="warehouse" /> },
       { path: 'profile/store', element: <PartnerProfile section="store" /> },
       { path: 'profile/qualification', element: <PartnerProfile section="qualification" /> },

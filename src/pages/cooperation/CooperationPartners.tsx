@@ -169,7 +169,16 @@ export default function PurchaseSuppliers() {
   // 取消编辑
   const handleCancelEdit = () => { setEditing(false); setEditForm(null); };
   // 保存编辑（写入共享 store：列表、合作商终端等读取方全局同步）
-  const handleSaveEdit = () => { if (editForm) { updateSupplierInStore(editForm); setEditing(false); setEditForm(null); } };
+  const handleSaveEdit = () => {
+    if (editForm) {
+      // 短信通知手机号：编辑时为拼接字符串，保存时拆分为数组（最多 2 个）
+      const sms = editForm.smsNotifyPhones as unknown;
+      const normalized = { ...editForm, smsNotifyPhones: Array.isArray(sms) ? (sms as string[]).slice(0, 2) : String(sms ?? '').split(/[、,，\s]+/).filter(Boolean).slice(0, 2) };
+      updateSupplierInStore(normalized);
+      setEditing(false);
+      setEditForm(null);
+    }
+  };
 
   // 仓库编辑（合作仓库联动仓储 > 仓库设置）
   const updateWarehouse = (idx: number, patch: Partial<SupplierWarehouse>) => {
@@ -522,7 +531,7 @@ export default function PurchaseSuppliers() {
                   ['联系人职务', 'contactPosition', 'text'],
                   ['联系电话', 'contactPhone', 'text'],
                   ['联系邮箱', 'contactEmail', 'text'],
-                  ['短信通知手机号', 'smsNotifyPhone', 'text'],
+                  ['短信通知手机号（最多 2 个，用、分隔）', 'smsNotifyPhones', 'text'],
                   ['联系地址', 'contactAddress', 'text'],
                   ['合作时间', 'cooperationDate', 'text'],
                   ['主营品类', 'mainCategories', 'text'],
@@ -576,7 +585,7 @@ export default function PurchaseSuppliers() {
                     <div key={field} style={{ gridColumn: type === 'textarea' ? '1 / -1' : undefined }}>
                       <label className="drawer-label">{label}</label>
                       {editing && type !== 'textarea' ? (
-                        <input className="filter-input" style={{ width: '100%' }} value={String((editForm as unknown as Record<string, unknown>)?.[field] ?? '')} onChange={e => setEditForm(prev => prev ? { ...prev, [field]: e.target.value } : prev)} />
+                        <input className="filter-input" style={{ width: '100%' }} value={field === 'smsNotifyPhones' ? ((editForm as unknown as Record<string, unknown>)?.[field] as string[] | undefined)?.join('、') ?? '' : String((editForm as unknown as Record<string, unknown>)?.[field] ?? '')} onChange={e => setEditForm(prev => prev ? { ...prev, [field]: e.target.value } : prev)} />
                       ) : editing && type === 'textarea' ? (
                         <textarea className="filter-input" style={{ width: '100%', minHeight: 60, resize: 'vertical' }} value={String((editForm as unknown as Record<string, unknown>)?.[field] ?? '')} onChange={e => setEditForm(prev => prev ? { ...prev, [field]: e.target.value } : prev)} />
                       ) : (
@@ -1018,7 +1027,7 @@ export default function PurchaseSuppliers() {
                 <InfoItem label="联系人职务">{selectedSupplier.contactPosition || '—'}</InfoItem>
                 <InfoItem label="联系电话">{selectedSupplier.contactPhone || '—'}</InfoItem>
                 <InfoItem label="联系邮箱">{selectedSupplier.contactEmail || '—'}</InfoItem>
-                <InfoItem label="短信通知手机号" mono>{selectedSupplier.smsNotifyPhone || '—'}</InfoItem>
+                <InfoItem label="短信通知手机号" mono>{(selectedSupplier.smsNotifyPhones ?? []).join('、') || '—'}</InfoItem>
                 <InfoItem label="主营品类">{selectedSupplier.mainCategories.join('、') || '—'}</InfoItem>
                 <InfoItem label="资质状态">{String(selectedSupplier.qualificationStatus ?? '—')}</InfoItem>
                 <InfoItem label="公司主营品牌" span={3}>

@@ -75,7 +75,7 @@ const genOrderCode = (orders: CustomerOrder[]): string => {
   return `KHD${dateKey}${String(seq).padStart(3, '0')}`;
 };
 
-/** 入池演示种子：华茗堂(北京全省)、浦发银行(全国)、品茗轩(广州市) */
+/** 入池演示种子（13 家直营客户）：覆盖 全国/全省/全市/区县 多种范围形态 */
 const seedPoolConfigs: Record<string, CustomerPoolConfig> = {
   c1: {
     enabled: true, nationwide: false, provinces: ['北京'], cities: [], districts: [],
@@ -87,6 +87,16 @@ const seedPoolConfigs: Record<string, CustomerPoolConfig> = {
   },
   c6: { enabled: true, nationwide: true, provinces: [], cities: [], districts: [] },
   c3: { enabled: true, nationwide: false, provinces: [], cities: ['广东/广州市'], districts: [] },
+  c25: { enabled: true, nationwide: false, provinces: [], cities: ['福建/南平市'], districts: ['福建/南平市/武夷山市'] },
+  c26: { enabled: true, nationwide: false, provinces: ['云南'], cities: [], districts: [] },
+  c29: { enabled: true, nationwide: false, provinces: [], cities: [], districts: ['云南/西双版纳傣族自治州/勐海县'] },
+  c31: { enabled: true, nationwide: false, provinces: [], cities: ['安徽/黄山市'], districts: [] },
+  c35: { enabled: true, nationwide: false, provinces: [], cities: [], districts: ['北京/北京市/昌平区'] },
+  c36: { enabled: true, nationwide: false, provinces: [], cities: ['广东/广州市'], districts: ['广东/广州市/天河区'] },
+  c37: { enabled: true, nationwide: false, provinces: ['上海'], cities: [], districts: [] },
+  c24: { enabled: true, nationwide: false, provinces: [], cities: [], districts: ['北京/北京市/海淀区'] },
+  c27: { enabled: true, nationwide: false, provinces: ['福建'], cities: ['福建/宁德市'], districts: ['福建/宁德市/福鼎市'] },
+  c34: { enabled: true, nationwide: false, provinces: [], cities: ['江苏/南京市'], districts: [] },
 };
 
 export const useCustomerStore = create<CustomerState>((set, get) => ({

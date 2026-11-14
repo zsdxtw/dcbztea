@@ -11,6 +11,8 @@ import { usePriceStore } from '../../stores/priceStore';
 import { customerItems } from '../../data/customers';
 import { teaProducts } from '../../data/teaProducts';
 import { PROVINCE_NAMES, getCities, getDistricts } from '../../data/regions';
+/** 报备地区可选省份（排除 台湾/香港/澳门） */
+const REPORT_PROVINCES = PROVINCE_NAMES.filter((p) => !['台湾', '香港', '澳门'].includes(p));
 import type { PartnerOrderReportKind, PartnerReport, PartnerReportType } from '../../types';
 import { PARTNER_REPORT_TYPE_LABELS, PARTNER_REPORT_STATUS_LABELS, PARTNER_ORDER_KIND_LABELS } from '../../data/partner';
 import './partner.css';
@@ -308,7 +310,6 @@ export default function PartnerReports() {
   };
 
   /* ── 地区复选树操作（商品/地区报备） ── */
-  const toggleRegion = (path: string) => setForm((f) => ({ ...f, regions: f.regions.includes(path) ? f.regions.filter((x) => x !== path) : [...f.regions, path] }));
   /** 某路径是否被更上层覆盖（选了省则市/县禁用） */
   const covered = (path: string) => {
     if (path === '全国') return false;
@@ -626,7 +627,7 @@ export default function PartnerReports() {
                   {/* 报备地区（复选树） */}
                   <div style={{ marginBottom: 'var(--space-4)' }}>
                     <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>报备地区 *（可复选：多个省 / 市 / 县，或全国）</label>
-                    <RegionTree form={form} setForm={setForm} treeOpen={treeOpen} setTreeOpen={setTreeOpen} toggleRegion={toggleRegion} covered={covered} regionChecked={regionChecked} />
+                    <RegionTree form={form} setForm={setForm} treeOpen={treeOpen} setTreeOpen={setTreeOpen} />
                   </div>
                 </>
               )}
@@ -638,7 +639,7 @@ export default function PartnerReports() {
                     地区报备：该客户在所选地区的<strong>全部订单</strong>都将报备匹配给贵司，其中既有贵司经营的品牌，也有未经营的品牌（未经营品牌可协同其他供货商履约）。
                   </div>
                   <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>报备地区 *（可复选：多个省 / 市 / 县，或全国）</label>
-                  <RegionTree form={form} setForm={setForm} treeOpen={treeOpen} setTreeOpen={setTreeOpen} toggleRegion={toggleRegion} covered={covered} regionChecked={regionChecked} />
+                  <RegionTree form={form} setForm={setForm} treeOpen={treeOpen} setTreeOpen={setTreeOpen} />
                 </div>
               )}
 
@@ -661,74 +662,149 @@ export default function PartnerReports() {
   );
 }
 
-/** 地区复选树（全国 + 省/市/县三级，勾选上级后下级禁用） */
-function RegionTree({ treeOpen, setTreeOpen, toggleRegion, covered, regionChecked }: {
+
+
+/**
+ * 地区复选（全国 + 省/市/县三级，可复选，勾选上级后下级禁用）。
+ * 展示方式参照管理后台「入池管理 → 入池范围」：全国 chip + 省份 chips（复选框勾选=全省，▾ 内联展开该省市/区县 chips），
+ * 顶部为已选区域可删标签。操作直接作用于 form.regions 路径数组（'全国' | '省' | '省/市' | '省/市/县'）。
+ */
+
+/**
+ * 地区复选（全国 + 省/市/县三级，可复选，勾选上级后下级禁用）。
+ * 展示方式参照管理后台「入池管理 → 入池范围」：全国 chip + 省份 chips（复选框勾选=全省，▾ 内联展开该省市/区县 chips），
+ * 顶部为已选区域可删标签。操作直接作用于 form.regions 路径数组（'全国' | '省' | '省/市' | '省/市/县'）。
+ */
+function RegionTree({ form, setForm, treeOpen, setTreeOpen }: {
   form: ReportForm;
   setForm: React.Dispatch<React.SetStateAction<ReportForm>>;
   treeOpen: TreeOpen;
   setTreeOpen: React.Dispatch<React.SetStateAction<TreeOpen>>;
-  toggleRegion: (path: string) => void;
-  covered: (path: string) => boolean;
-  regionChecked: (path: string) => boolean;
 }) {
+  const regions = form.regions;
+  const toggleRegion = (path: string) => setForm((f) => ({ ...f, regions: f.regions.includes(path) ? f.regions.filter((x) => x !== path) : [...f.regions, path] }));
+  const regionChecked = (path: string) => regions.includes(path);
+  /** 上级覆盖：全国覆盖全部；省覆盖其市/县；市覆盖其区县 */
+  const covered = (path: string): boolean => {
+    if (regions.includes('全国')) return true;
+    const segs = path.split('/');
+    if (segs.length >= 2 && regions.includes(segs[0])) return true;
+    if (segs.length >= 3 && regions.includes(`${segs[0]}/${segs[1]}`)) return true;
+    return false;
+  };
+  const expandedProv = treeOpen.prov ?? '';
+  const cities = expandedProv ? getCities(expandedProv) : [];
+  const nationwide = regions.includes('全国');
+
   return (
-    <div style={{ border: '1px solid var(--pk-line)', borderRadius: 10, maxHeight: 300, overflowY: 'auto' }}>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--pk-line)', background: regionChecked('全国') ? 'var(--pk-accent-soft)' : 'transparent', cursor: 'pointer' }}>
-        <input type="checkbox" checked={regionChecked('全国')} onChange={() => toggleRegion('全国')} />
-        <span style={{ fontSize: 13.5, fontWeight: 600 }}>全国（全部地区）</span>
-      </label>
-      {PROVINCE_NAMES.map((pv) => {
-        const provOpen = treeOpen.prov === pv;
-        const cities = getCities(pv);
-        return (
-          <div key={pv} style={{ borderBottom: '1px solid var(--color-neutral-100)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', background: provOpen ? 'var(--color-neutral-50)' : 'transparent' }}>
-              <button type="button" onClick={() => setTreeOpen((t) => ({ ...t, prov: provOpen ? '' : pv, city: '' }))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-neutral-400)', display: 'inline-flex', padding: 0, width: 14 }} title={provOpen ? '收起' : '展开市/县'}>
-                <svg viewBox="0 0 16 16" fill="none" style={{ width: 11, height: 11, transform: provOpen ? 'rotate(90deg)' : 'none' }}><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+    <div style={{ border: '1px solid var(--pk-line)', borderRadius: 10, padding: '10px 12px' }}>
+      {/* 已选范围摘要（可删标签） */}
+      {regions.length > 0 && !nationwide && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8, paddingBottom: 8, borderBottom: '1px dashed var(--pk-line)' }}>
+          <span style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>已选（点击 × 删除）：</span>
+          {regions.map((path) => (
+            <span key={path} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 999, fontSize: 12, fontWeight: 500, background: '#E6F2ED', color: '#01795D', border: '1px solid #B8DCCF' }}>
+              {path.split('/').join('·')}
+              <button type="button" title="删除" onClick={() => toggleRegion(path)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#01795D', display: 'inline-flex', padding: 0, lineHeight: 1 }}>
+                <svg viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9 }}><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
               </button>
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', flex: 1 }}>
-                <input type="checkbox" checked={regionChecked(pv)} disabled={covered(pv) && !regionChecked(pv)} onChange={() => toggleRegion(pv)} />
-                {pv}（全省）
+            </span>
+          ))}
+        </div>
+      )}
+      {nationwide && (
+        <div style={{ fontSize: 12.5, color: 'var(--pk-ink2)', marginBottom: 8 }}>已选择<strong>全国</strong>范围，全部地区命中。</div>
+      )}
+
+      {/* 全国 + 省份 chips（复选框勾选=全省，▾ 展开市/区县） */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => toggleRegion('全国')}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8,
+            fontSize: 12.5, cursor: 'pointer', userSelect: 'none', fontWeight: 600,
+            border: `1px solid ${nationwide ? '#01795D' : 'var(--pk-line)'}`,
+            background: nationwide ? '#E6F2ED' : 'var(--color-neutral-0)',
+            color: nationwide ? '#01795D' : 'var(--pk-ink2)',
+          }}
+        >
+          全国
+        </button>
+        {REPORT_PROVINCES.map((pv) => {
+          const provOn = regionChecked(pv);
+          const provOpen = expandedProv === pv;
+          const provDis = nationwide;
+          return (
+            <span key={pv} style={{ display: 'inline-flex', overflow: 'hidden', borderRadius: 8, border: `1px solid ${provOn || provOpen ? '#01795D' : 'var(--pk-line)'}`, background: provOn ? '#E6F2ED' : 'var(--color-neutral-0)', opacity: provDis ? 0.45 : 1 }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 8px', cursor: 'pointer', color: provOn ? '#01795D' : 'var(--pk-ink2)', fontWeight: provOn ? 600 : 400 }}>
+                <input type="checkbox" checked={provOn} disabled={provDis} onChange={() => toggleRegion(pv)} style={{ margin: 0, accentColor: '#01795D' }} />
+                {pv}
               </label>
-            </div>
-            {provOpen && (
-              <div style={{ background: 'var(--color-neutral-50)', padding: '2px 0 6px' }}>
-                {cities.map((ct) => {
-                  const cityPath = `${pv}/${ct.name}`;
-                  const cityOpen = treeOpen.city === cityPath;
-                  const districts = getDistricts(pv, ct.name);
-                  return (
-                    <div key={cityPath}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 12px 5px 32px' }}>
-                        <button type="button" onClick={() => setTreeOpen((t) => ({ ...t, city: cityOpen ? '' : cityPath }))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-neutral-400)', display: 'inline-flex', padding: 0, width: 12 }} title="展开区县">
-                          <svg viewBox="0 0 16 16" fill="none" style={{ width: 10, height: 10, transform: cityOpen ? 'rotate(90deg)' : 'none' }}><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                        </button>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, cursor: 'pointer', flex: 1 }}>
-                          <input type="checkbox" checked={regionChecked(cityPath)} disabled={covered(cityPath) && !regionChecked(cityPath)} onChange={() => toggleRegion(cityPath)} />
-                          {ct.name}（全市）
-                        </label>
-                      </div>
-                      {cityOpen && (
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '2px 12px 6px 52px' }}>
-                          {districts.map((dt) => {
-                            const distPath = `${cityPath}/${dt}`;
-                            return (
-                              <label key={distPath} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: regionChecked(distPath) ? 'var(--pk-accent-dark)' : 'inherit', fontWeight: regionChecked(distPath) ? 600 : 400 }}>
-                                <input type="checkbox" checked={regionChecked(distPath)} disabled={covered(distPath) && !regionChecked(distPath)} onChange={() => toggleRegion(distPath)} />
-                                {dt}
-                              </label>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+              <button
+                type="button" title={provOpen ? '收起市/区县' : '展开市/区县'}
+                onClick={() => setTreeOpen((t) => ({ ...t, prov: provOpen ? '' : pv, city: '' }))}
+                style={{ background: 'rgba(0,0,0,0.04)', border: 'none', borderLeft: '1px solid var(--pk-line)', cursor: 'pointer', color: 'inherit', display: 'inline-flex', alignItems: 'center', padding: '0 5px' }}
+              >
+                <svg viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9, transform: provOpen ? 'rotate(180deg)' : 'none' }}><path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            </span>
+          );
+        })}
+      </div>
+
+      {/* 内联展开：市/区县 chips */}
+      {expandedProv && (
+        <div style={{ marginTop: 8, padding: '8px 10px', background: 'var(--color-neutral-50)', borderRadius: 8, border: '1px solid var(--pk-line)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--pk-accent-dark)' }}>
+              {expandedProv} · 市（勾选=全市，▾ 展开区县）
+            </span>
+            <button type="button" onClick={() => setTreeOpen((t) => ({ ...t, prov: '', city: '' }))} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--pk-ink3)', padding: 0 }}>收起</button>
           </div>
-        );
-      })}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {cities.map((ct) => {
+              const cityPath = `${expandedProv}/${ct.name}`;
+              const cityOn = regionChecked(cityPath);
+              const cityOpen = treeOpen.city === cityPath;
+              const cityDis = nationwide || regions.includes(expandedProv);
+              const districts = getDistricts(expandedProv, ct.name);
+              return (
+                <span key={cityPath} style={{ display: 'inline-flex', flexWrap: 'wrap', overflow: 'hidden', borderRadius: 8, border: `1px solid ${cityOn ? '#01795D' : 'var(--pk-line)'}`, background: cityOn ? '#E6F2ED' : 'var(--color-neutral-0)', opacity: cityDis ? 0.45 : 1 }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 8px', cursor: 'pointer', color: cityOn ? '#01795D' : 'var(--pk-ink2)', fontWeight: cityOn ? 600 : 400 }}>
+                    <input type="checkbox" checked={cityOn} disabled={cityDis} onChange={() => toggleRegion(cityPath)} style={{ margin: 0, accentColor: '#01795D' }} />
+                    {ct.name}
+                  </label>
+                  <button
+                    type="button" title={cityOpen ? '收起区县' : '展开区县'}
+                    onClick={() => setTreeOpen((t) => ({ ...t, city: cityOpen ? '' : cityPath }))}
+                    style={{ background: 'rgba(0,0,0,0.04)', border: 'none', borderLeft: '1px solid var(--pk-line)', cursor: 'pointer', color: 'inherit', display: 'inline-flex', alignItems: 'center', padding: '0 5px' }}
+                  >
+                    <svg viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9, transform: cityOpen ? 'rotate(180deg)' : 'none' }}><path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  </button>
+                  {cityOpen && (
+                    <span style={{ display: 'flex', gap: '4px 10px', flexWrap: 'wrap', alignItems: 'center', padding: '4px 8px', borderTop: '1px dashed var(--pk-line)', width: '100%', background: '#fff' }}>
+                      {districts.map((dt) => {
+                        const distPath = `${cityPath}/${dt}`;
+                        const distOn = regionChecked(distPath);
+                        const distDis = cityDis;
+                        return (
+                          <label key={distPath} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: distDis ? 'not-allowed' : 'pointer', opacity: distDis ? 0.45 : 1, color: distOn ? '#01795D' : 'var(--pk-ink2)', fontWeight: distOn ? 600 : 400 }}>
+                            <input type="checkbox" checked={distOn} disabled={distDis} onChange={() => toggleRegion(distPath)} style={{ margin: 0, accentColor: '#01795D' }} />
+                            {dt}
+                          </label>
+                        );
+                      })}
+                      {districts.length === 0 && <span style={{ fontSize: 11.5, color: 'var(--pk-ink3)' }}>该市暂无区县数据</span>}
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

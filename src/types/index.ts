@@ -958,8 +958,8 @@ export interface SupplierItem {
   contactAddress: string;
   contactPhone: string;
   contactEmail: string;
-  /** 短信通知手机号（接收订单/审批等通知短信） */
-  smsNotifyPhone?: string;
+  /** 短信通知手机号（接收订单/审批等通知短信，最多 2 个） */
+  smsNotifyPhones?: string[];
   warehouses: SupplierWarehouse[];
   /** 主营品牌（品牌名称，来源于商品-品牌管理，支持多选） */
   mainBrands?: string[];

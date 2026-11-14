@@ -41,6 +41,10 @@ const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode
     icon: <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><rect x="11" y="3" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><rect x="3" y="11" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><rect x="11" y="11" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.3"/></svg>,
   },
   {
+    key: 'customers', label: '客户池', path: '/partner/customers',
+    icon: <svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="15" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.2"/></svg>,
+  },
+  {
     key: 'orders', label: '订单管理', path: '/partner/orders',
     icon: <svg viewBox="0 0 20 20" fill="none"><rect x="4" y="2" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h6M7 9h6M7 12h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
   },
@@ -57,10 +61,6 @@ const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode
     icon: <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v10M10 13l4-4M10 13l-4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 16.5h14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M13 3.5h4v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   },
   {
-    key: 'customers', label: '客户池', path: '/partner/customers',
-    icon: <svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M2 16a5 5 0 0110 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="15" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.2"/></svg>,
-  },
-  {
     key: 'settlement', label: '结算管理', path: '/partner/settlement',
     icon: <svg viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="16" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 9h2M5 12h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><circle cx="14" cy="10" r="2" stroke="currentColor" strokeWidth="1.2"/></svg>,
   },
@@ -71,6 +71,7 @@ const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode
       { label: '账号管理', path: '/partner/account' },
       { label: '门店信息', path: '/partner/profile/store' },
       { label: '基本信息', path: '/partner/profile/basic' },
+      { label: '联系信息', path: '/partner/profile/contact' },
       { label: '仓库信息', path: '/partner/profile/warehouse' },
       { label: '资质文件', path: '/partner/profile/qualification' },
       { label: '结算信息', path: '/partner/profile/finance' },
