@@ -218,7 +218,7 @@
 /* ── 表格面板 ───────────────────────────────────────────── */
 .pk-table-panel {
   background: var(--pk-surface); border: 1px solid var(--pk-line);
-  border-radius: var(--pk-radius); overflow: hidden;
+  border-radius: var(--pk-radius); overflow-x: auto; overflow-y: hidden;
 }
 .partner-shell .pk-table-panel .table-wrapper thead th {
   height: auto; padding: 13px 16px; background: transparent;

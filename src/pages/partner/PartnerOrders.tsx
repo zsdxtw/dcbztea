@@ -575,10 +575,10 @@ export default function PartnerOrders() {
         </div>
         <div className="pk-panel-body">
         <div className="pk-table-panel" style={{ margin: 0 }}>
-        <table>
+        <table style={{ minWidth: 1200 }}>
           <thead>
             <tr>
-              <th>序号</th><th>订单编号</th><th>客户</th><th>商品数</th><th>总金额</th>
+              <th>序号</th><th>订单编号</th><th>客户</th><th>总金额</th>
               <th>收件人</th><th>收件电话</th><th>收件地区</th>
               <th>配送方式</th><th>合作模式</th><th>来源类型</th><th>状态</th><th>下单日期</th><th>操作</th>
             </tr>
@@ -597,7 +597,6 @@ export default function PartnerOrders() {
                     </div>
                   </td>
                   <td className="cell-emph">{o.customerName}</td>
-                  <td className="mono">{o.items.length} 种</td>
                   <td className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--pk-accent)' }}>{money(o.totalAmount)}</td>
                   <td>{o.receiver}</td>
                   <td className="mono" style={{ fontSize: 13 }}>{o.receiverPhone}</td>
