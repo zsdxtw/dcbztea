@@ -3,7 +3,7 @@ import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
-import type { CustomerItem, CustomerType, PlatformItem, PlatformBankAccount, PlatformInvoiceInfo, CustomerBankAccount, CustomerInvoiceInfo, OrderContact, CustomerSubOrganization } from '../../types';
+import type { CustomerItem, CustomerPoolConfig, CustomerType, PlatformItem, PlatformBankAccount, PlatformInvoiceInfo, CustomerBankAccount, CustomerInvoiceInfo, OrderContact, CustomerSubOrganization } from '../../types';
 import { customerItems as initialCustomers, CUSTOMER_TYPE_LABELS, CUSTOMER_TYPE_DESC, LEVEL_COLORS, CUSTOMER_GROUP_MAP, generateOrderContactId, convertPersonalToDirect } from '../../data/customers';
 import { platformItems as globalPlatforms } from '../../data/platforms';
 import { PROVINCE_NAMES, getCityNames, getCities, getDistricts } from '../../data/regions';
@@ -15,6 +15,150 @@ import DeptEmployeeSelect from '../../components/business/DeptEmployeeSelect';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { useCustomerStore } from '../../stores/customerStore';
 import Pagination from '../../components/common/Pagination';
+
+/** 合作规则六段配置（标签 / 字段键 / 占位提示；管理后台与合作商终端共用口径） */
+const COOP_RULE_FIELDS: { label: string; key: 'requirements' | 'orderProcess' | 'shipping' | 'settlement' | 'promotion' | 'precautions'; placeholder: string }[] = [
+  { label: '基础要求', key: 'requirements', placeholder: '如：要求供货商品提供当季检测报告；礼盒类需带品牌礼袋...' },
+  { label: '订单流程', key: 'orderProcess', placeholder: '如：每周三前汇总需求向平台下单，订单经客户采购部确认后生效...' },
+  { label: '发货要求', key: 'shipping', placeholder: '如：现货商品 48 小时内发货，发货前同步物流单号...' },
+  { label: '结算规则', key: 'settlement', placeholder: '如：月结 30 天，次月 10 日前对账开票（增值税专用发票）...' },
+  { label: '推品规则', key: 'promotion', placeholder: '如：按平台每月推品清单优先推介，新品首单可申请支持价...' },
+  { label: '注意事项', key: 'precautions', placeholder: '如：发货前需预约收货时段；节假日期间订单顺延处理...' },
+];
+
+/** 入合作池范围编辑器：全国/省 chips + 手风琴市/区县（详情抽屉与入合作池弹窗共用） */
+function PoolScopeEditor({ cfg, update }: { cfg: CustomerPoolConfig; update: (patch: Partial<CustomerPoolConfig>) => void }) {
+  const [expandedProv, setExpandedProv] = useState('');
+  const [expandedCity, setExpandedCity] = useState('');
+  const scopeChips: { key: string; label: string; onRemove: () => void }[] = [
+    ...cfg.provinces.map((pv) => ({ key: 'p:' + pv, label: '全省 · ' + pv, onRemove: () => update({ provinces: cfg.provinces.filter((x) => x !== pv) }) })),
+    ...cfg.cities.map((ct) => ({ key: 'c:' + ct, label: '全市 · ' + ct.split('/').slice(1).join(' · '), onRemove: () => update({ cities: cfg.cities.filter((x) => x !== ct) }) })),
+    ...cfg.districts.map((dt) => ({ key: 'd:' + dt, label: '区县 · ' + dt.split('/').slice(1).join(' · '), onRemove: () => update({ districts: cfg.districts.filter((x) => x !== dt) }) })),
+  ];
+  return (
+    <>
+      {/* 已选范围摘要（可删标签） */}
+      {!cfg.nationwide && (cfg.provinces.length + cfg.cities.length + cfg.districts.length) > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8, paddingBottom: 8, borderBottom: '1px dashed var(--color-neutral-200)' }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>已选（点击 × 删除）：</span>
+          {scopeChips.map((chip) => (
+            <span key={chip.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 999, fontSize: 'var(--text-xs)', fontWeight: 500, background: 'var(--color-module-current-lightest)', color: 'var(--color-module-current-base)', border: '1px solid var(--color-module-current-light)' }}>
+              {chip.label}
+              <button type="button" onClick={chip.onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', display: 'inline-flex', padding: 0, lineHeight: 1 }} title="删除">
+                <svg viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9 }}><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {cfg.nationwide && (
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 8 }}>已选择<strong>全国</strong>范围，全部地区合作商均可见。</div>
+      )}
+
+      {/* 全国 + 省份 chips（点击勾选全省，▾ 展开市/区县） */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => update({ nationwide: !cfg.nationwide })}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8,
+            fontSize: 12.5, cursor: 'pointer', userSelect: 'none', fontWeight: 600,
+            border: `1px solid ${cfg.nationwide ? 'var(--color-module-current-base)' : 'var(--color-neutral-200)'}`,
+            background: cfg.nationwide ? 'var(--color-module-current-lightest)' : 'var(--color-neutral-0)',
+            color: cfg.nationwide ? 'var(--color-module-current-base)' : 'var(--color-neutral-700)',
+          }}
+        >
+          全国
+        </button>
+        {POOL_PROVINCES.map((pv) => {
+          const provOn = cfg.provinces.includes(pv);
+          const provOpen = expandedProv === pv;
+          const coveredBy = cfg.nationwide;
+          const provSelCount = cfg.cities.filter((x) => x.startsWith(pv + '/')).length + cfg.districts.filter((x) => x.startsWith(pv + '/')).length;
+          return (
+            <span key={pv} style={{ display: 'inline-flex', overflow: 'hidden', borderRadius: 8, border: `1px solid ${provOn || provOpen ? 'var(--color-module-current-base)' : 'var(--color-neutral-200)'}`, background: provOn ? 'var(--color-module-current-lightest)' : 'var(--color-neutral-0)', opacity: coveredBy ? 0.45 : 1 }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 8px', cursor: 'pointer', color: provOn ? 'var(--color-module-current-base)' : 'var(--color-neutral-700)', fontWeight: provOn ? 600 : 400 }}>
+                <input type="checkbox" checked={provOn} disabled={coveredBy} onChange={() => update({
+                  provinces: provOn ? cfg.provinces.filter((x) => x !== pv) : [...cfg.provinces, pv],
+                  cities: cfg.cities.filter((x) => !x.startsWith(pv + '/')),
+                  districts: cfg.districts.filter((x) => !x.startsWith(pv + '/')),
+                })} style={{ margin: 0, accentColor: 'var(--color-module-current-base)' }} />
+                {pv}
+                {!provOn && provSelCount > 0 && <span style={{ fontSize: 11, color: 'var(--color-module-current-base)' }}>{provSelCount}</span>}
+              </label>
+              <button
+                type="button" title={provOpen ? '收起市/区县' : '展开市/区县'}
+                onClick={() => { setExpandedProv(provOpen ? '' : pv); setExpandedCity(''); }}
+                style={{ background: 'rgba(0,0,0,0.04)', border: 'none', borderLeft: '1px solid var(--color-neutral-200)', cursor: 'pointer', color: 'inherit', display: 'inline-flex', alignItems: 'center', padding: '0 5px' }}
+              >
+                <svg viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9, transform: provOpen ? 'rotate(180deg)' : 'none' }}><path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            </span>
+          );
+        })}
+      </div>
+
+      {/* 内联展开：市/区县 chips */}
+      {expandedProv && (
+        <div style={{ marginTop: 8, padding: '8px 10px', background: 'var(--color-neutral-50)', borderRadius: 8, border: '1px solid var(--color-neutral-200)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-module-current-base)' }}>
+              {expandedProv} · 市（勾选=全市，▾ 展开区县）
+            </span>
+            <button type="button" onClick={() => { setExpandedProv(''); setExpandedCity(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', padding: 0 }}>收起</button>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {getCities(expandedProv).map((ct) => {
+              const cityKey = expandedProv + '/' + ct.name;
+              const cityOn = cfg.cities.includes(cityKey);
+              const cityOpen = expandedCity === cityKey;
+              const districts = getDistricts(expandedProv, ct.name);
+              const provOn = cfg.provinces.includes(expandedProv);
+              return (
+                <span key={cityKey} style={{ display: 'inline-flex', flexWrap: 'wrap', overflow: 'hidden', borderRadius: 8, border: `1px solid ${cityOn ? 'var(--color-module-current-base)' : 'var(--color-neutral-200)'}`, background: cityOn ? 'var(--color-module-current-lightest)' : 'var(--color-neutral-0)', opacity: provOn ? 0.45 : 1 }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 8px', cursor: 'pointer', color: cityOn ? 'var(--color-module-current-base)' : 'var(--color-neutral-700)', fontWeight: cityOn ? 600 : 400 }}>
+                    <input type="checkbox" checked={cityOn} disabled={provOn} onChange={() => update({
+                      cities: cityOn ? cfg.cities.filter((x) => x !== cityKey) : [...cfg.cities, cityKey],
+                      districts: cfg.districts.filter((x) => !x.startsWith(cityKey + '/')),
+                    })} style={{ margin: 0, accentColor: 'var(--color-module-current-base)' }} />
+                    {ct.name}
+                  </label>
+                  <button
+                    type="button" title={cityOpen ? '收起区县' : '展开区县'}
+                    onClick={() => setExpandedCity(cityOpen ? '' : cityKey)}
+                    style={{ background: 'rgba(0,0,0,0.04)', border: 'none', borderLeft: '1px solid var(--color-neutral-200)', cursor: 'pointer', color: 'inherit', display: 'inline-flex', alignItems: 'center', padding: '0 5px' }}
+                  >
+                    <svg viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9, transform: cityOpen ? 'rotate(180deg)' : 'none' }}><path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  </button>
+                  {cityOpen && (
+                    <span style={{ display: 'flex', gap: '4px 10px', flexWrap: 'wrap', alignItems: 'center', padding: '4px 8px', borderTop: '1px dashed var(--color-neutral-200)', width: '100%', background: 'var(--color-neutral-0)' }}>
+                      {districts.map((dt) => {
+                        const distKey = cityKey + '/' + dt;
+                        const distOn = cfg.districts.includes(distKey);
+                        return (
+                          <label key={distKey} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--text-xs)', cursor: provOn || cityOn ? 'not-allowed' : 'pointer', opacity: provOn || cityOn ? 0.45 : 1, color: distOn ? 'var(--color-module-current-base)' : 'var(--color-neutral-700)', fontWeight: distOn ? 600 : 400 }}>
+                            <input type="checkbox" checked={distOn} disabled={provOn || cityOn} onChange={() => update({
+                              districts: distOn ? cfg.districts.filter((x) => x !== distKey) : [...cfg.districts, distKey],
+                            })} style={{ margin: 0, accentColor: 'var(--color-module-current-base)' }} />
+                            {dt}
+                          </label>
+                        );
+                      })}
+                      {districts.length === 0 && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>该市暂无区县数据</span>}
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', lineHeight: 1.7 }}>
+        匹配规则：合作商在客户池页选择地区后，所选地区落在任一入合作池范围内（或已选全国）且入合作池状态为「是」的客户才会展示。勾选即时保存生效。
+      </div>
+    </>
+  );
+}
 
 /** 客户档案操作记录（页面会话级） */
 interface CustomerOpRecord {
@@ -79,8 +223,8 @@ export default function SalesCustomers() {
   /** 入池范围复选树：展开的省 / 市（各只展开一个，手风琴式） */
   const [expandedProv, setExpandedProv] = useState('');
   const [expandedCity, setExpandedCity] = useState('');
-  /** 合作规则编辑表单（客户要求 / 下单流程 / 结算规则） */
-  const [ruleForm, setRuleForm] = useState<{ requirements: string; orderProcess: string; settlement: string } | null>(null);
+  /** 合作规则编辑表单（六段，键见 COOP_RULE_FIELDS） */
+  const [ruleForm, setRuleForm] = useState<Record<string, string> | null>(null);
   /** 客户档案操作记录 */
   const [opRecords, setOpRecords] = useState<CustomerOpRecord[]>(seedOpRecords);
   /** 基本信息 / 结算开票 编辑态 */
@@ -90,6 +234,8 @@ export default function SalesCustomers() {
   const [platformForm, setPlatformForm] = useState<{ editingId: string | null; platformId: string; rate: string } | null>(null);
   /** 采购端管理：开通表单 */
   const [procOpenForm, setProcOpenForm] = useState<{ username: string; password: string; name: string; phone: string } | null>(null);
+  /** 入合作池设置弹窗：滑动开关选「是」时打开（淡茶扣点 + 入合作池范围 + 合作规则） */
+  const [poolDialog, setPoolDialog] = useState<{ customerId: string; name: string; cfg: CustomerPoolConfig; dachaDraft: string; err: string } | null>(null);
 
   /** 写入操作记录 */
   const addOpRecord = (customerCode: string, action: string, detail?: string) => {
@@ -513,8 +659,23 @@ export default function SalesCustomers() {
                     ...(activeTab === 'direct' ? [<span key="pool" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                       <button
                         type="button" role="switch" aria-checked={poolConfigs[c.id]?.enabled === true}
-                        title={poolConfigs[c.id]?.enabled ? '入池：是（点击改为否，合作商客户池不再展示）' : '入池：否（点击改为是，按入池范围对合作商展示）'}
-                        onClick={() => setPoolConfig(c.id, { ...(poolConfigs[c.id] ?? { enabled: false, nationwide: false, provinces: [], cities: [], districts: [] }), enabled: !(poolConfigs[c.id]?.enabled) })}
+                        title={poolConfigs[c.id]?.enabled ? '入合作池：是（点击改为否，合作商客户池不再展示）' : '入合作池：否（点击改为是，弹窗设置淡茶扣点/入合作池范围/合作规则）'}
+                        onClick={() => {
+                          const cfg = poolConfigs[c.id];
+                          if (cfg?.enabled) {
+                            // 是 → 否：直接关闭（合作商客户池不再展示）
+                            setPoolConfig(c.id, { ...cfg, enabled: false });
+                          } else {
+                            // 否 → 是：弹窗设置淡茶扣点 / 入合作池范围 / 合作规则
+                            setPoolDialog({
+                              customerId: c.id,
+                              name: c.shortName || c.name,
+                              cfg: { ...(cfg ?? { enabled: false, nationwide: false, provinces: [], cities: [], districts: [] }), enabled: true },
+                              dachaDraft: cfg?.dachaRate !== undefined ? String(cfg.dachaRate) : '',
+                              err: '',
+                            });
+                          }
+                        }}
                         style={{
                           position: 'relative', width: 38, height: 20, borderRadius: 999, border: 'none', cursor: 'pointer',
                           background: poolConfigs[c.id]?.enabled ? 'var(--color-module-current-base)' : 'var(--color-neutral-300)',
@@ -561,6 +722,66 @@ export default function SalesCustomers() {
             </div>
           </div>
         )}
+
+        {/* 入合作池设置弹窗：列表滑动开关选「是」时打开（淡茶扣点 + 入合作池范围 + 合作规则） */}
+        {poolDialog && (() => {
+          const update = (patch: Partial<CustomerPoolConfig>) => setPoolDialog(prev => prev ? { ...prev, cfg: { ...prev.cfg, ...patch } } : prev);
+          const rule = poolDialog.cfg.coopRule;
+          return (
+            <div className="category-dialog-overlay" onClick={() => setPoolDialog(null)}>
+              <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 720, maxWidth: '94vw' }}>
+                <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 4 }}>入合作池设置</h3>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
+                  为 <strong>{poolDialog.name}</strong> 开启入合作池：设置淡茶扣点、入合作池范围与合作规则，保存后合作商终端「客户池」按设置展示该客户。
+                </div>
+
+                <DrawerSection title="淡茶扣点">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                    <input
+                      className="filter-input mono" type="number" min={0} max={100} style={{ width: 120 }}
+                      placeholder="如 8 表示 8%"
+                      value={poolDialog.dachaDraft}
+                      onChange={(e) => setPoolDialog(f => f ? { ...f, dachaDraft: e.target.value, err: '' } : f)}
+                    />
+                    <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>%（平台对该客户的扣点比例，展示于合作商终端客户池卡片）</span>
+                  </div>
+                </DrawerSection>
+
+                <DrawerSection title="入合作池范围">
+                  <PoolScopeEditor cfg={poolDialog.cfg} update={update} />
+                </DrawerSection>
+
+                <DrawerSection title="合作规则">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                    {COOP_RULE_FIELDS.map(({ label, key, placeholder }) => (
+                      <div key={key}>
+                        <label className="drawer-label" style={{ display: 'block', marginBottom: 6 }}>{label}</label>
+                        <textarea className="filter-input" style={{ width: '100%', minHeight: 64, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.7 }} placeholder={placeholder} value={rule?.[key] ?? ''} onChange={(e) => update({ coopRule: { ...(rule ?? {}), [key]: e.target.value } })} />
+                      </div>
+                    ))}
+                  </div>
+                </DrawerSection>
+
+                {poolDialog.err && (
+                  <div style={{ padding: '8px 12px', background: '#FFEBEE', color: '#C62828', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>{poolDialog.err}</div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+                  <Button variant="ghost" onClick={() => setPoolDialog(null)}>取消</Button>
+                  <Button onClick={() => {
+                    const rate = Number(poolDialog.dachaDraft);
+                    if (poolDialog.dachaDraft.trim() === '' || Number.isNaN(rate) || rate < 0 || rate > 100) {
+                      setPoolDialog(f => f ? { ...f, err: '请输入 0-100 之间的淡茶扣点比例' } : f);
+                      return;
+                    }
+                    setPoolConfig(poolDialog.customerId, { ...poolDialog.cfg, dachaRate: rate });
+                    setPoolDialog(null);
+                  }}>保存并开启</Button>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {showConvertConfirm && customerToConvert && (
           <div className="category-dialog-overlay" onClick={() => setShowConvertConfirm(false)}>
@@ -770,7 +991,7 @@ export default function SalesCustomers() {
                 ['procurement', '采买平台管理', true],
                 ['contacts', '下单人', detailCustomer.type === 'direct'],
                 ['suborg', '分子机构', detailCustomer.type === 'direct'],
-                ['pool', '入池管理', detailCustomer.type === 'direct'],
+                ['pool', '入合作池管理', detailCustomer.type === 'direct'],
                 ['ops', '操作记录', true],
               ] as ['basic' | 'finance' | 'viaPlatform' | 'procurement' | 'contacts' | 'suborg' | 'ops', string, boolean][]).map(([key, label, show]) => show ? (
                 <button key={key} type="button" className={`drawer-tab${detailTab === key ? ' active' : ''}`} onClick={() => setDetailTab(key)}>
@@ -1143,12 +1364,12 @@ export default function SalesCustomers() {
                 ];
                 return (
                   <>
-                    <DrawerSection title="入池状态">
+                    <DrawerSection title="入合作池状态">
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                           <button
                             type="button" role="switch" aria-checked={cfg.enabled}
-                            title={cfg.enabled ? '入池：是（点击改为否，合作商客户池不再展示该客户）' : '入池：否（点击改为是，按入池范围对合作商展示）'}
+                            title={cfg.enabled ? '入合作池：是（点击改为否，合作商客户池不再展示该客户）' : '入合作池：否（点击改为是，按入合作池范围对合作商展示）'}
                             onClick={() => update({ enabled: !cfg.enabled })}
                             style={{
                               position: 'relative', width: 44, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer',
@@ -1164,8 +1385,23 @@ export default function SalesCustomers() {
                           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: cfg.enabled ? 'var(--color-module-current-base)' : 'var(--color-neutral-400)' }}>{cfg.enabled ? '是' : '否'}</span>
                         </span>
                         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', flex: 1, minWidth: 200 }}>
-                          入池=是时，该客户按下方入池范围展示在合作商终端「客户池」；入池=否则不展示。设置即时生效。
+                          入合作池=是时，该客户按下方入合作池范围展示在合作商终端「客户池」；入合作池=否则不展示。设置即时生效。
                         </span>
+                      </div>
+                    </DrawerSection>
+
+                    <DrawerSection title="淡茶扣点">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                        <input
+                          className="filter-input mono" type="number" min={0} max={100} style={{ width: 120 }}
+                          placeholder="如 8 表示 8%"
+                          value={cfg.dachaRate ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            update({ dachaRate: v === '' ? undefined : Math.max(0, Math.min(100, Number(v))) });
+                          }}
+                        />
+                        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>%（平台对该客户的扣点比例，展示于合作商终端客户池卡片；留空=未设置）</span>
                       </div>
                     </DrawerSection>
 
@@ -1173,45 +1409,35 @@ export default function SalesCustomers() {
                     <DrawerSection
                       title="合作规则"
                       extra={ruleForm === null && (
-                        <Button size="sm" variant="ghost" onClick={() => setRuleForm({
-                          requirements: cfg.coopRule?.requirements ?? '',
-                          orderProcess: cfg.coopRule?.orderProcess ?? '',
-                          settlement: cfg.coopRule?.settlement ?? '',
-                        })}>编辑</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setRuleForm(Object.fromEntries(COOP_RULE_FIELDS.map(({ key }) => [key, cfg.coopRule?.[key] ?? ''])))}>编辑</Button>
                       )}
                     >
                       {ruleForm === null ? (
-                        cfg.coopRule && (cfg.coopRule.requirements || cfg.coopRule.orderProcess || cfg.coopRule.settlement) ? (
+                        cfg.coopRule && COOP_RULE_FIELDS.some(({ key }) => cfg.coopRule?.[key]) ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                            {([['客户要求', cfg.coopRule.requirements], ['下单流程', cfg.coopRule.orderProcess], ['结算规则', cfg.coopRule.settlement]] as [string, string | undefined][]).map(([label, text]) => (
-                              <div key={label} style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
+                            {COOP_RULE_FIELDS.map(({ label, key }) => (
+                              <div key={key} style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
                                 <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', paddingTop: 2, minWidth: 56 }}>{label}</span>
-                                <span style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--color-neutral-700)', lineHeight: 1.8 }}>{text || '—'}</span>
+                                <span style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--color-neutral-700)', lineHeight: 1.8 }}>{cfg.coopRule?.[key] || '—'}</span>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <EmptyText>暂未设置合作规则，点击「编辑」填写客户要求、下单流程与结算规则（合作商在客户池查看该客户时展示）。</EmptyText>
+                          <EmptyText>暂未设置合作规则，点击「编辑」填写基础要求、订单流程、发货要求、结算规则、推品规则与注意事项（合作商在客户池查看该客户时展示）。</EmptyText>
                         )
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                          <div>
-                            <label className="drawer-label" style={{ display: 'block', marginBottom: 6 }}>客户要求（品质、包装、售后等）</label>
-                            <textarea className="filter-input" style={{ width: '100%', minHeight: 72, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.7 }} placeholder="如：要求供货商品提供当季检测报告；礼盒类需带品牌礼袋..." value={ruleForm.requirements} onChange={(e) => setRuleForm((f) => f ? { ...f, requirements: e.target.value } : f)} />
-                          </div>
-                          <div>
-                            <label className="drawer-label" style={{ display: 'block', marginBottom: 6 }}>下单流程（订货方式、确认流程等）</label>
-                            <textarea className="filter-input" style={{ width: '100%', minHeight: 72, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.7 }} placeholder="如：每周三前汇总需求向平台下单，订单经客户采购部确认后生效..." value={ruleForm.orderProcess} onChange={(e) => setRuleForm((f) => f ? { ...f, orderProcess: e.target.value } : f)} />
-                          </div>
-                          <div>
-                            <label className="drawer-label" style={{ display: 'block', marginBottom: 6 }}>结算规则（账期、开票、对账等）</label>
-                            <textarea className="filter-input" style={{ width: '100%', minHeight: 72, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.7 }} placeholder="如：月结 30 天，次月 10 日前对账开票（增值税专用发票）..." value={ruleForm.settlement} onChange={(e) => setRuleForm((f) => f ? { ...f, settlement: e.target.value } : f)} />
-                          </div>
+                          {COOP_RULE_FIELDS.map(({ label, key, placeholder }) => (
+                            <div key={key}>
+                              <label className="drawer-label" style={{ display: 'block', marginBottom: 6 }}>{label}</label>
+                              <textarea className="filter-input" style={{ width: '100%', minHeight: 64, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.7 }} placeholder={placeholder} value={ruleForm[key] ?? ''} onChange={(e) => setRuleForm((f) => f ? { ...f, [key]: e.target.value } : f)} />
+                            </div>
+                          ))}
                           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
                             <Button variant="ghost" onClick={() => setRuleForm(null)}>取消</Button>
                             <Button onClick={() => {
-                              update({ coopRule: { requirements: ruleForm.requirements.trim() || undefined, orderProcess: ruleForm.orderProcess.trim() || undefined, settlement: ruleForm.settlement.trim() || undefined } });
-                              addOpRecord(detailCustomer.customerCode || '—', '修改合作规则', '设置合作商与该客户的合作规则（客户要求 / 下单流程 / 结算规则）');
+                              update({ coopRule: Object.fromEntries(COOP_RULE_FIELDS.map(({ key }) => [key, (ruleForm[key] ?? '').trim() || undefined])) });
+                              addOpRecord(detailCustomer.customerCode || '—', '修改合作规则', '设置合作商与该客户的合作规则（' + COOP_RULE_FIELDS.map(({ label }) => label).join(' / ') + '）');
                               setRuleForm(null);
                             }}>保存</Button>
                           </div>

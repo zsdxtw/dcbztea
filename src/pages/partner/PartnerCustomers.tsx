@@ -66,12 +66,26 @@ function orderableProductsOf(c: CustomerItem, customerQuotes: ReturnType<typeof 
   });
 }
 
-/** 客户池：经营地区默认取注册地址省市县，展示入池范围命中的客户卡片（5×2），选中后下方展示该客户报品商品（左品牌栏+右列表，参照供货报价） */
+/** 客户池：经营地区默认取注册地址省市县，展示入合作池范围命中的客户卡片（5×2），选中后上方展示合作规则、下方展示该客户报品商品（左品牌栏+右列表，参照供货报价） */
 export default function PartnerCustomers() {
   const poolConfigs = useCustomerStore((s) => s.poolConfigs);
   const suppliers = useSupplierStore((s) => s.suppliers);
   const customerQuotes = usePriceStore((s) => s.customerQuotes);
   const storeProducts = usePriceStore((s) => s.products);
+
+  /** 扣点模式文案：淡茶扣点 ~ 淡茶扣点+各经平台扣点（区间取最小~最大） */
+  const dachaRangeText = (c: CustomerItem, dachaRate?: number): string => {
+    if (dachaRate === undefined) return '未设置';
+    const rates = (c.platformIds ?? []).map((id) => {
+      const raw = c.platformCommissionRates?.[id] ?? '0';
+      const n = parseFloat(String(raw).replace('%', ''));
+      return Number.isNaN(n) ? 0 : dachaRate + n;
+    });
+    const all = [dachaRate, ...rates];
+    const min = Math.min(...all);
+    const max = Math.max(...all);
+    return min === max ? `${min}%` : `${min}%~${max}%`;
+  };
 
   const auth = getPartnerAuth();
   const partner = useMemo(() => {
@@ -130,7 +144,7 @@ export default function PartnerCustomers() {
       <PageHead
         eyebrow="合作商终端 · 客户池"
         title="客户池"
-        desc="经营地区默认取贵司注册地址所在的省/市/县，可自由切换。展示入池范围覆盖当前经营地区的客户（入池=是）；点击客户卡片，下方展示该客户报品商品与报价（由平台报品报（调）价统一设置）。"
+        desc="经营地区默认取贵司注册地址所在的省/市/县，可自由切换。展示入合作池范围覆盖当前经营地区的客户（入合作池=是）；点击客户卡片，上方展示平台设置的合作规则（基础要求/订单流程/发货要求/结算规则/推品规则/注意事项），下方展示该客户报品商品与报价（由平台报品报（调）价统一设置）。"
       />
 
       {/* 经营地区筛选 */}
@@ -169,7 +183,7 @@ export default function PartnerCustomers() {
                   textAlign: 'left', cursor: 'pointer', padding: '10px 12px', borderRadius: 10, position: 'relative',
                   border: `2px solid ${on ? '#01795D' : 'var(--pk-line)'}`,
                   background: on ? 'var(--pk-accent-soft)' : '#fff',
-                  display: 'flex', flexDirection: 'column', gap: 5, minHeight: 120,
+                  display: 'flex', flexDirection: 'column', gap: 5,
                 }}>
                 <span style={{ position: 'absolute', top: 8, right: 8 }} title={c.status === 'active' ? '合作中' : '已暂停'}>
                   <Pill tone={c.status === 'active' ? 'green' : 'amber'}>{c.status === 'active' ? '合作中' : '已暂停'}</Pill>
@@ -182,6 +196,12 @@ export default function PartnerCustomers() {
                 <div style={{ fontSize: 11, color: 'var(--pk-ink3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={poolScopeText(cfg)}>
                   地区：{poolScopeText(cfg)}
                 </div>
+                <div style={{ borderTop: '1px dashed var(--pk-line)', paddingTop: 5, display: 'flex', flexDirection: 'column', gap: 2, fontSize: 11, lineHeight: 1.5 }}>
+                  <span style={{ color: 'var(--pk-ink2)' }} title="淡茶扣点 + 该客户经平台的各平台扣点">
+                    扣点模式：<strong style={{ color: '#01795D' }}>{dachaRangeText(c, cfg?.dachaRate)}</strong>
+                  </span>
+                  <span style={{ color: 'var(--pk-ink3)' }}>差价模式：视具体订单情况</span>
+                </div>
               </button>
             );
           })}
@@ -192,6 +212,54 @@ export default function PartnerCustomers() {
           <Pagination total={filtered.length} page={page} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} label="家客户" />
         </div>
       )}
+
+      {/* 选中客户：合作规则（来自管理后台「客户列表 · 入池管理」的设置） */}
+      {selected && (() => {
+        const rule = poolConfigs[selected.id]?.coopRule;
+        const hasRule = !!(rule && (rule.requirements || rule.orderProcess || rule.settlement));
+        const columns: { label: string; text?: string }[] = [
+          { label: '基础要求', text: rule?.requirements },
+          { label: '订单流程', text: rule?.orderProcess },
+          { label: '发货要求', text: rule?.shipping },
+          { label: '结算规则', text: rule?.settlement },
+          { label: '推品规则', text: rule?.promotion },
+          { label: '注意事项', text: rule?.precautions },
+        ];
+        return (
+          <div className="pk-panel" style={{ marginTop: 18 }}>
+            <div className="pk-panel-head">
+              <div className="pk-panel-title">
+                合作规则
+                <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--pk-ink3)' }}>
+                  与该客户合作的规则说明 · 来自管理后台「客户列表 · 入合作池管理」设置
+                </span>
+              </div>
+              <span style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>{selected.shortName || selected.name}</span>
+            </div>
+            <div className="pk-panel-body">
+              {hasRule ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                  {columns.map((col) => (
+                    <div key={col.label} style={{ background: '#fff', border: '1px solid var(--pk-line)', borderRadius: 10, padding: '12px 14px' }}>
+                      <span style={{
+                        display: 'inline-block', padding: '2px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+                        background: 'var(--pk-accent-soft)', color: '#01795D', marginBottom: 8,
+                      }}>{col.label}</span>
+                      <div style={{ fontSize: 13, color: 'var(--pk-ink2)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+                        {col.text || <span style={{ color: 'var(--pk-ink3)' }}>—</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--pk-ink3)', lineHeight: 1.8 }}>
+                  该客户暂未设置合作规则。管理后台可在「客户列表 → 客户详情 → 入合作池管理 → 合作规则」中设置客户要求、下单流程与结算规则，设置后此处同步展示。
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 选中客户：可报商品（左品牌栏 + 右商品列表，参照供货报价） */}
       {selected && (

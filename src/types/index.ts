@@ -792,13 +792,21 @@ export interface CustomerPoolConfig {
   districts: string[];
   /** 合作规则（合作商与该客户合作的规则说明，展示于合作商终端客户池） */
   coopRule?: {
-    /** 客户要求（品质、包装、售后等要求） */
+    /** 基础要求（品质、包装、售后等要求） */
     requirements?: string;
-    /** 下单流程（订货方式、确认流程等） */
+    /** 订单流程（订货方式、确认流程等） */
     orderProcess?: string;
+    /** 发货要求（发货时限、物流方式等） */
+    shipping?: string;
     /** 结算规则（账期、开票、对账等） */
     settlement?: string;
+    /** 推品规则（推品清单、推介支持等） */
+    promotion?: string;
+    /** 注意事项（禁止事项、风险提示等补充说明） */
+    precautions?: string;
   };
+  /** 淡茶扣点（百分比，平台对该客户的扣点比例；展示于合作商终端客户池卡片） */
+  dachaRate?: number;
 }
 
 /** 入池范围匹配：入池开 + (全国 或 选中省/市/县 命中任一范围) 才对合作商展示 */

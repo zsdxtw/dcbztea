@@ -82,7 +82,10 @@ const seedPoolConfigs: Record<string, CustomerPoolConfig> = {
     coopRule: {
       requirements: '客户为连锁茶庄，要求供货商品提供当季检测报告；礼盒类需带品牌礼袋；拒收破损包装，破损包退换。',
       orderProcess: '每周三前汇总需求向平台下单，订单经客户采购部邮件确认后生效；紧急补货可电话下单后补单。',
+      shipping: '现货商品 48 小时内发货；期货与定制商品按约定交期发货，发货前同步物流单号至客户采购部。',
       settlement: '月结 30 天，次月 10 日前对账开票（增值税专用发票），月底前付款；超期按合同约定计滞纳金。',
+      promotion: '按平台每月更新的推品清单优先向客户推介；推品首单可申请额外 3% 支持价，需提前报备。',
+      precautions: '发货前请与客户仓库预约收货时段；节假日期间订单顺延处理，重大促销节点（如中秋/春节）需提前 15 天备货。',
     },
   },
   c6: { enabled: true, nationwide: true, provinces: [], cities: [], districts: [] },
