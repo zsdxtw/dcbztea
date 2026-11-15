@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { TeaProduct, PurchasePriceRule } from '../types';
-import { teaProducts } from '../data/teaProducts';
+import { teaProducts, nonTeaDemoProducts } from '../data/teaProducts';
 import { purchasePriceRules, salesQuotationRules, calcPlatformNetPrice, type SalesQuotationRule } from '../data/prices';
 import { customerItems } from '../data/customers';
 
@@ -173,7 +173,7 @@ function seedCustomerQuotes(): CustomerQuoteMap {
 }
 
 export const usePriceStore = create<PriceStore>((set, get) => ({
-  products: teaProducts,
+  products: [...teaProducts, ...nonTeaDemoProducts],
   purchaseRules: purchasePriceRules,
   salesQuotations: salesQuotationRules,
   customerQuotes: seedCustomerQuotes(),

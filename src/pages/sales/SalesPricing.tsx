@@ -31,6 +31,13 @@ function purchaseInfoOf(productId: string, rules: PurchasePriceRule[]) {
 const PRIMARY = '#0F64B5';
 const PRIMARY_LIGHT = '#EBF3FC';
 
+/* 列表紧凑行高：覆盖全局表格 48px 固定高与叠加内边距，图文行上下空挡收紧 */
+const QUOTE_TABLE_CSS = `
+.sp-quote-table thead th { padding: 7px 10px; }
+.sp-quote-table tbody td { height: auto; padding: 5px 10px; vertical-align: middle; }
+.sp-quote-table tbody td:first-child { padding-left: 14px; }
+`;
+
 /** 商品状态标签（来源于商品管理该商品的上下架/采购/生产状态） */
 const SHELF_LABELS: Record<string, string> = { on: '已上架', off: '已下架' };
 const PURCHASE_LABELS: Record<string, string> = { available: '可采购', stopped: '已停采' };
@@ -423,7 +430,9 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
                 <option value="market">市场价</option>
               </select>
             </div>
-            <table className="detail-inline-table" style={{ border: 'none' }}>
+            <div style={{ overflowX: 'auto' }}>
+            <style>{QUOTE_TABLE_CSS}</style>
+            <table className="detail-inline-table sp-quote-table" style={{ border: 'none', minWidth: 1500 }}>
               <thead>
                 <tr>
                   <th style={{ width: 44 }}>序号</th><th style={{ width: 82 }}>图片</th><th style={{ width: 110 }}>商品编号</th><th style={{ width: 150 }}>客户侧商品编号</th><th>商品名称</th><th>品牌 / 规格</th><th>状态</th><th>市场价</th><th>进货价</th><th>销售报价</th>
@@ -596,6 +605,7 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
                 )}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* 分页（总数超过每页条数时展示；每页 10/20/50 可调） */}

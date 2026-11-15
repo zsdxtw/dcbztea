@@ -7,8 +7,6 @@ import type { CustomerItem, CustomerPoolConfig, CustomerType, PlatformItem, Plat
 import { customerItems as initialCustomers, CUSTOMER_TYPE_LABELS, CUSTOMER_TYPE_DESC, LEVEL_COLORS, CUSTOMER_GROUP_MAP, generateOrderContactId, convertPersonalToDirect } from '../../data/customers';
 import { platformItems as globalPlatforms } from '../../data/platforms';
 import { PROVINCE_NAMES, getCityNames, getCities, getDistricts } from '../../data/regions';
-/** 入池范围可选省份（排除 台湾/香港/澳门） */
-const POOL_PROVINCES = PROVINCE_NAMES.filter((p) => !['台湾', '香港', '澳门'].includes(p));
 import { generateCustomerCode } from '../../utils/customerCode';
 import { useDrawerWidth } from '../../hooks/useDrawerWidth';
 import DeptEmployeeSelect from '../../components/business/DeptEmployeeSelect';
@@ -70,7 +68,7 @@ function PoolScopeEditor({ cfg, update }: { cfg: CustomerPoolConfig; update: (pa
         >
           全国
         </button>
-        {POOL_PROVINCES.map((pv) => {
+        {PROVINCE_NAMES.map((pv) => {
           const provOn = cfg.provinces.includes(pv);
           const provOpen = expandedProv === pv;
           const coveredBy = cfg.nationwide;
@@ -1479,7 +1477,7 @@ export default function SalesCustomers() {
                         >
                           全国
                         </button>
-                        {POOL_PROVINCES.map((pv) => {
+                        {PROVINCE_NAMES.map((pv) => {
                           const provOn = cfg.provinces.includes(pv);
                           const provOpen = expandedProv === pv;
                           const coveredBy = cfg.nationwide;

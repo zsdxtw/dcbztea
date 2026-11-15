@@ -2,6 +2,32 @@
 import type { BrandItem } from '../types';
 
 export const brandItems: BrandItem[] = [
+  /* ── 非茶分类品牌（茶具/茶周边/其他） ── */
+  {
+    id: 'b-nontea-1', code: '028', name: '藏壶者', logo: '', owner: '宜兴藏壶者茶具有限公司',
+    introduction: '宜兴紫砂与景德镇瓷器茶具品牌，全手工器型见长', requirements: '需提供材质检测报告与工艺证书', policy: '年度返利2%，季度结算', series: ['曼生十八式', '经典器型', '青花系列', '素白系列', '乌金石系列', '竹语系列', '六君子系列', '观茶系列'],
+    trademarkCert: ['藏壶者商标注册证.pdf'], jdStoreUrl: '', tmallStoreUrl: '',
+    contactPerson: '许建壶', contactPhone: '0510-8765****', province: '江苏', city: '无锡市', district: '宜兴市', address: '丁蜀镇紫砂村',
+    categoryType: 'teaware', mainCategories: ['茶壶', '茶杯', '茶盘茶台', '茶道配件'], productCount: 8, supplierCount: 1,
+    website: '', cooperationDate: '2024-03-10',
+  },
+  {
+    id: 'b-nontea-2', code: '029', name: '九曲红', logo: '', owner: '杭州九曲红文化创意有限公司',
+    introduction: '茶周边开发品牌，主营茶食品、礼盒套装与茶叶包装', requirements: '食品类需SC认证，礼盒类需品牌授权', policy: '年度返利3%，季度结算', series: ['江南茶点', '茶糖系列', '中秋限定', '商务定制', '锡语系列', '通用包装'],
+    trademarkCert: ['九曲红商标注册证.pdf'], jdStoreUrl: '', tmallStoreUrl: '',
+    contactPerson: '祝九曲', contactPhone: '0571-8899****', province: '浙江', city: '杭州市', district: '西湖区', address: '转塘街道创意园',
+    categoryType: 'tea-peripheral', mainCategories: ['茶食品', '礼盒套装', '茶叶罐/包装'], productCount: 6, supplierCount: 1,
+    website: '', cooperationDate: '2024-05-18',
+  },
+  {
+    id: 'b-nontea-3', code: '030', name: '山尔堂', logo: '', owner: '武夷山山尔堂茶文化有限公司',
+    introduction: '茶文化衍生品牌，主营泡茶水、茶书茶画与茶香道', requirements: '饮用水需生产许可，书籍需出版资质', policy: '年度返利2%，半年结算', series: ['武夷山泉', '典藏书系', '茶席香事'],
+    trademarkCert: ['山尔堂商标注册证.pdf'], jdStoreUrl: '', tmallStoreUrl: '',
+    contactPerson: '张山尔', contactPhone: '0599-5233****', province: '福建', city: '南平市', district: '武夷山市', address: '度假区茶文化街',
+    categoryType: 'other', mainCategories: ['泡茶水', '茶书茶画', '茶香/香道'], productCount: 3, supplierCount: 1,
+    website: '', cooperationDate: '2024-08-02',
+  },
+
   /* ── 绿茶 ── */
   {
     id: '1', code: '001', name: '西湖牌', logo: '', owner: '杭州西湖茶叶有限公司',

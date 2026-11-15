@@ -11,8 +11,6 @@ import { usePriceStore } from '../../stores/priceStore';
 import { customerItems } from '../../data/customers';
 import { teaProducts } from '../../data/teaProducts';
 import { PROVINCE_NAMES, getCities, getDistricts } from '../../data/regions';
-/** 报备地区可选省份（排除 台湾/香港/澳门） */
-const REPORT_PROVINCES = PROVINCE_NAMES.filter((p) => !['台湾', '香港', '澳门'].includes(p));
 import type { PartnerOrderReportKind, PartnerReport, PartnerReportType } from '../../types';
 import { PARTNER_REPORT_TYPE_LABELS, PARTNER_REPORT_STATUS_LABELS, PARTNER_ORDER_KIND_LABELS } from '../../data/partner';
 import './partner.css';
@@ -732,7 +730,7 @@ function RegionTree({ form, setForm, treeOpen, setTreeOpen }: {
         >
           全国
         </button>
-        {REPORT_PROVINCES.map((pv) => {
+        {PROVINCE_NAMES.map((pv) => {
           const provOn = regionChecked(pv);
           const provOpen = expandedProv === pv;
           const provDis = nationwide;

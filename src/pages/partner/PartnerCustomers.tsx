@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import Pagination from '../../components/common/Pagination';
 import { PageHead, Pill } from './PartnerUI';
 import { getPartnerAuth } from './PartnerLayout';
 import { customerItems, CUSTOMER_TYPE_LABELS } from '../../data/customers';
+import { getInitials } from '../../utils/pinyinInitials';
 import { useCustomerStore } from '../../stores/customerStore';
 import { usePriceStore, effectiveCustomerQuote } from '../../stores/priceStore';
 import { useSupplierStore } from '../../stores/supplierStore';
@@ -151,12 +152,41 @@ export default function PartnerCustomers() {
   /** 选中客户的可报商品（报品=是） */
   const orderableProducts = useMemo(() => (selected ? orderableProductsOf(selected, customerQuotes, storeProducts) : []), [selected, customerQuotes, storeProducts]);
 
-  /** 左侧品牌栏 */
+  /** 左侧品牌栏：按拼音首字母 A-Z 排序分组（参照报品报（调）价） */
   const brandNav = useMemo(() => {
     const map = new Map<string, number>();
     orderableProducts.forEach((p) => map.set(p.brand, (map.get(p.brand) ?? 0) + 1));
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([name, count]) => ({ name, count }));
+    return [...map.entries()]
+      .map(([name, count]) => ({ name, count, initial: (getInitials(name)[0] ?? '#').toUpperCase() }))
+      .sort((a, b) => a.initial.localeCompare(b.initial) || a.name.localeCompare(b.name, 'zh-Hans-CN'));
   }, [orderableProducts]);
+  const brandGroups = useMemo(() => {
+    const groups: { letter: string; items: typeof brandNav }[] = [];
+    brandNav.forEach((b) => {
+      const g = groups[groups.length - 1];
+      if (g && g.letter === b.initial) g.items.push(b);
+      else groups.push({ letter: b.initial, items: [b] });
+    });
+    return groups;
+  }, [brandNav]);
+  /** 字母导航滚动联动 */
+  const [activeLetter, setActiveLetter] = useState('');
+  const brandListRef = useRef<HTMLDivElement>(null);
+  const onBrandListScroll = () => {
+    const el = brandListRef.current;
+    if (!el) return;
+    const groupEls = [...el.querySelectorAll<HTMLElement>('[data-letter]')];
+    let current = groupEls[0]?.dataset.letter ?? '';
+    for (const g of groupEls) {
+      if (g.offsetTop - el.scrollTop <= 30) current = g.dataset.letter ?? current;
+    }
+    setActiveLetter(current);
+  };
+  const scrollToLetter = (letter: string) => {
+    const el = brandListRef.current;
+    const target = el?.querySelector<HTMLElement>(`[data-letter="${letter}"]`);
+    if (el && target) el.scrollTo({ top: target.offsetTop - 4, behavior: 'smooth' });
+  };
   const brandProducts = useMemo(() => orderableProducts.filter((p) => !brand || p.brand === brand), [orderableProducts, brand]);
   /** 可报商品列表分页 */
   const prodTotalPages = Math.max(1, Math.ceil(brandProducts.length / prodPageSize));
@@ -293,38 +323,64 @@ export default function PartnerCustomers() {
           </div>
           <div className="pk-panel-body">
             <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-              {/* 左侧品牌栏 */}
-              <div className="pk-panel" style={{ width: 200, flexShrink: 0, margin: 0 }}>
+              {/* 左侧品牌栏（参照报品报（调）价：A-Z 字母导航 + 分组列表） */}
+              <div className="pk-panel" style={{ width: 216, flexShrink: 0, margin: 0 }}>
                 <div className="pk-panel-head" style={{ paddingBottom: 10 }}>
                   <div className="pk-panel-title" style={{ fontSize: 13 }}>商品品牌</div>
                 </div>
-                <div className="pk-panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <button type="button" onClick={() => setBrand('')}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
-                      padding: '8px 12px', borderRadius: 10, cursor: 'pointer',
-                      border: brand === '' ? '1px solid var(--pk-accent)' : '1px solid transparent',
-                      background: brand === '' ? 'var(--pk-accent-soft)' : 'transparent',
-                      color: brand === '' ? '#01795D' : 'var(--pk-ink2)',
-                      fontWeight: brand === '' ? 600 : 500, fontSize: 13,
-                    }}>
-                    全部品牌
-                    <span style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>{orderableProducts.length}</span>
-                  </button>
-                  {brandNav.map((b) => (
-                    <button key={b.name} type="button" onClick={() => setBrand(b.name)}
+                <div className="pk-panel-body" style={{ display: 'flex', alignItems: 'stretch', padding: 0 }}>
+                  {/* A-Z 字母导航 */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, width: 22, flexShrink: 0, padding: '6px 0 6px 4px', borderRight: '1px solid var(--pk-line)', maxHeight: 460, overflowY: 'auto' }}>
+                    {brandGroups.map((g) => {
+                      const active = activeLetter === g.letter;
+                      return (
+                        <button key={g.letter} type="button" onClick={() => scrollToLetter(g.letter)}
+                          title={`${g.letter}（${g.items.length} 个品牌）`}
+                          style={{
+                            width: 16, height: 16, borderRadius: 4, border: 'none', cursor: 'pointer', flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: active ? 700 : 500,
+                            background: active ? '#01795D' : 'transparent', color: active ? '#fff' : 'var(--pk-ink3)',
+                          }}>{g.letter}</button>
+                      );
+                    })}
+                  </div>
+                  {/* 品牌列表（按字母分组，粘性字母头） */}
+                  <div ref={brandListRef} onScroll={onBrandListScroll} style={{ flex: 1, minWidth: 0, maxHeight: 460, overflowY: 'auto', padding: 4, position: 'relative' }}>
+                    <button type="button" onClick={() => setBrand('')}
                       style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
-                        padding: '8px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                        border: brand === b.name ? '1px solid var(--pk-accent)' : '1px solid transparent',
-                        background: brand === b.name ? 'var(--pk-accent-soft)' : 'transparent',
-                        color: brand === b.name ? '#01795D' : 'var(--pk-ink2)',
-                        fontWeight: brand === b.name ? 600 : 500, fontSize: 13,
+                        padding: '8px 12px', borderRadius: 10, cursor: 'pointer',
+                        border: brand === '' ? '1px solid #01795D' : '1px solid transparent',
+                        background: brand === '' ? 'var(--pk-accent-soft)' : 'transparent',
+                        color: brand === '' ? '#01795D' : 'var(--pk-ink2)',
+                        fontWeight: brand === '' ? 600 : 500, fontSize: 13,
                       }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>
-                      <span style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>{b.count}</span>
+                      全部品牌
+                      <span style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>{orderableProducts.length}</span>
                     </button>
-                  ))}
+                    {brandGroups.map((g) => (
+                      <div key={g.letter} data-letter={g.letter}>
+                        <div style={{
+                          position: 'sticky', top: 0, zIndex: 1, fontSize: 11, fontWeight: 700, color: '#01795D',
+                          background: 'var(--color-neutral-50)', padding: '4px 10px', borderRadius: 6, letterSpacing: '0.05em',
+                        }}>{g.letter}</div>
+                        {g.items.map((b) => (
+                          <button key={b.name} type="button" onClick={() => setBrand(b.name)}
+                            style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
+                              padding: '7px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                              border: brand === b.name ? '1px solid #01795D' : '1px solid transparent',
+                              background: brand === b.name ? 'var(--pk-accent-soft)' : 'transparent',
+                              color: brand === b.name ? '#01795D' : 'var(--pk-ink2)',
+                              fontWeight: brand === b.name ? 600 : 400, fontSize: 12.5,
+                            }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>
+                            <span style={{ fontSize: 11, color: 'var(--pk-ink3)' }}>{b.count}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 

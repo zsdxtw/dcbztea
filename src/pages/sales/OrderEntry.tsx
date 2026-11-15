@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
@@ -7,6 +7,7 @@ import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePriceStore, effectiveCustomerQuote, effectivePlatformQuote } from '../../stores/priceStore';
 import { calcPlatformNetPrice } from '../../data/prices';
 import { customerItems, CUSTOMER_TYPE_LABELS } from '../../data/customers';
+import { productCategoryLabels } from '../../data/productCategories';
 import { platformItems } from '../../data/platforms';
 import { getSalesDefaultPrice, getPersonalMinPrice } from '../../data/prices';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
@@ -59,6 +60,11 @@ export default function OrderEntry() {
   const [custDropOpen, setCustDropOpen] = useState(false);
   /** 商品选择：品牌筛选 + 名称搜索 */
   const [itemBrand, setItemBrand] = useState('');
+  /** 商品分类筛选（一级分类，来源于分类管理） */
+  const [itemCategory, setItemCategory] = useState('');
+  /** 商品选择区分页 */
+  const [pickerPage, setPickerPage] = useState(1);
+  const PICKER_PAGE_SIZE = 12;
   const [itemSearch, setItemSearch] = useState('');
   const [savedTip, setSavedTip] = useState('');
 
@@ -70,16 +76,21 @@ export default function OrderEntry() {
     ...platformItems.map((p) => ({ id: p.id, name: p.name, typeLabel: '平台客户', level: '—', contactPerson: p.contactPerson, contactPhone: p.contactPhone, contactAddress: p.contactAddress })),
   ], []);
 
-  /** 终端直营客户(经平台销售的终端客户选择用) */
-  const directCustomerOptions: CustomerOption[] = useMemo(
-    () => customerItems.filter((c) => c.type === 'direct').map((c) => ({ id: c.id, name: c.name, typeLabel: '直营客户', level: c.level || '—', contactPerson: c.contactPerson, contactPhone: c.contactPhone, contactAddress: c.contactAddress || c.region })),
+  /** 经平台销售的终端客户（有经平台标记的客户，携带真实客户类型标签） */
+  const viaCustomerOptions: CustomerOption[] = useMemo(
+    () => customerItems.filter((c) => c.viaPlatform).map((c) => ({ id: c.id, name: c.name, typeLabel: CUSTOMER_TYPE_LABELS[c.type], level: c.level || '—', contactPerson: c.contactPerson, contactPhone: c.contactPhone, contactAddress: c.contactAddress || c.region })),
     [],
   );
+  /** 经平台销售下的客户类型选项：来源于有经平台销售客户的客户类型去重 */
+  const VIA_TYPES = useMemo(
+    () => [...new Set(viaCustomerOptions.map((c) => c.typeLabel))],
+    [viaCustomerOptions],
+  );
 
-  /** 客户名称下拉:直接销售仅展示当前所选客户类型的客户;经平台销售仅展示直营客户 */
+  /** 客户名称下拉：按当前所选客户类型过滤（直接销售=全部在库客户；经平台销售=有经平台标记的客户） */
   const searchPool = useMemo(
-    () => (isVia ? directCustomerOptions : customerOptions.filter((c) => c.typeLabel === customerType)),
-    [isVia, directCustomerOptions, customerOptions, customerType],
+    () => (isVia ? viaCustomerOptions : customerOptions).filter((c) => c.typeLabel === customerType),
+    [isVia, viaCustomerOptions, customerOptions, customerType],
   );
 
   const matchedCustomer = matchedCustomerId ? searchPool.find((c) => c.id === matchedCustomerId) ?? customerOptions.find((c) => c.id === matchedCustomerId) ?? null : null;
@@ -130,6 +141,15 @@ export default function OrderEntry() {
   };
 
   /** 添加商品（已添加的不可重复添加） */
+  /** 点击商品卡片：未添加→加入明细；已添加→从明细删除 */
+  const toggleProduct = (productId: string) => {
+    if (items.some((it) => it.productId === productId)) {
+      removeProduct(productId);
+      return;
+    }
+    addProduct(productId);
+  };
+
   const addProduct = (productId: string) => {
     const p = products.find((x) => x.id === productId);
     if (!p || items.some((it) => it.productId === productId)) return;
@@ -152,16 +172,34 @@ export default function OrderEntry() {
   const entryTotal = items.reduce((s, it) => s + it.price * it.quantity, 0);
   const hasMinPriceWarning = items.some((it) => minPriceWarning(it));
 
-  /** 商品选择列表：品牌 + 名称过滤(仅上架商品;报品与否不影响销售开单可选商品) */
+  /** 商品所属一级分类（兼容两类数据：茶叶 categories=["绿茶-西湖龙井"] 一段式、非茶 ["茶具","茶壶","紫砂壶"] 三段式） */
+const L1_OF_L2: Record<string, string> = {
+  '绿茶': '茶叶', '红茶': '茶叶', '青茶': '茶叶', '白茶': '茶叶', '黄茶': '茶叶', '黑茶': '茶叶', '花草茶': '茶叶',
+  '茶壶': '茶具', '茶杯': '茶具', '茶盘茶台': '茶具', '茶道配件': '茶具',
+  '茶食品': '茶周边', '礼盒套装': '茶周边', '茶叶罐/包装': '茶周边',
+  '泡茶水': '其他', '茶书茶画': '其他', '茶香/香道': '其他',
+};
+const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
+  L1_OF_L2[p.category.split('-')[0]] ?? p.categories?.[0] ?? '';
+
+/** 商品选择列表：一级分类 + 品牌 + 名称过滤(仅上架商品;报品与否不影响销售开单可选商品) */
   const pickerProducts = useMemo(() => {
     const kw = itemSearch.trim();
-    return products.filter((p) => p.shelfStatus === 'on' && (!itemBrand || p.brand === itemBrand) && (!kw || p.name.includes(kw))).slice(0, 24);
-  }, [products, itemBrand, itemSearch]);
+    return products.filter((p) => p.shelfStatus === 'on' && (!itemCategory || l1OfProduct(p) === itemCategory) && (!itemBrand || p.brand === itemBrand) && (!kw || p.name.includes(kw)));
+  }, [products, itemCategory, itemBrand, itemSearch]);
+  const pickerTotalPages = Math.max(1, Math.ceil(pickerProducts.length / PICKER_PAGE_SIZE));
+  const pagedPickerProducts = pickerProducts.slice((pickerPage - 1) * PICKER_PAGE_SIZE, pickerPage * PICKER_PAGE_SIZE);
+  useEffect(() => { setPickerPage(1); }, [itemCategory, itemBrand, itemSearch]);
+  /** 品牌下拉选项：联动所选分类（全部品牌=全部商品的品牌；选了分类=该分类下的品牌） */
+  const pickerBrands = useMemo(
+    () => [...new Set(products.filter((p) => p.shelfStatus === 'on' && (!itemCategory || l1OfProduct(p) === itemCategory)).map((p) => p.brand))],
+    [products, itemCategory],
+  );
 
   const selectCustomer = (c: CustomerOption) => {
     setMatchedCustomerId(c.id);
     setCustomerSearch(c.name);
-    if (!isVia) setCustomerType(c.typeLabel);
+    setCustomerType(c.typeLabel);
     if (c.contactPerson && !receiver) setReceiver(c.contactPerson);
     if (c.contactPhone && !receiverPhone) setReceiverPhone(c.contactPhone);
   };
@@ -173,6 +211,9 @@ export default function OrderEntry() {
   };
 
   const switchPath = (path: 'direct' | 'via_platform') => {
+    // 切换路径后类型不在可用选项中时重置为首项
+    const pool = path === 'via_platform' ? [...new Set(customerItems.filter((c) => c.viaPlatform).map((c) => CUSTOMER_TYPE_LABELS[c.type]))] : DIRECT_TYPES;
+    setCustomerType((t) => (pool.includes(t) ? t : pool[0] ?? t));
     setSalesPath(path);
     setPlatformCustomerId('');
     setExternalOrderNo('');
@@ -213,7 +254,7 @@ export default function OrderEntry() {
       customerOrderTime: customerOrderTime || undefined,
       customerOrderNo: customerOrderNo.trim() || undefined,
       customerName: customerSearch.trim(),
-      customerType: isVia ? '直营客户' : customerType,
+      customerType,
       customerRegion: [regionProv, regionCity, regionDist].filter(Boolean).join(''),
       items,
       receiver: receiver.trim(),
@@ -299,32 +340,19 @@ export default function OrderEntry() {
             </div>
           )}
 
-          {/* 客户类型(仅直接销售)+ 客户侧订单号 + 客户下单时间 */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
-            {!isVia && (
-              <div>
-                {label('客户类型', true)}
-                <select className="filter-input" value={customerType} onChange={(e) => changeCustomerType(e.target.value)} style={{ width: '100%' }}>
-                  {DIRECT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-            )}
-            <div>
-              {label('客户侧订单号（客户下单渠道的单号，非必输）')}
-              <input className="filter-input" placeholder="客户侧订单号" value={customerOrderNo} onChange={(e) => setCustomerOrderNo(e.target.value)} style={{ width: '100%' }} />
+          {/* 客户类型 + 客户名称 同一行 */}
+          <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
+            <div style={{ width: 190, flexShrink: 0 }}>
+              {label('客户类型', true)}
+              <select className="filter-input" value={customerType} onChange={(e) => changeCustomerType(e.target.value)} style={{ width: '100%' }}>
+                {(isVia ? VIA_TYPES : DIRECT_TYPES).map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
             </div>
-            <div>
-              {label('客户下单时间')}
-              <input className="filter-input" type="datetime-local" value={customerOrderTime} onChange={(e) => setCustomerOrderTime(e.target.value)} style={{ width: '100%' }} />
-            </div>
-          </div>
-
-          {/* 客户名称(直接销售=各类型客户;经平台销售=终端直营客户)：可搜索下拉（点击展开全部在库客户，输入即过滤） */}
-          <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
-            {label('客户名称（经平台销售为终端直营客户；下拉选择在库客户，可输入搜索）', true)}
+            <div style={{ flex: 1.4, minWidth: 0, position: 'relative' }}>
+            {label('客户名称', true)}
             <div style={{ position: 'relative' }}>
               <input
-                className="filter-input" placeholder={isVia ? '点击选择终端直营客户，或输入名称搜索' : '点击选择客户，或输入名称搜索'} style={{ width: '100%', paddingRight: 56 }}
+                className="filter-input" placeholder={isVia ? '点击选择经平台客户，或输入名称搜索' : '点击选择客户，或输入名称搜索'} style={{ width: '100%', paddingRight: 56 }}
                 value={customerSearch}
                 onChange={(e) => { setCustomerSearch(e.target.value); setMatchedCustomerId(''); setError(''); setCustDropOpen(true); }}
                 onFocus={() => setCustDropOpen(true)} onClick={() => setCustDropOpen(true)}
@@ -335,7 +363,7 @@ export default function OrderEntry() {
                 <button
                   type="button" title="清除已选客户"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => { setMatchedCustomerId(''); setCustomerSearch(''); setCustomerType(isVia ? '直营客户' : customerType); }}
+                  onClick={() => { setMatchedCustomerId(''); setCustomerSearch(''); }}
                   style={{ position: 'absolute', right: 30, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-neutral-400)', fontSize: 15, lineHeight: 1, padding: 0 }}
                 >×</button>
               )}
@@ -347,7 +375,7 @@ export default function OrderEntry() {
               {custDropOpen && (
                 <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, maxHeight: 260, overflowY: 'auto', background: '#fff', border: '1px solid var(--color-border-primary)', borderRadius: 'var(--radius-md)', zIndex: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
                   <div style={{ padding: '6px 12px', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', borderBottom: '1px solid var(--color-neutral-100)', position: 'sticky', top: 0, background: '#fff' }}>
-                    {isVia ? '在库直营客户' : '在库客户'} 共 {searchPool.length} 家{customerSearch.trim() ? ` · 匹配 ${customerSuggestions.length} 家` : ''}
+                    {isVia ? '在库经平台客户' : '在库客户'} 共 {searchPool.length} 家{customerSearch.trim() ? ` · 匹配 ${customerSuggestions.length} 家` : ''}
                   </div>
                   {customerSuggestions.length === 0 && (
                     <div style={{ padding: '12px', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)', textAlign: 'center' }}>未找到匹配客户（可换关键词或直接使用该名称）</div>
@@ -378,6 +406,15 @@ export default function OrderEntry() {
                 <span>等级：{matchedCustomer.level}</span>
               </div>
             )}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {label('客户侧订单号')}
+              <input className="filter-input" placeholder="客户侧订单号" value={customerOrderNo} onChange={(e) => setCustomerOrderNo(e.target.value)} style={{ width: '100%' }} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {label('客户下单时间')}
+              <input className="filter-input" type="datetime-local" value={customerOrderTime} onChange={(e) => setCustomerOrderTime(e.target.value)} style={{ width: '100%' }} />
+            </div>
           </div>
 
           {/* 收货人 / 联系电话（客户名称下一行；联系电话必输） */}
@@ -392,48 +429,34 @@ export default function OrderEntry() {
             </div>
           </div>
 
-          {/* 收货地址：省 / 地市 / 区县 三级联动（参照合作商注册）+ 详细地址（灰只读省市区框在前） */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)', alignItems: 'end' }}>
-            <div style={{ paddingBottom: 8 }}>
-              <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 'var(--radius-sm)', background: 'var(--color-module-current-lightest)', color: 'var(--color-module-current-base)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', whiteSpace: 'nowrap' }}>收货地址</span>
-            </div>
-            <div>
-              {label('省份', true)}
-              <select className="filter-input" value={regionProv} onChange={(e) => { setRegionProv(e.target.value); setRegionCity(''); setRegionDist(''); setError(''); }} style={{ width: '100%' }}>
-                <option value="">请选择</option>
+          {/* 收货地址（字段名样式同收货人）：三联下拉 + 详细地址 同一行 */}
+          <div style={{ marginBottom: 'var(--space-3)' }}>
+            {label('收货地址', true)}
+            <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+              <select className="filter-input" value={regionProv} onChange={(e) => { setRegionProv(e.target.value); setRegionCity(''); setRegionDist(''); setError(''); }} style={{ width: 100, flexShrink: 0 }} title="省份">
+                <option value="">省份</option>
                 {PROVINCE_NAMES.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
-            </div>
-            <div>
-              {label('地市', true)}
-              <select className="filter-input" disabled={!regionProv} value={regionCity} onChange={(e) => { setRegionCity(e.target.value); setRegionDist(''); setError(''); }} style={{ width: '100%' }}>
-                <option value="">请选择</option>
+              <select className="filter-input" disabled={!regionProv} value={regionCity} onChange={(e) => { setRegionCity(e.target.value); setRegionDist(''); setError(''); }} style={{ width: 100, flexShrink: 0 }} title="地市">
+                <option value="">地市</option>
                 {regionProv && getCityNames(regionProv).map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
-            </div>
-            <div>
-              {label('区县', true)}
-              <select className="filter-input" disabled={!regionCity} value={regionDist} onChange={(e) => { setRegionDist(e.target.value); setError(''); }} style={{ width: '100%' }}>
-                <option value="">请选择</option>
+              <select className="filter-input" disabled={!regionCity} value={regionDist} onChange={(e) => { setRegionDist(e.target.value); setError(''); }} style={{ width: 100, flexShrink: 0 }} title="区县">
+                <option value="">区县</option>
                 {regionProv && regionCity && getDistricts(regionProv, regionCity).map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
+              <input className="filter-input" placeholder="详细地址（街道、门牌号）" value={receiverAddress} onChange={(e) => { setReceiverAddress(e.target.value); setError(''); }} style={{ flex: 1, minWidth: 0 }} />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 2fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)', alignItems: 'end' }}>
-            <div style={{ paddingBottom: 8 }} />
-            <div>
-              {label('收货详细地址', true)}
-              <input
-                className="filter-input" readOnly title="根据所选择的省 / 地市 / 区县自动生成"
-                placeholder="省 / 地市 / 区县"
-                value={[regionProv, regionCity, regionDist].filter(Boolean).join(' / ')}
-                style={{ width: '100%', background: '#F1F5F2', color: '#57625C', cursor: 'not-allowed' }}
-              />
-            </div>
-            <div>
-              {label('详细地址', true)}
-              <input className="filter-input" placeholder="街道、门牌号" value={receiverAddress} onChange={(e) => { setReceiverAddress(e.target.value); setError(''); }} style={{ width: '100%' }} />
-            </div>
+
+          {/* 备注（多行） */}
+          <div>
+            {label('备注')}
+            <textarea
+              className="filter-input" placeholder="订单备注（平台要求、客户要求等）"
+              value={remark} onChange={(e) => setRemark(e.target.value)}
+              style={{ width: '100%', minHeight: 64, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }}
+            />
           </div>
         </Card>
 
@@ -441,28 +464,31 @@ export default function OrderEntry() {
           {/* 添加商品：品牌筛选 + 名称搜索 → 商品卡片（首图），点击即添加 */}
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>添加商品：</span>
+            <select className="filter-select" value={itemCategory} onChange={(e) => setItemCategory(e.target.value)} style={{ width: 130 }} title="按一级分类筛选">
+              <option value="">全部分类</option>
+              {Object.values(productCategoryLabels).map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
             <select className="filter-select" value={itemBrand} onChange={(e) => setItemBrand(e.target.value)} style={{ width: 160 }}>
               <option value="">全部品牌</option>
-              {[...new Set(products.map((p) => p.brand))].map((b) => <option key={b} value={b}>{b}</option>)}
+              {pickerBrands.map((b) => <option key={b} value={b}>{b}</option>)}
             </select>
             <input className="filter-input" placeholder="搜索商品名称..." value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} style={{ width: 200 }} />
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>共 {pickerProducts.length} 款</span>
           </div>
           {pickerProducts.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', maxHeight: 260, overflowY: 'auto', padding: 2 }}>
-              {pickerProducts.map((p) => {
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', padding: 2 }}>
+              {pagedPickerProducts.map((p) => {
                 const added = items.some((it) => it.productId === p.id);
                 const img = p.mainImages?.[0];
                 return (
                   <button
                     key={p.id}
-                    disabled={added}
-                    onClick={() => addProduct(p.id)}
-                    title={added ? '已添加' : '点击添加到订单'}
+                    onClick={() => toggleProduct(p.id)}
+                    title={added ? '已添加，点击从明细中删除' : '点击添加到订单'}
                     style={{
-                      display: 'flex', gap: 10, alignItems: 'center', textAlign: 'left', cursor: added ? 'not-allowed' : 'pointer',
-                      padding: 8, borderRadius: 'var(--radius-md)', border: `1px solid ${added ? 'var(--color-neutral-100)' : 'var(--color-neutral-200)'}`,
-                      background: added ? 'var(--color-bg-tertiary)' : 'var(--color-neutral-0)', opacity: added ? 0.6 : 1,
+                      display: 'flex', gap: 10, alignItems: 'center', textAlign: 'left', cursor: 'pointer',
+                      padding: 8, borderRadius: 'var(--radius-md)', border: `1px solid ${added ? 'var(--color-module-current-base)' : 'var(--color-neutral-200)'}`,
+                      background: added ? 'var(--color-module-current-lightest)' : 'var(--color-neutral-0)',
                     }}
                   >
                     {img ? (
@@ -481,25 +507,46 @@ export default function OrderEntry() {
             </div>
           )}
 
-          {/* 已选商品列表：首图 + 数量 + 销售实价 + 删除 */}
-          {items.length === 0 ? (
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)', padding: 'var(--space-2) 0' }}>尚未添加商品，点击上方商品卡片即可添加（可按品牌筛选或搜索）</div>
-          ) : (
-            <table className="detail-inline-table">
-              <thead><tr><th style={{ width: 60 }}>首图</th><th>商品 / 规格 / 品牌</th><th style={{ width: 130 }}>市场价</th><th style={{ width: 120 }}>销售报价</th><th style={{ width: 90 }}>数量</th><th style={{ width: 110 }}>销售实价</th>{isVia && <th style={{ width: 120 }}>销售给平台价</th>}<th style={{ width: 110, textAlign: 'right' }}>小计</th><th style={{ width: 60 }} /></tr></thead>
+          {pickerTotalPages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+              <button type="button" disabled={pickerPage <= 1} onClick={() => setPickerPage(pickerPage - 1)}
+                style={{ minWidth: 26, height: 26, borderRadius: 6, cursor: pickerPage <= 1 ? 'not-allowed' : 'pointer', border: '1px solid var(--color-neutral-200)', background: 'var(--color-neutral-0)', color: 'var(--color-neutral-600)', fontSize: 12, padding: '0 8px', opacity: pickerPage <= 1 ? 0.5 : 1 }}>上一页</button>
+              {Array.from({ length: pickerTotalPages }, (_, i) => i + 1).map((n) => (
+                <button key={n} type="button" onClick={() => setPickerPage(n)}
+                  style={{
+                    minWidth: 26, height: 26, padding: '0 6px', borderRadius: 6, cursor: 'pointer',
+                    border: `1px solid ${pickerPage === n ? 'var(--color-module-current-base)' : 'var(--color-neutral-200)'}`,
+                    background: pickerPage === n ? 'var(--color-module-current-base)' : 'var(--color-neutral-0)',
+                    color: pickerPage === n ? '#fff' : 'var(--color-neutral-600)',
+                    fontSize: 12, fontWeight: 500, fontFamily: 'var(--font-family-mono)',
+                  }}>{n}</button>
+              ))}
+              <button type="button" disabled={pickerPage >= pickerTotalPages} onClick={() => setPickerPage(pickerPage + 1)}
+                style={{ minWidth: 26, height: 26, borderRadius: 6, cursor: pickerPage >= pickerTotalPages ? 'not-allowed' : 'pointer', border: '1px solid var(--color-neutral-200)', background: 'var(--color-neutral-0)', color: 'var(--color-neutral-600)', fontSize: 12, padding: '0 8px', opacity: pickerPage >= pickerTotalPages ? 0.5 : 1 }}>下一页</button>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginLeft: 8 }}>共 {pickerProducts.length} 款 · 第 {pickerPage} / {pickerTotalPages} 页</span>
+            </div>
+          )}
+          {/* 已选商品列表：图片 + 数量 + 销售实价 + 删除（表头常显，未添加时仅显示提示行） */}
+          <table className="detail-inline-table">
+              <thead><tr><th style={{ width: 44 }}>序号</th><th style={{ width: 60 }}>图片</th><th>商品名称</th><th style={{ width: 90 }}>品牌</th><th style={{ width: 110 }}>规格</th><th style={{ width: 130 }}>市场价</th><th style={{ width: 120 }}>销售报价</th><th style={{ width: 90 }}>数量</th><th style={{ width: 110 }}>销售实价</th>{isVia && <th style={{ width: 120 }}>销售给平台价</th>}<th style={{ width: 110, textAlign: 'right' }}>小计</th><th style={{ width: 60 }} /></tr></thead>
               <tbody>
+                {items.length === 0 && (
+                  <tr><td colSpan={isVia ? 10 : 9} style={{ textAlign: 'center', color: 'var(--color-neutral-400)', padding: 'var(--space-3)' }}>尚未添加商品，点击上方商品卡片即可添加（可按品牌筛选或搜索）</td></tr>
+                )}
                 {items.map((it, idx) => {
                   const warn = minPriceWarning(it);
                   const p = products.find((x) => x.id === it.productId);
                   const img = p?.mainImages?.[0];
                   return (
                     <tr key={it.productId}>
+                      <td className="mono" style={{ color: 'var(--color-neutral-400)' }}>{idx + 1}</td>
                       <td>{img ? <img src={img} alt={it.productName} style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-neutral-100)' }} /> : <span style={{ display: 'inline-flex', width: 44, height: 44, borderRadius: 'var(--radius-sm)', background: 'var(--color-neutral-100)', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--color-neutral-400)' }}>无图</span>}</td>
                       <td>
                         <div style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</div>
-                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{it.spec} · {p?.brand ?? '—'}</div>
                         {warn && <div style={{ fontSize: 'var(--text-xs)', color: '#CB405D' }}>⚠ {warn}</div>}
                       </td>
+                      <td>{p?.brand ?? '—'}</td>
+                      <td style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>{it.spec}</td>
                       <td>
                         <div className="mono" style={{ fontSize: 'var(--text-sm)' }}>{p ? money(p.marketPrice) : '—'}</div>
                         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>京东价：{p?.jdPrice ?? '—'} / 天猫价：{p?.tmallPrice ?? '—'}</div>
@@ -520,7 +567,7 @@ export default function OrderEntry() {
                           <td>
                             {pn !== undefined
                               ? <span className="mono" style={{ color: '#CB405D', fontWeight: 'var(--font-semibold)' }}>{money(pn)}</span>
-                              : <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>选择平台客户后计算</span>}
+                              : <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>选择平台和客户后计算</span>}
                           </td>
                         );
                       })()}
@@ -531,22 +578,20 @@ export default function OrderEntry() {
                 })}
               </tbody>
             </table>
-          )}
           <div style={{ fontSize: 'var(--text-sm)', textAlign: 'right', borderTop: '1px solid var(--color-neutral-100)', paddingTop: 'var(--space-3)' }}>
             合计：<strong className="mono" style={{ color: 'var(--color-module-current-base)', fontSize: 'var(--text-md)' }}>{money(entryTotal)}</strong>
           </div>
-        </Card>
 
-        <Card title="备注" style={{ marginTop: 'var(--space-4)' }}>
-          <input className="filter-input" placeholder="订单备注（平台要求、客户要求等）" value={remark} onChange={(e) => setRemark(e.target.value)} style={{ width: '100%' }} />
-          {error && (
-            <div style={{ padding: '8px 12px', background: '#FFEBEE', color: '#C62828', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginTop: 'var(--space-3)' }}>{error}</div>
-          )}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
-            <Button variant="ghost" onClick={resetForm}>重置</Button>
-            <Button onClick={saveOrder}>保存订单并匹配报备</Button>
+          {/* 操作按钮：合计下一行，居中，间距加宽（重置=辅色调实心，创建=主色调） */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-6)', marginTop: 'var(--space-6)' }}>
+            <Button onClick={saveOrder}>创建订单并匹配报备</Button>
+            <Button style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)' }} onClick={resetForm}>重置</Button>
           </div>
         </Card>
+
+        {error && (
+          <div style={{ padding: '8px 12px', background: '#FFEBEE', color: '#C62828', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginTop: 'var(--space-4)' }}>{error}</div>
+        )}
       </div>
     </>
   );
