@@ -38,7 +38,7 @@ export default function PartnerDashboard() {
     () => (myId ? getPartnerFlowOrders(myId) : []),
     [flowVersion, myId],
   );
-  const myScore = getScoreSummary(scoreEntries, myId ?? '', myName);
+  const myScore = getScoreSummary({ entries: scoreEntries, supplierId: myId ?? '', supplierName: myName });
 
   const flowPending = flowOrders.filter((o) => o.status === 'pending').length;
   const flowDoing = flowOrders.filter((o) => o.status === 'accepted' || o.status === 'shipping').length;
@@ -106,7 +106,7 @@ export default function PartnerDashboard() {
       </div>
 
       {/* 通知公告（管理后台「合作商 → 通知公告」发布，置顶优先） */}
-      <div className="pk-panel">
+      <div className="pk-panel" style={{ marginBottom: 22 }}>
         <div className="pk-panel-head">
           <span className="pk-panel-title">通知公告</span>
           <span style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>{publishedNotices.length} 条 · 来自平台发布</span>
@@ -183,7 +183,7 @@ export default function PartnerDashboard() {
       {/* 公告详情弹窗 */}
       {noticeDetail && (
         <div className="category-dialog-overlay" onClick={() => setNoticeDetail(null)}>
-          <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 560, maxWidth: '94vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+          <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 800, maxWidth: '94vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontSize: 17, fontWeight: 600, marginBottom: 6 }}>
               {noticeDetail.pinned && <span style={{ color: '#01795D', marginRight: 4 }}>[置顶]</span>}
               {noticeDetail.title}

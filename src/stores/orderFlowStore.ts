@@ -758,7 +758,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
 
       const { quote: wq, score: ws } = get().settings.compareWeights;
       const entries = useScoreStore.getState().entries;
-      const summaries = cmp.quotes.map((q) => getScoreSummary(entries, q.supplierId, q.supplierName));
+      const summaries = cmp.quotes.map((q) => getScoreSummary({ entries, supplierId: q.supplierId, supplierName: q.supplierName }));
       const maxTotal = Math.max(...summaries.map((s) => s.total), 1);
       const minQuote = Math.min(...cmp.quotes.map((q) => q.amount));
 
@@ -848,18 +848,8 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       };
       if (status === 'settled') {
         const onTime = opts?.onTime ?? true;
-        patchOrder(id, { partnerStatus: 'settled', processStatus: 'completed', settleOnTime: onTime }, { action: '结算完成', detail: onTime ? '按时履约 · 积分 +5' : '超时发货 · 积分 -5' });
-        if (order.partnerId && order.partnerName) {
-          useScoreStore.getState().addEntry({
-            supplierId: order.partnerId,
-            supplierName: order.partnerName,
-            dimension: 'fulfillment',
-            delta: onTime ? 5 : -5,
-            reason: onTime ? `订单按时履约结算（${order.code}）` : `订单超时发货（${order.code}）`,
-            refCode: order.code,
-            operator: '管理员',
-          });
-        }
+        // 经营/报备积分已改为派生计算（computeScore 按结算单量与金额实时汇总），此处不再写台账
+        patchOrder(id, { partnerStatus: 'settled', processStatus: 'completed', settleOnTime: onTime }, { action: '结算完成', detail: onTime ? '按时履约结算完成' : '超时履约结算完成' });
         usePurchaseStore.getState().settleByChild(order.code);
         return;
       }

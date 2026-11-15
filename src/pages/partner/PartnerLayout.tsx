@@ -49,12 +49,12 @@ const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode
     icon: <svg viewBox="0 0 20 20" fill="none"><rect x="4" y="2" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h6M7 9h6M7 12h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
   },
   {
-    key: 'returns', label: '退货管理', path: '/partner/returns',
-    icon: <svg viewBox="0 0 20 20" fill="none"><path d="M7 4h9a1 1 0 011 1v9a1 1 0 01-1 1H7M3 10h9M9 6.5L5.5 10 9 13.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  },
-  {
     key: 'reports', label: '报备管理', path: '/partner/reports', serviceOnly: true,
     icon: <svg viewBox="0 0 20 20" fill="none"><path d="M6 3h8a1 1 0 011 1v12l-5-2.5L5 16V4a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M8 7h4M8 10h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
+  },
+  {
+    key: 'referrals', label: '业务推介', path: '/partner/referrals',
+    icon: <svg viewBox="0 0 20 20" fill="none"><path d="M10 2.5L12 7l4.5.5-3.3 3 .9 4.5L10 12.7 5.9 15l.9-4.5-3.3-3L8 7l2-4.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
   },
   {
     key: 'quotes', label: '供货报价', path: '/partner/quotes', supplierOnly: true,
@@ -63,6 +63,10 @@ const PARTNER_MENUS: { key: string; label: string; path: string; icon: ReactNode
   {
     key: 'settlement', label: '结算管理', path: '/partner/settlement',
     icon: <svg viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="16" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 9h2M5 12h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><circle cx="14" cy="10" r="2" stroke="currentColor" strokeWidth="1.2"/></svg>,
+  },
+  {
+    key: 'scores', label: '积分管理', path: '/partner/scores',
+    icon: <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.3"/><path d="M7.2 10.8L5.5 17l4.5-2.5L14.5 17l-1.7-6.2" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M8 7l1.4 1.4L12.2 5.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   },
   {
     key: 'system', label: '设置', path: '/partner/account',

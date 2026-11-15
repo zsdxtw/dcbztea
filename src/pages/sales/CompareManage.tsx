@@ -37,7 +37,7 @@ export default function CompareManage() {
   );
 
   const current = selectedId ? compareOrders.find((o) => o.id === selectedId) ?? null : null;
-  const scoreOf = (id: string, name: string) => getScoreSummary(scoreEntries, id, name);
+  const scoreOf = (id: string, name: string) => getScoreSummary({ entries: scoreEntries, supplierId: id, supplierName: name });
 
   const doFinalize = (o: ExternalOrder, force: boolean) => {
     const res = store.getState().finalizeCompare(o.id, force);

@@ -271,7 +271,7 @@ export default function PartnerAccountPage() {
       {/* 删除操作员账号确认弹窗 */}
       {deleting && (
         <div className="category-dialog-overlay" onClick={() => setDeleting(null)}>
-          <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 420 }}>
+          <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 460 }}>
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>删除操作员账号</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
               账号 <b className="mono">{deleting.username}</b>（{deleting.name || '未命名'}）删除后无法恢复，确认删除？

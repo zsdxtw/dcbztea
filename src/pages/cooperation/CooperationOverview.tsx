@@ -118,7 +118,7 @@ export default function CooperationOverview() {
   /* ── 积分排行（期初分 + 台账四维累加，取前 5） ── */
   const scoreRank = useMemo(
     () => suppliers
-      .map((s) => getScoreSummary(scoreEntries, s.id, s.name))
+      .map((s) => getScoreSummary({ entries: scoreEntries, supplierId: s.id, supplierName: s.name }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 5),
     [suppliers, scoreEntries],
@@ -191,13 +191,17 @@ export default function CooperationOverview() {
             headerRight={<Button size="sm" variant="ghost" onClick={() => navigate('/cooperation/cooperation-scores')}>查看全部</Button>}
           >
             <Table
-              headers={['排名', '合作商', '拜访', '报备', '履约', '违约', '总分']}
+              headers={['排名', '合作商', '基础', '经营', '报备', '推介', '营销', '处罚', '总分']}
               rows={scoreRank.map((r, i) => [
                 <span key="rk" className="mono" style={{ fontWeight: 'var(--font-semibold)', color: i < 3 ? 'var(--color-module-current-base)' : 'var(--color-neutral-500)' }}>{i + 1}</span>,
                 <span key="n" style={{ fontWeight: 'var(--font-medium)' }}>{r.supplierName}</span>,
-                <span key="v" className="mono">{r.visit}</span>,
-                <span key="r" className="mono">{r.report}</span>,
-                <span key="f" className="mono">{r.fulfillment}</span>,
+                <span key="b" className="mono">{r.basic}</span>,
+                <span key="op" className="mono">{r.operation}</span>,
+                <span key="rp" className="mono">{r.report}</span>,
+                <span key="rf" className="mono">{r.referral}</span>,
+                <span key="mk" className="mono">{r.marketing}</span>,
+                
+                
                 <span key="p" className="mono" style={{ color: r.penalty < 0 ? '#C62828' : undefined }}>{r.penalty}</span>,
                 <span key="t" className="mono" style={{ fontWeight: 'var(--font-bold)', color: 'var(--color-module-current-base)' }}>{r.total}</span>,
               ])}

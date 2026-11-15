@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
+import { getInitials } from '../../utils/pinyinInitials';
 import { platformItems } from '../../data/platforms';
 import { customerItems } from '../../data/customers';
 import { calcPlatformNetPrice, purchasePriceRules, PRICE_SUPPLIERS } from '../../data/prices';
@@ -65,7 +66,7 @@ function ProductThumb({ p }: { p: TeaProduct }) {
 type QuotationTab = 'direct' | 'channel' | 'platform';
 
 const TAB_CONFIG: { key: QuotationTab; label: string; desc: string }[] = [
-  { key: 'direct', label: '直营客户报价', desc: '为每个直营客户单独配置商品并报价（单品价格 > 品牌整体折扣）；经平台客户还需对所经各平台单独设置「经平台报价」与平台 SKU（不经自动计算）' },
+  { key: 'direct', label: '直营客户报价', desc: '为每个直营客户单独配置商品并报价（单品价格 > 品牌整体折扣）；经平台客户还需对所经各平台单独设置「经平台报价」与客户侧商品编号（SKU，不经自动计算）' },
   { key: 'channel', label: '渠道客户报价', desc: '为每个渠道客户单独配置商品并报价（渠道客户无经平台报价）' },
   { key: 'platform', label: '平台客户报价', desc: '淡茶半盏直接销售给平台客户（京东慧采 / 史泰博等）时的报价配置' },
 ];
@@ -98,6 +99,7 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
   const customerQuotes = usePriceStore((s) => s.customerQuotes);
   const setCustomerProductOverride = usePriceStore((s) => s.setCustomerProductOverride);
   const setCustomerProductReported = usePriceStore((s) => s.setCustomerProductReported);
+  const setCustomerDirectCode = usePriceStore((s) => s.setCustomerDirectCode);
   const setCustomerPlatformQuote = usePriceStore((s) => s.setCustomerPlatformQuote);
   const setBrandDiscount = usePriceStore((s) => s.setBrandDiscount);
   const adjustCustomerStock = usePriceStore((s) => s.adjustCustomerStock);
@@ -107,12 +109,42 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
   const customer = customers.find((c) => c.id === selectedId) ?? customers[0];
   const cfg = customer ? getQuoteConfig(customerQuotes, customer.id) : { brandDiscounts: {}, products: {} };
 
-  /** 左侧品牌栏:全部品牌(含未配置的品牌) */
+  /** 左侧品牌栏:全部品牌(含未配置的品牌)，按拼音首字母 A-Z 排序并分组 */
   const brands = useMemo(() => {
     const map = new Map<string, number>();
     products.forEach((p) => map.set(p.brand, (map.get(p.brand) ?? 0) + 1));
-    return [...map.entries()].map(([name, count]) => ({ name, count }));
+    return [...map.entries()]
+      .map(([name, count]) => ({ name, count, initial: (getInitials(name)[0] ?? '#').toUpperCase() }))
+      .sort((a, b) => a.initial.localeCompare(b.initial) || a.name.localeCompare(b.name, 'zh-Hans-CN'));
   }, [products]);
+  /** 按首字母分组（左侧 A-Z 字母导航用） */
+  const brandGroups = useMemo(() => {
+    const groups: { letter: string; items: typeof brands }[] = [];
+    brands.forEach((b) => {
+      const g = groups[groups.length - 1];
+      if (g && g.letter === b.initial) g.items.push(b);
+      else groups.push({ letter: b.initial, items: [b] });
+    });
+    return groups;
+  }, [brands]);
+  /** 品牌列表滚动位置对应的当前字母（左侧导航高亮） */
+  const [activeLetter, setActiveLetter] = useState('');
+  const brandListRef = useRef<HTMLDivElement>(null);
+  const onBrandListScroll = () => {
+    const el = brandListRef.current;
+    if (!el) return;
+    const groupEls = [...el.querySelectorAll<HTMLElement>('[data-letter]')];
+    let current = groupEls[0]?.dataset.letter ?? '';
+    for (const g of groupEls) {
+      if (g.offsetTop - el.scrollTop <= 30) current = g.dataset.letter ?? current;
+      else break;
+    }
+    setActiveLetter(current);
+  };
+  const scrollToLetter = (letter: string) => {
+    const el = brandListRef.current?.querySelector<HTMLElement>(`[data-letter="${letter}"]`);
+    if (el && brandListRef.current) brandListRef.current.scrollTop = el.offsetTop - 2;
+  };
   const [selectedBrand, setSelectedBrand] = useState('');
   const [discountDraft, setDiscountDraft] = useState('');
   const [keyword, setKeyword] = useState('');
@@ -128,8 +160,8 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
 
-  /** 单品报价设置弹窗(参照合作商终端:跟随品牌 / 单独折扣 / 单独报价) */
-  const [overrideDialog, setOverrideDialog] = useState<{ product: typeof products[0]; mode: 'none' | 'discount' | 'price'; value: string } | null>(null);
+  /** 报价报编号弹窗(直接销售报价方式 + 客户侧商品编号 + 经平台销售) */
+  const [overrideDialog, setOverrideDialog] = useState<{ product: typeof products[0]; mode: 'none' | 'discount' | 'price'; value: string; directCode: string } | null>(null);
 
   /** 设置库存弹窗（该客户×该商品的独立库存，不联动商品全局库存） */
   const [stockDialog, setStockDialog] = useState<{ product: TeaProduct; mode: 'add' | 'sub'; qty: string; err: string } | null>(null);
@@ -195,6 +227,8 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
     const mode = overrideDialog.mode;
     const value = overrideDialog.value;
     const product = overrideDialog.product;
+    // 客户侧商品编号（直接销售）：非必输，随弹窗保存
+    setCustomerDirectCode(customer.id, product.id, overrideDialog.directCode);
     if (mode === 'none') {
       setCustomerProductOverride(customer.id, product.id, null);
       setOverrideDialog(null);
@@ -254,45 +288,74 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
         {/* 左侧品牌栏:列出所有品牌 */}
         <div style={{ width: 216, flexShrink: 0, border: '1px solid var(--color-neutral-100)', borderRadius: 'var(--radius-md)', background: 'var(--color-neutral-0)' }}>
           <div style={{ padding: '10px 12px', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', borderBottom: '1px solid var(--color-neutral-100)' }}>全部品牌</div>
-          <div style={{ maxHeight: 520, overflowY: 'auto', padding: 4 }}>
-            <button
-              onClick={() => { setSelectedBrand(''); setDiscountDraft(''); }}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
-                padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
-                border: selectedBrand === '' ? `1px solid ${PRIMARY}` : '1px solid transparent',
-                background: selectedBrand === '' ? PRIMARY_LIGHT : 'transparent',
-                color: selectedBrand === '' ? PRIMARY : 'var(--color-neutral-600)',
-                fontWeight: selectedBrand === '' ? 'var(--font-medium)' : 500, fontSize: 'var(--text-sm)',
-              }}
-            >
-              全部品牌
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{products.length}</span>
-            </button>
-            {brands.map((b) => {
-              const active = selectedBrand === b.name;
-              const discount = cfg.brandDiscounts[b.name];
-              return (
-                <button
-                  key={b.name}
-                  onClick={() => { setSelectedBrand(b.name); setDiscountDraft(discount != null ? String(discount) : ''); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, width: '100%',
-                    padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                    border: active ? `1px solid ${PRIMARY}` : '1px solid transparent',
-                    background: active ? PRIMARY_LIGHT : 'transparent',
-                    color: active ? PRIMARY : 'var(--color-neutral-600)',
-                    fontWeight: active ? 'var(--font-medium)' : 500, fontSize: 'var(--text-sm)',
-                  }}
-                >
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-                    {discount != null && <span style={{ fontSize: 11, fontWeight: 600, color: PRIMARY, background: PRIMARY_LIGHT, borderRadius: 999, padding: '1px 7px' }}>{discount}%</span>}
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{b.count}</span>
-                  </span>
-                </button>
-              );
-            })}
+          <div style={{ display: 'flex', alignItems: 'stretch' }}>
+            {/* A-Z 字母导航（左侧）：点击跳转，高亮当前滚动位置 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, width: 24, flexShrink: 0, padding: '6px 0 6px 4px', borderRight: '1px solid var(--color-neutral-100)', maxHeight: 520, overflowY: 'auto' }}>
+              {brandGroups.map((g) => {
+                const active = activeLetter === g.letter;
+                return (
+                  <button
+                    key={g.letter}
+                    type="button"
+                    onClick={() => scrollToLetter(g.letter)}
+                    title={`${g.letter}（${g.items.length} 个品牌）`}
+                    style={{
+                      width: 18, height: 18, borderRadius: 4, border: 'none', cursor: 'pointer', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: active ? 700 : 500,
+                      background: active ? PRIMARY : 'transparent', color: active ? '#fff' : 'var(--color-neutral-400)',
+                    }}
+                  >{g.letter}</button>
+                );
+              })}
+            </div>
+            <div ref={brandListRef} onScroll={onBrandListScroll} style={{ flex: 1, minWidth: 0, maxHeight: 520, overflowY: 'auto', padding: 4, position: 'relative' }}>
+              <button
+                onClick={() => { setSelectedBrand(''); setDiscountDraft(''); }}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
+                  padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
+                  border: selectedBrand === '' ? `1px solid ${PRIMARY}` : '1px solid transparent',
+                  background: selectedBrand === '' ? PRIMARY_LIGHT : 'transparent',
+                  color: selectedBrand === '' ? PRIMARY : 'var(--color-neutral-600)',
+                  fontWeight: selectedBrand === '' ? 'var(--font-medium)' : 500, fontSize: 'var(--text-sm)',
+                }}
+              >
+                全部品牌
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{products.length}</span>
+              </button>
+              {brandGroups.map((g) => (
+                <div key={g.letter} data-letter={g.letter}>
+                  <div style={{
+                    position: 'sticky', top: 0, zIndex: 1, fontSize: 11, fontWeight: 700, color: PRIMARY,
+                    background: 'var(--color-neutral-50)', padding: '4px 12px', borderRadius: 6, letterSpacing: '0.05em',
+                  }}>{g.letter}</div>
+                  {g.items.map((b) => {
+                    const active = selectedBrand === b.name;
+                    const discount = cfg.brandDiscounts[b.name];
+                    return (
+                      <button
+                        key={b.name}
+                        onClick={() => { setSelectedBrand(b.name); setDiscountDraft(discount != null ? String(discount) : ''); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, width: '100%',
+                          padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                          border: active ? `1px solid ${PRIMARY}` : '1px solid transparent',
+                          background: active ? PRIMARY_LIGHT : 'transparent',
+                          color: active ? PRIMARY : 'var(--color-neutral-600)',
+                          fontWeight: active ? 'var(--font-medium)' : 500, fontSize: 'var(--text-sm)',
+                        }}
+                      >
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                          {discount != null && <span style={{ fontSize: 11, fontWeight: 600, color: PRIMARY, background: PRIMARY_LIGHT, borderRadius: 999, padding: '1px 7px' }}>{discount}%</span>}
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{b.count}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -363,7 +426,7 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
             <table className="detail-inline-table" style={{ border: 'none' }}>
               <thead>
                 <tr>
-                  <th style={{ width: 44 }}>序号</th><th style={{ width: 82 }}>图片</th><th>商品名称</th><th>品牌 / 规格</th><th>状态</th><th>市场价</th><th>进货价</th><th>销售报价</th>
+                  <th style={{ width: 44 }}>序号</th><th style={{ width: 82 }}>图片</th><th style={{ width: 110 }}>商品编号</th><th style={{ width: 150 }}>客户侧商品编号</th><th>商品名称</th><th>品牌 / 规格</th><th>状态</th><th>市场价</th><th>进货价</th><th>销售报价</th>
                   <th>折扣率</th>
                   <th>报价方式</th>
                   <th>可售</th>
@@ -386,6 +449,28 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
                     <tr key={p.id}>
                       <td className="mono" style={{ color: 'var(--color-neutral-500)' }}>{(page - 1) * pageSize + idx + 1}</td>
                       <td><ProductThumb p={p} /></td>
+                      <td className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-600)' }}>{p.code}</td>
+                      <td>
+                        {(() => {
+                          const lines: { label: string; value: string }[] = [];
+                          if (q?.directCode) lines.push({ label: '直采', value: q.directCode });
+                          (q?.platformQuotes ?? []).forEach((x) => {
+                            const plat = platforms.find((pl) => pl.id === x.platformId);
+                            if (x.sku && plat) lines.push({ label: plat.name, value: x.sku });
+                          });
+                          if (lines.length === 0) return <span style={{ color: 'var(--color-neutral-300)' }}>—</span>;
+                          return (
+                            <div style={{ fontSize: 'var(--text-xs)', lineHeight: 1.9 }}>
+                              {lines.map((l) => (
+                                <div key={l.label} style={{ whiteSpace: 'nowrap' }}>
+                                  <span style={{ color: 'var(--color-neutral-400)' }}>{l.label}：</span>
+                                  <span className="mono" style={{ color: 'var(--color-neutral-700)' }}>{l.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td>
                         <div className="cell-emph" style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
                         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{p.spec}</div>
@@ -488,10 +573,11 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
                                 product: p,
                                 mode: ov?.price !== undefined ? 'price' : ov?.discount !== undefined ? 'discount' : 'none',
                                 value: ov?.price !== undefined ? String(ov.price) : ov?.discount !== undefined ? String(ov.discount) : '',
+                                directCode: ov?.directCode ?? '',
                               });
                             }}
                           >
-                            报价
+                            报价报编号
                           </button>
                           <button
                             type="button"
@@ -506,7 +592,7 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
                   );
                 })}
                 {listProducts.length === 0 && (
-                  <tr><td colSpan={11} style={{ textAlign: 'center', color: 'var(--color-neutral-400)', padding: 'var(--space-4)' }}>暂无商品</td></tr>
+                  <tr><td colSpan={13} style={{ textAlign: 'center', color: 'var(--color-neutral-400)', padding: 'var(--space-4)' }}>暂无商品</td></tr>
                 )}
               </tbody>
             </table>
@@ -543,7 +629,7 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
       {overrideDialog && (
         <div className="category-dialog-overlay" onClick={() => setOverrideDialog(null)}>
           <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: allowPlatformQuotes && customer.platforms.length > 0 ? 640 : 440, maxWidth: '94vw' }}>
-            <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 4 }}>设置单品报价</h3>
+            <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 4 }}>报价报编号</h3>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-4)', lineHeight: 1.8 }}>
               {overrideDialog.product.name} · {overrideDialog.product.brand} · 市场价 {formatMoney(overrideDialog.product.marketPrice)}{cfg.brandDiscounts[overrideDialog.product.brand] !== undefined ? ` · 品牌折扣 ${cfg.brandDiscounts[overrideDialog.product.brand]}%` : ''}
               <br />
@@ -557,41 +643,62 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
               })()}
               {' · '}京东价 {overrideDialog.product.jdPrice ? formatMoney(overrideDialog.product.jdPrice) : '—'} · 天猫价 {overrideDialog.product.tmallPrice ? formatMoney(overrideDialog.product.tmallPrice) : '—'}
             </div>
-            {([
-              ['none', '跟随品牌折扣', '清除单品设置，按品牌统一折扣计算'],
-              ['discount', '单独折扣', '报价 = 该商品市场价 × 折扣%'],
-              ['price', '单独报价', '直接指定该商品报价（元）'],
-            ] as const).map(([m, name, desc]) => (
-              <label key={m} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', borderRadius: 'var(--radius-md)', border: `1px solid ${overrideDialog.mode === m ? PRIMARY : 'var(--color-neutral-200)'}`, background: overrideDialog.mode === m ? PRIMARY_LIGHT : 'transparent', cursor: 'pointer', marginBottom: 8 }}>
-                <input type="radio" name="ov-mode" checked={overrideDialog.mode === m} onChange={() => setOverrideDialog({ ...overrideDialog, mode: m, value: '' })} style={{ marginTop: 3 }} />
-                <span style={{ flex: 1 }}>
-                  <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>{name}</span>
-                  <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>{desc}</span>
-                </span>
-                {m !== 'none' && overrideDialog.mode === m && (
-                  <input
-                    className="filter-input mono" type="text" inputMode={m === 'discount' ? 'numeric' : 'decimal'}
-                    placeholder={m === 'discount' ? '如 85' : '如 368'}
-                    style={{ width: 110, height: 30, fontSize: 'var(--text-sm)', flexShrink: 0 }}
-                    value={overrideDialog.value}
-                    onChange={(e) => {
-                      const filtered = m === 'discount' ? e.target.value.replace(/[^\d]/g, '') : e.target.value.replace(/[^\d.]/g, '');
-                      setOverrideDialog(d => d ? { ...d, value: filtered } : d);
-                    }}
-                  />
-                )}
-              </label>
-            ))}
+            {(() => {
+              const labels = ([
+                ['none', '跟随品牌折扣', '清除单品设置，按品牌统一折扣计算'],
+                ['discount', '单独折扣', '报价 = 该商品市场价 × 折扣%'],
+                ['price', '单独报价', '直接指定该商品报价（元）'],
+              ] as const).map(([m, name, desc]) => (
+                <label key={m} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', borderRadius: 'var(--radius-md)', border: `1px solid ${overrideDialog.mode === m ? PRIMARY : 'var(--color-neutral-200)'}`, background: overrideDialog.mode === m ? PRIMARY_LIGHT : 'transparent', cursor: 'pointer', marginBottom: 8 }}>
+                  <input type="radio" name="ov-mode" checked={overrideDialog.mode === m} onChange={() => setOverrideDialog({ ...overrideDialog, mode: m, value: '' })} style={{ marginTop: 3 }} />
+                  <span style={{ flex: 1 }}>
+                    <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>{name}</span>
+                    <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>{desc}</span>
+                  </span>
+                  {m !== 'none' && overrideDialog.mode === m && (
+                    <input
+                      className="filter-input mono" type="text" inputMode={m === 'discount' ? 'numeric' : 'decimal'}
+                      placeholder={m === 'discount' ? '如 85' : '如 368'}
+                      style={{ width: 110, height: 30, fontSize: 'var(--text-sm)', flexShrink: 0 }}
+                      value={overrideDialog.value}
+                      onChange={(e) => {
+                        const filtered = m === 'discount' ? e.target.value.replace(/[^\d]/g, '') : e.target.value.replace(/[^\d.]/g, '');
+                        setOverrideDialog(d => d ? { ...d, value: filtered } : d);
+                      }}
+                    />
+                  )}
+                </label>
+              ));
+              // 该客户有经平台销售的平台时，报价选项冠以「直接销售」标题与下方「经平台销售」区分；无平台时不展示
+              const hasPlatforms = allowPlatformQuotes && customer.platforms.length > 0;
+              return hasPlatforms ? (
+                <div style={{ marginBottom: 'var(--space-3)' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 6 }}>直接销售</div>
+                  {labels}
+                </div>
+              ) : labels;
+            })()}
 
-            {/* 经平台销售:各平台单独报价与供货 SKU(单独设置,不经公司计算) */}
+            {/* 客户侧商品编号（直接销售：客户自采系统的商品编号，非必输）— 单独报价方框下方，字段名与输入框同行 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 'var(--space-3)' }}>
+              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-text-primary)', whiteSpace: 'nowrap' }}>客户侧商品编号</span>
+              <input
+                className="filter-input mono" style={{ flex: 1, height: 30, fontSize: 'var(--text-sm)' }}
+                placeholder="客户侧系统的商品编号（非必输）"
+                value={overrideDialog.directCode}
+                onChange={(e) => setOverrideDialog(d => d ? { ...d, directCode: e.target.value } : d)}
+              />
+            </div>
+
+            {/* 经平台销售:各平台单独报价与客户侧商品编号(SKU)(单独设置,不经公司计算) */}
             {allowPlatformQuotes && customer.platforms.length > 0 && (
               <div style={{ borderTop: '1px solid var(--color-neutral-100)', paddingTop: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
-                <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 6 }}>经平台销售报价与供货 SKU</div>
+                <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 6 }}>经平台销售</div>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginBottom: 8, lineHeight: 1.6 }}>
-                  各平台单独设置价格（不经公司自动计算），并设置通过该平台给该客户供货的 SKU。
+                  各平台单独设置价格（不经公司自动计算），并设置通过该平台给该客户供货的客户侧商品编号（SKU）。
                 </div>
                 <table className="detail-inline-table">
-                  <thead><tr><th>平台（扣点）</th><th style={{ width: 130 }}>平台销售报价</th><th style={{ width: 170 }}>供货 SKU</th></tr></thead>
+                  <thead><tr><th>平台（扣点）</th><th style={{ width: 130 }}>经平台销售报价（元）</th><th style={{ width: 170 }}>平台在客户侧商品编号（SKU）</th></tr></thead>
                   <tbody>
                     {customer.platforms.map((plat) => {
                       const pq = (cfg.products[overrideDialog.product.id]?.platformQuotes ?? []).find((x) => x.platformId === plat.id);
@@ -611,7 +718,7 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
                           </td>
                           <td>
                             <input
-                              className="filter-input mono" placeholder="平台 SKU 编码"
+                              className="filter-input mono" placeholder="客户侧商品编号（SKU）"
                               value={pq?.sku ?? ''}
                               onChange={(e) => setCustomerPlatformQuote(customer.id, overrideDialog.product.id, plat.id, { sku: e.target.value })}
                               style={{ width: '100%', height: 28 }}

@@ -27,8 +27,10 @@ export interface CustomerProductQuote {
   discount?: number;
   /** 是否报品（报给该客户可下单；缺省=是；否=合作商终端客户菜单不展示该商品） */
   reported?: boolean;
-  /** 经平台客户的各平台报价与 SKU（仅经平台客户有内容） */
+  /** 经平台客户的各平台报价与 SKU（仅经平台客户有内容；平台 SKU 即客户侧商品编号） */
   platformQuotes: CustomerPlatformQuote[];
+  /** 客户侧商品编号（直接销售：客户自采系统中的商品编号，非必输） */
+  directCode?: string;
 }
 /** 单个客户的报价配置 */
 export interface CustomerQuoteConfig {
@@ -142,6 +144,8 @@ interface PriceStore {
   setBrandDiscount: (customerId: string, brand: string, discount: number | null) => void;
   /** 客户报价：设置平台报价（price undefined=恢复自动折算）与平台 SKU */
   setCustomerPlatformQuote: (customerId: string, productId: string, platformId: string, patch: { price?: number; sku?: string }) => void;
+  /** 客户报价：设置客户侧商品编号（直接销售，客户自采系统的商品编号；非必输） */
+  setCustomerDirectCode: (customerId: string, productId: string, code: string) => void;
 }
 
 /** 初始客户报价种子（不经平台 / 经平台 / 品牌折扣三类示例） */
@@ -318,6 +322,20 @@ export const usePriceStore = create<PriceStore>((set, get) => ({
       products[productId] = { ...cur, reported };
     } else {
       products[productId] = { productId, platformQuotes: [], reported };
+    }
+    return { customerQuotes: { ...s.customerQuotes, [customerId]: { ...cfg, products } } };
+  }),
+
+  /** 设置客户侧商品编号（直接销售；无条目则创建；保留既有报品状态与报价） */
+  setCustomerDirectCode: (customerId, productId, code) => set((s) => {
+    const cfg = getQuoteConfig(s.customerQuotes, customerId);
+    const cur = cfg.products[productId];
+    const products = { ...cfg.products };
+    const cleaned = code.trim() || undefined;
+    if (cur) {
+      products[productId] = { ...cur, directCode: cleaned };
+    } else {
+      products[productId] = { productId, platformQuotes: [], directCode: cleaned };
     }
     return { customerQuotes: { ...s.customerQuotes, [customerId]: { ...cfg, products } } };
   }),

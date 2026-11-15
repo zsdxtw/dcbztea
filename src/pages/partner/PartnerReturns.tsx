@@ -52,8 +52,8 @@ const EMPTY_DRAFT: ReturnDraft = {
   reason: '', solution: 'refund', refundAmount: '',
 };
 
-/** 合作商退货管理：处理客户退货（受理 → 收货 → 退款/换货完成） */
-export default function PartnerReturns() {
+/** 合作商退货管理：处理客户退货（受理 → 收货 → 退款/换货完成）；embedded=true 时作为弹窗嵌入订单管理页（省去页头） */
+export default function PartnerReturns({ embedded = false }: { embedded?: boolean } = {}) {
   const returns = useReturnStore((s) => s.returns);
   const addReturn = useReturnStore((s) => s.addReturn);
   const setStatus = useReturnStore((s) => s.setStatus);
@@ -166,12 +166,14 @@ export default function PartnerReturns() {
   };
 
   return (
-    <div className="pk-page">
-      <PageHead
-        eyebrow="合作商终端 · 退货"
-        title="退货管理"
-        desc="处理客户退货：受理客户申请 → 客户寄回 → 确认收货质检 → 完成退款/换货。"
-      />
+    <div className="pk-page" style={embedded ? { padding: 0 } : undefined}>
+      {!embedded && (
+        <PageHead
+          eyebrow="合作商终端 · 退货"
+          title="退货管理"
+          desc="处理客户退货：受理客户申请 → 客户寄回 → 确认收货质检 → 完成退款/换货。"
+        />
+      )}
 
       {/* 状态 Tab */}
       <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-4)' }}>
@@ -291,7 +293,7 @@ export default function PartnerReturns() {
       {/* 登记退货弹窗 */}
       {addOpen && (
         <div className="category-dialog-overlay" onClick={() => setAddOpen(false)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 560, maxWidth: '94vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 800, maxWidth: '94vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-4)' }}>登记客户退货</h3>
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
@@ -357,7 +359,7 @@ export default function PartnerReturns() {
       {/* 完成处理弹窗（已收货 → 完成） */}
       {finishOf && (
         <div className="category-dialog-overlay" onClick={() => setFinishOf(null)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 460, maxWidth: '94vw' }}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 800, maxWidth: '94vw' }}>
             <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-3)' }}>完成处理 · {finishOf.code}</h3>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-600)', marginBottom: 'var(--space-3)', lineHeight: 1.8 }}>
               {finishOf.customerName} · {finishOf.items.map((i) => `${i.productName}×${i.quantity}`).join('、')}<br />

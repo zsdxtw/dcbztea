@@ -155,7 +155,7 @@ export default function ExternalOrders() {
     return () => clearInterval(t);
   }, []);
   const activeSuppliers = useMemo(() => suppliers.filter((s) => s.status === 'active'), [suppliers]);
-  const scoreOf = (id: string, name: string) => getScoreSummary(scoreEntries, id, name);
+  const scoreOf = (id: string, name: string) => getScoreSummary({ entries: scoreEntries, supplierId: id, supplierName: name });
 
   /** 审批通过的报备记录（销售单分发弹窗·报备匹配选择用） */
   const approvedReports = useReportStore((s) => s.reports.filter((r) => r.status === 'approved'));

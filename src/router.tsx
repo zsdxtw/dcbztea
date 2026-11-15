@@ -21,6 +21,7 @@ import PurchaseStoreOverview from './pages/purchase/PurchaseStoreOverview';
 import CooperationStores from './pages/cooperation/CooperationStores';
 import CooperationScores from './pages/cooperation/CooperationScores';
 import CooperationNotices from './pages/cooperation/CooperationNotices';
+import ReferralManage from './pages/referral/ReferralManage';
 import PurchaseReconciliation from './pages/purchase/PurchaseReconciliation';
 import PurchaseReturn from './pages/purchase/PurchaseReturn';
 
@@ -107,6 +108,8 @@ import PartnerReturns from './pages/partner/PartnerReturns';
 import PartnerQuotes from './pages/partner/PartnerQuotes';
 import PartnerReports from './pages/partner/PartnerReports';
 import PartnerCustomers from './pages/partner/PartnerCustomers';
+import PartnerReferrals from './pages/partner/PartnerReferrals';
+import PartnerScores from './pages/partner/PartnerScores';
 import PartnerSettlement from './pages/partner/PartnerSettlement';
 import PartnerAccountPage from './pages/partner/PartnerAccountPage';
 import PartnerProfile from './pages/partner/PartnerProfile';
@@ -164,6 +167,7 @@ export const router = createBrowserRouter([
       { path: 'cooperation/cooperation-scores', element: <CooperationScores /> },
       { path: 'cooperation/cooperation-reports', element: <SalesReports /> },
       { path: 'cooperation/cooperation-notices', element: <CooperationNotices /> },
+      { path: 'cooperation/referral-manage', element: <ReferralManage /> },
       { path: 'cooperation', element: <Navigate to="/cooperation/cooperation-overview" replace /> },
       { path: 'purchase/purchase-store-overview', element: <PurchaseStoreOverview /> },
       { path: 'purchase/purchase-reconciliation', element: <Navigate to="/finance/finance-supplier-reconciliation" replace /> },
@@ -278,6 +282,8 @@ export const router = createBrowserRouter([
       { path: 'quotes', element: <PartnerQuotes /> },
       { path: 'reports', element: <PartnerReports /> },
       { path: 'customers', element: <PartnerCustomers /> },
+      { path: 'referrals', element: <PartnerReferrals /> },
+      { path: 'scores', element: <PartnerScores /> },
       { path: 'settlement', element: <PartnerSettlement /> },
       { path: 'account', element: <PartnerAccountPage /> },
       /* 设置菜单：合作商信息分区子页（仓库信息免审批直接保存）；门店信息为一级菜单 */

@@ -6,9 +6,33 @@ import { customerItems, CUSTOMER_TYPE_LABELS } from '../../data/customers';
 import { useCustomerStore } from '../../stores/customerStore';
 import { usePriceStore, effectiveCustomerQuote } from '../../stores/priceStore';
 import { useSupplierStore } from '../../stores/supplierStore';
+import { platformItems } from '../../data/platforms';
+import type { TeaProduct } from '../../types';
 import { PROVINCE_NAMES, getCities, getDistricts } from '../../data/regions';
 import type { CustomerItem, CustomerPoolConfig } from '../../types';
 import './partner.css';
+
+/** 商品缩略图（显示样式参考报品报价：70×70 主图，缺省图显示茶叶图标） */
+function ProductThumb({ p }: { p: TeaProduct }) {
+  const [failed, setFailed] = useState(false);
+  const src = p.mainImages?.[0];
+  if (!src || failed) {
+    return (
+      <div style={{ width: 70, height: 70, borderRadius: 'var(--radius-sm)', background: 'var(--color-neutral-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }} title={p.name}>
+        <svg viewBox="0 0 20 20" fill="none" style={{ width: 18, height: 18, color: 'var(--color-neutral-300)' }}>
+          <path d="M10 3C6.8 6.5 5 9.2 5 11.4a5 5 0 0010 0C15 9.2 13.2 6.5 10 3z" stroke="currentColor" strokeWidth="1.3" />
+        </svg>
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src} alt={p.name}
+      onError={() => setFailed(true)}
+      style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-neutral-100)', display: 'block', flexShrink: 0 }}
+    />
+  );
+}
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 const norm = (s: string) => s.replace(/市$/, '');
@@ -238,16 +262,10 @@ export default function PartnerCustomers() {
             </div>
             <div className="pk-panel-body">
               {hasRule ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                <div style={{ padding: '12px 16px', background: 'var(--pk-accent-soft)', borderRadius: 10, fontSize: 12.5, color: '#01795D', lineHeight: 1.7 }}>
                   {columns.map((col) => (
-                    <div key={col.label} style={{ background: '#fff', border: '1px solid var(--pk-line)', borderRadius: 10, padding: '12px 14px' }}>
-                      <span style={{
-                        display: 'inline-block', padding: '2px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600,
-                        background: 'var(--pk-accent-soft)', color: '#01795D', marginBottom: 8,
-                      }}>{col.label}</span>
-                      <div style={{ fontSize: 13, color: 'var(--pk-ink2)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
-                        {col.text || <span style={{ color: 'var(--pk-ink3)' }}>—</span>}
-                      </div>
+                    <div key={col.label} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                      <strong style={{ fontWeight: 600 }}>{col.label}</strong>：{col.text || '—'}
                     </div>
                   ))}
                 </div>
@@ -316,17 +334,37 @@ export default function PartnerCustomers() {
                 <table>
                   <thead>
                     <tr>
-                      <th>序号</th><th>商品编号</th><th>商品名称</th><th>品牌</th><th>分类</th>
-                      <th>市场价</th><th>客户报价</th>
+                      <th>序号</th><th style={{ width: 82 }}>图片</th><th>商品编号</th><th>客户侧商品编号</th><th>商品名称</th><th>品牌</th><th>分类</th>
+                      <th>市场价</th><th>客户采购价</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pagedBrandProducts.map((p, idx) => {
                       const quote = effectiveCustomerQuote(customerQuotes, selected.id, p.id, storeProducts);
+                      const pq = customerQuotes[selected.id]?.products[p.id];
+                      const skuLines: { label: string; value: string }[] = [];
+                      if (pq?.directCode) skuLines.push({ label: '直采', value: pq.directCode });
+                      (pq?.platformQuotes ?? []).forEach((x) => {
+                        const plat = platformItems.find((pl) => pl.id === x.platformId);
+                        if (x.sku && plat) skuLines.push({ label: plat.shortName ?? plat.name, value: x.sku });
+                      });
                       return (
                         <tr key={p.id}>
                           <td className="mono" style={{ color: 'var(--pk-ink3)' }}>{idx + 1}</td>
+                          <td><ProductThumb p={p} /></td>
                           <td className="cell-mono-emph">{p.code}</td>
+                          <td>
+                            {skuLines.length === 0 ? <span style={{ color: 'var(--pk-ink3)' }}>—</span> : (
+                              <div style={{ fontSize: 12, lineHeight: 1.9 }}>
+                                {skuLines.map((l) => (
+                                  <div key={l.label} style={{ whiteSpace: 'nowrap' }}>
+                                    <span style={{ color: 'var(--pk-ink3)' }}>{l.label}：</span>
+                                    <span className="mono" style={{ color: 'var(--pk-ink2)' }}>{l.value}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
                           <td className="cell-emph">{p.name}</td>
                           <td>{p.brand}</td>
                           <td className="cell-muted">{p.category}</td>
@@ -338,7 +376,7 @@ export default function PartnerCustomers() {
                       );
                     })}
                     {brandProducts.length === 0 && (
-                      <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--pk-ink3)', padding: '28px 0' }}>该品牌下暂无可报商品</td></tr>
+                      <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--pk-ink3)', padding: '28px 0' }}>该品牌下暂无可报商品</td></tr>
                     )}
                   </tbody>
                 </table>

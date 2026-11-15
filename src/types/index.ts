@@ -809,6 +809,73 @@ export interface CustomerPoolConfig {
   dachaRate?: number;
 }
 
+/* ════════════════════════════════════════
+ * 客户推介（合作商向平台推介客户参加茶培训 / 茶活动）
+ * ════════════════════════════════════════ */
+
+/** 推介业务类型：茶培训 / 茶活动 / 入驻淡茶（推介新合作商注册入驻） */
+export type ReferralBizType = 'training' | 'activity' | 'join';
+
+/** 茶培训项目子类 */
+export type ReferralTrainingKind = '审评师初级' | '审评师中级' | '审评师高级' | '茶艺师' | '兴趣爱好班';
+
+/** 推介单状态：待确认 → 跟进中 → 客户确认 → 推介成功 / 推介失败 */
+export type ReferralStatus = 'pending' | 'contacting' | 'confirmed' | 'succeeded' | 'failed';
+
+/** 推介奖励规则（管理后台按推介业务设置，展示于合作商发起推介弹窗） */
+export interface ReferralRewardRule {
+  /** 积分奖励（推介成功自动入账） */
+  score: number;
+  /** 分润类型：fixed 固定金额 / percent 成交金额百分比（二选一） */
+  profitType: 'fixed' | 'percent';
+  /** 分润值：fixed 时为元，percent 时为百分比数值（如 5 表示成交金额的 5%） */
+  profitValue: number;
+  /** 其他奖励说明（如新商扶持资源、礼品等） */
+  otherReward: string;
+}
+
+/** 平台跟进记录 */
+export interface ReferralFollowUp {
+  time: string;
+  operator: string;
+  note: string;
+}
+
+/** 客户推介单（合作商发起，平台跟进，成功后结算收益并落实客户福利） */
+export interface CustomerReferral {
+  id: string;
+  /** 推介编号（TJ-0001 顺序生成） */
+  code: string;
+  /** 推介合作商 */
+  supplierId: string;
+  supplierName: string;
+  /** 业务类型：training 茶培训 / activity 茶活动 / join 入驻淡茶 */
+  bizType: ReferralBizType;
+  /** 培训项目子类（bizType=training 时有值） */
+  trainingKind?: ReferralTrainingKind;
+  /** 推介项目名称（培训自动拼接，活动手填，入驻自动生成） */
+  title: string;
+  /** 被推介客户名称（客户池选择或手填） */
+  customerName: string;
+  /** 客户联系方式 */
+  customerPhone: string;
+  /** 被推介客户联系人（bizType=join 时填写） */
+  contactPerson?: string;
+  /** 是否允许平台直接电话联系客户 */
+  allowDirectCall: boolean;
+  /** 推介成功收益（合作商所得，元） */
+  rewardAmount: number;
+  /** 客户福利（客户通过推介获得的权益说明） */
+  customerBenefit: string;
+  remark?: string;
+  status: ReferralStatus;
+  submitTime: string;
+  /** 推介成功时间 */
+  successTime?: string;
+  /** 平台跟进记录（时间线） */
+  followUps: ReferralFollowUp[];
+}
+
 /** 入池范围匹配：入池开 + (全国 或 选中省/市/县 命中任一范围) 才对合作商展示 */
 export function matchPoolScope(
   cfg: CustomerPoolConfig | undefined,
@@ -1878,8 +1945,8 @@ export interface FlowSettings {
  * 合作商积分体系
  * ════════════════════════════════════════ */
 
-/** 积分维度：客户拜访 / 报备情况 / 履约情况 / 处罚情况 */
-export type ScoreDimension = 'visit' | 'report' | 'fulfillment' | 'penalty';
+/** 积分维度：基础(派生) / 经营(派生+台账) / 报备(派生+台账) / 推介(派生) / 营销(台账申报) / 处罚(台账) */
+export type ScoreDimension = 'basic' | 'operation' | 'report' | 'referral' | 'marketing' | 'penalty';
 
 /** 积分台账流水 */
 export interface PartnerScoreEntry {
@@ -1891,7 +1958,7 @@ export interface PartnerScoreEntry {
   delta: number;
   reason: string;
   time: string;
-  /** 关联订单 / 报备 / 比单编号 */
+  /** 关联订单 / 报备 / 推介编号 */
   refCode?: string;
   operator?: string;
 }
@@ -1904,16 +1971,53 @@ export interface PartnerScoreBase {
   ontimeRate: number;
 }
 
-/** 积分汇总（四维明细 + 总分） */
+/** 积分汇总（六维明细 + 总分） */
 export interface PartnerScoreSummary {
   supplierId: string;
   supplierName: string;
-  visit: number;
+  /** 基础积分（注册/门店/主营品牌/报价商品，派生） */
+  basic: number;
+  /** 经营积分（结算单量 + 结算金额，派生） */
+  operation: number;
+  /** 报备积分（订单报备/转单接单/报备经营金额，派生） */
   report: number;
-  fulfillment: number;
+  /** 推介积分（茶培训 +0.1 / 茶活动 +0.5，派生） */
+  referral: number;
+  /** 申报积分（合作商主动申报评估给分，台账） */
+  marketing: number;
+  /** 处罚扣分（人工台账 + 发货延迟自动扣分，负值） */
   penalty: number;
   total: number;
   ontimeRate: number;
+  /** 其中：发货延迟自动扣分（接单后第 4 天起每延迟 1 天扣 0.1，含于 penalty） */
+  lateShipDeduction?: number;
+}
+
+/** 积分申报类型：客户拜访 / 活动组织 / 其他（入驻推介积分由「业务推介」入驻淡茶推介成功自动计入，不在申报类型中） */
+export type MarketingClaimType = 'visit' | 'event' | 'other';
+
+/** 积分申报（合作商主动发起，如客户线下拜访等活动，平台评估给分） */
+export interface MarketingClaim {
+  id: string;
+  /** 申报编号（SB-0001 顺序生成） */
+  code: string;
+  supplierId: string;
+  supplierName: string;
+  /** 申报类型 */
+  claimType: MarketingClaimType;
+  /** 事项标题（如 客户线下拜访） */
+  title: string;
+  /** 事项描述 */
+  description: string;
+  /** 凭证图片（data URL，最多 5 张，非必输） */
+  images?: string[];
+  status: 'pending' | 'approved' | 'rejected';
+  /** 评估给分（通过时） */
+  score?: number;
+  submitTime: string;
+  reviewTime?: string;
+  reviewer?: string;
+  reviewNote?: string;
 }
 
 /* ═══════════════════════════════════════════════════════════

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { TeaLeafMark } from './PartnerLayout';
 import PartnerAgreement from './PartnerAgreement';
 import { useSupplierStore } from '../../stores/supplierStore';
+import { useReferralStore } from '../../stores/referralStore';
+import { REFERRAL_SUCCESS_SCORES } from '../../stores/scoreStore';
 import { BrandMultiSelect } from '../../components/common/BrandPicker';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
 import { brandItems } from '../../data/brands';
@@ -28,6 +30,12 @@ const CATEGORY_OPTIONS = (Object.entries(productCategoryLabels) as ['tea' | 'tea
 export default function PartnerRegister() {
   const navigate = useNavigate();
   const submitRegistration = useSupplierStore(s => s.submitRegistration);
+  const suppliers = useSupplierStore(s => s.suppliers);
+  /** 推荐注册归因：URL 带 ?ref=<合作商id>（专属链接 / 二维码进入）时，注册成功自动认定为由该合作商推介 */
+  const refParams = new URLSearchParams(window.location.search);
+  const refSupplierId = refParams.get('ref') ?? '';
+  const refChannel = refParams.get('src') === 'q' ? 'qrcode' as const : 'link' as const;
+  const referrer = refSupplierId ? suppliers.find((s) => s.id === refSupplierId) : undefined;
   /** 注册页滚动容器（body 全局 overflow:hidden，滚动发生在本容器上） */
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollTop = (smooth = true) => scrollRef.current?.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' });
@@ -184,6 +192,17 @@ export default function PartnerRegister() {
     };
 
     const approval = submitRegistration(draft, username, applyNote.trim());
+    // 推荐注册归因：自动为推荐人生成 1 条推介成功的入驻淡茶记录（积分管理随之 +3 分）
+    if (referrer) {
+      useReferralStore.getState().addJoinSuccessReferral({
+        supplierId: referrer.id,
+        supplierName: referrer.name,
+        customerName: name.trim(),
+        contactPerson: contactPerson.trim(),
+        customerPhone: contactPhone.trim(),
+        channel: refChannel,
+      });
+    }
     setSuccess({ code: approval.payload.code ?? approval.code, username });
     scrollTop(false);
   };
@@ -288,6 +307,11 @@ export default function PartnerRegister() {
         <p className="pk-register-desc">
           填写企业信息提交入驻申请，平台审批通过后即可承接订单分发、客户经营与月度结算。
         </p>
+        {referrer && (
+          <div className="pk-register-tip" style={{ background: 'rgba(1,121,93,0.08)', borderColor: 'rgba(1,121,93,0.3)', color: '#01795D', fontWeight: 500 }}>
+            推介注册：您由合作商「{referrer.name}」推荐入驻，注册成功将自动认定为其推介，积分 +{REFERRAL_SUCCESS_SCORES.join} 分。
+          </div>
+        )}
         <div className="pk-register-tip">
           带 * 内容均为必填：资质文件区所列方框（营业执照、食品经营许可证、各品牌授权书）均需勾选提交。
           仓库、门店、结算信息无需在本页填写，审批通过后登录合作商工作台在「设置」菜单中维护即可。

@@ -7,6 +7,8 @@ import { useReportStore, getTransferredOrders } from '../../stores/reportStore';
 import { useOrderFlowStore, getPartnerFlowOrders, getPartnerSystemQuote } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { useSupplierStore } from '../../stores/supplierStore';
+import { useReturnStore } from '../../stores/returnStore';
+import PartnerReturns from './PartnerReturns';
 import { PROVINCE_NAMES, getCities, getDistricts } from '../../data/regions';
 import Pagination from '../../components/common/Pagination';
 import type { PartnerOrder, PartnerOrderStatus } from '../../types';
@@ -152,7 +154,7 @@ function SignUpDialog({ state, tick, myId, myName, onClose, onDone }: {
   };
   return (
     <div className="category-dialog-overlay" onClick={onClose}>
-      <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 680, maxWidth: '94vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 800, maxWidth: '94vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 4 }}>比单报名 · {o.code}</div>
         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
           客户 {o.customerName} · 订单金额 {money(o.totalAmount)}
@@ -247,7 +249,7 @@ function ShipDialog({ state, onClose, onDone }: {
 
   return (
     <div className="category-dialog-overlay" onClick={onClose}>
-      <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 640, maxWidth: '94vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 800, maxWidth: '94vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 4 }}>发货 · {o.code}</div>
         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-3)' }}>
           客户 {o.customerName} · 收货 {o.receiver}（{o.receiverPhone}）· {o.receiverAddress}
@@ -369,9 +371,10 @@ export default function PartnerOrders() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [selected, setSelected] = useState<PartnerOrder | null>(null);
-  /** 弹窗：比单报名 / 比单管理 / 发货 */
+  /** 弹窗：比单报名 / 比单管理 / 发货 / 退货管理 */
   const [signUpOf, setSignUpOf] = useState<SignUpDialogState | null>(null);
   const [compareMgmtOpen, setCompareMgmtOpen] = useState(false);
+  const [returnsOpen, setReturnsOpen] = useState(false);
   const [shipOf, setShipOf] = useState<ShipDialogState | null>(null);
   const [msg, setMsg] = useState('');
   const flash = (text: string) => { setMsg(text); setTimeout(() => setMsg(''), 3500); };
@@ -444,6 +447,12 @@ export default function PartnerOrders() {
     (o.transferKind === 'compare' && (o.compareSigned || o.status !== 'pending' || o.status === 'pending' && o.compareSigned)) ||
     (o.compareMyQuote !== undefined),
   ), [allOrders]);
+  /** 比单中的单数（参与中、尚未定标） */
+  const comparingCount = myCompareOrders.filter((o) => o.status === 'pending').length;
+
+  /** 退货单（本合作商）：退货管理弹窗数据；处理中 = 未完成 / 未拒绝 */
+  const myReturns = useReturnStore((s) => s.returns).filter((r) => r.supplierId === myId);
+  const processingReturns = myReturns.filter((r) => !['completed', 'rejected'].includes(r.status)).length;
 
   const updateStatus = (id: string, status: PartnerOrderStatus) => {
     if (id.startsWith('ext_')) {
@@ -571,7 +580,34 @@ export default function PartnerOrders() {
               <input className="filter-input" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ height: 32, fontSize: 13 }} title="结束日期（含当日）" />
             </>
           )}
-          <Button style={{ marginLeft: 'auto' }} onClick={() => setCompareMgmtOpen(true)}>比单管理</Button>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
+            <span style={{ position: 'relative', display: 'inline-flex' }}>
+              <Button onClick={() => setCompareMgmtOpen(true)}>比单管理</Button>
+              {comparingCount > 0 && (
+                <span
+                  title={`比单中的订单数 ${comparingCount}`}
+                  style={{
+                    position: 'absolute', top: -7, right: -7, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600,
+                    background: 'var(--color-semantic-error)', color: '#fff', border: '2px solid #fff', lineHeight: 1, zIndex: 1,
+                  }}
+                >{comparingCount}</span>
+              )}
+            </span>
+            <span style={{ position: 'relative', display: 'inline-flex' }}>
+              <Button onClick={() => setReturnsOpen(true)} title="退货管理（处理客户退货）">退货管理</Button>
+              {processingReturns > 0 && (
+                <span
+                  title={`处理中的退货单数 ${processingReturns}（已完成 / 已拒绝不计数）`}
+                  style={{
+                    position: 'absolute', top: -7, right: -7, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600,
+                    background: 'var(--color-semantic-error)', color: '#fff', border: '2px solid #fff', lineHeight: 1, zIndex: 1,
+                  }}
+                >{processingReturns}</span>
+              )}
+            </span>
+          </div>
         </div>
         <div className="pk-panel-body">
         <div className="pk-table-panel" style={{ margin: 0 }}>
@@ -732,10 +768,21 @@ export default function PartnerOrders() {
         )}
       </DetailDrawer>
 
-      {/* 弹窗：比单报名 / 比单管理 / 发货 */}
+      {/* 弹窗：比单报名 / 比单管理 / 发货 / 退货管理 */}
       {signUpOf && <SignUpDialog state={signUpOf} tick={tick} myId={myId} myName={myName} onClose={() => setSignUpOf(null)} onDone={flash} />}
       {compareMgmtOpen && <CompareMgmtDialog orders={myCompareOrders} onClose={() => setCompareMgmtOpen(false)} />}
       {shipOf && <ShipDialog state={shipOf} onClose={() => setShipOf(null)} onDone={flash} />}
+      {returnsOpen && (
+        <div className="category-dialog-overlay" onClick={() => setReturnsOpen(false)}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 1100, maxWidth: '94vw', maxHeight: '86vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)' }}>退货管理</div>
+              <Button variant="ghost" onClick={() => setReturnsOpen(false)}>关闭</Button>
+            </div>
+            <PartnerReturns embedded />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
