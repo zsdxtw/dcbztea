@@ -63,7 +63,7 @@ export default function CompareManage() {
 
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['订单编号', '客户', '订单金额', '底价', '报名数', '截止倒计时', '状态', '中单合作商', '操作']}
+            headers={['销售单编号', '客户', '订单金额', '底价', '报名数', '截止倒计时', '状态', '中单合作商', '操作']}
             rows={compareOrders.map((o) => {
               const cmp = o.compare!;
               const scored = !!cmp.scored;

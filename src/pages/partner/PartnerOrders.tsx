@@ -1,6 +1,9 @@
 import { useState, useMemo, useEffect, type ReactNode } from 'react';
 import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
+import {
+  FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS, stageOfOrder, fulfillmentTimes,
+} from '../../utils/fulfillment';
 import { PageHead, Pill, ORDER_STATUS_TONE } from './PartnerUI';
 import { getPartnerAuth } from './PartnerLayout';
 import { useReportStore, getTransferredOrders } from '../../stores/reportStore';
@@ -96,7 +99,7 @@ function CompareMgmtDialog({ orders, onClose }: { orders: PartnerOrder[]; onClos
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           <table className="detail-inline-table" style={{ margin: 0 }}>
             <thead>
-              <tr><th>订单编号</th><th>客户</th><th>商品</th><th>我的报价</th><th>当前状态</th><th>结果</th></tr>
+              <tr><th>销售单编号</th><th>客户</th><th>商品</th><th>我的报价</th><th>当前状态</th><th>结果</th></tr>
             </thead>
             <tbody>
               {orders.map((o) => {
@@ -376,6 +379,9 @@ export default function PartnerOrders() {
   const [compareMgmtOpen, setCompareMgmtOpen] = useState(false);
   const [returnsOpen, setReturnsOpen] = useState(false);
   const [shipOf, setShipOf] = useState<ShipDialogState | null>(null);
+  /** 待接单：接单确认弹窗 / 退回确认弹窗 */
+  const [acceptOf, setAcceptOf] = useState<PartnerOrder | null>(null);
+  const [returnOf, setReturnOf] = useState<PartnerOrder | null>(null);
   const [msg, setMsg] = useState('');
   const flash = (text: string) => { setMsg(text); setTimeout(() => setMsg(''), 3500); };
 
@@ -474,7 +480,7 @@ export default function PartnerOrders() {
     if (platformHandled) return null;
     if (o.status === 'pending') {
       if (o.transferKind === 'compare') {
-        // 比单订单：操作是报名（已报名展示比单中标记）
+        // 比单转入订单：报名参加比单（已报名展示比单中标记）+ 查看
         return (
           <>
             {o.compareSigned ? (
@@ -485,10 +491,17 @@ export default function PartnerOrders() {
             ) : (
               <Button size="sm" onClick={() => setSignUpOf({ order: o, sel: o.items.map((it) => it.productName), amount: String(getPartnerSystemQuote(myId, o.items.map((it) => ({ productId: '', productName: it.productName, spec: it.spec, quantity: it.quantity, price: it.price }))) || '') })}>报名</Button>
             )}
+            <Button size="sm" variant="ghost" onClick={() => setSelected(o)}>查看</Button>
           </>
         );
       }
-      return <Button size="sm" variant="ghost" onClick={() => updateStatus(o.id, 'accepted')}>接单</Button>;
+      return (
+        <>
+          <Button size="sm" onClick={() => setAcceptOf(o)}>接单</Button>
+          {o.id.startsWith('ext_') && <Button size="sm" variant="ghost" onClick={() => setReturnOf(o)}>退回</Button>}
+          <Button size="sm" variant="ghost" onClick={() => setSelected(o)}>查看</Button>
+        </>
+      );
     }
     if (o.status === 'accepted') {
       return (
@@ -541,7 +554,7 @@ export default function PartnerOrders() {
 
       <div className="pk-panel">
         <div className="pk-panel-head" style={{ flexWrap: 'wrap', gap: 10, justifyContent: 'flex-start' }}>
-          <input className="filter-input" placeholder="搜索订单号、客户、收货人..." value={keyword} onChange={e => setKeyword(e.target.value)} style={{ width: 190, height: 32, fontSize: 13 }} />
+          <input className="filter-input" placeholder="搜索销售单编号、客户、收货人..." value={keyword} onChange={e => setKeyword(e.target.value)} style={{ width: 190, height: 32, fontSize: 13 }} />
           <span style={{ fontSize: 13, color: 'var(--pk-ink2)', fontWeight: 500 }}>配送方式：</span>
           <select className="filter-select" value={filterDelivery} onChange={e => setFilterDelivery(e.target.value)} style={{ height: 32, fontSize: 13 }}>
             <option value="">全部</option>
@@ -614,7 +627,7 @@ export default function PartnerOrders() {
         <table style={{ minWidth: 1200 }}>
           <thead>
             <tr>
-              <th>序号</th><th>订单编号</th><th>客户</th><th>总金额</th>
+              <th>序号</th><th>销售单编号</th><th>客户</th><th>总金额</th>
               <th>收件人</th><th>收件电话</th><th>收件地区</th>
               <th>配送方式</th><th>合作模式</th><th>来源类型</th><th>状态</th><th>下单日期</th><th>操作</th>
             </tr>
@@ -676,7 +689,25 @@ export default function PartnerOrders() {
           selected && (
             <>
               <Button variant="ghost" onClick={() => setSelected(null)}>关闭</Button>
-              {selected.transferKind !== 'order-opportunity' && selected.status === 'pending' && !selected.compareSigned && selected.transferKind !== 'compare' && <Button onClick={() => updateStatus(selected.id, 'accepted')}>接单</Button>}
+              {selected.transferKind === 'compare' && selected.status === 'pending' && (
+                <Button onClick={() => {
+                  const target = selected;
+                  setSelected(null);
+                  setSignUpOf({
+                    order: target,
+                    sel: target.items.map((it) => it.productName),
+                    amount: String(target.compareSigned
+                      ? (target.compareMyQuote ?? '')
+                      : getPartnerSystemQuote(myId, target.items.map((it) => ({ productId: '', productName: it.productName, spec: it.spec, quantity: it.quantity, price: it.price }))) || ''),
+                  });
+                }}>{selected.compareSigned ? '查看报名' : '报名'}</Button>
+              )}
+              {selected.transferKind !== 'order-opportunity' && selected.status === 'pending' && !selected.compareSigned && selected.transferKind !== 'compare' && (
+                <>
+                  <Button variant="ghost" onClick={() => setReturnOf(selected)}>退回</Button>
+                  <Button onClick={() => setAcceptOf(selected)}>接单</Button>
+                </>
+              )}
               {selected.status === 'accepted' && <Button onClick={() => setShipOf({ order: selected, mode: 'logistics', company: '', trackingNo: '', qty: {}, err: '' })}>发货</Button>}
               {selected.status === 'shipping' && <Button onClick={() => updateStatus(selected.id, 'transit')}>确认妥投</Button>}
               {selected.status === 'transit' && <Button onClick={() => updateStatus(selected.id, 'delivered')}>确认签收</Button>}
@@ -688,7 +719,7 @@ export default function PartnerOrders() {
           <>
             <DrawerSection title="订单信息">
               <InfoGrid>
-                <InfoItem label="订单编号" mono emph>{selected.code}</InfoItem>
+                <InfoItem label="销售单编号" mono emph>{selected.code}</InfoItem>
                 <InfoItem label="客户名称">{selected.customerName}</InfoItem>
                 <InfoItem label="客户类型">{selected.customerType}</InfoItem>
                 <InfoItem label="配送方式">{PARTNER_DELIVERY_LABELS[selected.deliveryMode]}</InfoItem>
@@ -710,6 +741,30 @@ export default function PartnerOrders() {
                 )}
               </InfoGrid>
             </DrawerSection>
+
+            {/* 履约时间线（仅平台流转订单）：来单 / 接单 / 发货 / 妥投 / 确收 */}
+            {(() => {
+              const fo = flowOrdersVersion.find((o) => o.code === selected.code);
+              if (!fo?.fulfillment) return null;
+              const stage = stageOfOrder(fo);
+              const sc = FULFILLMENT_STAGE_COLORS[stage];
+              return (
+                <DrawerSection title="履约时间线">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <span style={{ padding: '2px 8px', borderRadius: '999px', fontSize: 12, fontWeight: 600, background: sc.bg, color: sc.color }}>{FULFILLMENT_STAGE_LABELS[stage]}</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-neutral-400)' }}>待接单 → 已接单 → 已发货 → 已签收/妥投 → 确认收货</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 12 }}>
+                    {fulfillmentTimes(fo).map((t) => (
+                      <div key={t.label}>
+                        <div style={{ fontSize: 12, color: 'var(--color-neutral-500)', marginBottom: 2 }}>{t.label}</div>
+                        <div className="mono" style={{ fontSize: 13, fontWeight: 500, color: t.value === '—' ? 'var(--color-neutral-400)' : 'var(--color-neutral-800)', whiteSpace: 'nowrap' }}>{t.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </DrawerSection>
+              );
+            })()}
 
             <DrawerSection title={`商品明细（${selected.items.length} 种）`}>
               <table className="detail-inline-table">
@@ -780,6 +835,59 @@ export default function PartnerOrders() {
               <Button variant="ghost" onClick={() => setReturnsOpen(false)}>关闭</Button>
             </div>
             <PartnerReturns embedded />
+          </div>
+        </div>
+      )}
+
+      {/* 接单确认弹窗：展示订单商品列表，确认接单 / 关闭 */}
+      {acceptOf && (
+        <div className="category-dialog-overlay" onClick={() => setAcceptOf(null)}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 660, maxWidth: '94vw' }}>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 4 }}>确认接单 · {acceptOf.code}</div>
+            <div style={{ fontSize: 13, color: 'var(--color-neutral-500)', marginBottom: 16, lineHeight: 1.7 }}>
+              {acceptOf.customerName}（{acceptOf.customerType}）· {PARTNER_DELIVERY_LABELS[acceptOf.deliveryMode]} · 订单金额 <span className="mono" style={{ color: 'var(--pk-accent)', fontWeight: 600 }}>{money(acceptOf.totalAmount)}</span>
+              <br />接单后请按期备货发货，发货后状态自动流转为「已发货」。
+            </div>
+            <table className="detail-inline-table">
+              <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>单价</th><th>小计</th></tr></thead>
+              <tbody>
+                {acceptOf.items.map((it, i) => (
+                  <tr key={`${it.productName}-${i}`}>
+                    <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
+                    <td>{it.spec}</td>
+                    <td className="mono">{it.quantity}</td>
+                    <td className="mono">{money(it.price)}</td>
+                    <td className="mono" style={{ fontWeight: 600 }}>{money(it.price * it.quantity)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+              <Button variant="ghost" onClick={() => setAcceptOf(null)}>关闭</Button>
+              <Button onClick={() => { updateStatus(acceptOf.id, 'accepted'); setAcceptOf(null); flash(`已接单：${acceptOf.code}`); }}>确认接单</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 退回确认弹窗：仅支持整单退回，退回后进入待分发 */}
+      {returnOf && (
+        <div className="category-dialog-overlay" onClick={() => setReturnOf(null)}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 460, maxWidth: '94vw' }}>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 8 }}>退回订单 · {returnOf.code}</div>
+            <div style={{ fontSize: 13, color: 'var(--color-neutral-600)', lineHeight: 1.8, marginBottom: 20 }}>
+              退回<strong>仅支持整单退回</strong>，退回后订单进入平台<strong>待分发</strong>，需由平台重新分发。
+              确认退回该订单吗？
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <Button variant="ghost" onClick={() => setReturnOf(null)}>取消</Button>
+              <Button onClick={() => {
+                const res = useOrderFlowStore.getState().partnerReturnOrder(returnOf.id.replace('ext_', ''));
+                setReturnOf(null);
+                setSelected(null);
+                flash(res.msg);
+              }}>确认退回</Button>
+            </div>
           </div>
         </div>
       )}

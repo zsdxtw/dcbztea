@@ -15,18 +15,15 @@ import { externalOrderSeeds } from '../data/externalOrders';
 import { usePriceStore } from './priceStore';
 import type { SupplyPlanLine } from '../types';
 import { getStock } from '../data/stock';
+import { nextShipmentCode, soRootOf } from '../utils/orderCodes';
 
 const now = () => new Date().toISOString().slice(0, 10);
 
-/** 由订单编号取母销售单号（子履约单 DXS…LY01 → DXS…；母销售单原样返回） */
-export const soRootOf = (code: string): string => code.split('LY')[0] ?? code;
+/** 由订单编号取母销售单号（子履约单 SO-…LY01 → SO-…；母销售单原样返回） */
+export { soRootOf };
 
-/** 销售发货单编号：FHDXS + 2 位发货方（01=自营发货 / 02=合作商发货）+ 4 位（00001 起，全平台顺序递增） */
-let doSeq = 0;
-const genDeliveryNo = (shipper: 'self' | 'partner'): string => {
-  doSeq += 1;
-  return `FHDXS${shipper === 'self' ? '01' : '02'}${String(doSeq).padStart(4, '0')}`;
-};
+/** 销售发货单编号：销售单编号 + FH + 2 位（该销售单下全部履约单的发货单全局顺序递增） */
+const genDeliveryNo = (motherCode: string): string => nextShipmentCode(motherCode);
 const nowMin = () => new Date().toISOString().slice(0, 16).replace('T', ' ');
 
 /** 采购口径单价：比单用中单价（由调用方传入），否则按供应商采购价规则（缺省销售实价 55%） */
@@ -95,7 +92,7 @@ function seedDocs(): PurchaseDoc[] {
   let pkgSeq = 1;
   const mkPkg = (doc: PurchaseDoc, productId: string, productName: string, qty: number, company: string, prefix: number, delivered: boolean): ShipmentPackage => {
     const pkg: ShipmentPackage = {
-      id: `pkg_seed_${pkgSeq}`, packageNo: genDeliveryNo(doc.source === 'self' ? 'self' : 'partner'),
+      id: `pkg_seed_${pkgSeq}`, packageNo: genDeliveryNo(doc.motherCode),
       logisticsCompany: company, trackingNo: `${company.includes('顺丰') ? 'SF' : 'DB'}${7000000000 + prefix}`,
       shippedAt: `${doc.createTime} 09:30`,
       items: [{ productId, productName, qty }],
@@ -257,7 +254,7 @@ export const usePurchaseStore = create<PurchaseState>((set, get) => {
       const seq = doc.packages.length + 1;
       const pkg: ShipmentPackage = {
         id: `pkg_${Date.now()}`,
-        packageNo: genDeliveryNo(doc.source === 'self' ? 'self' : 'partner'),
+        packageNo: genDeliveryNo(doc.motherCode),
         logisticsCompany: input.logisticsCompany.trim(),
         trackingNo: input.trackingNo.trim(),
         shippedAt: nowMin(),

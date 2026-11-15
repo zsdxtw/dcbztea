@@ -10,7 +10,10 @@ import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, TRANSFER_SOURCE_LABE
 import {
   buildFamilies, familyStatesOf, distributeStateOf, shipStateOf, settleStateOf, FAMILY_STATE_COLORS,
 } from '../../utils/salesOrderFamily';
-import type { ExternalOrder } from '../../types';
+import {
+  FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS, stageOfOrder, fulfillmentTimes,
+} from '../../utils/fulfillment';
+import type { ExternalOrder, FulfillmentStage } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -18,6 +21,14 @@ const pill = (text: string) => {
   const c = (FAMILY_STATE_COLORS as Record<string, { bg: string; color: string }>)[text] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
   return (
     <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: c.bg, color: c.color, whiteSpace: 'nowrap' }}>{text}</span>
+  );
+};
+
+/** 履约状态标签（统一五状态口径） */
+const stagePill = (stage: FulfillmentStage) => {
+  const c = FULFILLMENT_STAGE_COLORS[stage];
+  return (
+    <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: c.bg, color: c.color, whiteSpace: 'nowrap' }}>{FULFILLMENT_STAGE_LABELS[stage]}</span>
   );
 };
 
@@ -152,7 +163,7 @@ export default function SalesOrderDetail() {
 
           {/* 当前订单信息 */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3) var(--space-4)', marginBottom: 'var(--space-4)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)' }}>
-            {infoItem('订单编号', current.code, { mono: true, emph: true })}
+            {infoItem('销售单编号', current.code, { mono: true, emph: true })}
             {infoItem('分发路径', pathLabel(current))}
             {infoItem('合作商 / 跟单人', current.partnerName ?? (current.path === 'self' ? `自营${current.follower ? ` · ${current.follower}` : ''}` : '—'))}
             {infoItem('订单金额', <span style={{ fontWeight: 'var(--font-semibold)' }}>{money(current.totalAmount)}</span>, { mono: true })}
@@ -160,6 +171,23 @@ export default function SalesOrderDetail() {
             {infoItem('发货状态', pill(shipStateOf(current, currentPos)))}
             {infoItem('结算状态', pill(settleStateOf(current)))}
             {infoItem(current.parentCode ? '关联销售单' : '单据性质', current.parentCode ?? (children.length > 0 ? '母销售单（已拆分）' : '母销售单（未拆分，即履约单）'))}
+          </div>
+
+          {/* 履约时间线：来单 → 接单 → 发货 → 妥投 → 确收 */}
+          <div style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)' }}>销售履约状态</span>
+              {stagePill(stageOfOrder(current))}
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>待接单 → 已接单 → 已发货 → 已签收/妥投 → 确认收货</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 'var(--space-3)' }}>
+              {fulfillmentTimes(current).map((t) => (
+                <div key={t.label} style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', marginBottom: 2 }}>{t.label}</div>
+                  <div className="mono" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: t.value === '—' ? 'var(--color-neutral-400)' : 'var(--color-neutral-800)', whiteSpace: 'nowrap' }}>{t.value}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 'var(--space-4)' }}>
@@ -222,7 +250,7 @@ export default function SalesOrderDetail() {
             </div>
           )}
 
-          {/* 销售发货单（FHDXS）标签：该子履约单下全部发货单（PO 包裹 + 自营分仓发货） */}
+          {/* 销售发货单（销售单编号+FH）标签：该子履约单下全部发货单（PO 包裹 + 自营分仓发货） */}
           {(() => {
             const poPkgs = currentPos.flatMap((d) => d.packages.filter((x) => x.status !== 'void').map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, delivered: x.status === 'delivered', items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') })));
             const selfPkgs = (current.selfShipments ?? []).map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, delivered: x.status === 'delivered', items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') }));

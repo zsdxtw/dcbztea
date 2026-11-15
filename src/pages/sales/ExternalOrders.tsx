@@ -514,7 +514,7 @@ export default function ExternalOrders() {
         {/* 子单平铺列表（逐单操作视图；母单聚合总览见「销售单管理 → 销售订单」） */}
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['订单编号', '关联销售单', '来源', '客户', '地区', '收件人', '收件地址', '金额', '状态', '分发路径', '合作商', '录入时间', '操作']}
+            headers={['销售单编号', '关联销售单', '来源', '客户', '地区', '收件人', '收件地址', '金额', '状态', '分发路径', '合作商', '录入时间', '操作']}
             rows={pagedOrders.map((o) => [
               <span key="c" className="cell-mono-emph">{o.code}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.externalOrderNo ?? '—'}</span></span>,
               o.parentCode ? (
@@ -688,7 +688,7 @@ export default function ExternalOrders() {
             {!editForm.externalOrderNo && Object.keys(editForm).length === 0 && (
               <DrawerSection title="订单信息">
                 <InfoGrid>
-                  <InfoItem label="订单编号" mono emph>{current.code}</InfoItem>
+                  <InfoItem label="销售单编号" mono emph>{current.code}</InfoItem>
                   <InfoItem label="来源平台">{platformLabelOf(current)}</InfoItem>
                   <InfoItem label="平台母销售单号" mono>{current.externalOrderNo ?? '—'}</InfoItem>
                   <InfoItem label="来源渠道">{current.sourceChannel === 'manual' ? '手工录入' : '直连推送'}</InfoItem>

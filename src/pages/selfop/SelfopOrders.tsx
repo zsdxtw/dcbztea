@@ -59,7 +59,7 @@ export default function SelfopOrders() {
 
       <div className="pk-panel" style={{ padding: 0 }}>
         <Table
-          headers={['订单编号', '客户', '商品', '金额', '跟单人', '采购', '状态', '物流', '操作']}
+          headers={['销售单编号', '客户', '商品', '金额', '跟单人', '采购', '状态', '物流', '操作']}
           rows={filtered.map((o) => {
             const st = stageOf(o);
             const meta = STAGE_META[st];

@@ -1755,6 +1755,28 @@ export type ExternalProcessStatus =
 /** 外部订单来源渠道：手工录入 / 平台直连推送 */
 export type ExternalChannel = 'manual' | 'push';
 
+/**
+ * 销售履约状态（销售单分发完成后进入履约环节的统一口径）
+ * 待接单 → 已接单 → 已发货 → 已签收/妥投 → 确认收货
+ */
+export type FulfillmentStage = 'pending_accept' | 'accepted' | 'shipped' | 'delivered' | 'confirmed';
+
+/** 销售履约时间线（销售履约单五节点时间） */
+export interface FulfillmentTimeline {
+  /** 当前履约状态 */
+  stage: FulfillmentStage;
+  /** 来单时间（分发到自营 / 合作商的时间） */
+  arriveTime?: string;
+  /** 接单时间 */
+  acceptTime?: string;
+  /** 发货时间 */
+  shipTime?: string;
+  /** 妥投时间 */
+  deliverTime?: string;
+  /** 确收时间 */
+  confirmTime?: string;
+}
+
 /** 转出来源：报备命中 / 指定 / 比单 */
 export type TransferSource = 'report' | DistributeMode;
 
@@ -1906,8 +1928,14 @@ export interface ExternalOrder {
   /** 来源渠道：manual=手工录入 / push=平台直连推送 */
   sourceChannel: ExternalChannel;
   processStatus: ExternalProcessStatus;
-  /** 来源附加标签：比单未成（分拆后未成交商品形成的子订单）/ 自营退回 */
-  sourceTag?: 'compare_failed' | 'self_returned';
+  /** 来源附加标签：比单未成（分拆后未成交商品形成的子订单）/ 自营退回 / 待接单取回（按原分发来源） */
+  sourceTag?:
+    | 'compare_failed'
+    | 'self_returned'
+    | 'self_takeback'
+    | 'assign_takeback'
+    | 'report_takeback'
+    | 'compare_takeback';
   /** 母销售单编号（拆单生成的子订单指向母销售单；详情页按母子 Tab 展示） */
   parentCode?: string;
   /** 报备命中列表（命中即自动转出，列表用于展示「报备分发」来源） */
@@ -1928,6 +1956,8 @@ export interface ExternalOrder {
   selfPo?: SelfPurchase;
   /** 自营发货包裹（分仓发货 / 到货出库生成，按物流单号跟踪妥投） */
   selfShipments?: SelfShipment[];
+  /** 销售履约时间线（分发后建立，记录五节点时间：来单/接单/发货/妥投/确收） */
+  fulfillment?: FulfillmentTimeline;
   compare?: CompareSession;
   /** 处理轨迹 */
   history: { time: string; action: string; detail?: string }[];

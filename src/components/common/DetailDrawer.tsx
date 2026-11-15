@@ -116,8 +116,8 @@ export default function DetailDrawer({
         {/* 主体 */}
         <div className="drawer-body">{children}</div>
 
-        {/* 底部 */}
-        {!hideFooter && (
+        {/* 底部（隐藏默认底部的页面若传了自定义 footer，仍渲染自定义内容） */}
+        {(!hideFooter || footer) && (
           <div className="drawer-footer">{footer ?? defaultFooter}</div>
         )}
       </div>

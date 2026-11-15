@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
@@ -11,7 +11,7 @@ import { productCategoryLabels } from '../../data/productCategories';
 import { platformItems } from '../../data/platforms';
 import { getSalesDefaultPrice, getPersonalMinPrice } from '../../data/prices';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
-import type { ExternalOrderItem } from '../../types';
+import type { ExternalOrder, ExternalOrderItem } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -66,7 +66,8 @@ export default function OrderEntry() {
   const [pickerPage, setPickerPage] = useState(1);
   const PICKER_PAGE_SIZE = 12;
   const [itemSearch, setItemSearch] = useState('');
-  const [savedTip, setSavedTip] = useState('');
+  /** 创建成功后展示的成功页数据 */
+  const [createdOrder, setCreatedOrder] = useState<ExternalOrder | null>(null);
 
   const isVia = salesPath === 'via_platform';
 
@@ -200,8 +201,7 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
     setMatchedCustomerId(c.id);
     setCustomerSearch(c.name);
     setCustomerType(c.typeLabel);
-    if (c.contactPerson && !receiver) setReceiver(c.contactPerson);
-    if (c.contactPhone && !receiverPhone) setReceiverPhone(c.contactPhone);
+    // 展示客户联系人和联系电话作为参考，但不自动填入收货信息（收货人/收货电话按实际收货方手动输入）
   };
 
   const changeCustomerType = (t: string) => {
@@ -235,7 +235,7 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
       return;
     }
     if (!customerSearch.trim() || !regionProv.trim() || !receiver.trim() || !receiverPhone.trim()) {
-      setError('客户名称、客户区域（省份）、收货人、联系电话为必填');
+      setError('客户名称、客户区域（省份）、收货人、收货电话为必填');
       return;
     }
     if (items.length === 0 || items.some((it) => it.quantity <= 0)) {
@@ -265,10 +265,7 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
       sourceChannel: 'manual',
     });
     resetForm();
-    setSavedTip(order.processStatus === 'report_match_pending'
-      ? `销售单 ${order.code} 已保存并命中报备，进入「报备-匹配待确认」，3 秒后跳转销售单分发…`
-      : `销售单 ${order.code} 已保存，进入「分发-待处理」，3 秒后跳转销售单分发…`);
-    setTimeout(() => { setSavedTip(''); navigate('/sales/order-distribute'); }, 3000);
+    setCreatedOrder(order);
   };
 
   const label = (text: string, required?: boolean) => (
@@ -276,6 +273,22 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
       {text}{required && <span style={{ color: '#CB405D', marginLeft: 2 }}>*</span>}
     </label>
   );
+
+  /* ── 创建成功弹窗：展示销售单编号与关键信息，可直接去分发 ── */
+  const createdHitReport = createdOrder?.processStatus === 'report_match_pending';
+  const createdSummary: { label: string; value: ReactNode; mono?: boolean; span?: boolean }[] = createdOrder ? [
+    { label: '客户名称', value: createdOrder.customerName },
+    { label: '客户类型', value: createdOrder.customerType },
+    { label: '销售路径', value: createdOrder.salesPath === 'via_platform' ? '经平台销售' : '直接销售' },
+    { label: '订单金额', value: money(createdOrder.totalAmount), mono: true },
+    { label: '商品种数', value: `${createdOrder.items.length} 种` },
+    { label: '下单时间', value: createdOrder.entryTime, mono: true },
+    { label: '收货人', value: createdOrder.receiver },
+    { label: '收货电话', value: createdOrder.receiverPhone, mono: true },
+    ...(createdOrder.externalOrderNo ? [{ label: '平台订单号', value: createdOrder.externalOrderNo, mono: true }] : []),
+    ...(createdOrder.customerOrderNo ? [{ label: '客户侧单号', value: createdOrder.customerOrderNo, mono: true }] : []),
+    { label: '收货地址', value: createdOrder.receiverAddress, span: true },
+  ] : [];
 
   return (
     <>
@@ -286,10 +299,6 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
           首先选择<strong>销售路径</strong>：直接销售（直营 / 渠道 / 平台 / 个人客户）或经平台销售（淡茶 → 平台客户 → 直营客户）；
           保存时自动与审批通过的报备比对，命中则进入「报备-匹配待确认」，人工确认后转派报备合作商。
         </div>
-
-        {savedTip && (
-          <div style={{ padding: '10px 14px', background: '#E8F5E9', color: '#01795D', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>{savedTip}</div>
-        )}
 
         <Card title="订单信息">
           {/* 销售路径选择 */}
@@ -401,8 +410,7 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
             </div>
             {matchedCustomer && (
               <div style={{ display: 'flex', gap: 'var(--space-4)', padding: 'var(--space-2) var(--space-3)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', marginTop: 'var(--space-2)', fontSize: 'var(--text-sm)' }}>
-                <span>✓ 已匹配在库客户</span>
-                <span>联系人：{matchedCustomer.contactPerson}</span>
+                <span>联系人：{matchedCustomer.contactPerson || '—'}{matchedCustomer.contactPhone ? `（${matchedCustomer.contactPhone}）` : ''}</span>
                 <span>等级：{matchedCustomer.level}</span>
               </div>
             )}
@@ -417,15 +425,15 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
             </div>
           </div>
 
-          {/* 收货人 / 联系电话（客户名称下一行；联系电话必输） */}
+          {/* 收货人 / 收货电话（客户名称下一行；收货电话必输） */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
             <div>
               {label('收货人', true)}
               <input className="filter-input" placeholder="收货人姓名" value={receiver} onChange={(e) => { setReceiver(e.target.value); setError(''); }} style={{ width: '100%' }} />
             </div>
             <div>
-              {label('联系电话', true)}
-              <input className="filter-input" placeholder="联系电话" value={receiverPhone} onChange={(e) => { setReceiverPhone(e.target.value); setError(''); }} style={{ width: '100%' }} />
+              {label('收货电话', true)}
+              <input className="filter-input" placeholder="收货电话" value={receiverPhone} onChange={(e) => { setReceiverPhone(e.target.value); setError(''); }} style={{ width: '100%' }} />
             </div>
           </div>
 
@@ -583,7 +591,7 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
           </div>
 
           {/* 操作按钮：合计下一行，居中，间距加宽（重置=辅色调实心，创建=主色调） */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-6)', marginTop: 'var(--space-6)' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-6)', marginTop: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
             <Button onClick={saveOrder}>创建订单并匹配报备</Button>
             <Button style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)' }} onClick={resetForm}>重置</Button>
           </div>
@@ -593,6 +601,49 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
           <div style={{ padding: '8px 12px', background: '#FFEBEE', color: '#C62828', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginTop: 'var(--space-4)' }}>{error}</div>
         )}
       </div>
+
+      {/* ── 创建成功弹窗（不跳页，留在当前页） ── */}
+      {createdOrder && (
+        <div className="category-dialog-overlay" onClick={() => setCreatedOrder(null)}>
+          <div className="category-dialog" style={{ width: 560, padding: 0, overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'var(--space-7) var(--space-6) var(--space-5)' }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: '50%', background: 'var(--color-module-current-lightest)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'var(--space-3)',
+              }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-module-current-base)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              </div>
+              <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)' }}>销售单创建成功</div>
+              <div className="mono" style={{ fontSize: 21, fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)', marginTop: 'var(--space-2)', letterSpacing: '0.02em' }}>
+                {createdOrder.code}
+              </div>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginTop: 'var(--space-2)', textAlign: 'center', lineHeight: 1.7 }}>
+                {createdHitReport
+                  ? '命中审批通过的报备，已进入「报备-匹配待确认」，确认后自动转派报备合作商'
+                  : '已进入「分发-待处理」，请选择履约路径（自营 / 指定 / 比单）完成分发'}
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--color-neutral-200)', padding: 'var(--space-5) var(--space-6)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 'var(--space-4) var(--space-5)' }}>
+                {createdSummary.map((f) => (
+                  <div key={f.label} style={{ gridColumn: f.span ? '1 / -1' : undefined, minWidth: 0 }}>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', marginBottom: 3 }}>{f.label}</div>
+                    <div className={f.mono ? 'mono' : undefined} style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', wordBreak: 'break-all' }}>{f.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', padding: 'var(--space-4) var(--space-6) var(--space-5)' }}>
+              <Button variant="ghost" onClick={() => setCreatedOrder(null)}>继续新建</Button>
+              <Button onClick={() => navigate('/sales/order-distribute')}>去分发</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -207,7 +207,7 @@ export default function SalesOverview() {
             })}
           </div>
           <Table
-            headers={['订单编号', '来源', '客户', '路径', '金额', '状态', '操作']}
+            headers={['销售单编号', '来源', '客户', '路径', '金额', '状态', '操作']}
             rows={recentFlow.map((o) => [
               <span key="c" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{o.code}</span>,
               <span key="src">{platformLabelOf(o)} · {EXTERNAL_CHANNEL_LABELS[o.sourceChannel]}</span>,
@@ -223,7 +223,7 @@ export default function SalesOverview() {
         {/* 近期销售单 */}
         <Card title="近期销售单" style={{ marginTop: 'var(--space-4)' }}>
           <Table
-            headers={['订单编号', '客户', '商品', '茶类', '金额', '状态']}
+            headers={['销售单编号', '客户', '商品', '茶类', '金额', '状态']}
             rows={salesOrders.map(order => [
               <span className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{order.code}</span>,
               <span>{order.partner}</span>,

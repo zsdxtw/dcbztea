@@ -190,6 +190,13 @@ export default function PartnerReturns({ embedded = false }: { embedded?: boolea
       <div className="pk-panel">
         <div className="pk-panel-head" style={{ flexWrap: 'wrap', gap: 10, justifyContent: 'flex-start' }}>
           <input className="filter-input" placeholder="搜索退货编号、销售单号、客户、原因..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 220, height: 32, fontSize: 13 }} />
+          <button
+            className="pk-reg-submit"
+            style={{ marginLeft: 'auto', height: 32, padding: '0 16px', fontSize: 13, letterSpacing: 'normal', textIndent: 0 }}
+            onClick={() => { setDraft(EMPTY_DRAFT); setDraftErr(''); setAddOpen(true); }}
+          >
+            登记退货
+          </button>
         </div>
         <div className="pk-panel-body">
         <div className="pk-table-panel" style={{ margin: 0 }}>
@@ -299,7 +306,7 @@ export default function PartnerReturns({ embedded = false }: { embedded?: boolea
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
                 <div>
                   <label className="drawer-label" style={{ display: 'block', marginBottom: 6 }}>关联销售单号 *</label>
-                  <input className="filter-input mono" style={{ width: '100%' }} placeholder="如 DXS202610210008" value={draft.sourceOrderCode} onChange={(e) => { setDraft((d) => ({ ...d, sourceOrderCode: e.target.value })); setDraftErr(''); }} />
+                  <input className="filter-input mono" style={{ width: '100%' }} placeholder="如 SO-2611150001" value={draft.sourceOrderCode} onChange={(e) => { setDraft((d) => ({ ...d, sourceOrderCode: e.target.value })); setDraftErr(''); }} />
                 </div>
                 <div>
                   <label className="drawer-label" style={{ display: 'block', marginBottom: 6 }}>客户名称 *</label>

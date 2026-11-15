@@ -33,10 +33,100 @@
 
 ### 相关文件
 
-- 编号工具函数：`src/utils/productCode.ts`
+- 编码工具函数：`src/utils/productCode.ts`
 - 品牌数据源（含编号）：`src/data/brands.tsx`
 - 分类数据源：`src/data/productCategories.tsx`
 - 商品数据：`src/data/teaProducts.tsx`
+
+---
+
+## 销售单编号规则
+
+销售体系共 **4 类单据编号**，全部以销售单编号为根，逐层派生。
+
+> **术语统一**：`销售单编号` = `销售单订单号` = `销售单号`（同一字段 `ExternalOrder.code`），界面与文档统一使用「销售单编号」。
+
+### 编号格式
+
+| 单据 | 格式 | 示例 |
+|------|------|------|
+| 销售单 | `SO-` + 年月日（6 位 YYMMDD）+ 4 位顺序号（从 0001 起） | `SO-2611150001` |
+| 销售履约单 | 销售单编号 + `LY` + 2 位顺序号（从 01 起） | `SO-2611150001LY01` |
+| 销售发货单 | 销售单编号 + `FH` + 2 位顺序号（从 01 起） | `SO-2611150001FH01` |
+| 销售退货单 | 销售单编号 + `TH` + 2 位顺序号（从 01 起） | `SO-2611150001TH01` |
+
+### 编号约束
+
+1. **销售单序号**：按日从 `0001` 开始，同日新增销售单依次递增（跨日重新从 0001 起）
+2. **履约单序号**：在同一销售单下从 `01` 起依次递增，一个销售单可拆出多个履约单
+3. **发货单序号**：在同一销售单下从 `01` 起依次递增，且为**该销售单下各履约单的全部发货单按生成时间先后顺序全局编号**（不按履约单分别从 01 起）
+4. **退货单序号**：销售履约单对应的退货单均挂在母销售单下统一编号，从 `01` 起依次递增
+5. **层级关系**：一个销售单 → 多个销售履约单 → 每个履约单下多个销售发货单 / 销售退货单
+6. **编号不可变**：已生成的单据编号不因后续拆单、分发、结算等操作改变
+
+### 相关文件
+
+- 编号工具函数：`src/utils/orderCodes.ts`（`genSalesOrderCode` / `genFulfillmentCode` / `nextShipmentCode` / `genReturnCode` / `soRootOf`）
+- 订单分发 Store：`src/stores/orderFlowStore.ts`
+- 采购/包裹 Store：`src/stores/purchaseStore.ts`
+- 退货 Store：`src/stores/returnStore.ts`
+- 新建销售单页：`src/pages/sales/OrderEntry.tsx`
+
+---
+
+## 销售履约规则
+
+销售单分发完成后进入**销售履约环节**，按销售履约单（未拆分时为母销售单本身）跟踪。
+
+### 履约状态链
+
+`待接单` → `已接单` → `已发货` → `已签收/妥投` → `确认收货`
+
+| 状态 | FulfillmentStage | 说明 |
+|------|------------------|------|
+| 待接单 | `pending_accept` | 已分发到自营 / 合作商，等待接单 |
+| 已接单 | `accepted` | 自营或合作商已接单，进入备货/采购 |
+| 已发货 | `shipped` | 已登记发货（自营分仓发货 / 合作商包裹） |
+| 已签收/妥投 | `delivered` | 全部包裹物流妥投或客户签收 |
+| 确认收货 | `confirmed` | 客户确认收货，订单完成（合作商链结算后置为该状态） |
+
+### 履约五节点时间
+
+| 字段 | 名称 | 写入时机 |
+|------|------|----------|
+| `arriveTime` | 来单时间 | 分发到自营 / 合作商（转派定案、选择自营路径、比单定标） |
+| `acceptTime` | 接单时间 | 自营接单 / 合作商终端接单 |
+| `shipTime` | 发货时间 | 自营分仓发货、到货出库、合作商发货登记 |
+| `deliverTime` | 妥投时间 | 全部包裹妥投 / 合作商物流妥投、客户签收 |
+| `confirmTime` | 确收时间 | 客户确认收货（合作商链为结算完成） |
+
+### 待接单操作
+
+| 端 | 操作 | 规则 |
+|----|------|------|
+| 管理后台 | 查看 / 取回 | 从自营或合作商主动取回；支持整体取回与部分取回 |
+| 合作商工作台 | 查看 / 接单 / 退回 | 接单需弹窗确认；退回仅支持整单退回 |
+
+**取回规则**：
+1. **整体取回**：履约单编号不变，订单回到销售单分发（`pending`）
+2. **部分取回**：按商品 + 数量取回，剩余部分沿用原履约单编号；取回部分按规则生成新的履约单编号（`母单号+LY+2位`）
+3. **来源标签**：按原分发来源新增 `自营取回` / `指定取回` / `报备取回` / `比单取回`（`sourceTag`：`self_takeback` / `assign_takeback` / `report_takeback` / `compare_takeback`）
+4. **退回规则**：合作商仅支持整单退回，退回后进入平台待分发，需重新分发
+
+### 关键约束
+
+1. **数据落位**：时间线存于 `ExternalOrder.fulfillment`（`FulfillmentTimeline`），`stage` 为当前履约状态
+2. **动作驱动**：所有节点时间由订单流转动作写入，不允许页面直接改写
+3. **三端一致**：管理后台销售单履约、合作商工作台订单管理、自营工作台订单管理使用同一套状态与时间口径（`src/utils/fulfillment.ts`）
+4. **旧数据兜底**：无 `fulfillment` 的历史订单按 `processStatus` / `partnerStatus` 推导状态，时间显示 `—`
+
+### 相关文件
+
+- 履约状态与时间工具：`src/utils/fulfillment.ts`
+- 流转写入：`src/stores/orderFlowStore.ts`
+- 管理后台：`src/pages/sales/SalesFulfillment.tsx`、`src/pages/sales/SalesOrderDetail.tsx`
+- 合作商工作台：`src/pages/partner/PartnerOrders.tsx`
+- 自营工作台：`src/pages/selfop/SelfopOrders.tsx`、`src/components/selfop/SelfOrderDetailDrawer.tsx`
 
 ---
 

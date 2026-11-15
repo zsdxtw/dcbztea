@@ -64,7 +64,7 @@ export const partnerProfile = {
 /* ── 分发的订单（来源于淡茶半盏后台） ── */
 export const partnerOrders: PartnerOrder[] = [
   {
-    id: 'po1', code: 'HHSO20260912001', customerName: '华茗堂茶庄', customerType: '直营客户',
+    id: 'po1', code: 'SO-2609120001', customerName: '华茗堂茶庄', customerType: '直营客户',
     items: [
       { productName: '西湖龙井·明前特级', spec: '50g/罐', quantity: 20, price: 452 },
       { productName: '碧螺春·一级', spec: '100g/袋', quantity: 15, price: 328 },
@@ -75,7 +75,7 @@ export const partnerOrders: PartnerOrder[] = [
     remark: '客户周年庆活动，请优先安排发货',
   },
   {
-    id: 'po2', code: 'HHSO20260911002', customerName: '清心茶坊', customerType: '直营客户',
+    id: 'po2', code: 'SO-2609110001', customerName: '清心茶坊', customerType: '直营客户',
     items: [
       { productName: '正山小种·特级', spec: '100g/罐', quantity: 30, price: 384 },
     ],
@@ -84,7 +84,7 @@ export const partnerOrders: PartnerOrder[] = [
     receiver: '清心茶坊收发部', receiverPhone: '139****2210', receiverAddress: '浙江宁波市鄞州区中山东路2001号',
   },
   {
-    id: 'po3', code: 'HHSO20260910003', customerName: '浦发银行', customerType: '平台客户',
+    id: 'po3', code: 'SO-2609100001', customerName: '浦发银行', customerType: '平台客户',
     items: [
       { productName: '金骏眉·特级', spec: '50g/罐', quantity: 12, price: 1024 },
       { productName: '白毫银针·特级', spec: '50g/罐', quantity: 8, price: 768 },
@@ -95,7 +95,7 @@ export const partnerOrders: PartnerOrder[] = [
     remark: '走京东慧采平台，需提供随货同行单',
   },
   {
-    id: 'po4', code: 'HHSO20260908004', customerName: '天福茗茶', customerType: '渠道客户',
+    id: 'po4', code: 'SO-2609080001', customerName: '天福茗茶', customerType: '渠道客户',
     items: [
       { productName: '铁观音·清香一级', spec: '250g/罐', quantity: 40, price: 208 },
     ],
@@ -104,7 +104,7 @@ export const partnerOrders: PartnerOrder[] = [
     receiver: '天福物流部', receiverPhone: '0592-566****', receiverAddress: '福建厦门市思明区莲前西路209号',
   },
   {
-    id: 'po5', code: 'HHSO20260905005', customerName: '交通银行', customerType: '平台客户',
+    id: 'po5', code: 'SO-2609050001', customerName: '交通银行', customerType: '平台客户',
     items: [
       { productName: '滇红·金芽特级', spec: '100g/罐', quantity: 25, price: 224 },
       { productName: '祁门红茶·特级', spec: '100g/罐', quantity: 18, price: 368 },
@@ -114,7 +114,7 @@ export const partnerOrders: PartnerOrder[] = [
     receiver: '交通银行总务处', receiverPhone: '021-3138****', receiverAddress: '上海市浦东新区银城中路188号',
   },
   {
-    id: 'po6', code: 'HHSO20260901006', customerName: '茗香阁直播', customerType: '带货客户',
+    id: 'po6', code: 'SO-2609010001', customerName: '茗香阁直播', customerType: '带货客户',
     items: [
       { productName: '凤凰单丛·蜜兰香', spec: '100g/袋', quantity: 50, price: 374 },
     ],
@@ -123,7 +123,7 @@ export const partnerOrders: PartnerOrder[] = [
     receiver: '茗香阁仓储', receiverPhone: '137****0912', receiverAddress: '广东广州市白云区黄石东路288号',
   },
   {
-    id: 'po7', code: 'HHSO20260828007', customerName: '八马茶业', customerType: '渠道客户',
+    id: 'po7', code: 'SO-2608280001', customerName: '八马茶业', customerType: '渠道客户',
     items: [
       { productName: '大红袍·特级', spec: '150g/盒', quantity: 22, price: 494 },
     ],
@@ -133,7 +133,7 @@ export const partnerOrders: PartnerOrder[] = [
     remark: '库存不足驳回，已与平台沟通改期',
   },
   {
-    id: 'po8', code: 'HHSO20260825008', customerName: '品茗轩', customerType: '直营客户',
+    id: 'po8', code: 'SO-2608250001', customerName: '品茗轩', customerType: '直营客户',
     items: [
       { productName: '太平猴魁·特级', spec: '100g/盒', quantity: 16, price: 530 },
     ],
@@ -202,7 +202,7 @@ export const partnerReports: PartnerReport[] = [
 /* ── 平台待分发订单池（管理台创建的新订单，可被审批通过的报备规则匹配转入合作商名下） ── */
 export const platformOrders: PlatformOrder[] = [
   {
-    id: 'pto1', code: 'HHSO20261013001', customerName: '华茗堂茶庄', customerType: '直营客户', customerRegion: '江苏南京',
+    id: 'pto1', code: 'SO-2610130001', customerName: '华茗堂茶庄', customerType: '直营客户', customerRegion: '江苏南京',
     items: [{ productName: '西湖龙井·明前特级', spec: '50g/罐', quantity: 60, price: 452 }],
     totalAmount: 27120, deliveryMode: 'direct', coopMode: 'supplier',
     orderDate: '2026-10-13', expectedShipDate: '2026-10-16',
@@ -210,14 +210,14 @@ export const platformOrders: PlatformOrder[] = [
     remark: '中秋团购订单，匹配自营订单报备后转合作商履约',
   },
   {
-    id: 'pto2', code: 'HHSO20261013002', customerName: '南京翠竹茶行', customerType: '渠道客户', customerRegion: '江苏南京',
+    id: 'pto2', code: 'SO-2610130002', customerName: '南京翠竹茶行', customerType: '渠道客户', customerRegion: '江苏南京',
     items: [{ productName: '雨花茶·特级', spec: '100g/罐', quantity: 30, price: 268 }],
     totalAmount: 8040, deliveryMode: 'warehouse', coopMode: 'supplier',
     orderDate: '2026-10-13', expectedShipDate: '2026-10-15',
     receiver: '翠竹茶行采购部', receiverPhone: '025-8463****', receiverAddress: '江苏南京市玄武区中山东路198号',
   },
   {
-    id: 'pto3', code: 'HHSO20261012003', customerName: '苏州吴门茶事', customerType: '个人客户', customerRegion: '江苏苏州',
+    id: 'pto3', code: 'SO-2610120002', customerName: '苏州吴门茶事', customerType: '个人客户', customerRegion: '江苏苏州',
     items: [{ productName: '武夷岩茶·水金龟', spec: '50g/罐', quantity: 20, price: 420 }],
     totalAmount: 8400, deliveryMode: 'direct', coopMode: 'service',
     orderDate: '2026-10-12', expectedShipDate: '2026-10-14',
@@ -225,7 +225,7 @@ export const platformOrders: PlatformOrder[] = [
     remark: '水金龟岩茶订单，命中商品报备（江苏区域）自动转入',
   },
   {
-    id: 'pto4', code: 'HHSO20261011004', customerName: '清心茶坊', customerType: '直营客户', customerRegion: '浙江宁波',
+    id: 'pto4', code: 'SO-2610110001', customerName: '清心茶坊', customerType: '直营客户', customerRegion: '浙江宁波',
     items: [{ productName: '金骏眉·特级', spec: '50g/罐', quantity: 10, price: 1024 }],
     totalAmount: 10240, deliveryMode: 'warehouse', coopMode: 'service',
     orderDate: '2026-10-11', expectedShipDate: '2026-10-14',
@@ -314,19 +314,19 @@ export const partnerSettlements: PartnerSettlement[] = [
     id: 'ps1', code: 'JS2026090001', period: '2026-09', orderCount: 3,
     orderAmount: 43896, deduction: 2194.8, settleAmount: 41701.2,
     method: '对公转账', status: 'unsettled', createTime: '2026-09-12',
-    orders: ['HHSO20260912001', 'HHSO20260911002', 'HHSO20260910003'],
+    orders: ['SO-2609120001', 'SO-2609110001', 'SO-2609100001'],
   },
   {
     id: 'ps2', code: 'JS2026080002', period: '2026-08', orderCount: 2,
     orderAmount: 32168, deduction: 1608.4, settleAmount: 30559.6,
     method: '对公转账', status: 'pending', createTime: '2026-09-02',
-    orders: ['HHSO20260828007', 'HHSO20260825008'],
+    orders: ['SO-2608280001', 'SO-2608250001'],
   },
   {
     id: 'ps3', code: 'JS2026070003', period: '2026-07', orderCount: 2,
     orderAmount: 30924, deduction: 1546.2, settleAmount: 29377.8,
     method: '对公转账', status: 'settled', createTime: '2026-08-02', settleTime: '2026-08-09',
-    orders: ['HHSO20260718009', 'HHSO20260710010'],
+    orders: ['SO-2607180001', 'SO-2607100001'],
   },
 ];
 

@@ -8,9 +8,10 @@ import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import SalesOrderInfoModal from '../../components/business/SalesOrderInfoModal';
 import {
-  EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS, TRANSFER_SOURCE_LABELS,
-} from '../../data/externalOrders';
-import type { ExternalOrder } from '../../types';
+  FULFILLMENT_STAGES, FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS,
+  stageOfOrder, stageIndexOf,
+} from '../../utils/fulfillment';
+import type { ExternalOrder, FulfillmentStage } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -18,30 +19,9 @@ const pill = (bg: string, color: string, text: string) => (
   <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: bg, color, whiteSpace: 'nowrap' }}>{text}</span>
 );
 
-/** 履约阶段：1 分发 → 2 接单 → 3 履约 → 4 运输 → 5 妥投 */
-type StageKey = 'dispatch' | 'accept' | 'doing' | 'transit' | 'done';
-const STAGE_CHAIN: { key: StageKey; label: string }[] = [
-  { key: 'dispatch', label: '分发' },
-  { key: 'accept', label: '接单' },
-  { key: 'doing', label: '履约' },
-  { key: 'transit', label: '运输' },
-  { key: 'done', label: '妥投' },
-];
-
-function stageOf(o: ExternalOrder): { idx: number; label: string } {
-  // 阶段 1：分发中
-  if (['pending', 'report_match_pending', 'comparing'].includes(o.processStatus)) return { idx: 0, label: '分发中' };
-  // 阶段 2：待接单
-  if (['self_pending', 'distribute_pending'].includes(o.processStatus)) return { idx: 1, label: '待接单' };
-  // 阶段 4：运输中
-  if (o.processStatus === 'self_shipped') return { idx: 3, label: '运输中' };
-  if (o.path === 'distribute' && (o.partnerStatus === 'shipping' || o.partnerStatus === 'transit')) return { idx: 3, label: o.partnerStatus === 'transit' ? '妥投待签收' : '运输中' };
-  // 阶段 5：妥投 / 完成
-  if (o.processStatus === 'self_delivered' || o.processStatus === 'completed') return { idx: 4, label: o.processStatus === 'completed' ? '已结算' : '已妥投' };
-  if (o.path === 'distribute' && ['delivered', 'settled'].includes(o.partnerStatus ?? '')) return { idx: 4, label: o.partnerStatus === 'settled' ? '已结算' : '已妥投' };
-  // 阶段 3：履约中（自营采购/入库、合作商备货）
-  return { idx: 2, label: o.path === 'self' ? '履约中（采购/发货准备）' : '履约中（备货）' };
-}
+/** 履约阶段链：待接单 → 已接单 → 已发货 → 已签收/妥投 → 确认收货 */
+type StageKey = FulfillmentStage;
+const STAGE_CHAIN = FULFILLMENT_STAGES;
 
 /** 履约单元：子订单 + 未被拆分的母销售单（有子单的母单由其子单代表） */
 export default function SalesFulfillment() {
@@ -50,21 +30,46 @@ export default function SalesFulfillment() {
   const purchaseDocs = usePurchaseStore((s) => s.docs);
   const [tab, setTab] = useState<'' | StageKey>('');
   const [linkOrderCode, setLinkOrderCode] = useState<string | null>(null);
+  /** 待接单取回弹窗 */
+  const [recallOf, setRecallOf] = useState<ExternalOrder | null>(null);
+  const [recallQty, setRecallQty] = useState<Record<string, string>>({});
+  const [recallMsg, setRecallMsg] = useState('');
+
+  const submitRecall = (all: boolean) => {
+    if (!recallOf) return;
+    const parts = all
+      ? undefined
+      : Object.entries(recallQty)
+        .map(([productName, q]) => ({ productName, quantity: Number(q) || 0 }))
+        .filter((p) => p.quantity > 0);
+    const res = useOrderFlowStore.getState().recallPendingOrder(recallOf.id, parts);
+    if (res.ok) {
+      setRecallOf(null);
+      setRecallQty({});
+      setRecallMsg(res.msg);
+      setTimeout(() => setRecallMsg(''), 3600);
+    } else {
+      setRecallMsg(res.msg);
+    }
+  };
 
   const units = useMemo(() => {
     const childCodes = new Set(orders.filter((o) => o.parentCode).map((o) => o.code));
     const rootHasChild = new Set(orders.filter((o) => childCodes.has(o.code) || o.parentCode).map((o) => o.parentCode ?? o.code));
-    return orders.filter((o) => !o.parentCode && !rootHasChild.has(o.code) || o.parentCode)
+    return orders
+      // 履约环节仅含已分发订单（待分发 / 报备待确认 / 比单中仍留在销售单分发）
+      .filter((o) => !['pending', 'report_match_pending', 'comparing'].includes(o.processStatus))
+      .filter((o) => !o.parentCode && !rootHasChild.has(o.code) || o.parentCode)
       .map((o) => {
-        const st = stageOf(o);
+        const stage = stageOfOrder(o);
         const doc = purchaseDocs.find((d) => d.childOrderCode === o.code);
         const pkgs = doc?.packages.filter((p) => p.status !== 'void') ?? [];
         const delivered = pkgs.filter((p) => p.status === 'delivered').length;
         return {
           order: o,
           rootCode: o.parentCode ?? o.code,
-          stageIdx: st.idx,
-          stageLabel: st.label,
+          stage,
+          stageIdx: stageIndexOf(stage),
           pkgCount: pkgs.length,
           pkgDelivered: delivered,
           lastTracking: pkgs[pkgs.length - 1],
@@ -73,8 +78,8 @@ export default function SalesFulfillment() {
       .sort((a, b) => b.stageIdx - a.stageIdx || b.order.entryTime.localeCompare(a.order.entryTime));
   }, [orders, purchaseDocs]);
 
-  const countOf = (k: '' | StageKey) => (k === '' ? units.length : units.filter((u) => u.stageIdx === STAGE_CHAIN.findIndex((s) => s.key === k)).length);
-  const filtered = useMemo(() => (tab === '' ? units : units.filter((u) => u.stageIdx === STAGE_CHAIN.findIndex((s) => s.key === tab))), [units, tab]);
+  const countOf = (k: '' | StageKey) => (k === '' ? units.length : units.filter((u) => u.stage === k).length);
+  const filtered = useMemo(() => (tab === '' ? units : units.filter((u) => u.stage === tab)), [units, tab]);
 
   return (
     <>
@@ -82,9 +87,13 @@ export default function SalesFulfillment() {
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           按<strong>子履约单 / 未拆分的母销售单</strong>维度跟踪每一张销售单的履约进度（未拆分时母销售单即履约单）：
-          分发 → 接单 → 履约（自营采购入库 / 合作商备货）→ 运输（包裹在途）→ 妥投 / 结算。
+          待接单 → 已接单 → 已发货 → 已签收/妥投 → 确认收货，并记录<strong>来单 / 接单 / 发货 / 妥投 / 确收</strong>五个时间节点。
           已拆分的母销售单由其子履约单各自呈现；包裹物流与合作商发货登记实时联动。
         </div>
+
+        {recallMsg && (
+          <div style={{ marginBottom: 'var(--space-3)', padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', background: '#E8F5E9', color: '#01795D' }}>{recallMsg}</div>
+        )}
 
         <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
           <button className={`tab-card-simple${tab === '' ? ' active' : ''}`} style={{ transition: 'none' }} onClick={() => setTab('')}>
@@ -100,14 +109,13 @@ export default function SalesFulfillment() {
 
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['订单编号', '关联销售单', '客户', '供应方式', '履约主体', '金额', '当前状态', '履约进度', '包裹物流', '录入时间', '操作']}
+            headers={['销售单编号', '关联销售单', '客户', '履约主体', '金额', '履约状态', '包裹物流', '操作']}
             rows={filtered.map((u) => {
               const o = u.order;
-              const c = EXTERNAL_STATUS_COLORS[o.processStatus === 'completed' ? 'processed' : o.processStatus] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
+              const sc = FULFILLMENT_STAGE_COLORS[u.stage];
               return [
                 <span key="c" className="cell-mono-emph">
                   {o.code}
-
                 </span>,
                 o.parentCode ? (
                   <span
@@ -123,32 +131,22 @@ export default function SalesFulfillment() {
                   <span key="link" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>—</span>
                 ),
                 <span key="cu" className="cell-emph">{o.customerName}</span>,
-                <span key="src" style={{ fontSize: 'var(--text-sm)' }}>
-                  {o.path === 'self' ? '自营' : TRANSFER_SOURCE_LABELS[o.transferSource ?? ''] ?? '待分发'}
-                </span>,
                 <span key="sub" style={{ fontSize: 'var(--text-sm)' }}>
-                  {o.path === 'self' ? `自营${o.follower ? ` · ${o.follower}` : ''}` : (o.partnerName ?? '—')}
+                  {o.path === 'self' ? `自营${o.follower ? ` · ${o.follower}` : ''}` : (o.partnerName ?? '待分发')}
                 </span>,
                 <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(o.totalAmount)}</span>,
-                pill(c.bg, c.color, EXTERNAL_STATUS_LABELS[o.processStatus] ?? o.processStatus),
-                <span key="stg" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                  {STAGE_CHAIN.map((s, i) => (
-                    <span key={s.key} style={{
-                      width: 8, height: 8, borderRadius: '50%',
-                      background: i < u.stageIdx ? '#01795D' : i === u.stageIdx ? 'var(--color-module-current-base)' : 'var(--color-neutral-200)',
-                    }} title={s.label} />
-                  ))}
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', marginLeft: 4, whiteSpace: 'nowrap' }}>{u.stageLabel}</span>
-                </span>,
+                pill(sc.bg, sc.color, FULFILLMENT_STAGE_LABELS[u.stage]),
                 u.pkgCount > 0
                   ? <span key="pkg" style={{ fontSize: 'var(--text-sm)' }}>
                       {u.pkgCount} 包裹 · {u.pkgDelivered} 签收
                       {u.lastTracking && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{u.lastTracking.logisticsCompany} {u.lastTracking.trackingNo}</span>}
                     </span>
                   : <span key="pkg" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>—</span>,
-                <span key="t" className="cell-muted" style={{ whiteSpace: 'nowrap' }}>{o.entryTime}</span>,
                 <div key="act" className="row-actions">
                   <Button size="sm" variant="ghost" onClick={() => navigate(`/sales/sales-orders/${u.rootCode}`)}>查看详情</Button>
+                  {(o.processStatus === 'self_pending' || o.processStatus === 'distribute_pending') && (
+                    <Button size="sm" variant="ghost" onClick={() => { setRecallOf(o); setRecallQty({}); setRecallMsg(''); }}>取回</Button>
+                  )}
                 </div>,
               ];
             })}
@@ -161,6 +159,52 @@ export default function SalesFulfillment() {
         </Card>
       </div>
       <SalesOrderInfoModal code={linkOrderCode} onClose={() => setLinkOrderCode(null)} />
+
+      {/* 待接单取回弹窗：整体取回（编号不变）/ 部分取回（取回部分生成新履约单） */}
+      {recallOf && (
+        <div className="category-dialog-overlay" onClick={() => setRecallOf(null)}>
+          <div className="category-dialog" style={{ width: 640 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 4 }}>取回订单 · {recallOf.code}</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7, marginBottom: 'var(--space-4)' }}>
+              从 <strong>{recallOf.path === 'self' ? '自营' : (recallOf.partnerName ?? '合作商')}</strong> 取回，取回后进入销售单分发。
+              整体取回时履约单编号不变；部分取回时<strong>剩余部分沿用原编号 {recallOf.code}</strong>，取回部分按规则生成新履约单。
+              留空或 0 表示不取回该商品。
+            </div>
+            <table className="detail-inline-table">
+              <thead><tr><th>商品名称</th><th>规格</th><th>订单数量</th><th>取回数量</th></tr></thead>
+              <tbody>
+                {recallOf.items.map((it) => (
+                  <tr key={it.productName}>
+                    <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
+                    <td>{it.spec}</td>
+                    <td className="mono">{it.quantity}</td>
+                    <td>
+                      <input
+                        className="filter-input mono"
+                        type="number"
+                        min={0}
+                        max={it.quantity}
+                        placeholder="0"
+                        value={recallQty[it.productName] ?? ''}
+                        onChange={(e) => setRecallQty((prev) => ({ ...prev, [it.productName]: e.target.value }))}
+                        style={{ width: 96, height: 30 }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {recallMsg && (
+              <div style={{ marginTop: 'var(--space-3)', padding: '8px 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', background: '#FFF3E0', color: '#B26A00' }}>{recallMsg}</div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-5)' }}>
+              <Button variant="ghost" onClick={() => setRecallOf(null)}>取消</Button>
+              <Button variant="ghost" onClick={() => submitRecall(true)}>整体取回</Button>
+              <Button onClick={() => submitRecall(false)}>确认部分取回</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

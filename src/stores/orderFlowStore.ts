@@ -24,22 +24,56 @@ import { useSupplierStore } from './supplierStore';
 import { usePriceStore } from './priceStore';
 import { useScoreStore, getScoreSummary } from './scoreStore';
 import { usePurchaseStore } from './purchaseStore';
+import {
+  genSalesOrderCode, genFulfillmentCode as genFulfillmentCodeUtil, nextShipmentCode, soRootOf,
+} from '../utils/orderCodes';
+import type { FulfillmentTimeline } from '../types';
 
 const now = () => new Date().toISOString().slice(0, 10);
 const nowTs = () => Date.now();
 const nowMin = () => new Date().toISOString().slice(0, 16).replace('T', ' ');
 
-/** 生成母销售单编号：DXS + 年月日 + 4 位序号（0001 起，同日递增） */
-const genOrderCode = (orders: ExternalOrder[]): string => {
-  const dateKey = now().replace(/-/g, '');
-  const seq = orders.filter((o) => !o.parentCode && o.code.includes(dateKey)).length + 1;
-  return `DXS${dateKey}${String(seq).padStart(4, '0')}`;
+/** 生成母销售单编号：SO- + 年月日(YYMMDD) + 4 位序号（0001 起，同日递增） */
+const genOrderCode = (orders: ExternalOrder[]): string =>
+  genSalesOrderCode(orders.filter((o) => !o.parentCode).map((o) => o.code));
+
+/** 生成履约单编号：母销售单编号 + LY + 2 位序号（01 起） */
+const genFulfillmentCode = (soCode: string, orders: ExternalOrder[]): string =>
+  genFulfillmentCodeUtil(soCode, orders.filter((o) => o.parentCode === soCode).map((o) => o.code));
+
+/** 收集某销售单下全部发货单号（自营包裹 + 采购单包裹），用于 FH 全局顺序编号 */
+const collectFamilyShipmentNos = (rootCode: string): string[] => {
+  const orders = useOrderFlowStore.getState().orders;
+  const docs = usePurchaseStore.getState().docs;
+  const selfNos = orders
+    .filter((o) => (o.parentCode ?? o.code) === rootCode)
+    .flatMap((o) => (o.selfShipments ?? []).map((s) => s.packageNo));
+  const poNos = docs
+    .filter((d) => d.motherCode === rootCode || soRootOf(d.childOrderCode) === rootCode)
+    .flatMap((d) => d.packages.map((p) => p.packageNo));
+  return [...selfNos, ...poNos];
 };
 
-/** 生成履约单编号：母销售单编号 + FO + 2 位序号（01 起，挂在母销售单下的履约单数递增） */
-const genFulfillmentCode = (soCode: string, orders: ExternalOrder[]): string => {
-  const seq = orders.filter((o) => o.parentCode === soCode).length + 1;
-  return `${soCode}LY${String(seq).padStart(2, '0')}`;
+/** 批量生成该销售单下的发货单编号（销售单编号 + FH + 2 位，跨履约单全局递增） */
+const genShipmentNos = (rootCode: string, count: number): string[] => {
+  const existing = collectFamilyShipmentNos(rootCode);
+  const out: string[] = [];
+  for (let i = 0; i < count; i += 1) out.push(nextShipmentCode(rootCode, existing));
+  return out;
+};
+
+/** 履约时间线补丁：保留已有节点时间，只更新本次流转的状态与时间 */
+const fulfil = (order: ExternalOrder | undefined, patch: Partial<FulfillmentTimeline>): FulfillmentTimeline => ({
+  ...(order?.fulfillment ?? { stage: 'pending_accept' }),
+  ...patch,
+} as FulfillmentTimeline);
+
+/** 待接单取回来源标签（按原分发来源：自营 / 指定 / 报备 / 比单） */
+const takebackSourceOf = (o: ExternalOrder): { tag: ExternalOrder['sourceTag']; label: string } => {
+  if (o.path === 'self') return { tag: 'self_takeback', label: '自营取回' };
+  if (o.transferSource === 'report') return { tag: 'report_takeback', label: '报备取回' };
+  if (o.transferSource === 'compare') return { tag: 'compare_takeback', label: '比单取回' };
+  return { tag: 'assign_takeback', label: '指定取回' };
 };
 
 /** 订单 → 平台订单结构（复用报备匹配逻辑） */
@@ -136,6 +170,14 @@ interface OrderFlowState {
   quickSplit: (id: string, mode: 'brand' | 'product') => { ok: boolean; msg: string };
   /** 重新分发：退回待处理重新选择路径 */
   resetToPending: (id: string, note?: string) => void;
+  /**
+   * 待接单取回（管理后台）：从自营 / 合作商主动取回订单。
+   * 不传 parts = 整体取回（履约单编号不变）；传 parts = 部分取回（剩余部分沿用原编号，取回部分生成新履约单）。
+   * 取回后进入销售单分发，来源标注「自营/指定/报备/比单 取回」。
+   */
+  recallPendingOrder: (id: string, parts?: { productName: string; quantity: number }[]) => { ok: boolean; msg: string };
+  /** 合作商退回（整单）：待接单 → 分发-待处理 */
+  partnerReturnOrder: (id: string) => { ok: boolean; msg: string };
 
   /* ── 自营执行（销售单自营菜单：接单 → 拆单 / 采购&发货 → 运输 → 妥投 → 确认收货） ── */
   /** 接单（详情页）：填跟单人，进入已接单 */
@@ -186,6 +228,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
 
   /** 内部：转出合作商（报备/指定/比单共用）→ 转派待接单 */
   const transfer = (id: string, supplierId: string, supplierName: string, source: TransferSource, detail: string) => {
+    const cur = get().orders.find((o) => o.id === id);
     patchOrder(id, {
       processStatus: 'distribute_pending',
       path: 'distribute',
@@ -194,6 +237,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       transferSource: source,
       transferTime: now(),
       partnerStatus: undefined,
+      fulfillment: fulfil(cur, { stage: 'pending_accept', arriveTime: nowMin() }),
     }, { action: source === 'report' ? '报备命中自动转出' : source === 'assign' ? '指定转派' : '比单转派', detail: `${detail} → ${supplierName} · 等待合作商接单` });
     // 三单联动：转派定案自动生成直送采购单（比单按中单价口径）
     const after = get().orders.find((o) => o.id === id);
@@ -219,7 +263,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
   ): ExternalOrder => ({
     ...mother,
     id: `eo_${nowTs()}_${seq}_${Math.floor(Math.random() * 1000)}`,
-    code: `${rootCode}FO${String(seq).padStart(2, '0')}`,
+    code: `${rootCode}LY${String(seq).padStart(2, '0')}`,
     parentCode: rootCode,
     items,
     totalAmount: items.reduce((s, it) => s + it.price * it.quantity, 0),
@@ -302,9 +346,11 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
 
     /* ── 路径选择与分发 ── */
     chooseSelfPath: (id) => {
+      const cur = get().orders.find((o) => o.id === id);
       patchOrder(id, {
         path: 'self',
         processStatus: 'self_pending',
+        fulfillment: fulfil(cur, { stage: 'pending_accept', arriveTime: nowMin() }),
       }, { action: '选择自营路径', detail: '背对背采购 · 等待管理后台接单（销售订单 → 分发订单）' });
     },
 
@@ -497,6 +543,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         processStatus: 'self_accepted',
         path: 'self',
         follower: input.follower,
+        fulfillment: fulfil(order, { stage: 'accepted', acceptTime: nowMin() }),
       }, { action: '接单（自营）', detail: `跟单人 ${input.follower || '—'} → 已接单（可拆单 / 采购&发货）` });
       return { ok: true, msg: '已接单，可进行拆单或采购&发货' };
     },
@@ -512,6 +559,112 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         follower: undefined,
       }, { action: '自营退回', detail: '退回销售单分发 · 重新进入分发-待处理（来源标注：自营退回）' });
       return { ok: true, msg: '已退回销售单分发（分发-待处理），来源已标注「自营退回」' };
+    },
+
+    /* ── 待接单取回 / 合作商退回 ── */
+    recallPendingOrder: (id, parts) => {
+      const order = get().orders.find((o) => o.id === id);
+      if (!order) return { ok: false, msg: '订单不存在' };
+      if (!['self_pending', 'distribute_pending'].includes(order.processStatus)) {
+        return { ok: false, msg: '仅待接单订单可取回' };
+      }
+      const src = takebackSourceOf(order);
+      const from = order.path === 'self' ? '自营' : (order.partnerName ?? '合作商');
+      const validParts = (parts ?? []).filter((p) => p.quantity > 0);
+
+      // 整体取回：履约单编号不变，直接回到分发-待处理
+      if (validParts.length === 0) {
+        patchOrder(id, {
+          processStatus: 'pending',
+          path: undefined,
+          partnerId: undefined,
+          partnerName: undefined,
+          transferSource: undefined,
+          transferTime: undefined,
+          partnerStatus: undefined,
+          distributeMode: undefined,
+          follower: undefined,
+          fulfillment: undefined,
+          sourceTag: src.tag,
+        }, { action: src.label, detail: `从${from}整体取回 → 回到销售单分发（履约单编号 ${order.code} 不变）` });
+        return { ok: true, msg: `已整体取回，订单进入分发-待处理（来源：${src.label}）` };
+      }
+
+      // 部分取回：校验数量
+      for (const p of validParts) {
+        const it = order.items.find((x) => x.productName === p.productName);
+        if (!it) return { ok: false, msg: `商品 ${p.productName} 不在订单内` };
+        if (p.quantity > it.quantity) return { ok: false, msg: `${p.productName} 取回数量超出订单数量` };
+      }
+      const takenTotal = validParts.reduce((s, p) => s + p.quantity, 0);
+      const orderQty = order.items.reduce((s, it) => s + it.quantity, 0);
+      if (takenTotal >= orderQty) return { ok: false, msg: '取回全部商品请使用「整体取回」' };
+
+      const rootCode = order.parentCode ?? order.code;
+      const newCode = genFulfillmentCode(rootCode, get().orders);
+      const takenItems = validParts.map((p) => ({
+        ...order.items.find((x) => x.productName === p.productName)!,
+        quantity: p.quantity,
+      }));
+      const remainItems = order.items
+        .map((it) => {
+          const p = validParts.find((x) => x.productName === it.productName);
+          return p ? { ...it, quantity: it.quantity - p.quantity } : it;
+        })
+        .filter((it) => it.quantity > 0);
+      const takenText = takenItems.map((i) => `${i.productName}×${i.quantity}`).join('、');
+
+      const recallOrder: ExternalOrder = {
+        ...order,
+        id: `eo_${nowTs()}_recall`,
+        code: newCode,
+        parentCode: rootCode,
+        items: takenItems,
+        totalAmount: takenItems.reduce((s, it) => s + it.price * it.quantity, 0),
+        processStatus: 'pending',
+        path: undefined,
+        partnerId: undefined,
+        partnerName: undefined,
+        transferSource: undefined,
+        transferTime: undefined,
+        partnerStatus: undefined,
+        distributeMode: undefined,
+        follower: undefined,
+        fulfillment: undefined,
+        sourceTag: src.tag,
+        reportMatches: undefined,
+        compare: undefined,
+        selfShipments: undefined,
+        selfPo: undefined,
+        history: [
+          ...order.history,
+          { time: now(), action: `${src.label}（部分）`, detail: `从${from}取回 ${takenText} → 生成新履约单 ${newCode}，进入分发-待处理` },
+        ],
+      };
+
+      patchOrder(id, {
+        items: remainItems,
+        totalAmount: remainItems.reduce((s, it) => s + it.price * it.quantity, 0),
+      }, { action: `${src.label}（部分）`, detail: `取回 ${takenText} → 生成新履约单 ${newCode}；剩余部分沿用原履约单 ${order.code}` });
+      set((s) => ({ orders: [recallOrder, ...s.orders] }));
+      return { ok: true, msg: `已部分取回（${takenText}），生成新履约单 ${newCode}，剩余部分沿用 ${order.code}` };
+    },
+
+    partnerReturnOrder: (id) => {
+      const order = get().orders.find((o) => o.id === id);
+      if (!order) return { ok: false, msg: '订单不存在' };
+      if (order.processStatus !== 'distribute_pending') return { ok: false, msg: '仅待接单订单可退回' };
+      patchOrder(id, {
+        processStatus: 'pending',
+        path: undefined,
+        partnerId: undefined,
+        partnerName: undefined,
+        transferSource: undefined,
+        transferTime: undefined,
+        partnerStatus: undefined,
+        fulfillment: undefined,
+      }, { action: '合作商退回', detail: `${order.partnerName ?? '合作商'}主动退回整单 → 进入分发-待处理` });
+      return { ok: true, msg: '已退回整单，订单进入分发-待处理' };
     },
 
     shipSelfOrder: (id, input) => {
@@ -547,12 +700,13 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
           if (line.quantity < gap) return { ok: false, msg: `${it.productName} 采购数量不得低于缺口 ${gap}` };
         }
       }
-      const seqBase = (order.selfShipments?.length ?? 0) + 1;
+      const selfRoot = order.parentCode ?? order.code;
+      const shipNos = genShipmentNos(selfRoot, shipments.length);
       const selfShipments = [
         ...(order.selfShipments ?? []),
         ...shipments.map((sh, i) => ({
           id: `ss_${nowTs()}_${i}`,
-          packageNo: `PKG-${order.code}-${String(seqBase + i).padStart(2, '0')}`,
+          packageNo: shipNos[i],
           warehouseId: sh.warehouseId,
           warehouseName: sh.warehouseName,
           logisticsCompany: sh.logisticsCompany.trim(),
@@ -595,6 +749,9 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
           ? { supplierId: purchase.supplierId, supplierName: purchase.supplierName, mode: purchase.mode, purchaseDate: now() }
           : order.selfPo,
         processStatus: shipments.length > 0 ? 'self_shipped' : order.processStatus,
+        fulfillment: shipments.length > 0
+          ? fulfil(order, { stage: 'shipped', shipTime: nowMin() })
+          : order.fulfillment,
       }, {
         action: shipments.length > 0 ? '采购&发货（分仓直发）' : '以销定采下单',
         detail: (shipments.length > 0 ? `${shipNote} → 已发货运输中` : '缺口全部以销定采，等待采购到货/直发') + poNote,
@@ -619,14 +776,16 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         .map((it) => ({ productId: it.productId, productName: it.productName, qty: it.quantity - (shippedMap.get(it.productId) ?? 0) }))
         .filter((x) => x.qty > 0);
       if (remainItems.length === 0) return { ok: false, msg: '订单商品已全部发出' };
-      const seq = (order.selfShipments?.length ?? 0) + 1;
+      const rootNo = order.parentCode ?? order.code;
+      const shipNo = genShipmentNos(rootNo, 1)[0];
       patchOrder(id, {
         processStatus: 'self_shipped',
+        fulfillment: fulfil(order, { stage: 'shipped', shipTime: nowMin() }),
         selfShipments: [
           ...(order.selfShipments ?? []),
           {
             id: `ss_${nowTs()}`,
-            packageNo: `PKG-${order.code}-${String(seq).padStart(2, '0')}`,
+            packageNo: shipNo,
             warehouseId: 'wh-ind-01',
             warehouseName: '杭州总仓',
             logisticsCompany: input.logisticsCompany.trim(),
@@ -670,6 +829,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       patchOrder(id, {
         selfShipments: shipments.length > 0 ? shipments : order.selfShipments,
         processStatus: done ? 'self_delivered' : order.processStatus,
+        fulfillment: done ? fulfil(order, { stage: 'delivered', deliverTime: nowMin() }) : order.fulfillment,
       }, { action: done ? '物流妥投' : '物流跟踪', detail: (note || '关联采购单包裹妥投') + poNote + (done ? ' → 订单妥投，待客户确认收货' : '') });
       return { ok: true, msg: done ? '全部包裹已妥投，订单进入「妥投」待确认收货' : '已推进物流妥投' };
     },
@@ -678,7 +838,10 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       const order = get().orders.find((o) => o.id === id);
       if (!order) return { ok: false, msg: '订单不存在' };
       if (order.processStatus !== 'self_delivered') return { ok: false, msg: '订单不在妥投状态' };
-      patchOrder(id, { processStatus: 'completed' }, { action: '客户确认收货', detail: '妥投订单人工/联机确认收货 · 订单完成' });
+      patchOrder(id, {
+        processStatus: 'completed',
+        fulfillment: fulfil(order, { stage: 'confirmed', confirmTime: nowMin() }),
+      }, { action: '客户确认收货', detail: '妥投订单人工/联机确认收货 · 订单完成' });
       for (const d of usePurchaseStore.getState().listByChildOrder(id)) {
         usePurchaseStore.getState().settleByChild(d.childOrderCode);
       }
@@ -800,6 +963,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
           processStatus: 'distribute_pending', path: 'distribute', distributeMode: 'compare',
           partnerId: grp.supplierId, partnerName: grp.supplierName,
           transferSource: 'compare', transferTime: now(),
+          fulfillment: { stage: 'pending_accept', arriveTime: nowMin() },
           compare: { ...cmp, scored: true, scores, itemAwards },
         }, '比单定标（按商品·积分优先）', `${grp.items.map((i) => i.productName).join('、')} → ${grp.supplierName}（积分排名第一）· 等待合作商接单`));
       }
@@ -849,14 +1013,26 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       if (status === 'settled') {
         const onTime = opts?.onTime ?? true;
         // 经营/报备积分已改为派生计算（computeScore 按结算单量与金额实时汇总），此处不再写台账
-        patchOrder(id, { partnerStatus: 'settled', processStatus: 'completed', settleOnTime: onTime }, { action: '结算完成', detail: onTime ? '按时履约结算完成' : '超时履约结算完成' });
+        patchOrder(id, {
+          partnerStatus: 'settled',
+          processStatus: 'completed',
+          settleOnTime: onTime,
+          fulfillment: fulfil(order, { stage: 'confirmed', confirmTime: nowMin() }),
+        }, { action: '结算完成', detail: onTime ? '按时履约结算完成' : '超时履约结算完成' });
         usePurchaseStore.getState().settleByChild(order.code);
         return;
       }
+      /** 合作商推进 → 履约时间线（接单/发货/妥投/签收） */
+      const stagePatch: Partial<FulfillmentTimeline> =
+        status === 'accepted' ? { stage: 'accepted', acceptTime: nowMin() }
+          : status === 'shipping' ? { stage: 'shipped', shipTime: nowMin() }
+            : status === 'transit' || status === 'delivered' ? { stage: 'delivered', deliverTime: nowMin() }
+              : {};
       patchOrder(id, {
         partnerStatus: status,
         // 接单、或比单中单订单首次推进（跳过接单直入已接单）时，同步流转为已处理
         ...(status === 'accepted' || order.processStatus === 'distribute_pending' ? { processStatus: 'processed' as const } : {}),
+        ...(Object.keys(stagePatch).length > 0 ? { fulfillment: fulfil(order, stagePatch) } : {}),
       }, { action: actionLabels[status] ?? '履约推进', detail: status === 'accepted' ? '合作商终端接单 → 已处理' : undefined });
       // PO 状态联动：接单→已确认；签收→全部包裹签收；结算→已结算
       const po = usePurchaseStore.getState();

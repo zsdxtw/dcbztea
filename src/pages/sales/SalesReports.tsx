@@ -217,7 +217,7 @@ export default function SalesReports() {
                 {matched.length > 0 ? (
                   <table className="detail-inline-table">
                     <thead>
-                      <tr><th>订单编号</th><th>客户</th><th>区域</th><th>商品</th><th>金额</th></tr>
+                      <tr><th>销售单编号</th><th>客户</th><th>区域</th><th>商品</th><th>金额</th></tr>
                     </thead>
                     <tbody>
                       {matched.map(mo => (

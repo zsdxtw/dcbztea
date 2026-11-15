@@ -124,7 +124,7 @@ export default function PartnerSettlement() {
         {flowOrders.length > 0 ? (
           <div style={{ padding: '0 22px 18px' }}>
             <Table
-              headers={['订单编号', '客户', '订单金额', '转入来源', '履约状态', '结算状态']}
+              headers={['销售单编号', '客户', '订单金额', '转入来源', '履约状态', '结算状态']}
               rows={flowOrders.map(o => [
                 <span key="c" className="cell-mono-emph">{o.code}</span>,
                 <span key="cu" className="cell-emph">{o.customerName}</span>,
@@ -177,7 +177,7 @@ export default function PartnerSettlement() {
             <DrawerSection title={`关联订单（${selected.orders.length} 笔）`}>
               <table className="detail-inline-table">
                 <thead>
-                  <tr><th>序号</th><th>订单编号</th></tr>
+                  <tr><th>序号</th><th>销售单编号</th></tr>
                 </thead>
                 <tbody>
                   {selected.orders.map((code, i) => (

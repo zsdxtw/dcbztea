@@ -8,6 +8,9 @@ import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, platformLabelOf } fr
 import { getWarehouseStock, WAREHOUSE_NAMES } from '../../data/stock';
 import { getEmployeeName, employees } from '../../data/organization';
 import { selfStageOf, acceptedSub, STAGE_META } from './selfStage';
+import {
+  FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS, stageOfOrder, fulfillmentTimes,
+} from '../../utils/fulfillment';
 import type { ExternalOrder, SelfShipment } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
@@ -237,7 +240,7 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
     >
       <DrawerSection title="订单信息">
         <InfoGrid>
-          <InfoItem label="订单编号" mono emph>{current.code}</InfoItem>
+          <InfoItem label="销售单编号" mono emph>{current.code}</InfoItem>
           {current.parentCode && <InfoItem label="关联母销售单" mono>{current.parentCode}</InfoItem>}
           <InfoItem label="客户">{current.customerName}（{current.customerType}）</InfoItem>
           <InfoItem label="跟单人">{current.follower ?? '—'}</InfoItem>
@@ -247,6 +250,28 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
           <InfoItem label="收货人">{current.receiver}（{current.receiverPhone}）</InfoItem>
           <InfoItem label="收货地址" span={3}>{current.receiverAddress}</InfoItem>
         </InfoGrid>
+      </DrawerSection>
+
+      {/* 履约时间线：来单 / 接单 / 发货 / 妥投 / 确收 */}
+      <DrawerSection title="履约时间线">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          {(() => {
+            const st = stageOfOrder(current);
+            const sc = FULFILLMENT_STAGE_COLORS[st];
+            return (
+              <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: sc.bg, color: sc.color }}>{FULFILLMENT_STAGE_LABELS[st]}</span>
+            );
+          })()}
+          <span style={{ fontSize: 12, color: 'var(--color-neutral-400)' }}>待接单 → 已接单 → 已发货 → 已签收/妥投 → 确认收货</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 12 }}>
+          {fulfillmentTimes(current).map((t) => (
+            <div key={t.label}>
+              <div style={{ fontSize: 12, color: 'var(--color-neutral-500)', marginBottom: 2 }}>{t.label}</div>
+              <div className="mono" style={{ fontSize: 13, fontWeight: 500, color: t.value === '—' ? 'var(--color-neutral-400)' : 'var(--color-neutral-800)', whiteSpace: 'nowrap' }}>{t.value}</div>
+            </div>
+          ))}
+        </div>
       </DrawerSection>
 
       <DrawerSection title={`商品明细（${current.items.length} 种）`}>
