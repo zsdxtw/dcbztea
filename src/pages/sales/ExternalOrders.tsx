@@ -15,6 +15,7 @@ import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABE
 import { PARTNER_ORDER_STATUS_LABELS, PARTNER_REPORT_TYPE_LABELS } from '../../data/partner';
 import { REGIONS, getCities, getDistricts, regionTextOf } from '../../data/regions';
 import SalesOrderInfoModal from '../../components/business/SalesOrderInfoModal';
+import { FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS, stageOfOrder } from '../../utils/fulfillment';
 import { usePriceStore } from '../../stores/priceStore';
 import { partnerInRegion } from '../../types';
 import type { ExternalOrder, RegionScope } from '../../types';
@@ -32,6 +33,32 @@ const statusPill = (status: string) => {
 
 /** 状态归并：已完成 / 自营执行中（已接单·运输·妥投）并入已处理（列表筛选/计数/展示统一） */
 const mergedStatus = (s: string) => (['completed', 'self_accepted', 'self_shipped', 'self_delivered'].includes(s) ? 'processed' : s);
+
+/** 销售履约单号：子履约单取自身编号；未拆分的销售单本身即履约单，按规则展示为 LY01 */
+const fulfillmentCodeOf = (o: ExternalOrder): string => (o.parentCode ? o.code : `${o.code}LY01`);
+/** 销售单订单号（履约单上层订单编号）：子履约单指向母销售单；未拆分时为自身 */
+const salesOrderCodeOf = (o: ExternalOrder): string => o.parentCode ?? o.code;
+
+/** 分发状态：仅分发环节（待分发 / 报备待确认 / 比单中 / 待接单 / 已分发） */
+const DISTRIBUTE_STATE: Record<string, { label: string; bg: string; color: string }> = {
+  pending: { label: '待分发', bg: '#FFF3E0', color: '#B26A00' },
+  report_match_pending: { label: '报备待确认', bg: '#E0F7FA', color: '#00838F' },
+  comparing: { label: '比单中', bg: '#EDE7F6', color: '#5E35B1' },
+  self_pending: { label: '自营待接单', bg: '#E3F2FD', color: '#0F64B5' },
+  distribute_pending: { label: '转派待接单', bg: '#E8F1FB', color: '#0F64B5' },
+  processed: { label: '已分发', bg: '#E8F5E9', color: '#2E7D32' },
+};
+const distributeStateOf = (o: ExternalOrder) =>
+  DISTRIBUTE_STATE[mergedStatus(o.processStatus)] ?? { label: '—', bg: '#F5F5F5', color: '#9E9E9E' };
+
+/** 订单状态：履约当前状态（接单 / 发货 / 妥投 / 确收 / 结算） */
+const orderStateOf = (o: ExternalOrder) => {
+  if (o.processStatus === 'completed' || o.partnerStatus === 'settled') return { label: '已结算（已完成）', bg: '#E8F5E9', color: '#2E7D32' };
+  if (!o.fulfillment) return { label: '未开始', bg: '#F5F5F5', color: '#9E9E9E' };
+  const st = stageOfOrder(o);
+  const c = FULFILLMENT_STAGE_COLORS[st];
+  return { label: FULFILLMENT_STAGE_LABELS[st], bg: c.bg, color: c.color };
+};
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -514,22 +541,19 @@ export default function ExternalOrders() {
         {/* 子单平铺列表（逐单操作视图；母单聚合总览见「销售单管理 → 销售订单」） */}
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['销售单编号', '关联销售单', '来源', '客户', '地区', '收件人', '收件地址', '金额', '状态', '分发路径', '合作商', '录入时间', '操作']}
-            rows={pagedOrders.map((o) => [
-              <span key="c" className="cell-mono-emph">{o.code}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.externalOrderNo ?? '—'}</span></span>,
-              o.parentCode ? (
-                <span
-                  key="link"
-                  className="mono"
-                  style={{ fontSize: 'var(--text-sm)', color: 'var(--color-module-current-base)', cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted' }}
-                  title="点击查看母销售单信息"
-                  onClick={() => setLinkOrderCode(o.parentCode!)}
-                >
-                  {o.parentCode}
-                </span>
-              ) : (
-                <span key="link" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>—</span>
-              ),
+            headers={['序号', '销售履约单号', '销售单订单号', '来源', '客户', '地区', '收件人', '收件地址', '金额', '分发状态', '订单状态', '分发路径', '合作商', '录入时间', '操作']}
+            rows={pagedOrders.map((o, idx) => [
+              <span key="no" className="mono cell-muted">{(page - 1) * pageSize + idx + 1}</span>,
+              <span key="c" className="cell-mono-emph">{fulfillmentCodeOf(o)}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.externalOrderNo ?? '—'}</span></span>,
+              <span
+                key="link"
+                className="mono"
+                style={{ fontSize: 'var(--text-sm)', color: 'var(--color-module-current-base)', cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted' }}
+                title="点击查看销售单订单信息"
+                onClick={() => setLinkOrderCode(salesOrderCodeOf(o))}
+              >
+                {salesOrderCodeOf(o)}
+              </span>,
               <span key="src">
                 {platformLabelOf(o)}
                 <span style={{ display: 'block' }}>{pill(
@@ -550,12 +574,11 @@ export default function ExternalOrders() {
               <span key="rcv" className="cell-emph">{o.receiver}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.receiverPhone}</span></span>,
               <span key="addr" className="cell-muted" style={{ fontSize: 'var(--text-sm)', minWidth: 160 }}>{o.receiverAddress}</span>,
               <span key="a" className="mono" style={{ fontWeight: 'var(--font-semibold)' }}>{money(o.totalAmount)}</span>,
-              <span key="s">
-                {statusPill(o.processStatus)}
-
-                {['processed', 'completed'].includes(o.processStatus) && o.path === 'distribute' && o.partnerStatus && (
-                  <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>{PARTNER_ORDER_STATUS_LABELS[o.partnerStatus]}</span>
-                )}
+              <span key="s" style={{ whiteSpace: 'nowrap' }}>
+                {(() => { const d = distributeStateOf(o); return pill(d.bg, d.color, d.label); })()}
+              </span>,
+              <span key="os" style={{ whiteSpace: 'nowrap' }}>
+                {(() => { const s2 = orderStateOf(o); return pill(s2.bg, s2.color, s2.label); })()}
               </span>,
               <span key="pa" style={{ fontSize: 'var(--text-sm)' }}>{pathLabel(o)}</span>,
               <span key="pt" style={{ fontSize: 'var(--text-sm)' }}>{o.partnerName ?? '—'}</span>,
