@@ -31,6 +31,50 @@ export function buildFamilies(orders: ExternalOrder[]): OrderFamily[] {
   }).sort((a, b) => b.mother.entryTime.localeCompare(a.mother.entryTime));
 }
 
+/* ── 履约单单元（默认履约单01 + 拆单后真实子履约单） ── */
+
+/**
+ * 履约单单元：订单进入管理后台即默认生成履约单01（编号 = 母销售单号 + LY01，虚拟挂在母单上，
+ * 生成时间 = 订单录入时间）；拆单后履约单 = 真实子履约单（LY01/LY02…，生成时间 = 拆单时间）。
+ * 分发、发货、物流等操作仍作用于 underlying（底层订单），展示层统一以履约单为维度。
+ */
+export interface FulfillmentUnit {
+  /** 底层订单（分发 / 发货等操作对象） */
+  underlying: ExternalOrder;
+  /** 序号（1 起） */
+  seq: number;
+  /** 履约单号：未拆分 = 母销售单号 + LY01；拆分后 = 子履约单号 */
+  code: string;
+  /** 是否默认履约单（未拆分，虚拟挂在母销售单上） */
+  virtual: boolean;
+  /** 生成时间 */
+  createdAt: string;
+  /** 履约单金额 */
+  amount: number;
+}
+
+/** 推导某销售单（家族）的履约单列表 */
+export function fulfillmentUnitsOf(family: OrderFamily): FulfillmentUnit[] {
+  if (family.children.length > 0) {
+    return family.children.map((c, i) => ({
+      underlying: c,
+      seq: i + 1,
+      code: c.code,
+      virtual: false,
+      createdAt: c.history?.[0]?.time ?? c.entryTime,
+      amount: c.totalAmount,
+    }));
+  }
+  return [{
+    underlying: family.mother,
+    seq: 1,
+    code: family.mother.code + 'LY01',
+    virtual: true,
+    createdAt: family.mother.entryTime,
+    amount: family.mother.totalAmount,
+  }];
+}
+
 /* ── 单笔订单三状态 ── */
 
 /** 单笔分发状态（沿用订单状态机文案，completed 归并为已分发完成） */
@@ -71,15 +115,31 @@ export interface FamilyStates {
   ship: '未发货' | '部分发货' | '全部发货';
   /** 未结算 / 部分结算 / 已结算 */
   settle: '未结算' | '部分结算' | '已结算';
+  /** 履约单总数 */
+  total: number;
+  /** 已分发（接单及以上）履约单数 */
+  distributed: number;
+  /** 已发货履约单数 */
+  shipped: number;
+  /** 已结算履约单数 */
+  settled: number;
 }
 
-/** 家族（母单含子单）三状态聚合 */
+/**
+ * 家族三状态聚合（按履约单维度：未拆分 = 默认履约单01；拆分后 = 全部子履约单，母单不参与聚合）
+ * 销售Single行显示聚合药丸 + 数值（如 部分发货 1/3）。
+ */
 export function familyStatesOf(family: OrderFamily): FamilyStates {
-  const list = family.all;
+  const units = fulfillmentUnitsOf(family);
+  const list = units.map((u) => u.underlying);
   const accepted = ['processed', 'completed', 'self_accepted', 'self_shipped', 'self_delivered'];
+  const distributed = list.filter((o) => accepted.includes(o.processStatus)).length;
+  const shipped = list.filter((o) => shipStateOf(o) === '已发货').length;
+  const settled = list.filter((o) => settleStateOf(o) === '已结算').length;
+  const total = list.length;
   const distribute: FamilyStates['distribute'] = list.every((o) => o.processStatus === 'pending')
     ? '待分发'
-    : list.every((o) => accepted.includes(o.processStatus))
+    : distributed === total
       ? '已分发'
       : '分发中';
   const shipMap: Record<TriState, FamilyStates['ship']> = { '全部': '全部发货', '部分': '部分发货', '未': '未发货' };
@@ -88,6 +148,10 @@ export function familyStatesOf(family: OrderFamily): FamilyStates {
     distribute,
     ship: shipMap[aggregate(list.map((o) => shipStateOf(o) === '已发货'))],
     settle: settleMap[aggregate(list.map((o) => settleStateOf(o) === '已结算'))],
+    total,
+    distributed,
+    shipped,
+    settled,
   };
 }
 

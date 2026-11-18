@@ -12,7 +12,7 @@ import { PROVINCE_NAMES, getCityNames, getDistricts, regionTextOf } from '../../
 import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS, TRANSFER_SOURCE_LABELS, platformLabelOf } from '../../data/externalOrders';
 import { PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
 import {
-  buildFamilies, familyStatesOf, shipStateOf, settleStateOf, FAMILY_STATE_COLORS,
+  buildFamilies, familyStatesOf, shipStateOf, settleStateOf, FAMILY_STATE_COLORS, fulfillmentUnitsOf,
 } from '../../utils/salesOrderFamily';
 import type { ExternalOrder } from '../../types';
 
@@ -268,7 +268,7 @@ export default function SalesOrders() {
             <div style={{ overflowX: 'auto' }}>
               <div style={{ minWidth: 1420 }}>
                 {/* 表头 */}
-                <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-neutral-100)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-500)', background: 'var(--color-neutral-50)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-4)', margin: 'var(--space-2) var(--space-3) 0', border: '1px solid var(--color-neutral-150)', borderRadius: 10, fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-500)', background: 'var(--color-neutral-50)' }}>
                   <span>序号</span>
                   <span />
                   <span>母销售单号</span>
@@ -291,7 +291,7 @@ export default function SalesOrders() {
                   const st = familyStatesOf(f);
                   const amount = (f.children.length > 0 ? f.children : f.all).reduce((s, o) => s + o.totalAmount, 0);
                   return (
-                    <div key={f.rootCode} style={{ borderBottom: '1px solid var(--color-neutral-100)' }}>
+                    <div key={f.rootCode} style={{ margin: 'var(--space-2) var(--space-3)', background: 'var(--color-neutral-0)', border: `1px solid ${open ? 'var(--color-module-current-light)' : 'var(--color-neutral-150)'}`, borderRadius: 10, overflow: 'hidden', boxShadow: open ? '0 2px 8px rgba(0,0,0,0.06)' : 'none' }}>
                       {/* 母销售单行（点击整行展开/收起履约单） */}
                       <div
                         style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', alignItems: 'center', padding: 'var(--space-3) var(--space-4)', cursor: 'pointer', background: open ? 'var(--color-neutral-50)' : 'transparent' }}
@@ -318,45 +318,108 @@ export default function SalesOrders() {
                             ? <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5', whiteSpace: 'nowrap' }}>{f.children.length} 单</span>
                             : <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>未拆分</span>}
                         </span>
-                        {pill(st.distribute)}
-                        {pill(st.ship)}
-                        {pill(st.settle)}
+                        <span key="dg" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          {pill(st.distribute)}
+                          {st.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.distributed}/{st.total}</span>}
+                        </span>
+                        <span key="sp" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          {pill(st.ship)}
+                          {st.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.shipped}/{st.total}</span>}
+                        </span>
+                        <span key="se" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          {pill(st.settle)}
+                          {st.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.settled}/{st.total}</span>}
+                        </span>
                         <span className="cell-muted" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{f.mother.entryTime}</span>
                         <span style={{ textAlign: 'center' }}>
                           <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setViewRoot(f.rootCode); }}>查看</Button>
                         </span>
                       </div>
 
-                      {/* 履约单展开区（母销售单下全部履约单，各展示自身内容） */}
-                      {open && (
-                        <div style={{ background: 'var(--color-neutral-50)', padding: 'var(--space-2) var(--space-4) var(--space-3)' }}>
-                          {f.children.length === 0 ? (
-                            <div style={{ padding: 'var(--space-2) 0 var(--space-2) 28px', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>未拆分 · 单一销售单（点击「查看」进入详情）</div>
-                          ) : (
-                            <Table
-                              headers={['子履约单号', '分发路径', '合作商 / 跟单人', '商品', '金额', '分发状态', '发货状态', '结算状态', '操作']}
-                              rows={f.children.map((c) => [
-                                <span key="c" className="cell-mono-emph">{c.code}</span>,
-                                <span key="p" style={{ fontSize: 'var(--text-sm)' }}>{pathLabel(c)}</span>,
-                                <span key="w" style={{ fontSize: 'var(--text-sm)' }}>{c.partnerName ?? (c.path === 'self' ? `自营${c.follower ? ` · ${c.follower}` : ''}` : '—')}</span>,
-                                <span key="i" style={{ whiteSpace: 'nowrap', fontSize: 'var(--text-sm)' }}>{c.items[0].productName}{c.items.length > 1 ? ` 等${c.items.length}种` : ''} ×{c.items.reduce((s, it) => s + it.quantity, 0)}</span>,
-                                <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(c.totalAmount)}</span>,
-                                orderDistributePill(c),
-                                pill(shipStateOf(c, poDocs.filter((d) => d.childOrderId === c.id))),
-                                pill(settleStateOf(c)),
-                                <div key="act" className="row-actions">
-                                  <Button size="sm" variant="ghost" onClick={() => setViewRoot(f.rootCode)}>查看</Button>
-                                </div>,
-                              ])}
-                            />
-                          )}
+                      {/* 履约单展开区（默认履约单01 / 拆单后全部履约单；与母单同体组合卡：淡蓝子区 + 连接线挂接各履约单） */}
+                      {open && (() => {
+                        const units = fulfillmentUnitsOf(f);
+                        return (
+                        <div style={{ borderTop: '1px solid var(--color-neutral-150)', background: 'var(--color-module-current-lightest)', padding: '10px 12px 12px 0' }}>
+                          <div style={{ paddingLeft: 88, display: 'flex', alignItems: 'baseline', gap: 8, margin: '2px 0 8px' }}>
+                            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)' }}>履约单</span>
+                            <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{units.length} 单</span>
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>履约单号 = 母销售单号 + LY 序号，拆单后顺延</span>
+                          </div>
+                          {units.map((u, ui) => {
+                            const pos = poDocs.filter((d) => d.childOrderId === u.underlying.id);
+                            const pkgs = pos.flatMap((d) => d.packages.filter((x) => x.status !== 'void'));
+                            const selfPkgs = (u.underlying.selfShipments ?? []);
+                            const pkgTotal = pkgs.length + selfPkgs.length;
+                            const delivered = pkgs.filter((x) => x.status === 'delivered').length
+                              + selfPkgs.filter((x) => x.status === 'delivered').length;
+                            const lastAll = [...selfPkgs.map((x) => ({ company: x.logisticsCompany, tracking: x.trackingNo })), ...pkgs.map((x) => ({ company: x.logisticsCompany, tracking: x.trackingNo }))];
+                            const lastPkg = pkgTotal > 0 ? lastAll[pkgTotal - 1] : null;
+                            const logText = lastPkg ? `${lastPkg.company ?? ''} ${lastPkg.tracking ?? ''}`.trim() : '';
+                            const shipDone = shipStateOf(u.underlying, pos) === '已发货';
+                            const pendingDist = u.underlying.processStatus === 'pending';
+                            /* 状态色：已发货=绿 / 分发中=琥珀 / 待分发=灰 */
+                            const accent = shipDone ? '#2E7D32' : pendingDist && u.virtual ? '#B0B7B0' : '#E6A23C';
+                            const badgeBg = shipDone ? '#E8F5E9' : pendingDist && u.virtual ? '#F0F2F0' : '#FFF8E9';
+                            const isLast = ui === units.length - 1;
+                            return (
+                            <div key={u.code} style={{ display: 'flex', alignItems: 'stretch' }}>
+                              {/* 连接线：自母单行下垂，经横肘挂接各履约单卡 */}
+                              <div style={{ width: 88, position: 'relative', flexShrink: 0 }}>
+                                <div style={{ position: 'absolute', left: 63, top: 0, bottom: isLast ? '50%' : 0, borderLeft: '2px solid var(--color-module-current-light)' }} />
+                                <div style={{ position: 'absolute', left: 63, top: '50%', width: 23, borderTop: '2px solid var(--color-module-current-light)' }} />
+                                <div style={{ position: 'absolute', left: 81, top: '50%', transform: 'translateY(-50%)', width: 10, height: 10, borderRadius: '50%', background: 'var(--color-neutral-0)', border: '2px solid var(--color-module-current-base)', zIndex: 1 }} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0, margin: '6px 0', display: 'flex', alignItems: 'center', gap: 14, background: 'var(--color-neutral-0)', border: '1px solid var(--color-neutral-150)', borderLeft: `3px solid ${accent}`, borderRadius: 8, padding: '8px 14px' }}>
+                                {/* LY 徽标 */}
+                                <div style={{ width: 46, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                  <span style={{ width: 40, height: 28, borderRadius: 8, background: badgeBg, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <span className="mono" style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: accent === '#B0B7B0' ? 'var(--color-neutral-500)' : accent }}>LY{String(u.seq).padStart(2, '0')}</span>
+                                  </span>
+                                  <span style={{ fontSize: 10, color: 'var(--pk-ink3, #99A29D)' }}>{u.virtual ? '默认履约' : '拆单生成'}</span>
+                                </div>
+                                {/* 履约单号 + 生成时间 */}
+                                <div style={{ width: 190, flexShrink: 0, minWidth: 0 }}>
+                                  <div className="cell-mono-emph" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)' }}>{u.code}</div>
+                                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>生成时间 <span className="mono">{u.createdAt}</span></div>
+                                </div>
+                                {/* 分发 / 发货状态药丸 */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+                                  {orderDistributePill(u.underlying)}
+                                  {pill(shipStateOf(u.underlying, pos))}
+                                </div>
+                                {/* 履约单金额 */}
+                                <div style={{ width: 110, flexShrink: 0, textAlign: 'right' }}>
+                                  <div className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)' }}>{money(u.amount)}</div>
+                                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>履约单金额</div>
+                                </div>
+                                {/* 物流信息 */}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  {pkgTotal > 0 ? (
+                                    <>
+                                      <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>
+                                        <span className="mono">{pkgTotal}</span> 包裹 · 妥投 <span className="mono" style={{ color: delivered === pkgTotal ? '#2E7D32' : '#9A7A1C' }}>{delivered}/{pkgTotal}</span>
+                                      </div>
+                                      {logText && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>末次：{logText}</div>}
+                                    </>
+                                  ) : (
+                                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>暂无发货包裹</div>
+                                  )}
+                                </div>
+                                {/* 操作 */}
+                                <Button size="sm" variant="ghost" style={{ flexShrink: 0 }} onClick={(e) => { e.stopPropagation(); navigate(`/sales/sales-orders/${f.rootCode}?child=${u.underlying.code}`); }}>查看</Button>
+                              </div>
+                            </div>
+                            );
+                          })}
                         </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   );
                 })}
                 {pagedFamilies.length === 0 && (
-                  <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>当前筛选条件下暂无销售订单</div>
+                  <div style={{ margin: 'var(--space-2) var(--space-3)', padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)', border: '1px dashed var(--color-neutral-150)', borderRadius: 10 }}>当前筛选条件下暂无销售订单</div>
                 )}
               </div>
             </div>

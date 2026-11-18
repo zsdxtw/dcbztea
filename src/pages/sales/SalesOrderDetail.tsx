@@ -8,7 +8,7 @@ import { usePurchaseStore } from '../../stores/purchaseStore';
 import { regionTextOf } from '../../data/regions';
 import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, TRANSFER_SOURCE_LABELS, platformLabelOf } from '../../data/externalOrders';
 import {
-  buildFamilies, familyStatesOf, distributeStateOf, shipStateOf, settleStateOf, FAMILY_STATE_COLORS,
+  buildFamilies, familyStatesOf, distributeStateOf, shipStateOf, settleStateOf, FAMILY_STATE_COLORS, fulfillmentUnitsOf,
 } from '../../utils/salesOrderFamily';
 import {
   FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS, stageOfOrder, fulfillmentTimes,
@@ -63,13 +63,14 @@ export default function SalesOrderDetail() {
 
   const family = useMemo(() => buildFamilies(orders).find((f) => f.rootCode === rootCode) ?? null, [orders, rootCode]);
 
-  /** 当前选中 Tab 的单号（默认母单；?child= 子单号定位） */
+  /** 当前选中 Tab 的单号（默认履约单01；?child= 定位子单） */
   const [activeCode, setActiveCode] = useState<string>(() => searchParams.get('child') ?? '');
+  const units = useMemo(() => (family ? fulfillmentUnitsOf(family) : []), [family]);
   const currentCode = useMemo(() => {
     if (!family) return '';
     if (activeCode && family.all.some((o) => o.code === activeCode)) return activeCode;
-    return family.mother.code;
-  }, [family, activeCode]);
+    return units[0]?.underlying.code ?? family.mother.code;
+  }, [family, activeCode, units]);
 
   if (!family) {
     return (
@@ -121,10 +122,18 @@ export default function SalesOrderDetail() {
         {/* ── 母子订单共同信息 ── */}
         <Card title="母销售单信息">
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
-            {pill(states.distribute)}
-            {pill(states.ship)}
-            {pill(states.settle)}
-            {children.length > 0 && pill(`已拆分 ${children.length} 单`)}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              {pill(states.distribute)}
+              {states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.distributed}/{states.total}</span>}
+            </span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              {pill(states.ship)}
+              {states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.shipped}/{states.total}</span>}
+            </span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              {pill(states.settle)}
+              {states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.settled}/{states.total}</span>}
+            </span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3) var(--space-4)' }}>
             {infoItem('母销售单号', family.rootCode, { mono: true, emph: true })}
@@ -148,22 +157,19 @@ export default function SalesOrderDetail() {
           </div>
         </Card>
 
-        {/* ── 子订单 Tab（母销售单 + 子订单1..N，各展示自身内容） ── */}
+        {/* ── 履约单 TAB（履约单01/02…，各展示自身内容与发货情况） ── */}
         <Card
-          title="子履约单明细（按子履约单切换）"
+          title="履约单明细（按履约单切换）"
           style={{ marginTop: 'var(--space-4)' }}
-          headerRight={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>母销售单一直存在、不随拆分改变；拆分后由其下子履约单（FO）执行履约</span>}
+          headerRight={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>销售单内容见上方「母销售单信息」；履约由其下履约单执行</span>}
         >
-          {children.length > 0 && (
-            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
-              {tabBtn(mother.code, `母销售单 ${mother.code}`)}
-              {children.map((c) => tabBtn(c.code, `子履约单 ${c.code}`))}
-            </div>
-          )}
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
+            {units.map((u) => tabBtn(u.underlying.code, `履约单${String(u.seq).padStart(2, '0')} · ${u.code}`))}
+          </div>
 
           {/* 当前订单信息 */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3) var(--space-4)', marginBottom: 'var(--space-4)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)' }}>
-            {infoItem('销售单编号', current.code, { mono: true, emph: true })}
+            {infoItem('履约单编号', current.code, { mono: true, emph: true })}
             {infoItem('分发路径', pathLabel(current))}
             {infoItem('合作商 / 跟单人', current.partnerName ?? (current.path === 'self' ? `自营${current.follower ? ` · ${current.follower}` : ''}` : '—'))}
             {infoItem('订单金额', <span style={{ fontWeight: 'var(--font-semibold)' }}>{money(current.totalAmount)}</span>, { mono: true })}
@@ -250,33 +256,32 @@ export default function SalesOrderDetail() {
             </div>
           )}
 
-          {/* 销售发货单（销售单编号+FH）标签：该子履约单下全部发货单（PO 包裹 + 自营分仓发货） */}
+          {/* 发货情况（包裹1、包裹2…：该履约单下全部发货包裹，PO 包裹 + 自营分仓发货） */}
           {(() => {
             const poPkgs = currentPos.flatMap((d) => d.packages.filter((x) => x.status !== 'void').map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, delivered: x.status === 'delivered', items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') })));
             const selfPkgs = (current.selfShipments ?? []).map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, delivered: x.status === 'delivered', items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') }));
             const all = [...poPkgs, ...selfPkgs];
-            if (all.length === 0) return null;
             return (
               <div style={{ marginTop: 'var(--space-4)' }}>
-                <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>销售发货单（{all.length}）</div>
-                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                  {all.map((x, i) => (
-                    <span
-                      key={i}
-                      title={`${x.company} ${x.tracking} · ${x.items}`}
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px',
-                        borderRadius: 'var(--radius-full)', fontSize: 'var(--text-sm)',
-                        background: x.delivered ? '#E9F4EF' : 'var(--color-module-current-lightest)',
-                        color: x.delivered ? '#01795D' : 'var(--color-module-current-base)',
-                        border: `1px solid ${x.delivered ? '#01795D30' : 'var(--color-module-current-base)30'}`,
-                      }}
-                    >
-                      <span className="mono" style={{ fontWeight: 600 }}>{x.no}</span>
-                      <span style={{ fontSize: 'var(--text-xs)', opacity: 0.8 }}>{x.delivered ? '已妥投' : '运输中'}</span>
-                    </span>
-                  ))}
-                </div>
+                <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>发货情况（{all.length} 个包裹）</div>
+                {all.length === 0 ? (
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)', padding: 'var(--space-2) 0' }}>暂无发货包裹（发货后此处按包裹 1、包裹 2… 展示物流信息）</div>
+                ) : (
+                  <table className="detail-inline-table">
+                    <thead><tr><th style={{ width: 70 }}>包裹</th><th style={{ width: 170 }}>发货单号</th><th>物流公司 / 单号</th><th>商品</th><th style={{ width: 90 }}>状态</th></tr></thead>
+                    <tbody>
+                      {all.map((x, i) => (
+                        <tr key={x.no + i}>
+                          <td style={{ fontWeight: 'var(--font-medium)' }}>包裹{i + 1}</td>
+                          <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{x.no}</td>
+                          <td style={{ fontSize: 'var(--text-sm)' }}>{x.company} <span className="mono">{x.tracking}</span></td>
+                          <td style={{ fontSize: 'var(--text-sm)' }}>{x.items}</td>
+                          <td>{x.delivered ? pill('已妥投') : pill('运输中')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             );
           })()}
