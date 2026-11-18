@@ -130,6 +130,144 @@
 
 ---
 
+## 销售路径规则
+
+### 一、三类角色
+
+| 角色 | 分类 | 说明 | 代码定义 |
+|------|------|------|----------|
+| **淡茶半盏** | 平台方 | 运营主体，连接上下游，采购 + 销售 + 分发 + 结算 | 管理后台 |
+| **合作商** | 供货/履约方 | 三类子类型（可多选） | `SupplierType = 'brand' \| 'supplier' \| 'service'` |
+| ↳ 品牌商 | 品牌持有方 | 商品品牌的持有者。管理后台维护品牌商档案，淡茶半盏向品牌商发起采购。与供应商/服务商**互斥**（一个合作商不能同时是品牌商和供应商/服务商） | `types: ['brand']` |
+| ↳ 供应商 | 差价模式供货方 | 给淡茶半盏供货的公司，一般是品牌的代理商、各地区茶叶门店。差价模式：供应商按约定价格卖给淡茶，淡茶自己决定售价 | `types: ['supplier']` + 合作模式 `coopMode: 'supplier'` |
+| ↳ 服务商 | 扣点模式供货方 | 在当地组织客户营销、自行发货履约，但销售逻辑上还是**服务商销售给淡茶半盏**（即服务商先以某个价格把商品卖给淡茶），一般是品牌当地的代理商、茶叶门店或地推营销服务公司。扣点模式：淡茶的售价固定，服务商拿扣点 | `types: ['service']` + 合作模式 `coopMode: 'service'` |
+| **客户** | 采购方 | 四类子类型 | `CustomerType = 'direct' \| 'channel' \| 'personal' \| 'platform' \| 'guest'` |
+| ↳ 直营客户 | 直接服务的企业客户 | 淡茶半盏直接销售的企业客户。可以走**直接销售**（淡茶→直营客户）或**经平台销售**（淡茶→平台客户→直营客户） | `type: 'direct'` + `viaPlatform?: boolean` 标记是否有经平台销售 |
+| ↳ 渠道客户 | 二次销售的企业客户 | 淡茶半盏销售给该客户，客户拿回去会二次销售 | `type: 'channel'` |
+| ↳ 平台客户 | 集采平台 | 指经过他们销售给直营客户的一些平台（京东慧采、史泰博、易积通等）。淡茶半盏可以**直接销售给平台客户**，也可以**经平台销售给直营客户** | `type: 'platform'` |
+| ↳ 个人客户 | 个人消费者 | 淡茶半盏直接销售给个人 | `type: 'personal'` |
+
+### 二、买卖关系（核心资金流）
+
+```
+采购端（供货链路）：三类合作商 ──销售──▶ 淡茶半盏
+  品牌商：淡茶向品牌商发起采购（品牌商可以只持有品牌，也可以兼做供应商）
+  供应商：差价模式，淡茶按约定价采购后自己定价销售
+  服务商：扣点模式，淡茶售价固定，服务商从售价中拿扣点
+
+销售端（客户链路）：淡茶半盏 ──销售──▶ 四类客户
+  直接销售：淡茶 → 直营客户 / 渠道客户 / 平台客户 / 个人客户
+  经平台销售：淡茶 → 平台客户（中间层） → 直营客户（终端）
+```
+
+> **关键**：服务商在销售链中**不直接卖给客户**，而是先把商品卖给淡茶半盏，再由淡茶半盏卖给客户。服务商的"服务"是在履约端（营销、发货、组织客户），买卖关系还是服务商→淡茶→客户。
+
+### 三、销售端路径编码
+
+销售端有两种路径，用 `ExternalOrder.salesPath` 区分：
+
+| salesPath | 含义 | 客户类型 | 说明 |
+|-----------|------|----------|------|
+| `direct` | 直接销售 | direct / channel / platform / personal | 淡茶半盏直接销售给客户，中间没有平台 |
+| `via_platform` | 经平台销售 | direct（仅有 viaPlatform 标记的） | 淡茶半盏通过平台客户销售给直营客户。订单需同时填 `platformCustomerId`（中间平台）和 `customerName`（终端直营客户） |
+
+> **注意**：`salesPath` 只描述销售端的路径，不描述履约端。履约端是自营还是分发由 `path: 'self' | 'distribute'` 决定。
+
+### 四、典型流程（四个核心场景）
+
+#### 流程 1：淡茶向品牌商采购 → 直接销售给四类客户
+
+```
+品牌商 ──采购──▶ 淡茶半盏 ──直接销售──▶ 直营客户 / 渠道客户 / 平台客户 / 个人客户
+```
+
+- 采购端：PurchaseOrder，合作商类型 `types: ['brand']`
+- 销售端：ExternalOrder `salesPath: 'direct'`，`customerType: 'direct'|'channel'|'platform'|'personal'`
+- 履约：`path: 'self'`（自营发货）或 `path: 'distribute'`（分发供应商履约）
+
+#### 流程 2：淡茶向品牌商采购 → 经平台销售给直营客户
+
+```
+品牌商 ──采购──▶ 淡茶半盏 ──经平台销售──▶ 平台客户 ──平台采买──▶ 直营客户
+```
+
+- 采购端：同流程 1，向品牌商采购
+- 销售端：ExternalOrder `salesPath: 'via_platform'`，`platformCustomerId` 填中间平台，`customerType: 'direct'`
+- 销平台报价/实价：= 销售报价/实价 × (1 − 平台扣点)
+
+#### 流程 3：服务商报备 → 淡茶转服务商履约
+
+```
+服务商 ──报备订单──▶ 淡茶半盏 ──确认分发──▶ 服务商履约 ──卖给──▶ 淡茶半盏 ──卖给──▶ 客户
+```
+
+- 服务商在当地营销获得客户商机 → 合作商工作台报备（`PartnerOrderReportKind = 'self'` 有货源 或 `no_supply` 无货源）
+- 淡茶审批报备 → 自动生成 ExternalOrder 并分发
+- 分发方式：`transferKind: 'order-opportunity'`（商机报备）或 `'product'`（商品报备）或 `'region'`（区域报备）
+- 履约：服务商接单 `coopMode: 'service'` 扣点模式，自行发货
+- 销售端路径：服务商的报备订单可以是直接销售也可以是经平台销售，由客户类型决定
+
+#### 流程 4：淡茶自营订单 → 分发履约
+
+```
+淡茶半盏 ──自营获得订单──▶ 分发（自营 / 指定 / 比单）──▶ 服务商 / 供应商 履约
+```
+
+- 订单来源：手工录入 / 平台直连推送，`processStatus: 'pending'`
+- 分发方式：
+  - **自营**：`path: 'self'` → 分仓发货（SelfShipment）
+  - **指定**：`distributeMode: 'assign'` → 指定服务商/供应商
+  - **比单**：`distributeMode: 'compare'` → 合作商报价竞争，`comparing` → `distribute_pending`
+  - **报备命中**：`transferKind: 'report_match'` → 报备合作商自动匹配
+- 履约承接方：服务商（`coopMode: 'service'`）或供应商（`coopMode: 'supplier'`）
+
+### 五、分发状态机（履约端，与销售端 salesPath 正交）
+
+```
+pending 待处理（新录入/推送的订单，未决定履约路径）
+  │
+  ├── 自营路径 ──▶ self_pending ──▶ self_accepted ──▶ self_shipped ──▶ self_delivered ──▶ completed
+  │                   自营待接单        自营已接单        自营发货          自营妥投           确认收货
+  │
+  └── 分发路径 ──▶ distribute_pending ──▶ processed ──▶ completed
+                    分发待接单（合作商接单）   已处理（发货/结算）
+  │
+  └── 报备匹配 ──▶ report_match_pending ──▶ distribute_pending
+                    报备-匹配待确认
+  │
+  └── 比单 ──▶ comparing ──▶ distribute_pending
+               比单中
+```
+
+### 六、代码中与销售路径相关的关键字段
+
+| 字段 | 位置 | 含义 | 取值 |
+|------|------|------|------|
+| `SupplierItem.types` | `src/types/index.ts` | 合作商类型 | `['brand']` / `['supplier']` / `['service']`（不可 brand 与 supplier/service 共存） |
+| `PartnerCoopMode` | `src/types/index.ts` | 合作模式（差价/扣点） | `'supplier'`（差价）/ `'service'`（扣点） |
+| `ExternalOrder.salesPath` | `src/types/index.ts` | 销售端路径 | `'direct'` / `'via_platform'` |
+| `ExternalOrder.path` | `src/types/index.ts` | 履约端路径 | `'self'`（自营）/ `'distribute'`（分发） |
+| `ExternalOrder.processStatus` | `src/types/index.ts` | 分发状态机 | 见上节状态机 |
+| `ExternalOrder.platformCustomerId` | `src/types/index.ts` | 中间平台客户 | 仅 `salesPath='via_platform'` 时有值 |
+| `ExternalOrder.transferKind` | `src/types/index.ts` | 分发来源 | `'order-self'`/`'order-opportunity'`/`'product'`/`'region'`/`'assign'`/`'compare'` |
+| `CustomerType` | `src/types/index.ts` | 客户类型 | `'direct'`/`'channel'`/`'personal'`/`'platform'`/`'guest'` |
+| `viaPlatform` | 客户主数据 | 是否有经平台销售 | 仅 direct 客户有 |
+
+### 七、相关文件
+
+- 角色类型定义：`src/types/index.ts`（`SupplierType`、`PartnerCoopMode`、`CustomerType`、`ExternalOrder`）
+- 合作商数据：`src/data/suppliers.tsx`
+- 客户数据：`src/data/customers.tsx`
+- 平台数据：`src/data/platforms.ts`
+- 采购订单（分发投影）：`src/pages/purchase/PurchaseOrders.tsx`
+- 销售单分发：`src/pages/sales/ExternalOrders.tsx`
+- 新建销售单：`src/pages/sales/OrderEntry.tsx`
+- 销售履约：`src/pages/sales/SalesFulfillment.tsx`
+- 合作商订单：`src/pages/partner/PartnerOrders.tsx`
+- 自营订单：`src/pages/selfop/SelfopOrders.tsx`
+
+---
+
 ## 配色规则
 
 ### 模块主色调与辅色调
@@ -241,7 +379,7 @@
 
 ## 价格体系规则
 
-整个项目的商品价格体系由 **8 种价格** 构成，分为「基准价」「渠道价」「订单实价」三层，所有价格均以元为单位、数值类型。
+整个项目的商品价格体系由 **基准价**、**渠道价**、**订单实价** 三层构成，另有经平台销售特有的销平台报价/实价。所有价格均以元为单位、数值类型。
 
 ### 价格类型定义
 
@@ -255,6 +393,34 @@
 | 6 | VIP销售价 | `vipPrice` | 渠道价 | 针对不同客户设置的差异化销售价，关联具体客户。按「商品 + 客户」维度维护，存储于 `VipPriceRule`，一个商品可为多个客户设置不同 VIP 价 |
 | 7 | 采购实价 | `actualPurchasePrice` | 订单实价 | 关联到具体采购订单的商品价格，记录采购下单时的实际采购价格。存储于采购订单明细 `PurchaseOrderItem` |
 | 8 | 销售实价 | `actualSalesPrice` | 订单实价 | 关联到具体销售订单的商品价格，记录销售下单时的实际销售价格。存储于销售订单明细 `SalesOrderItem` |
+
+### 销售报价统一规则（重要）
+
+**销售报价**是淡茶平台给客户的报价，**直接销售和经平台销售统一使用同一销售报价**，不再区分两种报价。销售报价取客户维度的有效报价（单品价 > 品牌整体折扣 > 未配置）。
+
+### 经平台销售的销平台价格
+
+经平台销售模式下有两种给**平台**的价格（与给客户的价格区分）：
+
+| 价格 | 定义 | 计算方式 |
+|------|------|----------|
+| 经平台销平台报价 | 经平台销售时淡茶给平台的报价 | 销售报价 ×（1 − 该客户经该平台的扣点） |
+| 经平台销平台实价 | 经平台销售时淡茶给平台的实价 | 销售实价 ×（1 − 该客户经该平台的扣点） |
+
+> 平台扣点数据来源：客户的 `platformCommissionRates` 字段（`customerItems`），按「客户 ID → 平台 ID → 扣点%」映射。
+
+### 页面展示规则
+
+| 页面 | 直接销售 | 经平台销售 |
+|------|----------|------------|
+| 新建销售单（`OrderEntry.tsx`） | 市场价 / 销售报价 / 数量 / 销售实价 / 小计 | 市场价 / 销售报价 / 数量 / 销售实价 / **销平台实价** / 小计（**不展示销平台报价**） |
+| 销售单详情弹窗（`SalesOrderInfoModal.tsx`） | 市场价 / 销售报价 / 销售实价 / 小计 | 市场价 / 销售报价 / **销平台报价** / 销售实价 / **销平台实价** / 小计 |
+
+### 取价工具函数（核心）
+
+- `effectiveCustomerQuote(map, customerId, productId, products)` — 客户维度有效报价（单品价 > 品牌折扣），定义于 `src/stores/priceStore.ts`
+- `calcPlatformNetPrice(price, commissionRate)` — 计算 price × (1 − 扣点)，定义于 `src/data/prices.tsx`
+- **quoteOf() 统一**：`OrderEntry.tsx` 和 `SalesOrderInfoModal.tsx` 中的 `quoteOf()` 不再区分 `isVia`，一律调用 `effectiveCustomerQuote`
 
 ### 价格层级与取值优先级
 
@@ -292,18 +458,19 @@ tmallPrice                 vipPrice
 1. **基准价唯一**：市场价、京东价、天猫价、销售价均为商品级单一值，一个商品只有一条
 2. **渠道价多维**：采购价按「商品+供应商」唯一，VIP销售价按「商品+客户」唯一
 3. **实价随单**：采购实价/销售实价一旦订单创建即固化，订单内可改，订单外不可改
-4. **价格联动展示**：采购下单时展示「市场价 / 采购价 / 实价」三列对比；销售下单时展示「市场价 / 销售价或VIP价 / 实价」三列对比
+4. **价格联动展示**：采购下单时展示「市场价 / 采购价 / 实价」三列对比；销售下单时直接销售展示「市场价 / 销售报价 / 销售实价」，经平台销售额外展示销平台实价
+5. **quoteOf 统一口径**：`OrderEntry.tsx` / `SalesOrderInfoModal.tsx` 中的 `quoteOf()` 不区分 `isVia`，一律取 `effectiveCustomerQuote`。不要再使用旧的 `effectivePlatformQuote` 作为销售报价来源
 
 ### 相关文件
 
-- 价格数据源：`src/data/prices.tsx`（采购价规则、VIP销售价规则）
+- 价格数据源：`src/data/prices.tsx`（采购价规则、VIP销售价规则、`calcPlatformNetPrice`）
+- 价格 Store：`src/stores/priceStore.ts`（`effectiveCustomerQuote`、`effectivePlatformQuote`）
 - 价格类型定义：`src/types/index.ts`（`PurchasePriceRule`、`VipPriceRule`、`PurchaseOrderItem`、`SalesOrderItem`）
 - 商品档案：`src/data/teaProducts.tsx`（`marketPrice`、`jdPrice`、`tmallPrice`、`salesPrice`）
+- 客户数据：`src/data/customers.tsx`（`platformCommissionRates` 平台扣点映射）
 - 价格管理页面：`src/pages/product/ProductPrice.tsx`
-- 采购报价页面：`src/pages/purchase/PurchasePricing.tsx`
-- 销售报价页面：`src/pages/sales/SalesQuotations.tsx`
-- 采购订单页面：`src/pages/purchase/PurchaseOrders.tsx`
-- 销售订单页面：`src/pages/sales/SalesOrders.tsx`
+- 新建销售单：`src/pages/sales/OrderEntry.tsx`
+- 销售单信息弹窗：`src/components/business/SalesOrderInfoModal.tsx`
 
 ---
 

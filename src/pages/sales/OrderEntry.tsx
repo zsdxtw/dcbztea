@@ -4,7 +4,7 @@ import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
-import { usePriceStore, effectiveCustomerQuote, effectivePlatformQuote } from '../../stores/priceStore';
+import { usePriceStore, effectiveCustomerQuote } from '../../stores/priceStore';
 import { calcPlatformNetPrice } from '../../data/prices';
 import { customerItems, CUSTOMER_TYPE_LABELS } from '../../data/customers';
 import { productCategoryLabels } from '../../data/productCategories';
@@ -105,22 +105,17 @@ export default function OrderEntry() {
   const selectedPlatformCustomer = platformItems.find((p) => p.id === platformCustomerId) ?? null;
 
   /**
-   * 销售报价取值（价格体系第三层，来自报品报（调）价）：
-   * 个人客户不提前报价；经平台单取所选平台客户的「经平台报价」（自动=客户报价×(1−扣点)）；其余取该客户有效报价（单品价>品牌折扣）。
+   * 销售报价（统一概念，直接销售/经平台销售均取客户维度报价）：
+   * 取该客户有效报价（单品价>品牌折扣）；个人客户不提前报价。
    */
   const quoteOf = (productId: string): number | undefined => {
     if (!matchedCustomerId) return undefined;
     const cust = customerItems.find((c) => c.id === matchedCustomerId);
     if (cust?.type === 'personal') return undefined;
-    if (isVia) {
-      if (!platformCustomerId) return undefined;
-      const rate = cust?.platformCommissionRates?.[platformCustomerId] ?? '0%';
-      return effectivePlatformQuote(customerQuotes, matchedCustomerId, productId, platformCustomerId, products, rate);
-    }
     return effectiveCustomerQuote(customerQuotes, matchedCustomerId, productId, products);
   };
 
-  /** 经平台订单的销售给平台价 = 销售实价 ×(1−扣点)；扣点取客户在所选平台配置的扣点 */
+  /** 经平台订单的销平台实价 = 销售实价 ×(1−扣点)；扣点取客户在所选平台配置的扣点 */
   const platformNetOf = (salesPrice: number): number | undefined => {
     if (!isVia || !platformCustomerId || !matchedCustomerId) return undefined;
     const cust = customerItems.find((c) => c.id === matchedCustomerId);
@@ -536,7 +531,7 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
           )}
           {/* 已选商品列表：图片 + 数量 + 销售实价 + 删除（表头常显，未添加时仅显示提示行） */}
           <table className="detail-inline-table">
-              <thead><tr><th style={{ width: 44 }}>序号</th><th style={{ width: 60 }}>图片</th><th>商品名称</th><th style={{ width: 90 }}>品牌</th><th style={{ width: 110 }}>规格</th><th style={{ width: 130 }}>市场价</th><th style={{ width: 120 }}>销售报价</th><th style={{ width: 90 }}>数量</th><th style={{ width: 110 }}>销售实价</th>{isVia && <th style={{ width: 120 }}>销售给平台价</th>}<th style={{ width: 110, textAlign: 'right' }}>小计</th><th style={{ width: 60 }} /></tr></thead>
+              <thead><tr><th style={{ width: 44 }}>序号</th><th style={{ width: 60 }}>图片</th><th>商品名称</th><th style={{ width: 90 }}>品牌</th><th style={{ width: 110 }}>规格</th><th style={{ width: 130 }}>市场价</th><th style={{ width: 120 }}>销售报价</th><th style={{ width: 90 }}>数量</th><th style={{ width: 110 }}>销售实价</th>{isVia && <th style={{ width: 120 }}>销平台实价</th>}<th style={{ width: 110, textAlign: 'right' }}>小计</th><th style={{ width: 60 }} /></tr></thead>
               <tbody>
                 {items.length === 0 && (
                   <tr><td colSpan={isVia ? 10 : 9} style={{ textAlign: 'center', color: 'var(--color-neutral-400)', padding: 'var(--space-3)' }}>尚未添加商品，点击上方商品卡片即可添加（可按品牌筛选或搜索）</td></tr>
@@ -563,7 +558,7 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
                         {(() => {
                           const q = quoteOf(it.productId);
                           return q !== undefined
-                            ? <span className="mono" style={{ color: 'var(--color-module-current-base)', fontWeight: 'var(--font-semibold)' }}>{money(q)}{isVia ? <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 400, color: 'var(--color-neutral-400)' }}>经平台报价</span> : null}</span>
+                            ? <span className="mono" style={{ color: 'var(--color-module-current-base)', fontWeight: 'var(--font-semibold)' }}>{money(q)}</span>
                             : <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>—（未配置报价）</span>;
                         })()}
                       </td>

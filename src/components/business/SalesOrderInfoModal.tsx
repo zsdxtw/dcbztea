@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Button from '../common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { customerItems } from '../../data/customers';
-import { usePriceStore, effectiveCustomerQuote, effectivePlatformQuote } from '../../stores/priceStore';
+import { usePriceStore, effectiveCustomerQuote } from '../../stores/priceStore';
 import { calcPlatformNetPrice } from '../../data/prices';
 import { EXTERNAL_STATUS_LABELS, platformLabelOf } from '../../data/externalOrders';
 import type { ExternalOrder } from '../../types';
@@ -21,17 +21,22 @@ export default function SalesOrderInfoModal({ code, onClose }: { code: string | 
   const [tab, setTab] = useState<'info' | 'fulfillments'>('info');
   const quoteMap = usePriceStore((s) => s.customerQuotes);
   const products = usePriceStore((s) => s.products);
-  /** 销售报价：经平台单取所选平台的经平台报价；其余取客户有效报价（单品价>品牌折扣）；个人客户无报价 */
+  /** 销售报价（统一概念，直接销售/经平台销售均取客户维度报价）；个人客户无报价 */
   const quoteOf = (o: ExternalOrder, productId: string): number | undefined => {
     const cust = customerItems.find((c) => c.name === o.customerName);
     if (!cust || cust.type === 'personal') return undefined;
-    if (o.salesPath === 'via_platform' && o.platformCustomerId) {
-      const rate = cust.platformCommissionRates?.[o.platformCustomerId] ?? '0%';
-      return effectivePlatformQuote(quoteMap, cust.id, productId, o.platformCustomerId, products, rate);
-    }
     return effectiveCustomerQuote(quoteMap, cust.id, productId, products);
   };
-  /** 经平台订单：销售给平台价 = 销售实价 ×(1−扣点)；扣点取客户在该平台配置（订单级口径） */
+  /** 经平台订单：销平台报价 = 销售报价 ×(1−扣点) */
+  const platformQuoteOf = (o: ExternalOrder, productId: string): number | undefined => {
+    if (o.salesPath !== 'via_platform' || !o.platformCustomerId) return undefined;
+    const cust = customerItems.find((c) => c.name === o.customerName);
+    const rate = cust?.platformCommissionRates?.[o.platformCustomerId] ?? '0%';
+    const q = quoteOf(o, productId);
+    if (q === undefined) return undefined;
+    return calcPlatformNetPrice(q, rate);
+  };
+  /** 经平台订单：销平台实价 = 销售实价 ×(1−扣点)；扣点取客户在该平台配置（订单级口径） */
   const platformNetOf = (o: ExternalOrder, salesPrice: number): number | undefined => {
     if (o.salesPath !== 'via_platform' || !o.platformCustomerId) return undefined;
     const cust = customerItems.find((c) => c.name === o.customerName);
@@ -86,7 +91,7 @@ export default function SalesOrderInfoModal({ code, onClose }: { code: string | 
                 </div>
                 <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, margin: 'var(--space-2) 0 var(--space-1)' }}>商品明细（{original.items.length} 种）</div>
                 <table className="detail-inline-table">
-                  <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>市场价</th><th>销售报价</th><th>销售实价</th>{isViaOrder(original) && <th>销售给平台价</th>}<th>小计</th></tr></thead>
+                  <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>市场价</th><th>销售报价</th>{isViaOrder(original) && <th>销平台报价</th>}<th>销售实价</th>{isViaOrder(original) && <th>销平台实价</th>}<th>小计</th></tr></thead>
                   <tbody>
                     {original.items.map((it, i) => {
                       const q = quoteOf(original, it.productId);
@@ -97,6 +102,10 @@ export default function SalesOrderInfoModal({ code, onClose }: { code: string | 
                           <td className="mono">{it.quantity}</td>
                           <td className="mono" style={{ color: 'var(--color-neutral-400)' }}>{marketOf(it.productId) !== undefined ? money(marketOf(it.productId)!) : '—'}</td>
                           <td className="mono" style={{ color: q !== undefined ? 'var(--color-module-current-base)' : undefined }}>{q !== undefined ? money(q) : '—'}</td>
+                          {isViaOrder(original) && (() => {
+                            const pq = platformQuoteOf(original, it.productId);
+                            return <td className="mono" style={{ color: 'var(--color-module-current-secondary)', fontWeight: 600 }}>{pq !== undefined ? money(pq) : '—'}</td>;
+                          })()}
                           <td className="mono">{money(it.price)}</td>
                           {isViaOrder(original) && (() => {
                             const pn = platformNetOf(original, it.price);
