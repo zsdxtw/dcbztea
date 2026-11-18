@@ -59,14 +59,18 @@ export default function SelfopOrders() {
 
       <div className="pk-panel" style={{ padding: 0 }}>
         <Table
-          headers={['销售单编号', '客户', '商品', '金额', '跟单人', '采购', '状态', '物流', '操作']}
+          headers={['销售单编号', '销售路径', '客户', '商品', '金额', '跟单人', '采购', '状态', '物流', '操作']}
           rows={filtered.map((o) => {
             const st = stageOf(o);
             const meta = STAGE_META[st];
             const pos = posOf(o);
             const pkgs = packageStatsOf(o, pos);
+            const isVia = o.salesPath === 'via_platform';
             return [
               <span key="c" className="cell-mono-emph">{o.code}{o.parentCode && <span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>母单 {o.parentCode}</span>}</span>,
+              <span key="sp">{isVia
+                ? <><span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5', whiteSpace: 'nowrap' }}>经平台销售</span><span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: '#0F64B5' }}>{o.platformCustomerName ?? '—'}</span></>
+                : <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E8F5E9', color: '#2E7D32', whiteSpace: 'nowrap' }}>直接销售</span>}</span>,
               <span key="cu" className="cell-emph">{o.customerName}</span>,
               <span key="i" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{o.items[0].productName}{o.items.length > 1 ? ` 等${o.items.length}种` : ''} ×{o.items.reduce((s, it) => s + it.quantity, 0)}</span>,
               <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(o.totalAmount)}</span>,

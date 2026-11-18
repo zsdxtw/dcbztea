@@ -11,6 +11,7 @@ const baseSeeds: ExternalOrder[] = [
   /* ── 待处理（手工录入） ── */
   {
     id: 'eo1', code: 'SO-2610250001', platform: 'tmall', externalOrderNo: 'TM-88213907-1',
+    salesPath: 'via_platform', platformCustomerId: 'p2', platformCustomerName: '史泰博',
     customerName: '清心茶坊', customerType: '直营客户', customerRegion: '浙江宁波',
     items: [{ productId: 'p5', productName: '金骏眉·特级', spec: '50g/罐', quantity: 12, price: 1024 }],
     totalAmount: 12288,
@@ -40,7 +41,8 @@ const baseSeeds: ExternalOrder[] = [
   /* ── 自营待接单（等管理后台在销售订单-分发订单接单） ── */
   {
     id: 'eo9', code: 'SO-2610240001', platform: 'tmall', externalOrderNo: 'TM-88012554-3',
-    customerName: '浦发银行', customerType: '平台客户', customerRegion: '上海浦东',
+    salesPath: 'via_platform', platformCustomerId: 'p1', platformCustomerName: '京东慧采',
+    customerName: '浦发银行', customerType: '直营客户', customerRegion: '上海浦东',
     items: [{ productId: 'p8', productName: '白毫银针·特级', spec: '50g/罐', quantity: 15, price: 768 }],
     totalAmount: 11520,
     receiver: '浦发银行采购中心', receiverPhone: '021-5888****', receiverAddress: '上海市浦东新区浦东南路500号',
@@ -76,7 +78,8 @@ const baseSeeds: ExternalOrder[] = [
   /* ── 比单中（公开报名制：底价 88 折，已有 2 家报名） ── */
   {
     id: 'eo6', code: 'SO-2610250004', platform: 'jd', externalOrderNo: 'JD-20603995',
-    customerName: '天福茗茶', customerType: '渠道客户', customerRegion: '福建厦门',
+    salesPath: 'via_platform', platformCustomerId: 'p3', platformCustomerName: '易积通',
+    customerName: '天福茗茶', customerType: '直营客户', customerRegion: '福建厦门',
     items: [
       { productId: 'p9', productName: '铁观音·清香一级', spec: '250g/罐', quantity: 40, price: 208 },
       { productId: 'p10', productName: '大红袍·特级', spec: '150g/盒', quantity: 22, price: 494 },
@@ -183,7 +186,8 @@ const baseSeeds: ExternalOrder[] = [
   /* ── 已处理（自营：管理后台已接单，采购中） ── */
   {
     id: 'eo11', code: 'SO-2610220001', platform: 'jd', externalOrderNo: 'JD-20775210',
-    customerName: '交通银行', customerType: '平台客户', customerRegion: '上海黄浦',
+    salesPath: 'via_platform', platformCustomerId: 'p1', platformCustomerName: '京东慧采',
+    customerName: '交通银行', customerType: '直营客户', customerRegion: '上海黄浦',
     items: [{ productId: 'p3', productName: '竹叶青·品味级', spec: '50g/罐', quantity: 40, price: 356 }],
     totalAmount: 14240,
     receiver: '交行采购中心', receiverPhone: '021-3138****', receiverAddress: '上海市黄浦区中山南路99号',
@@ -202,7 +206,8 @@ const baseSeeds: ExternalOrder[] = [
   /* ── 已完成（自营全链路） ── */
   {
     id: 'eo4', code: 'SO-2610180001', platform: 'tmall', externalOrderNo: 'TM-87390115-2',
-    customerName: '浦发银行', customerType: '平台客户', customerRegion: '上海浦东',
+    salesPath: 'via_platform', platformCustomerId: 'p1', platformCustomerName: '京东慧采',
+    customerName: '浦发银行', customerType: '直营客户', customerRegion: '上海浦东',
     items: [{ productId: 'p8', productName: '白毫银针·特级', spec: '50g/罐', quantity: 10, price: 768 }],
     totalAmount: 7680,
     receiver: '浦发银行采购中心', receiverPhone: '021-5888****', receiverAddress: '上海市浦东新区浦东南路500号',
@@ -312,6 +317,13 @@ const lcg = (seed: number) => (n: number) => {
   return () => { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; };
 };
 
+/** 平台客户池（经平台销售的中间平台） */
+const DEMO_PLATFORM_CUSTOMERS = [
+  { id: 'p1', name: '京东慧采' },
+  { id: 'p2', name: '史泰博' },
+  { id: 'p3', name: '易积通' },
+];
+
 /** 销售单编号：SO- + YYMMDD + 4 位序号；按日期登记已有最大序号，演示数据续号生成不重复 */
 const soDaySeq = new Map<string, number>();
 const registerSOCode = (code: string) => {
@@ -340,11 +352,15 @@ function buildOne(seq: number, statusPlan: {
   const day = 11 + (seq % 15);
   const date = `2026-10-${String(day).padStart(2, '0')}`;
   const items = statusPlan.items;
+  /** 约每 3 条订单生成 1 条经平台销售 */
+  const isViaPlatform = seq % 3 === 0;
+  const platformCust = isViaPlatform ? DEMO_PLATFORM_CUSTOMERS[(seq / 3) % DEMO_PLATFORM_CUSTOMERS.length] : undefined;
   return {
     id: `demo_${seq}`,
     code: nextSOCodeOf(`2610${String(day).padStart(2, '0')}`),
     platform,
     externalOrderNo: `${platform === 'tmall' ? 'TM' : platform === 'jd' ? 'JD' : platform === 'douyin' ? 'DY' : platform === 'pdd' ? 'PDD' : 'WX'}-DEMO-${1000 + seq}`,
+    ...(isViaPlatform ? { salesPath: 'via_platform' as const, platformCustomerId: platformCust!.id, platformCustomerName: platformCust!.name } : {}),
     customerName: cust.name,
     customerType: cust.type,
     customerRegion: `${cust.prov}${cust.cityShort}`,

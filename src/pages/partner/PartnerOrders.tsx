@@ -627,7 +627,7 @@ export default function PartnerOrders() {
         <table style={{ minWidth: 1200 }}>
           <thead>
             <tr>
-              <th>序号</th><th>销售单编号</th><th>客户</th><th>总金额</th>
+              <th>序号</th><th>销售单编号</th><th>销售路径</th><th>客户</th><th>总金额</th>
               <th>收件人</th><th>收件电话</th><th>收件地区</th>
               <th>配送方式</th><th>合作模式</th><th>来源类型</th><th>状态</th><th>下单日期</th><th>操作</th>
             </tr>
@@ -644,6 +644,11 @@ export default function PartnerOrders() {
                       <span className="cell-mono-emph">{o.code}</span>
                       {platformHandled && <Pill tone="blue">平台履约</Pill>}
                     </div>
+                  </td>
+                  <td>
+                    {o.salesPath === 'via_platform'
+                      ? <><Pill tone="blue">经平台销售</Pill><div style={{ fontSize: 12, color: '#0F64B5', marginTop: 2 }}>{o.platformCustomerName ?? '—'}</div></>
+                      : <Pill tone="green">直接销售</Pill>}
                   </td>
                   <td className="cell-emph">{o.customerName}</td>
                   <td className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--pk-accent)' }}>{money(o.totalAmount)}</td>
@@ -665,7 +670,7 @@ export default function PartnerOrders() {
               );
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={14} style={{ textAlign: 'center', color: 'var(--pk-ink3)', padding: '28px 0' }}>暂无订单</td></tr>
+              <tr><td colSpan={15} style={{ textAlign: 'center', color: 'var(--pk-ink3)', padding: '28px 0' }}>暂无订单</td></tr>
             )}
           </tbody>
         </table>

@@ -63,14 +63,18 @@ export default function CompareManage() {
 
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['销售单编号', '客户', '订单金额', '底价', '报名数', '截止倒计时', '状态', '中单合作商', '操作']}
+            headers={['销售单编号', '销售路径', '客户', '订单金额', '底价', '报名数', '截止倒计时', '状态', '中单合作商', '操作']}
             rows={compareOrders.map((o) => {
               const cmp = o.compare!;
               const scored = !!cmp.scored;
               const floor = compareFloorAmount(o.totalAmount, cmp.floorRule);
               const remain = cmp.deadline - tick;
+              const isVia = o.salesPath === 'via_platform';
               return [
                 <span key="c" className="cell-mono-emph">{o.code}</span>,
+                <span key="sp">{isVia
+                  ? <><span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5', whiteSpace: 'nowrap' }}>经平台销售</span><span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: '#0F64B5' }}>{o.platformCustomerName ?? '—'}</span></>
+                  : <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E8F5E9', color: '#2E7D32', whiteSpace: 'nowrap' }}>直接销售</span>}</span>,
                 <span key="cu" className="cell-emph">{o.customerName}</span>,
                 <span key="a" className="mono">{money(o.totalAmount)}</span>,
                 <span key="f" className="mono" style={{ color: '#B26A00' }}>{money(floor)}</span>,

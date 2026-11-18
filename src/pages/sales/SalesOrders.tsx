@@ -152,7 +152,7 @@ export default function SalesOrders() {
 
   
   /* 列表网格列定义（母单行 + 表头共用，保证对齐） */
-  const GRID = '34px 24px 168px 104px 130px 110px 116px 104px 88px 112px 100px 100px 96px 64px';
+  const GRID = '34px 24px 168px 104px 96px 130px 110px 116px 104px 88px 112px 100px 100px 96px 64px';
 
   const pageBtn = (n: number) => (
     <button
@@ -266,13 +266,14 @@ export default function SalesOrders() {
 
           <Card style={{ padding: 0 }}>
             <div style={{ overflowX: 'auto' }}>
-              <div style={{ minWidth: 1320 }}>
+              <div style={{ minWidth: 1420 }}>
                 {/* 表头 */}
                 <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-neutral-100)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-500)', background: 'var(--color-neutral-50)' }}>
                   <span>序号</span>
                   <span />
                   <span>母销售单号</span>
                   <span>来源</span>
+                  <span>销售路径</span>
                   <span>客户</span>
                   <span>地区</span>
                   <span>收件人</span>
@@ -302,6 +303,11 @@ export default function SalesOrders() {
                         <span style={{ fontSize: 'var(--text-sm)' }}>
                           {platformLabelOf(f.mother)}
                           <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: f.mother.sourceChannel === 'push' ? '#7B1FA2' : '#0F64B5' }}>{EXTERNAL_CHANNEL_LABELS[f.mother.sourceChannel]}</span>
+                        </span>
+                        <span>
+                          {f.mother.salesPath === 'via_platform'
+                            ? <><span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5', whiteSpace: 'nowrap' }}>经平台销售</span><span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: '#0F64B5' }}>{f.mother.platformCustomerName ?? '—'}</span></>
+                            : <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E8F5E9', color: '#2E7D32', whiteSpace: 'nowrap' }}>直接销售</span>}
                         </span>
                         <span className="cell-emph">{f.mother.customerName}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{f.mother.customerType}</span></span>
                         <span style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{regionText(f.mother)}</span>

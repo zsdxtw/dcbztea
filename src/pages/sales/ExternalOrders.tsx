@@ -541,7 +541,7 @@ export default function ExternalOrders() {
         {/* 子单平铺列表（逐单操作视图；母单聚合总览见「销售单管理 → 销售订单」） */}
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['序号', '销售履约单号', '销售单订单号', '来源', '客户', '地区', '收件人', '收件地址', '金额', '分发状态', '订单状态', '分发路径', '合作商', '录入时间', '操作']}
+            headers={['序号', '销售履约单号', '销售单订单号', '来源', '销售路径', '客户', '地区', '收件人', '收件地址', '金额', '分发状态', '订单状态', '分发路径', '合作商', '录入时间', '操作']}
             rows={pagedOrders.map((o, idx) => [
               <span key="no" className="mono cell-muted">{(page - 1) * pageSize + idx + 1}</span>,
               <span key="c" className="cell-mono-emph">{fulfillmentCodeOf(o)}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.externalOrderNo ?? '—'}</span></span>,
@@ -568,6 +568,11 @@ export default function ExternalOrders() {
                     SOURCE_TAG_LABELS[o.sourceTag].label,
                   )}</span>
                 )}
+              </span>,
+              <span key="sp">
+                {o.salesPath === 'via_platform'
+                  ? <>{pill('#E3F2FD', '#0F64B5', '经平台销售')}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: '#0F64B5' }}>{o.platformCustomerName ?? '—'}</span></>
+                  : pill('#E8F5E9', '#2E7D32', '直接销售')}
               </span>,
               <span key="cu" className="cell-emph">{o.customerName}</span>,
               <span key="rg" style={{ whiteSpace: 'nowrap', fontSize: 'var(--text-sm)' }}>{regionText(o)}</span>,

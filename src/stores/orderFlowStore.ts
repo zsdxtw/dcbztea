@@ -1060,6 +1060,8 @@ export function getPartnerFlowOrders(supplierId: string): PartnerOrder[] {
   const base = (o: ExternalOrder, over: Partial<PartnerOrder> = {}): PartnerOrder => ({
     id: `ext_${o.id}`,
     code: o.code,
+    salesPath: o.salesPath ?? 'direct',
+    platformCustomerName: o.platformCustomerName,
     customerName: o.customerName,
     customerType: o.customerType,
     customerRegion: o.customerRegion,

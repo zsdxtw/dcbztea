@@ -1486,6 +1486,10 @@ export interface PartnerOrder {
   id: string;
   /** 订单编号 */
   code: string;
+  /** 销售路径:direct=直接销售 / via_platform=经平台销售 */
+  salesPath?: 'direct' | 'via_platform';
+  /** 经平台销售时的中间平台简称 */
+  platformCustomerName?: string;
   customerName: string;
   customerType: string;
   /** 收件地区（省+市，如"江苏南京"） */
