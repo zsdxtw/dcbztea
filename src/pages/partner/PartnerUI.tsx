@@ -43,7 +43,7 @@ export const SETTLE_STATUS_TONE: Record<string, PillTone> = {
   unsettled: 'amber', pending: 'blue', settled: 'green',
 };
 export const CUSTOMER_TYPE_TONE: Record<string, PillTone> = {
-  直营客户: 'green', 平台客户: 'blue', 渠道客户: 'amber', 带货客户: 'purple', 个人客户: 'gray',
+  直营客户: 'green', 平台客户: 'blue', 渠道客户: 'amber', 个人客户: 'gray',
 };
 export const ACCOUNT_ROLE_TONE: Record<string, PillTone> = {
   admin: 'purple', business: 'blue', warehouse: 'amber',

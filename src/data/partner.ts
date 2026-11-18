@@ -114,7 +114,7 @@ export const partnerOrders: PartnerOrder[] = [
     receiver: '交通银行总务处', receiverPhone: '021-3138****', receiverAddress: '上海市浦东新区银城中路188号',
   },
   {
-    id: 'po6', code: 'SO-2609010001', customerName: '茗香阁直播', customerType: '带货客户',
+    id: 'po6', code: 'SO-2609010001', customerName: '茗香阁直播', customerType: '渠道客户',
     items: [
       { productName: '凤凰单丛·蜜兰香', spec: '100g/袋', quantity: 50, price: 374 },
     ],
@@ -298,7 +298,7 @@ export const partnerCustomers: PartnerCustomer[] = [
     cooperationDate: '2025-07-10', status: 'cooperating', totalOrders: 9, totalAmount: 96200,
   },
   {
-    id: 'pc5', name: '茗香阁直播', type: '带货客户', region: '广东广州',
+    id: 'pc5', name: '茗香阁直播', type: '渠道客户', region: '广东广州',
     contactPerson: '阁主', contactPhone: '137****0912',
     products: [
       { productId: 'p11', productName: '凤凰单丛·蜜兰香', spec: '100g/袋', supplyPrice: 374, marketPrice: 560 },

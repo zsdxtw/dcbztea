@@ -59,7 +59,7 @@ const baseSeeds: ExternalOrder[] = [
   /* ── 转派待接单（指定转派：直播渠道大单指定合作商履约） ── */
   {
     id: 'eo5', code: 'SO-2610250003', platform: 'pdd', externalOrderNo: 'PDD-2093184-1',
-    customerName: '茗香阁直播', customerType: '带货客户', customerRegion: '广东广州',
+    customerName: '茗香阁直播', customerType: '渠道客户', customerRegion: '广东广州',
     items: [{ productId: 'p11', productName: '凤凰单丛·蜜兰香', spec: '100g/袋', quantity: 50, price: 374 }],
     totalAmount: 18700,
     receiver: '茗香阁仓储', receiverPhone: '137****0912', receiverAddress: '广东广州市白云区黄石东路288号',
@@ -571,6 +571,136 @@ function buildDemoOrders(): ExternalOrder[] {
       { time: D(9), action: '整单分拆定案完成', detail: '无报名商品形成子履约单退回，母销售单保持不变' },
     ],
   });
+
+  /* ── 多履约单家族 D（按品牌拆单：母 + LY01/LY02/LY03，状态阶梯 妥投/发货中/待分发） ── */
+  {
+    const sM = next(); const s1 = next(); const s2 = next(); const s3 = next();
+    const mother = buildOne(sM, {
+      items: [], processStatus: 'processed',
+      history: [{ time: D(sM), action: '手工录入订单', detail: '演示数据' }],
+    });
+    const c1 = buildOne(s1, { items: [], processStatus: 'pending', history: [] });
+    const c2 = buildOne(s2, { items: [], processStatus: 'pending', history: [] });
+    const c3 = buildOne(s3, { items: [], processStatus: 'pending', history: [] });
+    /* 三个品牌组商品（绿茶组 / 白茶·红茶组 / 陈茶·乌龙组） */
+    const g1 = [
+      { productId: 'p1', productName: '西湖龙井·明前特级', spec: '50g/罐', quantity: 20, price: 452 },
+      { productId: 'p2', productName: '碧螺春·一级', spec: '100g/袋', quantity: 15, price: 328 },
+    ];
+    const g2 = [
+      { productId: 'p5', productName: '金骏眉·特级', spec: '50g/罐', quantity: 8, price: 1024 },
+      { productId: 'p8', productName: '白毫银针·特级', spec: '50g/罐', quantity: 10, price: 768 },
+    ];
+    const g3 = [
+      { productId: 'p12', productName: '寿眉·2019年陈', spec: '350g/饼', quantity: 30, price: 158 },
+      { productId: 'p13', productName: '凤凰单丛·蜜兰香', spec: '100g/袋', quantity: 12, price: 296 },
+    ];
+    const sumOf = (items: ExternalOrderItem[]) => items.reduce((s, it) => s + it.price * it.quantity, 0);
+    /* 子履约单继承母销售单字段（来源/客户/收货），仅履约信息各异 */
+    for (const [c, items, tag] of [[c1, g1, '绿茶组'], [c2, g2, '白茶·红茶组'], [c3, g3, '陈茶·乌龙组']] as const) {
+      c.items = items; c.totalAmount = sumOf(items);
+      c.platform = mother.platform; c.externalOrderNo = mother.externalOrderNo;
+      c.salesPath = mother.salesPath;
+      if (mother.platformCustomerName) { c.platformCustomerId = mother.platformCustomerId; c.platformCustomerName = mother.platformCustomerName; }
+      c.customerName = mother.customerName; c.customerType = mother.customerType; c.customerRegion = mother.customerRegion;
+      c.receiver = mother.receiver; c.receiverPhone = mother.receiverPhone; c.receiverAddress = mother.receiverAddress;
+      c.entryTime = mother.entryTime;
+      c.parentCode = mother.code;
+      c.history = [{ time: mother.entryTime, action: '拆单生成子订单', detail: `按品牌拆出（${tag}）` }];
+    }
+    c1.code = `${mother.code}LY01`;
+    c1.processStatus = 'processed';
+    c1.path = 'distribute'; c1.distributeMode = 'assign';
+    c1.partnerId = '3'; c1.partnerName = '八马茶业股份有限公司';
+    c1.transferSource = 'assign'; c1.transferTime = mother.entryTime;
+    c1.partnerStatus = 'delivered';
+    c1.history.push(
+      { time: mother.entryTime, action: '指定转派', detail: '→ 八马茶业股份有限公司' },
+      { time: mother.entryTime, action: '合作商接单', detail: '合作商终端接单' },
+      { time: mother.entryTime, action: '合作商发货', detail: '2 个包裹发出' },
+      { time: mother.entryTime, action: '客户签收', detail: '全部包裹妥投并签收' },
+    );
+    c2.code = `${mother.code}LY02`;
+    c2.processStatus = 'processed';
+    c2.path = 'distribute'; c2.distributeMode = 'assign';
+    c2.partnerId = '5'; c2.partnerName = '福建品品香茶业有限公司';
+    c2.transferSource = 'assign'; c2.transferTime = mother.entryTime;
+    c2.partnerStatus = 'shipping';
+    c2.history.push(
+      { time: mother.entryTime, action: '指定转派', detail: '→ 福建品品香茶业有限公司' },
+      { time: mother.entryTime, action: '合作商接单', detail: '合作商终端接单' },
+      { time: mother.entryTime, action: '合作商发货', detail: '分批发货 · 4 个包裹（部分在途）' },
+    );
+    c3.code = `${mother.code}LY03`;
+    c3.history[0].detail = '按品牌拆出（陈茶·乌龙组）· 待分发';
+    mother.items = [...g1, ...g2, ...g3];
+    mother.totalAmount = sumOf(mother.items);
+    mother.processStatus = 'processed';
+    mother.history = [
+      { time: mother.entryTime, action: '手工录入订单', detail: '母销售单（按品牌拆单演示）' },
+      { time: mother.entryTime, action: '按品牌一键拆单', detail: '按商品品牌拆为 3 张子履约单，分别履约' },
+    ];
+    orders.push(mother, c1, c2, c3);
+  }
+
+  /* ── 多履约单家族 E（比单按商品拆单：母 + LY01 已结算 / LY02 比单未成退回，经平台销售） ── */
+  {
+    const sM = next(); const s1 = next(); const s2 = next();
+    const mother = buildOne(sM, {
+      items: [], processStatus: 'processed',
+      history: [{ time: D(sM), action: '手工录入订单', detail: '母销售单（比单按商品拆单演示）' }],
+    });
+    const c1 = buildOne(s1, { items: [], processStatus: 'pending', history: [] });
+    const c2 = buildOne(s2, { items: [], processStatus: 'pending', history: [] });
+    const iA = [
+      { productId: 'p5', productName: '金骏眉·特级', spec: '50g/罐', quantity: 6, price: 1024 },
+      { productId: 'p8', productName: '白毫银针·特级', spec: '50g/罐', quantity: 4, price: 768 },
+    ];
+    const iB = [
+      { productId: 'p12', productName: '寿眉·2019年陈', spec: '350g/饼', quantity: 20, price: 158 },
+      { productId: 'p14', productName: '铁观音·清香一级', spec: '250g/罐', quantity: 10, price: 208 },
+    ];
+    const sumOf = (items: ExternalOrderItem[]) => items.reduce((s, it) => s + it.price * it.quantity, 0);
+    mother.salesPath = 'via_platform';
+    mother.platformCustomerId = 'p2'; mother.platformCustomerName = '史泰博';
+    for (const [c, items] of [[c1, iA], [c2, iB]] as const) {
+      c.items = items; c.totalAmount = sumOf(items);
+      c.platform = mother.platform; c.externalOrderNo = mother.externalOrderNo;
+      c.salesPath = 'via_platform'; c.platformCustomerId = 'p2'; c.platformCustomerName = '史泰博';
+      c.customerName = mother.customerName; c.customerType = mother.customerType; c.customerRegion = mother.customerRegion;
+      c.receiver = mother.receiver; c.receiverPhone = mother.receiverPhone; c.receiverAddress = mother.receiverAddress;
+      c.entryTime = mother.entryTime;
+      c.parentCode = mother.code;
+    }
+    c1.code = `${mother.code}LY01`;
+    c1.processStatus = 'completed';
+    c1.path = 'distribute'; c1.distributeMode = 'compare';
+    c1.partnerId = '11'; c1.partnerName = '杭州云茶供应链管理有限公司';
+    c1.transferSource = 'compare'; c1.transferTime = mother.entryTime;
+    c1.partnerStatus = 'settled'; c1.settleOnTime = true;
+    c1.history = [
+      { time: mother.entryTime, action: '拆单生成子订单', detail: '按商品拆出（高客单组）' },
+      { time: mother.entryTime, action: '比单定标（按商品·积分优先）', detail: '杭州云茶供应链管理有限公司中单' },
+      { time: mother.entryTime, action: '合作商发货', detail: '1 个包裹发出' },
+      { time: mother.entryTime, action: '客户签收', detail: '包裹妥投并签收' },
+      { time: mother.entryTime, action: '结算完成', detail: '按时履约 · 积分 +5' },
+    ];
+    c2.code = `${mother.code}LY02`;
+    c2.sourceTag = 'compare_failed';
+    c2.history = [
+      { time: mother.entryTime, action: '拆单生成子订单', detail: '按商品拆出（口粮茶组）' },
+      { time: mother.entryTime, action: '比单未成退回', detail: '无报名商品形成子订单，重新进入分发-待处理' },
+    ];
+    mother.items = [...iA, ...iB];
+    mother.totalAmount = sumOf(mother.items);
+    mother.processStatus = 'processed';
+    mother.history = [
+      { time: mother.entryTime, action: '手工录入订单', detail: '母销售单（经平台销售）' },
+      { time: mother.entryTime, action: '发起比单', detail: '公开报名 · 按商品积分排名定标' },
+      { time: mother.entryTime, action: '按商品拆分定案', detail: '已生成 2 张子履约单：LY01 中单已结算，LY02 比单未成退回待分发' },
+    ];
+    orders.push(mother, c1, c2);
+  }
 
   /* ── 自营链种子 ×4：已接单（采购在途）/ 已接单（到货待发）/ 已发货运输中（分仓直发）/ 妥投（直发采购） ── */
   for (let i = 0; i < 4; i++) {
