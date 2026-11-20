@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
+import DetailDrawer from '../../components/common/DetailDrawer';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
@@ -15,6 +14,7 @@ import {
   buildFamilies, familyStatesOf, shipStateOf, settleStateOf, FAMILY_STATE_COLORS, fulfillmentUnitsOf,
 } from '../../utils/salesOrderFamily';
 import type { ExternalOrder } from '../../types';
+import { SalesOrderDetailTabs } from './SalesOrderDetail';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -56,7 +56,6 @@ function regionText(o: ExternalOrder): string {
  * 母销售单行含三状态（分发 / 发货 / 结算），「查看」进入销售单履约详情页。分发订单 Tab 保留自营接单与履约跟踪。
  */
 export default function SalesOrders() {
-  const navigate = useNavigate();
 
   /* ── 全部销售单（母单聚合） ── */
   const flowOrders = useOrderFlowStore((s) => s.orders);
@@ -79,7 +78,7 @@ export default function SalesOrders() {
     customer: '', receiver: '', prov: '', city: '', dist: '', entryFrom: '', entryTo: '', orderFrom: '', orderTo: '',
   });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [viewRoot, setViewRoot] = useState<string | null>(null);
+  const [view, setView] = useState<{ root: string; child?: string } | null>(null);
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
 
@@ -152,7 +151,7 @@ export default function SalesOrders() {
 
   
   /* 列表网格列定义（母单行 + 表头共用，保证对齐） */
-  const GRID = '34px 24px 168px 104px 96px 130px 110px 116px 104px 88px 112px 100px 100px 96px 64px';
+  const GRID = '34px 24px 168px 104px 96px 130px 160px 116px 104px 88px 112px 100px 100px 96px 64px';
 
   const pageBtn = (n: number) => (
     <button
@@ -187,7 +186,7 @@ export default function SalesOrders() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
             <span className="so-f-label">关键词：</span>
             <input className="filter-input" placeholder="搜索原始/履约销售单号、客户、平台单号..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 260 }} />
-            <span className="so-f-label">来源：</span>
+            <span className="so-f-label">订单来源：</span>
             <select className="filter-select" value={filterChannel} onChange={(e) => setFilterChannel(e.target.value)}>
               <option value="">全部来源</option>
               <option value="manual">手工录入</option>
@@ -200,9 +199,9 @@ export default function SalesOrders() {
               <option value="分发中">分发中</option>
               <option value="已分发">已分发</option>
             </select>
-            <span className="so-f-label">发货状态：</span>
+            <span className="so-f-label">履约状态：</span>
             <select className="filter-select" value={filterShip} onChange={(e) => setFilterShip(e.target.value)}>
-              <option value="">全部发货状态</option>
+              <option value="">全部履约状态</option>
               <option value="未发货">未发货</option>
               <option value="部分发货">部分发货</option>
               <option value="全部发货">全部发货</option>
@@ -226,8 +225,8 @@ export default function SalesOrders() {
             </datalist>
 
             {/* 收件人 */}
-            <span className="so-f-label">收件人：</span>
-            <input className="filter-input" placeholder="全部收件人" value={draftReceiver} onChange={(e) => setDraftReceiver(e.target.value)} style={{ width: 110 }} />
+            <span className="so-f-label">收货人：</span>
+            <input className="filter-input" placeholder="全部收货人" value={draftReceiver} onChange={(e) => setDraftReceiver(e.target.value)} style={{ width: 110 }} />
 
             {/* 收件地区:省 / 市 / 县 */}
             <span className="so-f-label">收件地区：</span>
@@ -266,21 +265,21 @@ export default function SalesOrders() {
 
           <Card style={{ padding: 0 }}>
             <div style={{ overflowX: 'auto' }}>
-              <div style={{ minWidth: 1420 }}>
+              <div style={{ minWidth: 1670 }}>
                 {/* 表头 */}
                 <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-4)', margin: 'var(--space-2) var(--space-3) 0', border: '1px solid var(--color-neutral-150)', borderRadius: 10, fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-500)', background: 'var(--color-neutral-50)' }}>
                   <span>序号</span>
                   <span />
-                  <span>母销售单号</span>
-                  <span>来源</span>
+                  <span>销售单号</span>
+                  <span>订单来源</span>
                   <span>销售路径</span>
                   <span>客户</span>
-                  <span>地区</span>
-                  <span>收件人</span>
-                  <span style={{ textAlign: 'right' }}>金额（含子履约单）</span>
-                  <span style={{ textAlign: 'center' }}>子单数</span>
+                  <span>收货地区</span>
+                  <span>收货人</span>
+                  <span style={{ textAlign: 'right' }}>总金额</span>
+                  <span style={{ textAlign: 'center' }}>履约单数</span>
                   <span>分发状态</span>
-                  <span>发货状态</span>
+                  <span>履约状态</span>
                   <span>结算状态</span>
                   <span>录入时间</span>
                   <span style={{ textAlign: 'center' }}>操作</span>
@@ -301,7 +300,7 @@ export default function SalesOrders() {
                         <svg viewBox="0 0 16 16" fill="none" style={{ width: 12, height: 12, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s', color: 'var(--color-neutral-400)' }}><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         <span className="cell-mono-emph">{f.rootCode}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{f.mother.externalOrderNo}</span></span>
                         <span style={{ fontSize: 'var(--text-sm)' }}>
-                          {platformLabelOf(f.mother)}
+                          淡茶半盏
                           <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: f.mother.sourceChannel === 'push' ? '#7B1FA2' : '#0F64B5' }}>{EXTERNAL_CHANNEL_LABELS[f.mother.sourceChannel]}</span>
                         </span>
                         <span>
@@ -314,37 +313,46 @@ export default function SalesOrders() {
                         <span className="cell-emph" style={{ fontSize: 'var(--text-sm)' }}>{f.mother.receiver}</span>
                         <span className="mono" style={{ fontWeight: 'var(--font-semibold)', textAlign: 'right' }}>{money(amount)}</span>
                         <span style={{ textAlign: 'center' }}>
-                          {f.children.length > 0
-                            ? <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5', whiteSpace: 'nowrap' }}>{f.children.length} 单</span>
-                            : <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>未拆分</span>}
+                          <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5', whiteSpace: 'nowrap' }}>{st.total} 单</span>
                         </span>
                         <span key="dg" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           {pill(st.distribute)}
-                          {st.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.distributed}/{st.total}</span>}
+                          <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.distributed}/{st.total}</span>
                         </span>
                         <span key="sp" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           {pill(st.ship)}
-                          {st.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.shipped}/{st.total}</span>}
+                          <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.shipped}/{st.total}</span>
                         </span>
                         <span key="se" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           {pill(st.settle)}
-                          {st.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.settled}/{st.total}</span>}
+                          <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.settled}/{st.total}</span>
                         </span>
                         <span className="cell-muted" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{f.mother.entryTime}</span>
                         <span style={{ textAlign: 'center' }}>
-                          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setViewRoot(f.rootCode); }}>查看</Button>
+                          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setView({ root: f.rootCode }); }}>查看</Button>
                         </span>
                       </div>
 
-                      {/* 履约单展开区（默认履约单01 / 拆单后全部履约单；与母单同体组合卡：淡蓝子区 + 连接线挂接各履约单） */}
+                      {/* 履约单展开区：子行与母单行同列网格对齐（LY 徽标 + 迷你树形连接线 + 各列对齐母表头语义） */}
                       {open && (() => {
                         const units = fulfillmentUnitsOf(f);
                         return (
-                        <div style={{ borderTop: '1px solid var(--color-neutral-150)', background: 'var(--color-module-current-lightest)', padding: '10px 12px 12px 0' }}>
-                          <div style={{ paddingLeft: 88, display: 'flex', alignItems: 'baseline', gap: 8, margin: '2px 0 8px' }}>
-                            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)' }}>履约单</span>
-                            <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{units.length} 单</span>
-                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>履约单号 = 母销售单号 + LY 序号，拆单后顺延</span>
+                        <div style={{ background: 'var(--color-neutral-50)' }}>
+                          {/* 子单列表头（与主表头同款字样，底色与子单内容行一致） */}
+                          <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', alignItems: 'center', padding: 'var(--space-2) var(--space-4)', borderTop: '1px solid var(--color-neutral-150)', borderBottom: '1px solid var(--color-neutral-150)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-500)', background: 'var(--color-neutral-0)' }}>
+                            <span /><span />
+                            <span>履约单号（{units.length} 单）</span>
+                            <span>分发路径</span>
+                            <span style={{ gridColumn: 'span 2' }}>履约主体</span>
+                            <span>物流进度</span>
+                            <span>商品数量</span>
+                            <span style={{ textAlign: 'right' }}>金额</span>
+                            <span style={{ textAlign: 'center' }}>属性</span>
+                            <span>分发状态</span>
+                            <span>履约状态</span>
+                            <span>结算状态</span>
+                            <span>生成时间</span>
+                            <span style={{ textAlign: 'center' }}>操作</span>
                           </div>
                           {units.map((u, ui) => {
                             const pos = poDocs.filter((d) => d.childOrderId === u.underlying.id);
@@ -353,9 +361,6 @@ export default function SalesOrders() {
                             const pkgTotal = pkgs.length + selfPkgs.length;
                             const delivered = pkgs.filter((x) => x.status === 'delivered').length
                               + selfPkgs.filter((x) => x.status === 'delivered').length;
-                            const lastAll = [...selfPkgs.map((x) => ({ company: x.logisticsCompany, tracking: x.trackingNo })), ...pkgs.map((x) => ({ company: x.logisticsCompany, tracking: x.trackingNo }))];
-                            const lastPkg = pkgTotal > 0 ? lastAll[pkgTotal - 1] : null;
-                            const logText = lastPkg ? `${lastPkg.company ?? ''} ${lastPkg.tracking ?? ''}`.trim() : '';
                             const shipDone = shipStateOf(u.underlying, pos) === '已发货';
                             const pendingDist = u.underlying.processStatus === 'pending';
                             /* 状态色：已发货=绿 / 分发中=琥珀 / 待分发=灰 */
@@ -363,52 +368,59 @@ export default function SalesOrders() {
                             const badgeBg = shipDone ? '#E8F5E9' : pendingDist && u.virtual ? '#F0F2F0' : '#FFF8E9';
                             const isLast = ui === units.length - 1;
                             return (
-                            <div key={u.code} style={{ display: 'flex', alignItems: 'stretch' }}>
-                              {/* 连接线：自母单行下垂，经横肘挂接各履约单卡 */}
-                              <div style={{ width: 88, position: 'relative', flexShrink: 0 }}>
-                                <div style={{ position: 'absolute', left: 63, top: 0, bottom: isLast ? '50%' : 0, borderLeft: '2px solid var(--color-module-current-light)' }} />
-                                <div style={{ position: 'absolute', left: 63, top: '50%', width: 23, borderTop: '2px solid var(--color-module-current-light)' }} />
-                                <div style={{ position: 'absolute', left: 81, top: '50%', transform: 'translateY(-50%)', width: 10, height: 10, borderRadius: '50%', background: 'var(--color-neutral-0)', border: '2px solid var(--color-module-current-base)', zIndex: 1 }} />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0, margin: '6px 0', display: 'flex', alignItems: 'center', gap: 14, background: 'var(--color-neutral-0)', border: '1px solid var(--color-neutral-150)', borderLeft: `3px solid ${accent}`, borderRadius: 8, padding: '8px 14px' }}>
-                                {/* LY 徽标 */}
-                                <div style={{ width: 46, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                                  <span style={{ width: 40, height: 28, borderRadius: 8, background: badgeBg, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <span className="mono" style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: accent === '#B0B7B0' ? 'var(--color-neutral-500)' : accent }}>LY{String(u.seq).padStart(2, '0')}</span>
+                            <div key={u.code} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', alignItems: 'center', padding: 'var(--space-2) var(--space-4)', borderTop: ui === 0 ? 'none' : '1px solid var(--color-neutral-150)', background: 'var(--color-neutral-0)' }}>
+                              {/* LY 序号徽标（按履约状态着色） */}
+                              <span style={{ width: 30, height: 24, borderRadius: 6, background: badgeBg, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <span className="mono" style={{ fontSize: 10, fontWeight: 700, color: accent === '#B0B7B0' ? 'var(--color-neutral-500)' : accent }}>LY{String(u.seq).padStart(2, '0')}</span>
+                              </span>
+                              {/* 迷你树形连接线：竖线贯通各行，横肘挂接本行（末行止于中点） */}
+                              <span style={{ position: 'relative', alignSelf: 'stretch', display: 'block' }}>
+                                <span style={{ position: 'absolute', left: 10, top: 0, bottom: isLast ? '50%' : 0, borderLeft: '2px solid var(--color-module-current-light)' }} />
+                                <span style={{ position: 'absolute', left: 10, top: '50%', width: 9, borderTop: '2px solid var(--color-module-current-light)' }} />
+                                <span style={{ position: 'absolute', left: 17, top: '50%', transform: 'translateY(-50%)', width: 7, height: 7, borderRadius: '50%', background: 'var(--color-neutral-0)', border: `2px solid ${accent === '#B0B7B0' ? 'var(--color-neutral-300)' : 'var(--color-module-current-base)'}` }} />
+                              </span>
+                              {/* 履约单号 */}
+                              <span style={{ minWidth: 0 }}>
+                                <span className="cell-mono-emph" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{u.code}</span>
+                              </span>
+                              {/* 分发路径 */}
+                              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-600)', whiteSpace: 'nowrap' }}>{pathLabel(u.underlying)}</span>
+                              {/* 履约主体（跨 2 列，完整展示合作商全称） */}
+                              <span style={{ fontSize: 'var(--text-sm)', gridColumn: 'span 2', overflow: 'hidden', textOverflow: 'ellipsis' }} title={u.underlying.partnerName ?? ''}>
+                                {u.underlying.partnerName ?? (u.underlying.path === 'self' ? `自营${u.underlying.follower ? ` · ${u.underlying.follower}` : ''}` : '—')}
+                              </span>
+                              {/* 物流进度 */}
+                              <span style={{ minWidth: 0 }}>
+                                {pkgTotal > 0 ? (
+                                  <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', whiteSpace: 'nowrap' }}>
+                                    <span className="mono">{pkgTotal}</span> 包裹 · 妥投 <span className="mono" style={{ color: delivered === pkgTotal ? '#2E7D32' : '#9A7A1C' }}>{delivered}/{pkgTotal}</span>
                                   </span>
-                                  <span style={{ fontSize: 10, color: 'var(--pk-ink3, #99A29D)' }}>{u.virtual ? '默认履约' : '拆单生成'}</span>
-                                </div>
-                                {/* 履约单号 + 生成时间 */}
-                                <div style={{ width: 190, flexShrink: 0, minWidth: 0 }}>
-                                  <div className="cell-mono-emph" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)' }}>{u.code}</div>
-                                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>生成时间 <span className="mono">{u.createdAt}</span></div>
-                                </div>
-                                {/* 分发 / 发货状态药丸 */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
-                                  {orderDistributePill(u.underlying)}
-                                  {pill(shipStateOf(u.underlying, pos))}
-                                </div>
-                                {/* 履约单金额 */}
-                                <div style={{ width: 110, flexShrink: 0, textAlign: 'right' }}>
-                                  <div className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)' }}>{money(u.amount)}</div>
-                                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>履约单金额</div>
-                                </div>
-                                {/* 物流信息 */}
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  {pkgTotal > 0 ? (
-                                    <>
-                                      <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>
-                                        <span className="mono">{pkgTotal}</span> 包裹 · 妥投 <span className="mono" style={{ color: delivered === pkgTotal ? '#2E7D32' : '#9A7A1C' }}>{delivered}/{pkgTotal}</span>
-                                      </div>
-                                      {logText && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>末次：{logText}</div>}
-                                    </>
-                                  ) : (
-                                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>暂无发货包裹</div>
-                                  )}
-                                </div>
-                                {/* 操作 */}
-                                <Button size="sm" variant="ghost" style={{ flexShrink: 0 }} onClick={(e) => { e.stopPropagation(); navigate(`/sales/sales-orders/${f.rootCode}?child=${u.underlying.code}`); }}>查看</Button>
-                              </div>
+                                ) : (
+                                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', whiteSpace: 'nowrap' }}>暂无发货包裹</span>
+                                )}
+                              </span>
+                              {/* 商品数量（x 种 x 份） */}
+                              <span style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>
+                                <span className="mono">{u.underlying.items.length}</span> 种 <span className="mono">{u.underlying.items.reduce((s, it) => s + it.quantity, 0)}</span> 份
+                              </span>
+                              {/* 履约单金额（与母单「总金额」列对齐） */}
+                              <span className="mono" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', textAlign: 'right' }}>{money(u.amount)}</span>
+                              {/* 履约单属性 */}
+                              <span style={{ textAlign: 'center' }}>
+                                {u.virtual
+                                  ? <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#F5F5F5', color: '#9E9E9E', whiteSpace: 'nowrap' }}>默认履约</span>
+                                  : <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5', whiteSpace: 'nowrap' }}>拆单生成</span>}
+                              </span>
+                              {/* 分发 / 发货 / 结算状态（与母表头同列对齐） */}
+                              {orderDistributePill(u.underlying)}
+                              {pill(shipStateOf(u.underlying, pos))}
+                              {pill(settleStateOf(u.underlying))}
+                              {/* 生成时间（与母单「录入时间」列对齐） */}
+                              <span className="cell-muted" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{u.createdAt}</span>
+                              {/* 操作 */}
+                              <span style={{ textAlign: 'center' }}>
+                                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setView({ root: f.rootCode, child: u.underlying.code }); }}>查看</Button>
+                              </span>
                             </div>
                             );
                           })}
@@ -444,20 +456,20 @@ export default function SalesOrders() {
         </>)}
       </div>
 
-      {/* ── 销售单详情抽屉（参照客户管理抽屉样式） ── */}
+      {/* ── 销售单详情抽屉（销售单信息 / 履约单01… 分开 Tab 展示；子单进入默认定位该履约单 Tab） ── */}
       <DetailDrawer
-        open={!!viewRoot}
-        onClose={() => setViewRoot(null)}
+        open={!!view}
+        onClose={() => setView(null)}
         badge="SO"
-        title={viewRoot ?? ''}
+        title={view?.root ?? ''}
         statusTag={(() => {
-          const fam = families.find((f) => f.rootCode === viewRoot);
+          const fam = families.find((f) => f.rootCode === view?.root);
           if (!fam) return null;
           const st = familyStatesOf(fam);
           return <>{pill(st.distribute)}{pill(st.ship)}{pill(st.settle)}</>;
         })()}
         subtitle={(() => {
-          const fam = families.find((f) => f.rootCode === viewRoot);
+          const fam = families.find((f) => f.rootCode === view?.root);
           if (!fam) return '';
           const m = fam.mother;
           return `${platformLabelOf(m)} · ${m.customerName}（${m.customerType}） · ${m.receiver} ${m.receiverPhone}`;
@@ -465,93 +477,16 @@ export default function SalesOrders() {
         mode="view"
       >
         {(() => {
-          const fam = families.find((f) => f.rootCode === viewRoot);
+          const fam = families.find((f) => f.rootCode === view?.root);
           if (!fam) return null;
-          const m = fam.mother;
-          const children = fam.children;
-          const amount = (children.length > 0 ? children : fam.all).reduce((s, o) => s + o.totalAmount, 0);
           return (
-            <>
-              {/* 原始销售单信息 */}
-              <DrawerSection title="母销售单信息">
-                <InfoGrid cols={3}>
-                  <InfoItem label="母销售单号" emph mono>{fam.rootCode}</InfoItem>
-                  <InfoItem label="来源">{platformLabelOf(m)}{<span style={{ display: 'block', fontSize: 'var(--text-xs)', color: m.sourceChannel === 'push' ? '#7B1FA2' : '#0F64B5' }}>{EXTERNAL_CHANNEL_LABELS[m.sourceChannel]}</span>}</InfoItem>
-                  <InfoItem label="销售路径">{m.salesPath === 'via_platform' ? '经平台销售' : '直接销售'}</InfoItem>
-                  <InfoItem label="客户下单时间">{m.customerOrderTime ?? '—'}</InfoItem>
-                  <InfoItem label="客户侧订单号" mono>{m.customerOrderNo ?? '—'}</InfoItem>
-                  {m.platformCustomerName && <InfoItem label="平台客户">{m.platformCustomerName}</InfoItem>}
-                  <InfoItem label="客户" emph>{m.customerName}<span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{m.customerType}</span></InfoItem>
-                  <InfoItem label="客户区域">{regionText(m)}</InfoItem>
-                  <InfoItem label="订单金额（含子履约单）" emph mono valueStyle={{ color: 'var(--color-module-current-base)' }}>{`¥${amount.toLocaleString()}`}</InfoItem>
-                  <InfoItem label="子履约单数">{children.length > 0 ? `${children.length} 单` : '未拆分（即履约单）'}</InfoItem>
-                  <InfoItem label="录入时间 / 人">{m.entryTime} · {m.operator}</InfoItem>
-                  <InfoItem label="收货人">{m.receiver}</InfoItem>
-                  <InfoItem label="联系电话" mono>{m.receiverPhone}</InfoItem>
-                  <InfoItem label="收货地址" span={3}>{m.receiverAddress || '—'}</InfoItem>
-                  <InfoItem label="备注" span={3}>{m.remark || '—'}</InfoItem>
-                </InfoGrid>
-              </DrawerSection>
-
-              {/* 商品明细（母销售单全量） */}
-              <DrawerSection title={`商品明细（母销售单全量 ${m.items.length} 种）`}>
-                <table className="detail-inline-table">
-                  <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>销售实价</th><th>小计</th></tr></thead>
-                  <tbody>
-                    {m.items.map((it, i) => (
-                      <tr key={i}>
-                        <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
-                        <td>{it.spec}</td>
-                        <td className="mono">{it.quantity}</td>
-                        <td className="mono">¥{it.price.toLocaleString()}</td>
-                        <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>¥{(it.price * it.quantity).toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </DrawerSection>
-
-              {/* 子履约单履约情况 */}
-              <DrawerSection title={children.length > 0 ? `子履约单（${children.length}）` : '履约情况（未拆分，母销售单即履约单）'}>
-                {children.length > 0 ? (
-                  <table className="detail-inline-table">
-                    <thead><tr><th>子履约单号</th><th>分发路径</th><th>履约主体</th><th>金额</th><th>分发状态</th><th>发货状态</th><th>结算状态</th></tr></thead>
-                    <tbody>
-                      {children.map((c) => (
-                        <tr key={c.id}>
-                          <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{c.code}</td>
-                          <td style={{ fontSize: 'var(--text-sm)' }}>{pathLabel(c)}</td>
-                          <td style={{ fontSize: 'var(--text-sm)' }}>{c.partnerName ?? (c.path === 'self' ? `自营${c.follower ? ` · ${c.follower}` : ''}` : '—')}</td>
-                          <td className="mono">¥{c.totalAmount.toLocaleString()}</td>
-                          <td>{orderDistributePill(c)}</td>
-                          <td>{pill(shipStateOf(c, poDocs.filter((d) => d.childOrderId === c.id)))}</td>
-                          <td>{pill(settleStateOf(c))}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <InfoGrid cols={3}>
-                    <InfoItem label="分发状态">{pill(familyStatesOf(fam).distribute)}</InfoItem>
-                    <InfoItem label="发货状态">{pill(shipStateOf(m, poDocs.filter((d) => d.childOrderId === m.id)))}</InfoItem>
-                    <InfoItem label="结算状态">{pill(settleStateOf(m))}</InfoItem>
-                  </InfoGrid>
-                )}
-              </DrawerSection>
-
-              {/* 处理轨迹（母销售单） */}
-              <DrawerSection title="处理轨迹">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: 280, overflowY: 'auto' }}>
-                  {m.history.map((h, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', alignItems: 'baseline' }}>
-                      <span className="mono" style={{ color: 'var(--color-neutral-400)', flexShrink: 0 }}>{h.time}</span>
-                      <span style={{ fontWeight: 'var(--font-medium)', flexShrink: 0 }}>{h.action}</span>
-                      {h.detail && <span style={{ color: 'var(--color-neutral-500)' }}>{h.detail}</span>}
-                    </div>
-                  ))}
-                </div>
-              </DrawerSection>
-            </>
+            <SalesOrderDetailTabs
+              key={`${fam.rootCode}-${view?.child ?? 'info'}`}
+              family={fam}
+              poDocs={poDocs}
+              initialTab={view?.child ?? 'info'}
+              showStates={false}
+            />
           );
         })()}
       </DetailDrawer>

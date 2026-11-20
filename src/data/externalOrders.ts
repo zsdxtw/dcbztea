@@ -1,7 +1,7 @@
 /**
  * 订单分发（销售订单入口）Mock 数据源
  * 来源渠道：手工录入（manual）/ 平台直连推送（push）
- * 基础种子覆盖全部状态 + 程序化生成的 48 条随机状态演示订单（buildDemoOrders）
+ * 基础种子覆盖全部状态 + 程序化生成的 53 条随机状态演示订单（buildDemoOrders）
  */
 import type { ExternalOrder, ExternalOrderItem, ExternalPlatform } from '../types';
 
@@ -22,7 +22,7 @@ const baseSeeds: ExternalOrder[] = [
     history: [{ time: '2026-10-25', action: '手工录入订单', detail: '天猫平台' }],
   },
 
-  /* ── 待处理（平台直连推送） ── */
+  /* ── 待处理（平台直连推送 · 已拆单：LY01 已指定转派 / LY02 待分发） ── */
   {
     id: 'eo8', code: 'SO-2610250002', platform: 'douyin', externalOrderNo: 'DY-99012218',
     customerName: '茶颜悦色文创店', customerType: '渠道客户', customerRegion: '湖南长沙',
@@ -30,12 +30,49 @@ const baseSeeds: ExternalOrder[] = [
       { productId: 'p2', productName: '碧螺春·一级', spec: '100g/袋', quantity: 25, price: 328 },
       { productId: 'p12', productName: '寿眉·2019年陈', spec: '350g/饼', quantity: 30, price: 158 },
     ],
-    totalAmount: 12840,
+    totalAmount: 12940,
     receiver: '文创店仓储部', receiverPhone: '0731-8866****', receiverAddress: '湖南长沙市天心区太平老街58号',
     remark: '抖音商城直连推送，自动建单',
     entryTime: '2026-10-25', operator: '系统直连', sourceChannel: 'push',
     processStatus: 'pending',
-    history: [{ time: '2026-10-25', action: '直连推送订单', detail: '抖音商城 API 自动同步' }],
+    history: [
+      { time: '2026-10-25', action: '直连推送订单', detail: '抖音商城 API 自动同步' },
+      { time: '2026-10-25', action: '拆单', detail: '拆出子履约单 SO-2610250002LY01、SO-2610250002LY02，均挂本母销售单下' },
+    ],
+  },
+
+  /* ── SO-2610250002 子履约单 LY01（碧螺春 · 已指定转派八马，待接单） ── */
+  {
+    id: 'eo8_ly1', code: 'SO-2610250002LY01', parentCode: 'SO-2610250002',
+    platform: 'douyin', externalOrderNo: 'DY-99012218',
+    customerName: '茶颜悦色文创店', customerType: '渠道客户', customerRegion: '湖南长沙',
+    items: [{ productId: 'p2', productName: '碧螺春·一级', spec: '100g/袋', quantity: 25, price: 328 }],
+    totalAmount: 8200,
+    receiver: '文创店仓储部', receiverPhone: '0731-8866****', receiverAddress: '湖南长沙市天心区太平老街58号',
+    remark: '抖音商城直连推送，自动建单',
+    entryTime: '2026-10-25', operator: '系统直连', sourceChannel: 'push',
+    processStatus: 'distribute_pending',
+    path: 'distribute', distributeMode: 'assign',
+    partnerId: '3', partnerName: '八马茶业股份有限公司',
+    transferSource: 'assign', transferTime: '2026-10-25',
+    history: [
+      { time: '2026-10-25', action: '拆单生成子订单', detail: '从 SO-2610250002 拆出 · 碧螺春·一级×25' },
+      { time: '2026-10-25', action: '指定转派', detail: '指定八马茶业股份有限公司 → 等待合作商接单' },
+    ],
+  },
+
+  /* ── SO-2610250002 子履约单 LY02（寿眉 · 待分发） ── */
+  {
+    id: 'eo8_ly2', code: 'SO-2610250002LY02', parentCode: 'SO-2610250002',
+    platform: 'douyin', externalOrderNo: 'DY-99012218',
+    customerName: '茶颜悦色文创店', customerType: '渠道客户', customerRegion: '湖南长沙',
+    items: [{ productId: 'p12', productName: '寿眉·2019年陈', spec: '350g/饼', quantity: 30, price: 158 }],
+    totalAmount: 4740,
+    receiver: '文创店仓储部', receiverPhone: '0731-8866****', receiverAddress: '湖南长沙市天心区太平老街58号',
+    remark: '抖音商城直连推送，自动建单',
+    entryTime: '2026-10-25', operator: '系统直连', sourceChannel: 'push',
+    processStatus: 'pending',
+    history: [{ time: '2026-10-25', action: '拆单生成子订单', detail: '从 SO-2610250002 拆出（剩余部分） · 寿眉·2019年陈×30' }],
   },
 
   /* ── 自营待接单（等管理后台在销售订单-分发订单接单） ── */
@@ -260,7 +297,7 @@ const baseSeeds: ExternalOrder[] = [
 /* ── 标签与配色 ── */
 
 /* ═══════════════════════════════════════════════════════════════
- * 演示数据生成器：48 条随机状态订单（确定性索引驱动，覆盖状态机全貌）
+ * 演示数据生成器：53 条随机状态订单（确定性索引驱动，覆盖状态机全貌）
  * 含拆单家族（母/子订单、比单未成标签）、按商品比单中间态
  * ═══════════════════════════════════════════════════════════════ */
 
@@ -397,7 +434,7 @@ function pickItems(seq: number, forceFirst?: ExternalOrderItem): ExternalOrderIt
   return items;
 }
 
-/** 48 条演示订单 */
+/** 53 条演示订单 */
 function buildDemoOrders(): ExternalOrder[] {
   const orders: ExternalOrder[] = [];
   let seq = 1;
@@ -700,6 +737,86 @@ function buildDemoOrders(): ExternalOrder[] {
       { time: mother.entryTime, action: '按商品拆分定案', detail: '已生成 2 张子履约单：LY01 中单已结算，LY02 比单未成退回待分发' },
     ];
     orders.push(mother, c1, c2);
+  }
+
+  /* ── 多履约单家族 F（四单家族：LY01 已结算 / LY02 发货中 / LY03 转派待接单 / LY04 比单未成退回） ── */
+  {
+    const sM = next(); const s1 = next(); const s2 = next(); const s3 = next(); const s4 = next();
+    const mother = buildOne(sM, {
+      items: [], processStatus: 'processed',
+      history: [{ time: D(sM), action: '手工录入订单', detail: '演示数据' }],
+    });
+    const c1 = buildOne(s1, { items: [], processStatus: 'pending', history: [] });
+    const c2 = buildOne(s2, { items: [], processStatus: 'pending', history: [] });
+    const c3 = buildOne(s3, { items: [], processStatus: 'pending', history: [] });
+    const c4 = buildOne(s4, { items: [], processStatus: 'pending', history: [] });
+    /* 四个商品组（每履约单一组），金额合计 = 母销售单总额 */
+    const i1 = [{ productId: 'p1', productName: '西湖龙井·明前特级', spec: '50g/罐', quantity: 12, price: 452 }];
+    const i2 = [{ productId: 'p5', productName: '金骏眉·特级', spec: '50g/罐', quantity: 6, price: 1024 }];
+    const i3 = [{ productId: 'p12', productName: '寿眉·2019年陈', spec: '350g/饼', quantity: 36, price: 158 }];
+    const i4 = [{ productId: 'p14', productName: '铁观音·清香一级', spec: '250g/罐', quantity: 18, price: 208 }];
+    const sumOf = (items: ExternalOrderItem[]) => items.reduce((s, it) => s + it.price * it.quantity, 0);
+    /* 子履约单继承母销售单字段（来源/客户/收货），仅履约信息各异 */
+    for (const [c, items] of [[c1, i1], [c2, i2], [c3, i3], [c4, i4]] as const) {
+      c.items = items; c.totalAmount = sumOf(items);
+      c.platform = mother.platform; c.externalOrderNo = mother.externalOrderNo;
+      c.salesPath = mother.salesPath;
+      if (mother.platformCustomerName) { c.platformCustomerId = mother.platformCustomerId; c.platformCustomerName = mother.platformCustomerName; }
+      c.customerName = mother.customerName; c.customerType = mother.customerType; c.customerRegion = mother.customerRegion;
+      c.receiver = mother.receiver; c.receiverPhone = mother.receiverPhone; c.receiverAddress = mother.receiverAddress;
+      c.entryTime = mother.entryTime;
+      c.parentCode = mother.code;
+    }
+    c1.code = `${mother.code}LY01`;
+    c1.processStatus = 'completed';
+    c1.path = 'distribute'; c1.distributeMode = 'assign';
+    c1.partnerId = '2'; c1.partnerName = '福建正山堂茶业有限责任公司';
+    c1.transferSource = 'assign'; c1.transferTime = mother.entryTime;
+    c1.partnerStatus = 'settled'; c1.settleOnTime = true;
+    c1.history = [
+      { time: mother.entryTime, action: '拆单生成子订单', detail: '按商品拆出（龙井组）' },
+      { time: mother.entryTime, action: '指定转派', detail: '→ 福建正山堂茶业有限责任公司' },
+      { time: mother.entryTime, action: '合作商接单', detail: '合作商终端接单' },
+      { time: mother.entryTime, action: '合作商发货', detail: '1 个包裹发出' },
+      { time: mother.entryTime, action: '客户签收', detail: '包裹妥投并签收' },
+      { time: mother.entryTime, action: '结算完成', detail: '按时履约 · 积分 +5' },
+    ];
+    c2.code = `${mother.code}LY02`;
+    c2.processStatus = 'processed';
+    c2.path = 'distribute'; c2.distributeMode = 'assign';
+    c2.partnerId = '8'; c2.partnerName = '四川省峨眉山竹叶青茶业有限公司';
+    c2.transferSource = 'assign'; c2.transferTime = mother.entryTime;
+    c2.partnerStatus = 'shipping';
+    c2.history = [
+      { time: mother.entryTime, action: '拆单生成子订单', detail: '按商品拆出（金骏眉组）' },
+      { time: mother.entryTime, action: '指定转派', detail: '→ 四川省峨眉山竹叶青茶业有限公司' },
+      { time: mother.entryTime, action: '合作商接单', detail: '合作商终端接单' },
+      { time: mother.entryTime, action: '合作商发货', detail: '分批发货 · 2 个包裹（部分在途）' },
+    ];
+    c3.code = `${mother.code}LY03`;
+    c3.processStatus = 'distribute_pending';
+    c3.path = 'distribute'; c3.distributeMode = 'assign';
+    c3.partnerId = '4'; c3.partnerName = '云南大益茶业集团有限公司';
+    c3.transferSource = 'assign'; c3.transferTime = mother.entryTime;
+    c3.history = [
+      { time: mother.entryTime, action: '拆单生成子订单', detail: '按商品拆出（寿眉组）' },
+      { time: mother.entryTime, action: '指定转派', detail: '→ 云南大益茶业集团有限公司 · 等待合作商接单' },
+    ];
+    c4.code = `${mother.code}LY04`;
+    c4.processStatus = 'pending';
+    c4.sourceTag = 'compare_failed';
+    c4.history = [
+      { time: mother.entryTime, action: '拆单生成子订单', detail: '按商品拆出（铁观音组）' },
+      { time: mother.entryTime, action: '比单未成退回', detail: '该组商品比单无合作商报名，退回分发-待处理' },
+    ];
+    mother.items = [...i1, ...i2, ...i3, ...i4];
+    mother.totalAmount = sumOf(mother.items);
+    mother.processStatus = 'processed';
+    mother.history = [
+      { time: mother.entryTime, action: '手工录入订单', detail: '母销售单（四履约单家族演示）' },
+      { time: mother.entryTime, action: '按商品一键拆单', detail: '拆为 4 张子履约单：LY01 已结算 / LY02 发货中 / LY03 待接单 / LY04 比单未成退回待分发' },
+    ];
+    orders.push(mother, c1, c2, c3, c4);
   }
 
   /* ── 自营链种子 ×4：已接单（采购在途）/ 已接单（到货待发）/ 已发货运输中（分仓直发）/ 妥投（直发采购） ── */
