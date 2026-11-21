@@ -141,6 +141,14 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
   const children = family.children;
   const current = family.all.find((o) => o.code === code) ?? family.mother;
   const currentPos = poDocs.filter((d) => d.childOrderId === current.id);
+  /* 物流详情弹窗（点击发货情况表的物流公司/单号） */
+  const [logView, setLogView] = useState<{
+    no: string; company: string; tracking: string; status: string; settled?: boolean;
+    shippedAt?: string; deliveredAt?: string; confirmedAt?: string;
+    itemsList: { productName: string; qty: number }[];
+    poCode?: string; supplierName?: string; warehouseName?: string;
+  } | null>(null);
+  const logStatusLabel = (st: string) => (st === 'confirmed' ? '全部已确收' : st === 'delivered' ? '已妥投' : '运输中');
 
   return (
     <>
@@ -199,8 +207,8 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
 
         {/* 发货情况（包裹1、包裹2…：该履约单下全部发货包裹，PO 包裹 + 自营分仓发货；不单独成标签组） */}
         {(() => {
-          const poPkgs = currentPos.flatMap((d) => d.packages.filter((x) => x.status !== 'void').map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, status: x.status as string, settled: x.settled, items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') })));
-          const selfPkgs = (current.selfShipments ?? []).map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, status: x.status as string, settled: x.settled, items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') }));
+          const poPkgs = currentPos.flatMap((d) => d.packages.filter((x) => x.status !== 'void').map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, status: x.status as string, settled: x.settled, shippedAt: x.shippedAt, items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、'), itemsList: x.items, poCode: d.code, supplierName: d.supplierName, deliveredAt: undefined, confirmedAt: undefined, warehouseName: undefined })));
+          const selfPkgs = (current.selfShipments ?? []).map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, status: x.status as string, settled: x.settled, shippedAt: x.shippedAt, deliveredAt: x.deliveredAt, confirmedAt: x.confirmedAt, items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、'), itemsList: x.items, warehouseName: x.warehouseName, poCode: undefined, supplierName: undefined }));
           const all = [...poPkgs, ...selfPkgs];
           return all.length === 0 ? (
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)', padding: 'var(--space-2) 0' }}>暂无发货包裹（发货后此处按包裹 1、包裹 2… 展示物流信息）</div>
@@ -212,7 +220,15 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
                   <tr key={x.no + i}>
                     <td style={{ fontWeight: 'var(--font-medium)' }}>包裹{i + 1}</td>
                     <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{x.no}</td>
-                    <td style={{ fontSize: 'var(--text-sm)' }}>{x.company} <span className="mono">{x.tracking}</span></td>
+                    <td style={{ fontSize: 'var(--text-sm)' }}>
+                      <span
+                        style={{ color: 'var(--color-module-current-base)', cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted' }}
+                        title="点击查看物流详情"
+                        onClick={() => setLogView({ no: x.no, company: x.company, tracking: x.tracking, status: x.status, settled: x.settled, shippedAt: x.shippedAt, deliveredAt: x.deliveredAt, confirmedAt: x.confirmedAt, itemsList: x.itemsList, poCode: x.poCode, supplierName: x.supplierName, warehouseName: x.warehouseName })}
+                      >
+                        {x.company} <span className="mono">{x.tracking}</span>
+                      </span>
+                    </td>
                     <td style={{ fontSize: 'var(--text-sm)' }}>{x.items}</td>
                     <td>{pill(x.status === 'confirmed' ? '全部已确收' : x.status === 'delivered' ? '已妥投' : '运输中')}{x.settled && <span style={{ marginLeft: 4 }}>{pill('已结算')}</span>}</td>
                   </tr>
@@ -270,6 +286,45 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
         <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3) var(--space-4)', background: '#E0F7FA', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)' }}>
           命中报备：<strong className="mono">{current.reportMatches.map((m) => m.reportCode).join('、')}</strong>
           （{current.reportMatches.map((m) => `${m.reportCode}→${m.partnerName}`).join('；')}）
+        </div>
+      )}
+
+      {/* 物流详情弹窗 */}
+      {logView && (
+        <div className="category-dialog-overlay" onClick={() => setLogView(null)}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 620 }}>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-3)' }}>物流详情 · {logView.no}</div>
+            <InfoGrid cols={4}>
+              <InfoItem label="发货单号" mono emph>{logView.no}</InfoItem>
+              <InfoItem label="物流公司">{logView.company}</InfoItem>
+              <InfoItem label="运单号" mono>{logView.tracking}</InfoItem>
+              <InfoItem label="当前状态">{pill(logStatusLabel(logView.status))}</InfoItem>
+              <InfoItem label="发货时间" mono>{logView.shippedAt ?? '—'}</InfoItem>
+              {logView.deliveredAt && <InfoItem label="妥投时间" mono>{logView.deliveredAt}</InfoItem>}
+              {logView.confirmedAt && <InfoItem label="确收时间" mono>{logView.confirmedAt}</InfoItem>}
+              <InfoItem label="结算状态">{logView.settled ? pill('已结算') : pill('未结算')}</InfoItem>
+              {logView.poCode && <InfoItem label="关联采购单" mono>{logView.poCode}</InfoItem>}
+              {logView.supplierName && <InfoItem label="供应商">{logView.supplierName}</InfoItem>}
+              {logView.warehouseName && <InfoItem label="发货仓">{logView.warehouseName}</InfoItem>}
+            </InfoGrid>
+            <div style={{ marginTop: 'var(--space-4)' }}>
+              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>包裹商品</div>
+              <table className="detail-inline-table">
+                <thead><tr><th>商品名称</th><th style={{ width: 100 }}>数量</th></tr></thead>
+                <tbody>
+                  {logView.itemsList.map((it, i) => (
+                    <tr key={i}>
+                      <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
+                      <td className="mono">{it.qty}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-4)' }}>
+              <Button variant="ghost" onClick={() => setLogView(null)}>关闭</Button>
+            </div>
+          </div>
         </div>
       )}
     </>
