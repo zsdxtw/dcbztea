@@ -106,7 +106,7 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
         </div>
       </DrawerSection>
 
-      <DrawerSection title="收货信息" style={{ marginTop: 'var(--space-4)' }}>
+      <DrawerSection title="收货信息" style={{ marginTop: 'var(--space-7)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3) var(--space-4)' }}>
           {infoItem('收货人', mother.receiver, { emph: true })}
           {infoItem('联系电话', mother.receiverPhone, { mono: true })}
@@ -117,7 +117,7 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
         </div>
       </DrawerSection>
 
-      <DrawerSection title="商品信息" style={{ marginTop: 'var(--space-4)' }}>
+      <DrawerSection title="商品信息" style={{ marginTop: 'var(--space-7)' }}>
         <table className="detail-inline-table">
           <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>单价</th><th>小计</th></tr></thead>
           <tbody>
