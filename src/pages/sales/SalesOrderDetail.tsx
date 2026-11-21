@@ -46,15 +46,27 @@ const infoItem = (label: string, value: React.ReactNode, opts?: { mono?: boolean
  * 共享区块：销售单详情页与销售单列表「查看」抽屉共用
  * ────────────────────────────────────────────── */
 
-/** 母销售单信息内容（「销售单信息」Tab 内容区） */
-function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFamily; showStates?: boolean }) {
+/** 母销售单信息内容（拆分为 订单信息 / 收货信息 / 商品信息 三个标签） */
+function MotherOrderInfoSection({ family, showStates = true, section = 'order' }: { family: OrderFamily; showStates?: boolean; section: 'order' | 'receiver' | 'products' }) {
   const mother = family.mother;
   const children = family.children;
   const states = familyStatesOf(family);
   const amount = (children.length > 0 ? children : family.all).reduce((s, o) => s + o.totalAmount, 0);
+  /* 商品信息：按商品规格聚合（拆单家族合并全部子履约单商品行） */
+  const productRows = (() => {
+    const rows = children.length > 0 ? children.flatMap((c) => c.items) : mother.items;
+    const map = new Map<string, { productName: string; spec: string; quantity: number; price: number }>();
+    for (const it of rows) {
+      const key = `${it.productName}|${it.spec}`;
+      const cur = map.get(key);
+      if (cur) cur.quantity += it.quantity;
+      else map.set(key, { productName: it.productName, spec: it.spec, quantity: it.quantity, price: it.price });
+    }
+    return [...map.values()];
+  })();
   return (
     <>
-      {showStates && (
+      {showStates && section === 'order' && (
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {pill(states.distribute)}
@@ -74,26 +86,54 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
           </span>
         </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3) var(--space-4)' }}>
-        {infoItem('销售单号', family.rootCode, { mono: true, emph: true })}
-        {infoItem('订单来源', <>淡茶半盏<span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{EXTERNAL_CHANNEL_LABELS[mother.sourceChannel]}</span></>)}
-        {infoItem('下单平台', mother.platform ? EXTERNAL_PLATFORM_LABELS[mother.platform] : '—')}
-        {infoItem('平台订单号', mother.externalOrderNo, { mono: true })}
-        {infoItem('客户', `${mother.customerName}（${mother.customerType}）`, { emph: true })}
-        {infoItem('客户区域', regionTextOf(mother.customerRegion, mother.receiverAddress))}
-        {infoItem('总金额', <span style={{ color: 'var(--color-module-current-base)', fontWeight: 'var(--font-semibold)' }}>{money(amount)}</span>, { mono: true })}
-        {infoItem('履约单数', children.length > 0 ? `${children.length} 单` : '1 单（未拆分，母销售单即履约单）')}
-        {infoItem('收货人', mother.receiver)}
-        {infoItem('联系电话', mother.receiverPhone, { mono: true })}
-        {infoItem('销售路径', mother.salesPath === 'via_platform' ? '经平台销售' : '直接销售')}
-        {infoItem('客户下单时间', mother.customerOrderTime ?? '—')}
-        {infoItem('客户侧订单号', mother.customerOrderNo ?? '—', { mono: true })}
-        {infoItem('录入时间', fmtDateTime(mother.entryTime), { mono: true })}
-        {infoItem('录入人', mother.operator)}
-        {mother.platformCustomerName && infoItem('平台客户', mother.platformCustomerName)}
-        {infoItem('收货地址', mother.receiverAddress, { span: 2 })}
-        {infoItem('备注', mother.remark || '—', { span: 2 })}
-      </div>
+      {section === 'order' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3) var(--space-4)' }}>
+          {infoItem('销售单号', family.rootCode, { mono: true, emph: true })}
+          {infoItem('订单来源', <>淡茶半盏<span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{EXTERNAL_CHANNEL_LABELS[mother.sourceChannel]}</span></>)}
+          {infoItem('下单平台', mother.platform ? EXTERNAL_PLATFORM_LABELS[mother.platform] : '—')}
+          {infoItem('平台订单号', mother.externalOrderNo, { mono: true })}
+          {infoItem('客户', `${mother.customerName}（${mother.customerType}）`, { emph: true })}
+          {infoItem('客户区域', regionTextOf(mother.customerRegion, mother.receiverAddress))}
+          {infoItem('总金额', <span style={{ color: 'var(--color-module-current-base)', fontWeight: 'var(--font-semibold)' }}>{money(amount)}</span>, { mono: true })}
+          {infoItem('履约单数', children.length > 0 ? `${children.length} 单` : '1 单（未拆分，母销售单即履约单）')}
+          {infoItem('销售路径', mother.salesPath === 'via_platform' ? '经平台销售' : '直接销售')}
+          {infoItem('客户下单时间', mother.customerOrderTime ?? '—')}
+          {infoItem('客户侧订单号', mother.customerOrderNo ?? '—', { mono: true })}
+          {infoItem('录入时间', fmtDateTime(mother.entryTime), { mono: true })}
+          {infoItem('录入人', mother.operator)}
+          {mother.platformCustomerName && infoItem('平台客户', mother.platformCustomerName)}
+        </div>
+      )}
+      {section === 'receiver' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3) var(--space-4)' }}>
+          {infoItem('收货人', mother.receiver, { emph: true })}
+          {infoItem('联系电话', mother.receiverPhone, { mono: true })}
+          {infoItem('收货地区', regionTextOf(mother.customerRegion, mother.receiverAddress))}
+          {infoItem('销售路径', mother.salesPath === 'via_platform' ? '经平台销售' : '直接销售')}
+          {infoItem('收货地址', mother.receiverAddress, { span: 2 })}
+          {infoItem('备注', mother.remark || '—', { span: 2 })}
+        </div>
+      )}
+      {section === 'products' && (
+        <table className="detail-inline-table">
+          <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>单价</th><th>小计</th></tr></thead>
+          <tbody>
+            {productRows.map((it, i) => (
+              <tr key={i}>
+                <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
+                <td>{it.spec}</td>
+                <td className="mono">{it.quantity}</td>
+                <td className="mono">{money(it.price)}</td>
+                <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(it.price * it.quantity)}</td>
+              </tr>
+            ))}
+            <tr style={{ fontWeight: 'var(--font-semibold)' }}>
+              <td colSpan={4} style={{ textAlign: 'right', color: 'var(--color-text-secondary)' }}>合计</td>
+              <td className="mono" style={{ color: 'var(--color-module-current-base)' }}>{money(amount)}</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
     </>
   );
 }
@@ -238,7 +278,10 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
   );
 }
 
-/** 销售单详情 Tab 视图：销售单信息 / 履约单01 / 履约单02… 分开以 Tab 展示（列表「查看」抽屉与本详情页共用） */
+/** 母销售单信息标签键（销售单信息拆分为三个标签） */
+const INFO_TAB_KEYS = ['info-order', 'info-receiver', 'info-products'];
+
+/** 销售单详情 Tab 视图：订单信息 / 收货信息 / 商品信息 / 履约单01 / 履约单02… 分开以 Tab 展示（列表「查看」抽屉与本详情页共用） */
 export function SalesOrderDetailTabs({ family, poDocs, initialTab = 'info', showStates = true }: {
   family: OrderFamily;
   poDocs: PurchaseDoc[];
@@ -249,7 +292,9 @@ export function SalesOrderDetailTabs({ family, poDocs, initialTab = 'info', show
 }) {
   const units = useMemo(() => fulfillmentUnitsOf(family), [family]);
   const isUnitCode = (code: string) => units.some((u) => u.underlying.code === code);
-  const [active, setActive] = useState<string>(initialTab === 'info' || isUnitCode(initialTab) ? initialTab : 'info');
+  /* 销售单信息拆分为三个标签（订单信息 / 收货信息 / 商品信息）；'info' 兼容旧入口 */
+  const normalizeTab = (t: string) => (INFO_TAB_KEYS.includes(t) || isUnitCode(t) ? t : 'info-order');
+  const [active, setActive] = useState<string>(normalizeTab(initialTab));
 
   const tabBtn = (code: string, label: string) => (
     <button
@@ -267,16 +312,20 @@ export function SalesOrderDetailTabs({ family, poDocs, initialTab = 'info', show
     </button>
   );
 
-  const showInfo = active === 'info' || !isUnitCode(active);
+  const isInfoKey = (k: string) => INFO_TAB_KEYS.includes(k);
+  const showInfo = isInfoKey(active) || !isUnitCode(active);
+  const infoSection = isInfoKey(active) ? (active.replace('info-', '') as 'order' | 'receiver' | 'products') : 'order';
   return (
     <>
-      {/* 顶部 Tab：销售单信息 + 各履约单 */}
+      {/* 顶部 Tab：订单信息 / 收货信息 / 商品信息 + 各履约单 */}
       <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
-        {tabBtn('info', '销售单信息')}
+        {tabBtn('info-order', '订单信息')}
+        {tabBtn('info-receiver', '收货信息')}
+        {tabBtn('info-products', '商品信息')}
         {units.map((u) => tabBtn(u.underlying.code, `履约单${String(u.seq).padStart(2, '0')} · ${u.code}`))}
       </div>
       {showInfo
-        ? <MotherOrderInfoSection family={family} showStates={showStates} />
+        ? <MotherOrderInfoSection family={family} showStates={showStates} section={infoSection} />
         : <FulfillmentUnitDetail family={family} poDocs={poDocs} code={active} />}
     </>
   );
