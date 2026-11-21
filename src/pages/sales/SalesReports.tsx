@@ -171,7 +171,7 @@ export default function SalesReports() {
           return (
             <>
               <DrawerSection title="报备信息">
-                <InfoGrid>
+                <InfoGrid cols={4}>
                   <InfoItem label="报备编号" mono emph>{selected.code}</InfoItem>
                   <InfoItem label="报备类型">{PARTNER_REPORT_TYPE_LABELS[selected.type]}</InfoItem>
                   {selected.type === 'order' && <InfoItem label="报备模式">{PARTNER_ORDER_KIND_LABELS[selected.orderKind ?? 'self']}</InfoItem>}
@@ -185,7 +185,7 @@ export default function SalesReports() {
               </DrawerSection>
 
               <DrawerSection title="报备对象">
-                <InfoGrid>
+                <InfoGrid cols={4}>
                   <InfoItem label="报备客户" emph span={3}>{selected.customerName ?? '—'}</InfoItem>
                   {selected.type === 'order' && (
                     <>
@@ -246,7 +246,7 @@ export default function SalesReports() {
               </DrawerSection>
 
               <DrawerSection title="审批记录">
-                <InfoGrid>
+                <InfoGrid cols={4}>
                   <InfoItem label="审批状态">{STATUS_LABELS[selected.status]}</InfoItem>
                   <InfoItem label="审批时间">{selected.reviewTime || '—'}</InfoItem>
                   <InfoItem label="审批意见" span={3}>{selected.reviewNote || '待审批'}</InfoItem>

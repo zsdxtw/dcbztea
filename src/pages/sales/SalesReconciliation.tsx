@@ -233,7 +233,7 @@ export default function SalesReconciliation() {
         {selectedRecord && (
           <>
             <DrawerSection title="客户信息">
-              <InfoGrid cols={3}>
+              <InfoGrid cols={4}>
                 <InfoItem label="客户名称" emph>{selectedRecord.customer}</InfoItem>
                 <InfoItem label="客户类型">{CUSTOMER_TYPE_LABELS[selectedRecord.customerType]}</InfoItem>
                 <InfoItem label="对账单号" emph mono>{selectedRecord.code}</InfoItem>
@@ -245,7 +245,7 @@ export default function SalesReconciliation() {
             </DrawerSection>
 
             <DrawerSection title="订单汇总">
-              <InfoGrid cols={3}>
+              <InfoGrid cols={4}>
                 <InfoItem label="关联销售单数" mono>{selectedRecord.orderCount} 单</InfoItem>
                 <InfoItem label="发票状态">{selectedRecord.invoiceStatus}</InfoItem>
                 <InfoItem label="状态">{reconciliationStatusLabel(selectedRecord.status)}</InfoItem>

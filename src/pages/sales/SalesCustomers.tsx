@@ -1004,7 +1004,7 @@ export default function SalesCustomers() {
             {detailTab === 'basic' && (<>
               <DrawerSection title="基本信息">
                 {editBasic === null ? (
-                  <InfoGrid cols={3}>
+                  <InfoGrid cols={4}>
                     <InfoItem label="客户编号" emph mono>{detailCustomer.customerCode || '—'}</InfoItem>
                     <InfoItem label="客户简称" emph>{detailCustomer.shortName || '—'}</InfoItem>
                     <InfoItem label="客户名称" emph>{detailCustomer.name}</InfoItem>
@@ -1033,7 +1033,7 @@ export default function SalesCustomers() {
 
               <DrawerSection title="联系信息">
                 {editBasic === null ? (
-                  <InfoGrid cols={3}>
+                  <InfoGrid cols={4}>
                     <InfoItem label="联系人">{detailCustomer.contactPerson || '—'}</InfoItem>
                     <InfoItem label="联系电话" mono>{detailCustomer.contactPhone || '—'}</InfoItem>
                     <InfoItem label="联系邮箱">{detailCustomer.contactEmail || '—'}</InfoItem>
@@ -1049,7 +1049,7 @@ export default function SalesCustomers() {
               {detailTab === 'finance' && detailCustomer.type !== 'personal' && (<>
                 <DrawerSection title="财务信息">
                   {editFinance === null ? (
-                    <InfoGrid cols={3}>
+                    <InfoGrid cols={4}>
                       <InfoItem label="结算方式">{detailCustomer.settlementMethod || '—'}</InfoItem>
                       <InfoItem label="税号" mono>{detailCustomer.taxNo || '—'}</InfoItem>
                     </InfoGrid>
@@ -1233,7 +1233,7 @@ export default function SalesCustomers() {
                       )
                     ) : procOpenForm === null ? (
                       <>
-                        <InfoGrid cols={3}>
+                        <InfoGrid cols={4}>
                           <InfoItem label="采购端状态">
                             <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: procAdmin?.status === 'active' ? '#E8F5E9' : '#FFEBEE', color: procAdmin?.status === 'active' ? '#01795D' : '#C62828' }}>
                               {procAdmin?.status === 'active' ? '已开通 · 启用中' : '已开通 · 已停用'}
@@ -1633,7 +1633,7 @@ export default function SalesCustomers() {
                     <Field label="备注" full><input className="filter-input" style={{ width: '100%' }} value={editPlatformForm.remark ?? ''} onChange={e => setEditPlatformForm(prev => prev ? { ...prev, remark: e.target.value } : prev)} /></Field>
                   </div>
                 ) : (
-                  <InfoGrid cols={3}>
+                  <InfoGrid cols={4}>
                     <InfoItem label="平台名称" emph>{detailPlatform.name}</InfoItem>
                     <InfoItem label="平台简称" emph>{detailPlatform.shortName}</InfoItem>
                     <InfoItem label="平台编号" emph mono>{detailPlatform.code}</InfoItem>
@@ -1759,7 +1759,7 @@ export default function SalesCustomers() {
                     </div>
                   )
                 ) : (
-                  <InfoGrid cols={3}>
+                  <InfoGrid cols={4}>
                     <InfoItem label="采买平台状态">
                       <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E8F5E9', color: '#01795D' }}>已开通 · 启用中</span>
                     </InfoItem>

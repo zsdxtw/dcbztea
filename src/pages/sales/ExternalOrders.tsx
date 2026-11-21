@@ -734,7 +734,7 @@ export default function ExternalOrders() {
             {/* ── 查看态：订单信息 ── */}
             {!editForm.externalOrderNo && Object.keys(editForm).length === 0 && (
               <DrawerSection title="订单信息">
-                <InfoGrid>
+                <InfoGrid cols={4}>
                   <InfoItem label="销售单编号" mono emph>{current.code}</InfoItem>
                   <InfoItem label="来源平台">{platformLabelOf(current)}</InfoItem>
                   <InfoItem label="平台母销售单号" mono>{current.externalOrderNo ?? '—'}</InfoItem>
@@ -827,7 +827,7 @@ export default function ExternalOrders() {
             {/* ── 报备-匹配待确认 ── */}
             {current.processStatus === 'report_match_pending' && (
               <DrawerSection title="报备匹配（待确认）">
-                <InfoGrid>
+                <InfoGrid cols={4}>
                   {current.reportMatches?.map((m) => (
                     <InfoItem key={m.reportCode} label={`命中报备（${PARTNER_REPORT_TYPE_LABELS[m.reportType]}）`} mono>{m.reportCode}</InfoItem>
                   ))}
@@ -889,7 +889,7 @@ export default function ExternalOrders() {
             {/* ── 转派待接单 ── */}
             {current.processStatus === 'distribute_pending' && current.partnerName && (
               <DrawerSection title="转派待接单">
-                <InfoGrid>
+                <InfoGrid cols={4}>
                   <InfoItem label="合作商">{current.partnerName}</InfoItem>
                   <InfoItem label="分发方式">{TRANSFER_SOURCE_LABELS[current.transferSource ?? '']}</InfoItem>
                   <InfoItem label="分发时间">{current.transferTime ?? '—'}</InfoItem>
@@ -904,7 +904,7 @@ export default function ExternalOrders() {
             {/* ── 分发已完成：合作商履约（接单/发货/妥投由合作商终端推进；确收/结算在管理后台） ── */}
             {current.processStatus === 'processed' && current.path === 'distribute' && current.partnerName && (
               <DrawerSection title="合作商履约">
-                <InfoGrid>
+                <InfoGrid cols={4}>
                   <InfoItem label="合作商">{current.partnerName}</InfoItem>
                   <InfoItem label="分发方式">{TRANSFER_SOURCE_LABELS[current.transferSource ?? '']}</InfoItem>
                   <InfoItem label="履约状态">{current.partnerStatus ? PARTNER_ORDER_STATUS_LABELS[current.partnerStatus] : '待接单'}</InfoItem>
@@ -939,7 +939,7 @@ export default function ExternalOrders() {
             )}
 
             <DrawerSection title="收货信息">
-              <InfoGrid>
+              <InfoGrid cols={4}>
                 <InfoItem label="收货人">{current.receiver}</InfoItem>
                 <InfoItem label="联系电话" mono>{current.receiverPhone}</InfoItem>
                 <InfoItem label="收货地址" span={3}>{current.receiverAddress}</InfoItem>

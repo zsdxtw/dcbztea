@@ -142,7 +142,7 @@ export function DrawerSection({
   style?: React.CSSProperties;
 }) {
   return (
-    <div style={style}>
+    <div className="drawer-section" style={style}>
       <div className="drawer-section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span>{title}</span>
         {extra}

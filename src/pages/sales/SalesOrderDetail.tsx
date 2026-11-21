@@ -101,7 +101,7 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
         </InfoGrid>
       </DrawerSection>
 
-      <DrawerSection title="收货信息" style={{ marginTop: 'var(--space-7)' }}>
+      <DrawerSection title="收货信息">
         <InfoGrid cols={4}>
           <InfoItem label="收货人" emph>{mother.receiver}</InfoItem>
           <InfoItem label="联系电话" mono>{mother.receiverPhone}</InfoItem>
@@ -112,7 +112,7 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
         </InfoGrid>
       </DrawerSection>
 
-      <DrawerSection title="商品明细" style={{ marginTop: 'var(--space-7)' }}>
+      <DrawerSection title="商品明细">
         <table className="detail-inline-table">
           <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>单价</th><th>小计</th></tr></thead>
           <tbody>
@@ -363,7 +363,9 @@ export default function SalesOrderDetail() {
       <div className="content-body">
         {/* 销售单信息 / 履约单01 / 履约单02… 分开以 Tab 展示（?child= 定位默认履约单 Tab） */}
         <Card>
-          <SalesOrderDetailTabs family={family} poDocs={poDocs} initialTab={searchParams.get('child') ?? 'info'} />
+          <div className="detail-page-body">
+            <SalesOrderDetailTabs family={family} poDocs={poDocs} initialTab={searchParams.get('child') ?? 'info'} />
+          </div>
         </Card>
       </div>
     </>

@@ -182,7 +182,7 @@ export default function SalesReturn() {
         {selectedRecord && (
           <>
             <DrawerSection title="退货信息">
-              <InfoGrid cols={3}>
+              <InfoGrid cols={4}>
                 <InfoItem label="退货单号" emph mono>{selectedRecord.id}</InfoItem>
                 <InfoItem label="退货日期">{selectedRecord.returnDate}</InfoItem>
                 <InfoItem label="客户" emph>{selectedRecord.customer}</InfoItem>
@@ -195,7 +195,7 @@ export default function SalesReturn() {
             </DrawerSection>
 
             <DrawerSection title="原销售订单信息">
-              <InfoGrid cols={3}>
+              <InfoGrid cols={4}>
                 <InfoItem label="原销售单号" emph mono>{selectedRecord.originalOrder}</InfoItem>
                 <InfoItem label="下单日期">{selectedRecord.originalDate}</InfoItem>
                 <InfoItem label="原订单金额" mono>{selectedRecord.originalAmount}</InfoItem>
