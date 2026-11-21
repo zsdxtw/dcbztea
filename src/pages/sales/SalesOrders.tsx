@@ -308,7 +308,7 @@ export default function SalesOrders() {
                     <div key={f.rootCode} style={{ margin: 'var(--space-2) var(--space-3)', background: 'var(--color-neutral-0)', border: `1px solid ${open ? 'var(--color-module-current-light)' : 'var(--color-neutral-150)'}`, borderRadius: 10, overflow: 'hidden', boxShadow: open ? '0 2px 8px rgba(0,0,0,0.06)' : 'none' }}>
                       {/* 母销售单行（点击整行展开/收起履约单） */}
                       <div
-                        style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', alignItems: 'center', padding: 'var(--space-3) var(--space-4)', cursor: 'pointer', background: open ? 'var(--color-neutral-50)' : 'transparent', opacity: st.distribute === '已取消' ? 0.55 : 1 }}
+                        style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', alignItems: 'center', padding: 'var(--space-3) var(--space-4)', cursor: 'pointer', background: open ? 'var(--color-neutral-50)' : 'transparent' }}
                         onClick={() => toggleExpand(f.rootCode)}
                       >
                         <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{(page - 1) * pageSize + famIdx + 1}</span>
@@ -396,7 +396,7 @@ export default function SalesOrders() {
                                 : pendingDist && u.virtual ? '#F0F2F0' : '#FFF8E9';
                             const isLast = ui === units.length - 1;
                             return (
-                            <div key={u.code} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', alignItems: 'center', padding: 'var(--space-2) var(--space-4)', borderTop: ui === 0 ? 'none' : '1px solid var(--color-neutral-150)', background: 'var(--color-neutral-0)', opacity: u.underlying.processStatus === 'cancelled' ? 0.55 : 1 }}>
+                            <div key={u.code} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', alignItems: 'center', padding: 'var(--space-2) var(--space-4)', borderTop: ui === 0 ? 'none' : '1px solid var(--color-neutral-150)', background: 'var(--color-neutral-0)' }}>
                               {/* LY 序号徽标（按履约状态着色） */}
                               <span style={{ width: 30, height: 24, borderRadius: 6, background: badgeBg, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <span className="mono" style={{ fontSize: 10, fontWeight: 700, color: accent === '#B0B7B0' ? 'var(--color-neutral-500)' : accent }}>LY{String(u.seq).padStart(2, '0')}</span>
