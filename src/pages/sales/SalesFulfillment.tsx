@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
+import DetailDrawer from '../../components/common/DetailDrawer';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import SalesOrderInfoModal from '../../components/business/SalesOrderInfoModal';
+import { SalesOrderDetailTabs } from './SalesOrderDetail';
+import { EXTERNAL_CHANNEL_LABELS, platformLabelOf } from '../../data/externalOrders';
+import { buildFamilies, familyStatesOf, FAMILY_STATE_COLORS } from '../../utils/salesOrderFamily';
 import {
   FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS,
   stageOfOrder, stageIndexOf,
@@ -30,10 +33,12 @@ const STAGE_CHAIN: { key: string; label: string }[] = [
 
 /** 履约单元：子订单 + 未被拆分的母销售单（有子单的母单由其子单代表） */
 export default function SalesFulfillment() {
-  const navigate = useNavigate();
   const orders = useOrderFlowStore((s) => s.orders);
   const purchaseDocs = usePurchaseStore((s) => s.docs);
   const [tab, setTab] = useState<string>('');
+  /** 履约单详情抽屉（右侧拉出，样式同销售单列表详情） */
+  const [view, setView] = useState<{ root: string; child?: string } | null>(null);
+  const families = useMemo(() => buildFamilies(orders), [orders]);
   const [linkOrderCode, setLinkOrderCode] = useState<string | null>(null);
   /** 待接单取回弹窗 */
   const [recallOf, setRecallOf] = useState<ExternalOrder | null>(null);
@@ -154,7 +159,7 @@ export default function SalesFulfillment() {
                     </span>
                   : <span key="pkg" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>—</span>,
                 <div key="act" className="row-actions">
-                  <Button size="sm" variant="ghost" onClick={() => navigate(`/sales/sales-orders/${u.rootCode}`)}>查看详情</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setView({ root: u.rootCode, child: o.code })}>查看详情</Button>
                   {(o.processStatus === 'self_pending' || o.processStatus === 'distribute_pending') && (
                     <Button size="sm" variant="ghost" onClick={() => { setRecallOf(o); setRecallQty({}); setRecallMsg(''); }}>取回</Button>
                   )}
@@ -216,6 +221,37 @@ export default function SalesFulfillment() {
           </div>
         </div>
       )}
+
+      {/* ── 履约单详情抽屉（右侧拉出，展示样式与销售单列表详情一致） ── */}
+      <DetailDrawer
+        open={!!view}
+        onClose={() => setView(null)}
+        badge="SO"
+        title={view?.root ?? ''}
+        statusTag={(() => {
+          const fam = families.find((f) => f.rootCode === view?.root);
+          if (!fam) return null;
+          const st = familyStatesOf(fam);
+          const fp = (t: string) => {
+            const c = (FAMILY_STATE_COLORS as Record<string, { bg: string; color: string }>)[t] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
+            return pill(c.bg, c.color, t);
+          };
+          return <>{fp(st.distribute)}{fp(st.fulfill)}{fp(st.settle)}{fp(st.invoice)}</>;
+        })()}
+        subtitle={(() => {
+          const m = families.find((f) => f.rootCode === view?.root)?.mother;
+          return m ? `${platformLabelOf(m)} · ${m.customerName}（${m.customerType}） · ${m.receiver} ${m.receiverPhone}` : '';
+        })()}
+        footer={
+          <Button variant="ghost" onClick={() => setView(null)}>关闭</Button>
+        }
+      >
+        {(() => {
+          const fam = families.find((f) => f.rootCode === view?.root);
+          if (!fam) return null;
+          return <SalesOrderDetailTabs family={fam} poDocs={purchaseDocs} initialTab={view?.child ?? 'info'} />;
+        })()}
+      </DetailDrawer>
     </>
   );
 }
