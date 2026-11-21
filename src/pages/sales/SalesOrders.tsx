@@ -482,7 +482,7 @@ export default function SalesOrders() {
               </div>
             </div>
             {/* 吸底横向滚动条：sticky 常驻当前屏幕，与表格滚动双向同步 */}
-            <div ref={barScrollRef} onScroll={onBarScroll} className="so-hscroll" style={{ position: 'sticky', bottom: 0, overflowX: 'auto', overflowY: 'hidden', background: 'var(--color-neutral-50)', borderTop: '1px solid var(--color-neutral-150)' }}>
+            <div ref={barScrollRef} onScroll={onBarScroll} className="so-hscroll" style={{ position: 'sticky', bottom: 12, marginBottom: 12, overflowX: 'auto', overflowY: 'hidden', background: 'var(--color-neutral-50)', borderTop: '1px solid var(--color-neutral-150)', borderRadius: '0 0 var(--radius-md) var(--radius-md)' }}>
               <div style={{ width: 1690, height: 2 }} />
             </div>
           </Card>
