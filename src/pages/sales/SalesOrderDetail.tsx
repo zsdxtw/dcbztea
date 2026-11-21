@@ -177,44 +177,27 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 'var(--space-4)' }}>
-        {/* 商品明细 */}
-        <div>
-          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>商品明细（{current.items.length} 种）</div>
-          <table className="detail-inline-table">
-            <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>单价</th><th>小计</th></tr></thead>
-            <tbody>
-              {current.items.map((it, i) => (
-                <tr key={i}>
-                  <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
-                  <td>{it.spec}</td>
-                  <td className="mono">{it.quantity}</td>
-                  <td className="mono">{money(it.price)}</td>
-                  <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(it.price * it.quantity)}</td>
-                </tr>
-              ))}
-              <tr style={{ fontWeight: 'var(--font-semibold)' }}>
-                <td colSpan={4} style={{ textAlign: 'right', color: 'var(--color-text-secondary)' }}>合计</td>
-                <td className="mono" style={{ color: 'var(--color-module-current-base)' }}>{money(current.totalAmount)}</td>
+      {/* 商品明细（参考履约单信息段样式） */}
+      <DrawerSection title={`商品明细（${current.items.length} 种）`}>
+        <table className="detail-inline-table">
+          <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>单价</th><th>小计</th></tr></thead>
+          <tbody>
+            {current.items.map((it, i) => (
+              <tr key={i}>
+                <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
+                <td>{it.spec}</td>
+                <td className="mono">{it.quantity}</td>
+                <td className="mono">{money(it.price)}</td>
+                <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(it.price * it.quantity)}</td>
               </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* 处理轨迹 */}
-        <div>
-          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>处理轨迹</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: 320, overflowY: 'auto' }}>
-            {current.history.map((h, i) => (
-              <div key={i} style={{ display: 'flex', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', alignItems: 'baseline' }}>
-                <span className="mono" style={{ color: 'var(--color-neutral-400)', flexShrink: 0 }}>{h.time}</span>
-                <span style={{ fontWeight: 'var(--font-medium)', flexShrink: 0 }}>{h.action}</span>
-                {h.detail && <span style={{ color: 'var(--color-neutral-500)' }}>{h.detail}</span>}
-              </div>
             ))}
-          </div>
-        </div>
-      </div>
+            <tr style={{ fontWeight: 'var(--font-semibold)' }}>
+              <td colSpan={4} style={{ textAlign: 'right', color: 'var(--color-text-secondary)' }}>合计</td>
+              <td className="mono" style={{ color: 'var(--color-module-current-base)' }}>{money(current.totalAmount)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </DrawerSection>
 
       {/* 自营执行信息（采购&发货 / 物流跟踪） */}
       {current.path === 'self' && ((current.selfShipments?.length ?? 0) > 0 || currentPos.length > 0) && (
@@ -243,8 +226,7 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
         const selfPkgs = (current.selfShipments ?? []).map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, status: x.status as string, settled: x.settled, items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') }));
         const all = [...poPkgs, ...selfPkgs];
         return (
-          <div style={{ marginTop: 'var(--space-4)' }}>
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>发货情况（{all.length} 个包裹）</div>
+          <DrawerSection title={`发货情况（${all.length} 个包裹）`}>
             {all.length === 0 ? (
               <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)', padding: 'var(--space-2) 0' }}>暂无发货包裹（发货后此处按包裹 1、包裹 2… 展示物流信息）</div>
             ) : (
@@ -263,9 +245,22 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
                 </tbody>
               </table>
             )}
-          </div>
+          </DrawerSection>
         );
       })()}
+
+      {/* 处理轨迹（展示在发货情况下面） */}
+      <DrawerSection title="处理轨迹">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: 320, overflowY: 'auto' }}>
+          {current.history.map((h, i) => (
+            <div key={i} style={{ display: 'flex', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', alignItems: 'baseline' }}>
+              <span className="mono" style={{ color: 'var(--color-neutral-400)', flexShrink: 0 }}>{h.time}</span>
+              <span style={{ fontWeight: 'var(--font-medium)', flexShrink: 0 }}>{h.action}</span>
+              {h.detail && <span style={{ color: 'var(--color-neutral-500)' }}>{h.detail}</span>}
+            </div>
+          ))}
+        </div>
+      </DrawerSection>
 
       {/* 报备命中 */}
       {current.reportMatches && current.reportMatches.length > 0 && (
