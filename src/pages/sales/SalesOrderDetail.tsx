@@ -141,14 +141,12 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
   const children = family.children;
   const current = family.all.find((o) => o.code === code) ?? family.mother;
   const currentPos = poDocs.filter((d) => d.childOrderId === current.id);
-  /* 物流详情弹窗（点击发货情况表的物流公司/单号） */
+  /* 物流跟踪弹窗（点击发货情况表的物流公司/单号）：展示货物当前位置与途经轨迹 */
   const [logView, setLogView] = useState<{
-    no: string; company: string; tracking: string; status: string; settled?: boolean;
-    shippedAt?: string; deliveredAt?: string; confirmedAt?: string;
-    itemsList: { productName: string; qty: number }[];
-    poCode?: string; supplierName?: string; warehouseName?: string;
+    company: string; tracking: string; status: string;
+    currentLoc: string; currentEvent: string;
+    trail: { time: string; loc: string; event: string }[];
   } | null>(null);
-  const logStatusLabel = (st: string) => (st === 'confirmed' ? '全部已确收' : st === 'delivered' ? '已妥投' : '运输中');
 
   return (
     <>
@@ -224,7 +222,39 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
                       <span
                         style={{ color: 'var(--color-module-current-base)', cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted' }}
                         title="点击查看物流详情"
-                        onClick={() => setLogView({ no: x.no, company: x.company, tracking: x.tracking, status: x.status, settled: x.settled, shippedAt: x.shippedAt, deliveredAt: x.deliveredAt, confirmedAt: x.confirmedAt, itemsList: x.itemsList, poCode: x.poCode, supplierName: x.supplierName, warehouseName: x.warehouseName })}
+                        onClick={() => {
+                          /* 确定性演示轨迹：揽收 → 干线 → 目的城分拨 → 派送 → 妥投/确收（按单号哈希选枢纽，同一单号轨迹一致） */
+                          const destCity = regionTextOf(current.customerRegion, current.receiverAddress).split(' / ')[1] ?? '目的地';
+                          const origin = x.warehouseName ?? `${x.supplierName ?? '供应商'}发货仓`;
+                          const hash = [...x.tracking].reduce((s, ch) => s + ch.charCodeAt(0), 0);
+                          const hubs = ['杭州', '上海', '南京', '武汉', '合肥'].filter((h) => !destCity.startsWith(h));
+                          const hub = hubs[hash % hubs.length];
+                          const plus = (h: number) => {
+                            const d = new Date((x.shippedAt ?? '').replace(' ', 'T'));
+                            if (isNaN(d.getTime())) return x.shippedAt ?? '';
+                            d.setHours(d.getHours() + h);
+                            const p = (n: number) => String(n).padStart(2, '0');
+                            return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+                          };
+                          const trail: { time: string; loc: string; event: string }[] = [
+                            { time: plus(0), loc: origin, event: `${x.company}已揽收` },
+                            { time: plus(3), loc: origin, event: `离开${origin}，发往${destCity}` },
+                            { time: plus(14), loc: `${hub}转运中心`, event: `途经${hub}转运中心，装车发往${destCity}` },
+                          ];
+                          if (x.status !== 'shipped') {
+                            trail.push({ time: plus(26), loc: `${destCity}转运中心`, event: `到达${destCity}转运中心` });
+                            trail.push({ time: plus(34), loc: `${destCity}派送网点`, event: `到达${destCity}派送网点，安排投递` });
+                            trail.push({ time: plus(40), loc: `${destCity} · ${current.receiverAddress.slice(-12)}`, event: '已妥投（投递完成）' });
+                          }
+                          if (x.status === 'confirmed') {
+                            trail.push({ time: plus(46), loc: destCity, event: '客户确认收货' });
+                          }
+                          const last = trail[trail.length - 1];
+                          const currentLoc = x.status === 'shipped' ? `${hub}转运中心 → ${destCity} 干线运输中`
+                            : x.status === 'delivered' ? `已投递至 ${destCity}`
+                              : `已确收 · ${destCity}`;
+                          setLogView({ company: x.company, tracking: x.tracking, status: x.status, currentLoc, currentEvent: `${last.event} · ${last.time}`, trail });
+                        }}
                       >
                         {x.company} <span className="mono">{x.tracking}</span>
                       </span>
@@ -289,38 +319,40 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
         </div>
       )}
 
-      {/* 物流详情弹窗 */}
+      {/* 物流跟踪弹窗（当前所在地 + 途经轨迹） */}
       {logView && (
         <div className="category-dialog-overlay" onClick={() => setLogView(null)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 620 }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-3)' }}>物流详情 · {logView.no}</div>
-            <InfoGrid cols={4}>
-              <InfoItem label="发货单号" mono emph>{logView.no}</InfoItem>
-              <InfoItem label="物流公司">{logView.company}</InfoItem>
-              <InfoItem label="运单号" mono>{logView.tracking}</InfoItem>
-              <InfoItem label="当前状态">{pill(logStatusLabel(logView.status))}</InfoItem>
-              <InfoItem label="发货时间" mono>{logView.shippedAt ?? '—'}</InfoItem>
-              {logView.deliveredAt && <InfoItem label="妥投时间" mono>{logView.deliveredAt}</InfoItem>}
-              {logView.confirmedAt && <InfoItem label="确收时间" mono>{logView.confirmedAt}</InfoItem>}
-              <InfoItem label="结算状态">{logView.settled ? pill('已结算') : pill('未结算')}</InfoItem>
-              {logView.poCode && <InfoItem label="关联采购单" mono>{logView.poCode}</InfoItem>}
-              {logView.supplierName && <InfoItem label="供应商">{logView.supplierName}</InfoItem>}
-              {logView.warehouseName && <InfoItem label="发货仓">{logView.warehouseName}</InfoItem>}
-            </InfoGrid>
-            <div style={{ marginTop: 'var(--space-4)' }}>
-              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>包裹商品</div>
-              <table className="detail-inline-table">
-                <thead><tr><th>商品名称</th><th style={{ width: 100 }}>数量</th></tr></thead>
-                <tbody>
-                  {logView.itemsList.map((it, i) => (
-                    <tr key={i}>
-                      <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
-                      <td className="mono">{it.qty}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 560 }}>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 2 }}>物流跟踪 · {logView.tracking}</div>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-600)', marginBottom: 'var(--space-3)' }}>
+              <span>物流公司：<strong>{logView.company}</strong></span>
+              <span>运单号：<strong className="mono">{logView.tracking}</strong></span>
             </div>
+
+            {/* 当前所在地（突出展示） */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-3)' }}>
+              <svg viewBox="0 0 18 18" fill="none" style={{ width: 20, height: 20, color: 'var(--color-module-current-base)', flexShrink: 0 }}><path d="M9 16s5.5-4.6 5.5-8.5A5.5 5.5 0 009 2a5.5 5.5 0 00-5.5 5.5C3.5 11.4 9 16 9 16z" stroke="currentColor" strokeWidth="1.3"/><circle cx="9" cy="7.5" r="2" stroke="currentColor" strokeWidth="1.3"/></svg>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)' }}>当前所在：{logView.currentLoc}</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{logView.currentEvent}</div>
+              </div>
+            </div>
+
+            {/* 途经轨迹（最新在上） */}
+            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>物流轨迹</div>
+            <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 300, overflowY: 'auto' }}>
+              {[...logView.trail].reverse().map((t, i) => (
+                <div key={i} style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start', padding: '6px 0' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 6, background: i === 0 ? 'var(--color-module-current-base)' : 'var(--color-neutral-300)' }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 'var(--text-sm)', color: i === 0 ? 'var(--color-neutral-800)' : 'var(--color-neutral-600)', fontWeight: i === 0 ? 'var(--font-semibold)' : 400 }}>{t.event}</div>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{t.loc}</div>
+                  </div>
+                  <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', flexShrink: 0 }}>{t.time}</span>
+                </div>
+              ))}
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-4)' }}>
               <Button variant="ghost" onClick={() => setLogView(null)}>关闭</Button>
             </div>
