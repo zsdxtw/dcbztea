@@ -9,7 +9,6 @@ import { usePurchaseStore } from '../../stores/purchaseStore';
 import { customerItems } from '../../data/customers';
 import { PROVINCE_NAMES, getCityNames, getDistricts, regionTextOf } from '../../data/regions';
 import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS, TRANSFER_SOURCE_LABELS, platformLabelOf } from '../../data/externalOrders';
-import { PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
 import {
   buildFamilies, familyStatesOf, fulfillStateOf, settleStateOf, invoiceStateOf, FAMILY_STATE_COLORS, fulfillmentUnitsOf,
 } from '../../utils/salesOrderFamily';
@@ -59,6 +58,7 @@ export default function SalesOrders() {
   const flowOrders = useOrderFlowStore((s) => s.orders);
   const [keyword, setKeyword] = useState('');
   const [filterChannel, setFilterChannel] = useState('');
+  const [filterPath, setFilterPath] = useState('');
   const [filterDistribute, setFilterDistribute] = useState('');
   const [filterFulfill, setFilterFulfill] = useState('');
   const [filterSettle, setFilterSettle] = useState('');
@@ -81,18 +81,16 @@ export default function SalesOrders() {
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
 
-  /* ── Tab：全部销售单 / 分发订单 ── */
-  const [tab, setTab] = useState<'all' | 'flow'>('all');
-  const selfPendingCount = flowOrders.filter((o) => o.processStatus === 'self_pending').length;
-
   const families = useMemo(() => buildFamilies(flowOrders), [flowOrders]);
 
   const filteredFamilies = useMemo(() => families.filter((f) => {
     const kw = keyword.trim();
     if (kw && ![f.mother, ...f.children].some((o) =>
-      o.code.includes(kw) || (o.parentCode ?? '').includes(kw) || o.customerName.includes(kw) || (o.externalOrderNo ?? '').includes(kw),
+      o.code.includes(kw) || (o.parentCode ?? '').includes(kw) || o.customerName.includes(kw) || (o.externalOrderNo ?? '').includes(kw)
+      || o.items.some((it) => it.productName.includes(kw)) || o.receiver.includes(kw) || o.receiverAddress.includes(kw),
     )) return false;
     if (filterChannel && f.mother.sourceChannel !== filterChannel) return false;
+    if (filterPath && (f.mother.salesPath ?? 'direct') !== filterPath) return false;
     const st = familyStatesOf(f);
     if (filterDistribute && st.distribute !== filterDistribute) return false;
     if (filterFulfill && st.fulfill !== filterFulfill) return false;
@@ -117,13 +115,12 @@ export default function SalesOrders() {
       if (a.orderTo && t > a.orderTo) return false;
     }
     return true;
-  }), [families, keyword, filterChannel, filterDistribute, filterFulfill, filterSettle, filterInvoice, applied]);
+  }), [families, keyword, filterChannel, filterPath, filterDistribute, filterFulfill, filterSettle, filterInvoice, applied]);
 
   const totalPages = Math.max(1, Math.ceil(filteredFamilies.length / pageSize));
   const pagedFamilies = filteredFamilies.slice((page - 1) * pageSize, page * pageSize);
-  useEffect(() => { setPage(1); }, [keyword, filterChannel, filterDistribute, filterFulfill, filterSettle, filterInvoice, applied, pageSize]);
+  useEffect(() => { setPage(1); }, [keyword, filterChannel, filterPath, filterDistribute, filterFulfill, filterSettle, filterInvoice, applied, pageSize]);
   useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
-  useEffect(() => { setExpanded(new Set()); }, [tab]);
 
   const applyFilters = () => {
     setApplied({
@@ -151,7 +148,7 @@ export default function SalesOrders() {
 
   
   /* 列表网格列定义（母单行 + 表头共用，保证对齐） */
-  const GRID = '34px 24px 168px 104px 96px 130px 160px 116px 104px 88px 112px 100px 100px 100px 96px 64px';
+  const GRID = '34px 24px 168px 104px 96px 130px 140px 104px 88px 112px 100px 100px 100px 96px 64px';
 
   const pageBtn = (n: number) => (
     <button
@@ -176,9 +173,8 @@ export default function SalesOrders() {
         breadcrumbs={['销售', '销售单管理', '销售单列表']}
       />
       <div className="content-body">
-        {/* ── 全部销售单 Tab：母单一行 + 展开子单 ── */}
-        {tab === 'all' && (<>
-          <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
+        {/* ── 母销售单一行 + 展开子履约单 ── */}
+        <>          <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
             展示<strong>全部母销售单</strong>：以<strong>手工录入</strong>或<strong>直连推送</strong>的母销售单（SO）为一行（分发/履约/结算/开票四状态为该母销售单含全部子履约单的聚合），点击母销售单行展开其下全部子履约单（FO）；未拆分的母销售单即履约单；点击「查看」进入销售单履约详情页。
             逐单分发操作请前往「<strong>销售单管理 → 销售单分发</strong>」；履约进度跟踪见「销售单履约」。
           </div>
@@ -191,6 +187,12 @@ export default function SalesOrders() {
               <option value="">全部来源</option>
               <option value="manual">手工录入</option>
               <option value="push">直连推送</option>
+            </select>
+            <span className="so-f-label">销售路径：</span>
+            <select className="filter-select" value={filterPath} onChange={(e) => setFilterPath(e.target.value)}>
+              <option value="">全部路径</option>
+              <option value="direct">直接销售</option>
+              <option value="via_platform">经平台销售</option>
             </select>
             <span className="so-f-label">分发状态：</span>
             <select className="filter-select" value={filterDistribute} onChange={(e) => setFilterDistribute(e.target.value)}>
@@ -278,7 +280,7 @@ export default function SalesOrders() {
 
           <Card style={{ padding: 0 }}>
             <div style={{ overflowX: 'auto' }}>
-              <div style={{ minWidth: 1780 }}>
+              <div style={{ minWidth: 1690 }}>
                 {/* 表头 */}
                 <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-4)', margin: 'var(--space-2) var(--space-3) 0', border: '1px solid var(--color-neutral-150)', borderRadius: 10, fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-500)', background: 'var(--color-neutral-50)' }}>
                   <span>序号</span>
@@ -287,8 +289,7 @@ export default function SalesOrders() {
                   <span>订单来源</span>
                   <span>销售路径</span>
                   <span>客户</span>
-                  <span>收货地区</span>
-                  <span>收货人</span>
+                  <span>收货人 / 地区</span>
                   <span style={{ textAlign: 'right' }}>总金额</span>
                   <span style={{ textAlign: 'center' }}>履约单数</span>
                   <span>分发状态</span>
@@ -307,24 +308,29 @@ export default function SalesOrders() {
                     <div key={f.rootCode} style={{ margin: 'var(--space-2) var(--space-3)', background: 'var(--color-neutral-0)', border: `1px solid ${open ? 'var(--color-module-current-light)' : 'var(--color-neutral-150)'}`, borderRadius: 10, overflow: 'hidden', boxShadow: open ? '0 2px 8px rgba(0,0,0,0.06)' : 'none' }}>
                       {/* 母销售单行（点击整行展开/收起履约单） */}
                       <div
-                        style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', alignItems: 'center', padding: 'var(--space-3) var(--space-4)', cursor: 'pointer', background: open ? 'var(--color-neutral-50)' : 'transparent' }}
+                        style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', alignItems: 'center', padding: 'var(--space-3) var(--space-4)', cursor: 'pointer', background: open ? 'var(--color-neutral-50)' : 'transparent', opacity: st.distribute === '已取消' ? 0.55 : 1 }}
                         onClick={() => toggleExpand(f.rootCode)}
                       >
                         <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{(page - 1) * pageSize + famIdx + 1}</span>
                         <svg viewBox="0 0 16 16" fill="none" style={{ width: 12, height: 12, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s', color: 'var(--color-neutral-400)' }}><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         <span className="cell-mono-emph">{f.rootCode}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{f.mother.externalOrderNo}</span></span>
+                        {/* 来源：直接销售=淡茶半盏 / 经平台销售=该平台（平台客户） */}
                         <span style={{ fontSize: 'var(--text-sm)' }}>
-                          淡茶半盏
+                          {f.mother.salesPath === 'via_platform'
+                            ? (f.mother.platformCustomerName ?? (f.mother.platform ? EXTERNAL_PLATFORM_LABELS[f.mother.platform] : '经平台销售'))
+                            : '淡茶半盏'}
                           <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: f.mother.sourceChannel === 'push' ? '#7B1FA2' : '#0F64B5' }}>{EXTERNAL_CHANNEL_LABELS[f.mother.sourceChannel]}</span>
                         </span>
                         <span>
                           {f.mother.salesPath === 'via_platform'
-                            ? <><span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5', whiteSpace: 'nowrap' }}>经平台销售</span><span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: '#0F64B5' }}>{f.mother.platformCustomerName ?? '—'}</span></>
+                            ? <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5', whiteSpace: 'nowrap' }}>经平台销售</span>
                             : <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E8F5E9', color: '#2E7D32', whiteSpace: 'nowrap' }}>直接销售</span>}
                         </span>
                         <span className="cell-emph">{f.mother.customerName}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{f.mother.customerType}</span></span>
-                        <span style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{regionText(f.mother)}</span>
-                        <span className="cell-emph" style={{ fontSize: 'var(--text-sm)' }}>{f.mother.receiver}</span>
+                        <span style={{ minWidth: 0 }}>
+                          <span className="cell-emph" style={{ fontSize: 'var(--text-sm)', display: 'block' }}>{f.mother.receiver}</span>
+                          <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', whiteSpace: 'nowrap' }}>{regionText(f.mother)}</span>
+                        </span>
                         <span className="mono" style={{ fontWeight: 'var(--font-semibold)', textAlign: 'right' }}>{money(amount)}</span>
                         <span style={{ textAlign: 'center' }}>
                           <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5', whiteSpace: 'nowrap' }}>{st.total} 单</span>
@@ -365,12 +371,11 @@ export default function SalesOrders() {
                             <span>物流进度</span>
                             <span>商品数量</span>
                             <span style={{ textAlign: 'right' }}>金额</span>
-                            <span style={{ textAlign: 'center' }}>属性</span>
+                            <span style={{ textAlign: 'center' }}>属性 / 生成</span>
                             <span>分发状态</span>
                             <span>履约状态</span>
                             <span>结算状态</span>
                             <span>开票状态</span>
-                            <span>生成时间</span>
                             <span style={{ textAlign: 'center' }}>操作</span>
                           </div>
                           {units.map((u, ui) => {
@@ -391,7 +396,7 @@ export default function SalesOrders() {
                                 : pendingDist && u.virtual ? '#F0F2F0' : '#FFF8E9';
                             const isLast = ui === units.length - 1;
                             return (
-                            <div key={u.code} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', alignItems: 'center', padding: 'var(--space-2) var(--space-4)', borderTop: ui === 0 ? 'none' : '1px solid var(--color-neutral-150)', background: 'var(--color-neutral-0)' }}>
+                            <div key={u.code} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', alignItems: 'center', padding: 'var(--space-2) var(--space-4)', borderTop: ui === 0 ? 'none' : '1px solid var(--color-neutral-150)', background: 'var(--color-neutral-0)', opacity: u.underlying.processStatus === 'cancelled' ? 0.55 : 1 }}>
                               {/* LY 序号徽标（按履约状态着色） */}
                               <span style={{ width: 30, height: 24, borderRadius: 6, background: badgeBg, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <span className="mono" style={{ fontSize: 10, fontWeight: 700, color: accent === '#B0B7B0' ? 'var(--color-neutral-500)' : accent }}>LY{String(u.seq).padStart(2, '0')}</span>
@@ -408,9 +413,9 @@ export default function SalesOrders() {
                               </span>
                               {/* 分发路径 */}
                               <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-600)', whiteSpace: 'nowrap' }}>{pathLabel(u.underlying)}</span>
-                              {/* 履约主体（跨 2 列，完整展示合作商全称） */}
+                              {/* 履约主体（跨 2 列，完整展示合作商全称；未分发显示待分发） */}
                               <span style={{ fontSize: 'var(--text-sm)', gridColumn: 'span 2', overflow: 'hidden', textOverflow: 'ellipsis' }} title={u.underlying.partnerName ?? ''}>
-                                {u.underlying.partnerName ?? (u.underlying.path === 'self' ? '自营' : '—')}
+                                {u.underlying.partnerName ?? (u.underlying.path === 'self' ? '自营' : '待分发')}
                               </span>
                               {/* 物流进度 */}
                               <span style={{ minWidth: 0 }}>
@@ -428,19 +433,18 @@ export default function SalesOrders() {
                               </span>
                               {/* 履约单金额（与母单「总金额」列对齐） */}
                               <span className="mono" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', textAlign: 'right' }}>{money(u.amount)}</span>
-                              {/* 履约单属性 */}
+                              {/* 履约单属性 + 生成时间（合并一格） */}
                               <span style={{ textAlign: 'center' }}>
                                 {u.virtual
                                   ? <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#F5F5F5', color: '#9E9E9E', whiteSpace: 'nowrap' }}>默认履约</span>
                                   : <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5', whiteSpace: 'nowrap' }}>拆单生成</span>}
+                                <span className="mono" style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>{u.createdAt}</span>
                               </span>
                               {/* 分发 / 发货 / 结算状态（与母表头同列对齐） */}
                               {orderDistributePill(u.underlying)}
                               {pill(fulText)}
                               {pill(settleStateOf(u.underlying, pos))}
                               {pill(invoiceStateOf(u.underlying))}
-                              {/* 生成时间（与母单「录入时间」列对齐） */}
-                              <span className="cell-muted" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{u.createdAt}</span>
                               {/* 操作 */}
                               <span style={{ textAlign: 'center' }}>
                                 <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setView({ root: f.rootCode, child: u.underlying.code }); }}>查看</Button>
@@ -477,7 +481,7 @@ export default function SalesOrders() {
               </select>
             </div>
           )}
-        </>)}
+        </>
       </div>
 
       {/* ── 销售单详情抽屉（销售单信息 / 履约单01… 分开 Tab 展示；子单进入默认定位该履约单 Tab） ── */}
