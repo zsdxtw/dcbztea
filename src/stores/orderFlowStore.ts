@@ -159,7 +159,7 @@ interface OrderFlowState {
   /** 删除订单（仅手工录入的待处理订单） */
   deleteOrder: (id: string) => { ok: boolean; msg: string };
   /** 修改订单信息（待处理/待接单/比单中可改） */
-  updateOrder: (id: string, patch: Partial<Pick<ExternalOrder, 'externalOrderNo' | 'customerName' | 'customerType' | 'customerRegion' | 'receiver' | 'receiverPhone' | 'receiverAddress' | 'remark' | 'items'>>) => { ok: boolean; msg: string };
+  updateOrder: (id: string, patch: Partial<Pick<ExternalOrder, 'externalOrderNo' | 'customerOrderNo' | 'customerOrderTime' | 'customerName' | 'customerType' | 'customerRegion' | 'receiver' | 'receiverPhone' | 'receiverAddress' | 'remark' | 'items'>>) => { ok: boolean; msg: string };
 
   /* ── 路径选择与分发 ── */
   chooseSelfPath: (id: string) => void;
@@ -362,13 +362,21 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
     updateOrder: (id, patch) => {
       const order = get().orders.find((o) => o.id === id);
       if (!order) return { ok: false, msg: '订单不存在' };
-      if (order.processStatus === 'processed') return { ok: false, msg: '订单已进入履约（分发已完成），不可修改' };
+      if (order.sourceChannel !== 'manual') return { ok: false, msg: '直连推送订单仅支持接口推送修改，不支持在管理后台修改' };
+      if (order.processStatus === 'cancelled') return { ok: false, msg: '已取消订单不可修改' };
+      /* 权限：客户侧订单号/客户下单时间任意状态可改；收货信息/商品明细需未进入待接单（且不在比单中、未拆分） */
+      const coreEditable = order.processStatus === 'pending' || order.processStatus === 'report_match_pending';
+      const hasChildren = get().orders.some((o) => o.parentCode === order.code);
+      const coreKeys = ['receiver', 'receiverPhone', 'receiverAddress', 'remark', 'items'];
+      const coreTouched = Object.keys(patch).some((k) => coreKeys.includes(k));
+      if (coreTouched && hasChildren) return { ok: false, msg: '该销售单已拆分，收货信息与商品明细请修改其下履约单' };
+      if (coreTouched && !coreEditable) return { ok: false, msg: '订单已进入待接单或比单状态，收货信息与商品明细不可修改' };
       const nextItems = patch.items ?? order.items;
+      const changedKeys = Object.keys(patch).filter((k) => patch[k as keyof typeof patch] !== undefined);
       patchOrder(id, {
         ...patch,
-        items: nextItems,
-        totalAmount: nextItems.reduce((s, it) => s + it.price * it.quantity, 0),
-      }, { action: '修改订单信息', detail: '管理后台修改订单内容' });
+        ...(patch.items ? { totalAmount: nextItems.reduce((s, it) => s + it.price * it.quantity, 0) } : {}),
+      }, { action: '修改订单信息', detail: `管理后台修改：${changedKeys.map((k) => ({ customerOrderNo: '客户侧订单号', customerOrderTime: '客户下单时间', receiver: '收货人', receiverPhone: '联系电话', receiverAddress: '收货地址', remark: '备注', items: '商品明细' }[k] ?? k)).join('、')}` });
       return { ok: true, msg: '订单已修改' };
     },
 

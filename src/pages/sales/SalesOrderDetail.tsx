@@ -86,7 +86,7 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
           <InfoItem label="订单来源">{mother.salesPath === 'via_platform'
             ? (mother.platformCustomerName ?? (mother.platform ? EXTERNAL_PLATFORM_LABELS[mother.platform] : '经平台销售'))
             : '淡茶半盏'}（{EXTERNAL_CHANNEL_LABELS[mother.sourceChannel]}）</InfoItem>
-          <InfoItem label="下单平台">{mother.platform ? EXTERNAL_PLATFORM_LABELS[mother.platform] : '—'}</InfoItem>
+          <InfoItem label="下单平台">{mother.salesPath === 'via_platform' ? (mother.platformCustomerName ?? '—') : '—'}</InfoItem>
           <InfoItem label="平台订单号" mono>{mother.externalOrderNo}</InfoItem>
           <InfoItem label="客户" emph>{`${mother.customerName}（${mother.customerType}）`}</InfoItem>
           <InfoItem label="客户区域">{regionTextOf(mother.customerRegion, mother.receiverAddress)}</InfoItem>
@@ -106,7 +106,6 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
           <InfoItem label="收货人" emph>{mother.receiver}</InfoItem>
           <InfoItem label="联系电话" mono>{mother.receiverPhone}</InfoItem>
           <InfoItem label="收货地区">{regionTextOf(mother.customerRegion, mother.receiverAddress)}</InfoItem>
-          <InfoItem label="销售路径">{mother.salesPath === 'via_platform' ? '经平台销售' : '直接销售'}</InfoItem>
           <InfoItem label="收货地址" span={2}>{mother.receiverAddress}</InfoItem>
           <InfoItem label="备注" span={2}>{mother.remark || '—'}</InfoItem>
         </InfoGrid>

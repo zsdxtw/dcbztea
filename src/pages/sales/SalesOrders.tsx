@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import HScrollBox from '../../components/common/HScrollBox';
-import DetailDrawer from '../../components/common/DetailDrawer';
+import DetailDrawer, { DrawerSection } from '../../components/common/DetailDrawer';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
@@ -81,7 +81,13 @@ export default function SalesOrders() {
     customer: '', receiver: '', prov: '', city: '', dist: '', entryFrom: '', entryTo: '', orderFrom: '', orderTo: '',
   });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [view, setView] = useState<{ root: string; child?: string } | null>(null);
+  const [view, setView] = useState<{ root: string; child?: string; edit?: boolean } | null>(null);
+  /** 销售单信息修改（手工录入订单）：客户侧订单号/下单时间任意状态可改；收货信息/商品明细未分发前可改 */
+  const [orderEdit, setOrderEdit] = useState<{
+    customerOrderNo: string; customerOrderTime: string;
+    receiver: string; receiverPhone: string; receiverAddress: string; remark: string;
+    items: ExternalOrder['items'];
+  } | null>(null);
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
 
@@ -140,6 +146,40 @@ export default function SalesOrders() {
     setDraftEntryFrom(''); setDraftEntryTo(''); setDraftOrderFrom(''); setDraftOrderTo('');
     setApplied({ customer: '', receiver: '', prov: '', city: '', dist: '', entryFrom: '', entryTo: '', orderFrom: '', orderTo: '' });
     setPage(1);
+  };
+
+  const startOrderEdit = (m: ExternalOrder) => setOrderEdit({
+    customerOrderNo: m.customerOrderNo ?? '',
+    customerOrderTime: (m.customerOrderTime ?? '').slice(0, 10),
+    receiver: m.receiver,
+    receiverPhone: m.receiverPhone,
+    receiverAddress: m.receiverAddress,
+    remark: m.remark ?? '',
+    items: m.items.map((it) => ({ ...it })),
+  });
+  const saveOrderEdit = () => {
+    if (!view?.root || !orderEdit) return;
+    const fam = families.find((f) => f.rootCode === view.root);
+    if (!fam) return;
+    const patch: Partial<ExternalOrder> = {
+      customerOrderNo: orderEdit.customerOrderNo || undefined,
+      customerOrderTime: orderEdit.customerOrderTime || undefined,
+    };
+    const coreEditable = (fam.mother.processStatus === 'pending' || fam.mother.processStatus === 'report_match_pending') && fam.children.length === 0;
+    if (coreEditable) {
+      patch.receiver = orderEdit.receiver;
+      patch.receiverPhone = orderEdit.receiverPhone;
+      patch.receiverAddress = orderEdit.receiverAddress;
+      patch.remark = orderEdit.remark || undefined;
+      patch.items = orderEdit.items;
+    }
+    const res = useOrderFlowStore.getState().updateOrder(fam.mother.id, patch);
+    if (res.ok) {
+      setOrderEdit(null);
+      setView((v) => (v ? { root: v.root, child: v.child } : v));
+    } else {
+      window.alert(res.msg);
+    }
   };
 
   const toggleExpand = (rootCode: string) => setExpanded((prev) => {
@@ -358,6 +398,9 @@ export default function SalesOrders() {
                         <span className="cell-muted" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{fmtDate(f.mother.entryTime)}</span>
                         <span style={{ textAlign: 'center' }}>
                           <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setView({ root: f.rootCode }); }}>查看</Button>
+                          {f.mother.sourceChannel === 'manual' && (
+                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setView({ root: f.rootCode, edit: true }); startOrderEdit(f.mother); }}>修改</Button>
+                          )}
                         </span>
                       </div>
 
@@ -502,10 +545,100 @@ export default function SalesOrders() {
           return `${platformLabelOf(m)} · ${m.customerName}（${m.customerType}） · ${m.receiver} ${m.receiverPhone}`;
         })()}
         mode="view"
+        footer={(() => {
+          const fam = families.find((f) => f.rootCode === view?.root);
+          const manual = fam?.mother.sourceChannel === 'manual';
+          if (view?.edit && orderEdit) {
+            return (
+              <>
+                <Button variant="ghost" onClick={() => setOrderEdit(null)}>取消</Button>
+                <Button onClick={saveOrderEdit}>保存修改</Button>
+              </>
+            );
+          }
+          return (
+            <>
+              <Button variant="ghost" onClick={() => setView(null)}>关闭</Button>
+              {manual && (
+                <Button onClick={() => {
+                  const fam2 = families.find((f) => f.rootCode === view?.root);
+                  if (fam2) startOrderEdit(fam2.mother);
+                  setView((v) => (v ? { ...v, edit: true } : v));
+                }}>修改</Button>
+              )}
+            </>
+          );
+        })()}
       >
         {(() => {
           const fam = families.find((f) => f.rootCode === view?.root);
           if (!fam) return null;
+          const m = fam.mother;
+          const coreEditable = (m.processStatus === 'pending' || m.processStatus === 'report_match_pending') && fam.children.length === 0;
+          if (view?.edit && orderEdit) {
+            return (
+              <>
+                <DrawerSection title="订单信息修改">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3) var(--space-4)' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>客户侧订单号</label>
+                      <input className="filter-input" style={{ width: '100%' }} value={orderEdit.customerOrderNo} onChange={(e) => setOrderEdit((f) => (f ? { ...f, customerOrderNo: e.target.value } : f))} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>客户下单时间</label>
+                      <input className="filter-input" type="date" style={{ width: '100%' }} value={orderEdit.customerOrderTime} onChange={(e) => setOrderEdit((f) => (f ? { ...f, customerOrderTime: e.target.value } : f))} />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 'var(--space-2)' }}>客户侧订单号 / 客户下单时间在订单任何状态下都可修改</div>
+                </DrawerSection>
+                {coreEditable ? (
+                  <>
+                    <DrawerSection title="收货信息修改">
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3) var(--space-4)' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>收货人</label>
+                          <input className="filter-input" style={{ width: '100%' }} value={orderEdit.receiver} onChange={(e) => setOrderEdit((f) => (f ? { ...f, receiver: e.target.value } : f))} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>联系电话</label>
+                          <input className="filter-input" style={{ width: '100%' }} value={orderEdit.receiverPhone} onChange={(e) => setOrderEdit((f) => (f ? { ...f, receiverPhone: e.target.value } : f))} />
+                        </div>
+                        <div style={{ gridColumn: 'span 2' }}>
+                          <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>收货地址</label>
+                          <input className="filter-input" style={{ width: '100%' }} value={orderEdit.receiverAddress} onChange={(e) => setOrderEdit((f) => (f ? { ...f, receiverAddress: e.target.value } : f))} />
+                        </div>
+                        <div style={{ gridColumn: 'span 4' }}>
+                          <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>备注</label>
+                          <input className="filter-input" style={{ width: '100%' }} value={orderEdit.remark} onChange={(e) => setOrderEdit((f) => (f ? { ...f, remark: e.target.value } : f))} />
+                        </div>
+                      </div>
+                    </DrawerSection>
+                    <DrawerSection title="商品明细修改">
+                      <table className="detail-inline-table">
+                        <thead><tr><th>商品名称</th><th>规格</th><th style={{ width: 100 }}>数量</th><th style={{ width: 120 }}>单价</th><th style={{ width: 110 }}>小计</th><th style={{ width: 70 }}>操作</th></tr></thead>
+                        <tbody>
+                          {orderEdit.items.map((it, i) => (
+                            <tr key={i}>
+                              <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
+                              <td>{it.spec}</td>
+                              <td><input className="filter-input mono" type="number" min={1} style={{ width: 72 }} value={it.quantity} onChange={(e) => setOrderEdit((f) => (f ? { ...f, items: f.items.map((x, j) => (j === i ? { ...x, quantity: Number(e.target.value) || 0 } : x)) } : f))} /></td>
+                              <td><input className="filter-input mono" type="number" min={0} style={{ width: 92 }} value={it.price} onChange={(e) => setOrderEdit((f) => (f ? { ...f, items: f.items.map((x, j) => (j === i ? { ...x, price: Number(e.target.value) || 0 } : x)) } : f))} /></td>
+                              <td className="mono">{money(it.price * it.quantity)}</td>
+                              <td><Button size="sm" variant="ghost" onClick={() => setOrderEdit((f) => (f ? { ...f, items: f.items.filter((_, j) => j !== i) } : f))}>删除</Button></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </DrawerSection>
+                  </>
+                ) : (
+                  <div style={{ padding: 'var(--space-3) var(--space-4)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
+                    订单已进入待接单 / 比单状态或已拆分，<strong>收货信息与商品明细不可修改</strong>；仅客户侧订单号 / 客户下单时间可修改。
+                  </div>
+                )}
+              </>
+            );
+          }
           return (
             <SalesOrderDetailTabs
               key={`${fam.rootCode}-${view?.child ?? 'info'}`}
