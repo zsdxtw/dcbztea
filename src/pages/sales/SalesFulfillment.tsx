@@ -136,7 +136,7 @@ export default function SalesFulfillment() {
                   : <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E8F5E9', color: '#2E7D32', whiteSpace: 'nowrap' }}>直接销售</span>}</span>,
                 <span key="cu" className="cell-emph">{o.customerName}</span>,
                 <span key="sub" style={{ fontSize: 'var(--text-sm)' }}>
-                  {o.path === 'self' ? `自营${o.follower ? ` · ${o.follower}` : ''}` : (o.partnerName ?? '待分发')}
+                  {o.path === 'self' ? '自营' : (o.partnerName ?? '待分发')}
                 </span>,
                 <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(o.totalAmount)}</span>,
                 pill(sc.bg, sc.color, FULFILLMENT_STAGE_LABELS[u.stage]),

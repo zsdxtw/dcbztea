@@ -2,10 +2,9 @@ import { useState, useEffect, type ReactNode } from 'react';
 import { Outlet, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
 import BrandLogo from '../../components/common/BrandLogo';
-import { useMyFollowCount } from './selfopShared';
 import '../partner/partner.css';
 
-/* ── 登录态（persona：自营运营人员，接单默认带出跟单人） ── */
+/* ── 登录态（persona：自营运营人员） ── */
 
 export interface SelfopAuth {
   username: string;
@@ -13,7 +12,7 @@ export interface SelfopAuth {
   role: string;
 }
 
-/** 演示自营运营账号（与管理后台跟单人口径一致） */
+/** 演示自营运营账号 */
 export const SELFOP_ACCOUNTS: { username: string; password: string; name: string; role: string }[] = [
   { username: 'zy01', password: '123456', name: '周雨桐', role: '自营运营组长' },
   { username: 'zy02', password: '123456', name: '陈默', role: '自营运营专员' },
@@ -84,8 +83,6 @@ export default function SelfopLayout() {
     };
   }, []);
 
-  const myOrders = useMyFollowCount(auth?.name);
-
   if (!auth) return <Navigate to="/selfop/login" replace />;
 
   const handleLogout = () => {
@@ -142,12 +139,8 @@ export default function SelfopLayout() {
           })}
         </nav>
 
-        {/* 底部：跟单人信息 + 用户 */}
+        {/* 底部：用户 */}
         <div className="pk-side-foot">
-          <div className="pk-partner-block" title="自营运营 · 跟单人">
-            <div className="pk-partner-name">跟单中 {myOrders} 单</div>
-            <div className="pk-partner-code mono">{auth.name} · {auth.role}</div>
-          </div>
           <div className="pk-user">
             <div className="pk-avatar">{auth.name.charAt(0)}</div>
             <div className="pk-user-text">

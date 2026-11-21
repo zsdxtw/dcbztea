@@ -17,7 +17,3 @@ export function useSelfOrders(): ExternalOrder[] {
   return useOrderFlowStore((s) => s.orders.filter(isSelfOrder));
 }
 
-/** 某跟单人名下自营订单数（响应式；缺省统计全部自营） */
-export function useMyFollowCount(follower?: string): number {
-  return useOrderFlowStore((s) => s.orders.filter((o) => isSelfOrder(o) && (!follower || o.follower === follower)).length);
-}

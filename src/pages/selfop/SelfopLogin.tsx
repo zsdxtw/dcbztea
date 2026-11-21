@@ -5,7 +5,7 @@ import '../partner/partner.css';
 
 /**
  * 自营工作台登录页：左侧品牌视觉 + 右侧极简表单（参照合作商工作台）
- * 演示账号为自营运营人员（persona）：登录后接单默认带出该跟单人。
+ * 演示账号为自营运营人员（persona）。
  */
 export default function SelfopLogin() {
   const navigate = useNavigate();
@@ -118,7 +118,7 @@ export default function SelfopLogin() {
 
           <div className="pk-login-demo">演示账号 <b>zy01 / 123456</b></div>
 
-          {/* 快捷演示登录：选择运营人员身份（接单默认带出该跟单人） */}
+          {/* 快捷演示登录：选择运营人员身份 */}
           <div className="pk-login-demo" style={{ marginBottom: 6 }}>或选择身份快捷进入：</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
             {SELFOP_ACCOUNTS.map((acc) => (

@@ -5,7 +5,6 @@ import Button from '../../components/common/Button';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import SelfOrderDetailDrawer from '../../components/selfop/SelfOrderDetailDrawer';
 import { selfStageOf, acceptedSub, STAGE_META, packageStatsOf, type SelfStage } from '../../components/selfop/selfStage';
-import { getSelfopAuth } from './SelfopLayout';
 import { useSelfOrders } from './selfopShared';
 import type { ExternalOrder } from '../../types';
 
@@ -17,7 +16,6 @@ const pill = (bg: string, color: string, text: string) => (
 
 /** 自营工作台 · 订单管理：自营订单全链路处理（与管理后台「销售单自营」共用抽屉与状态机） */
 export default function SelfopOrders() {
-  const auth = getSelfopAuth();
   const orders = useSelfOrders();
   const purchaseDocs = usePurchaseStore((s) => s.docs);
 
@@ -38,7 +36,7 @@ export default function SelfopOrders() {
       <PageHead
         eyebrow="订单"
         title="订单管理"
-        desc={<>自营销售单全链路处理：待接单（接单 / 退回）→ 已接单（拆单 / 采购&amp;发货）→ 已发货（运输中 / 妥投）→ 已确收；接单默认跟单人 <b>{auth?.name ?? '—'}</b></>}
+        desc={<>自营销售单全链路处理：待接单（接单 / 退回）→ 已接单（拆单 / 采购&amp;发货）→ 已发货（运输中 / 妥投）→ 已确收</>}
       />
 
       {/* 状态阶段 Tab */}
@@ -62,7 +60,7 @@ export default function SelfopOrders() {
 
       <div className="pk-panel" style={{ padding: 0 }}>
         <Table
-          headers={['销售单编号', '销售路径', '客户', '商品', '金额', '跟单人', '采购', '状态', '物流', '操作']}
+          headers={['销售单编号', '销售路径', '客户', '商品', '金额', '采购', '状态', '物流', '操作']}
           rows={filtered.map((o) => {
             const st = stageOf(o);
             const meta = STAGE_META[st];
@@ -77,7 +75,6 @@ export default function SelfopOrders() {
               <span key="cu" className="cell-emph">{o.customerName}</span>,
               <span key="i" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{o.items[0].productName}{o.items.length > 1 ? ` 等${o.items.length}种` : ''} ×{o.items.reduce((s, it) => s + it.quantity, 0)}</span>,
               <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(o.totalAmount)}</span>,
-              <span key="f" style={{ fontSize: 'var(--text-sm)' }}>{o.follower ?? '—'}</span>,
               <span key="po" style={{ fontSize: 'var(--text-sm)' }}>
                 {pos.length > 0 ? pos.map((d) => d.code).join('、') : '—'}
                 {o.selfPo && pos.length > 0 && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.selfPo.mode === 'direct' ? '直发客户' : '入库制'}</span>}
@@ -102,9 +99,9 @@ export default function SelfopOrders() {
         )}
       </div>
 
-      {/* 详情抽屉（共享组件；接单默认带出当前登录运营为跟单人） */}
+      {/* 详情抽屉（共享组件） */}
       {selectedId && (
-        <SelfOrderDetailDrawer orderId={selectedId} onClose={() => setSelectedId(null)} defaultFollower={auth?.name} />
+        <SelfOrderDetailDrawer orderId={selectedId} onClose={() => setSelectedId(null)} />
       )}
     </div>
   );

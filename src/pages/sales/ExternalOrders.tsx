@@ -390,7 +390,7 @@ export default function ExternalOrders() {
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           销售单分发决定<strong>销售订单由谁来供货发货</strong>（自营仓发货 / 合作商采购直发），均<strong>逐个展示子单</strong>（母单聚合总览请前往「销售单管理 → 销售订单」）。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>，保存后均自动与审批通过的报备比对。
-          命中报备的订单先进入<strong>报备-匹配待确认</strong>，人工确认匹配后分发给报备合作商；其余订单点击「分发」在弹窗中选择：转自营（在销售单自营/自营工作台接单，接单时填跟单人）、转派-指定、转派-报备、转派-比单（积分优先）；比单可限定合作商地区。
+          命中报备的订单先进入<strong>报备-匹配待确认</strong>，人工确认匹配后分发给报备合作商；其余订单点击「分发」在弹窗中选择：转自营（在销售单自营/自营工作台接单）、转派-指定、转派-报备、转派-比单（积分优先）；比单可限定合作商地区。
           履约状态进入已接单及后续后分发状态自动变为<strong>分发已完成</strong>；全部包裹妥投后由管理后台「确认收货」→ 履约已确收；待接单订单可「重新分发」回待分发重新选择路径，已接单的重新分发需二次确认。
         </div>
 
@@ -846,7 +846,7 @@ export default function ExternalOrders() {
             {current.processStatus === 'self_pending' && (
               <DrawerSection title="自营待接单">
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7, marginBottom: 'var(--space-2)' }}>
-                  订单已转入<strong>自营</strong>：接单（填跟单人）、退回分发等操作请在<strong>销售单自营</strong>菜单的详情页进行；
+                  订单已转入<strong>自营</strong>：接单、退回分发等操作请在<strong>销售单自营</strong>菜单的详情页进行；
                   接单后可拆单，并通过「采购&amp;发货」按仓库分仓直发（各仓快递单号）+ 缺口以销定采。
                 </div>
                 <Button onClick={() => navigate('/selfop/orders')}>前往自营工作台处理</Button>
@@ -1132,7 +1132,7 @@ export default function ExternalOrders() {
               {/* 转自营 */}
               {flowMode === 'self' && (
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7, padding: 'var(--space-2) 0' }}>
-                  转自营路径：订单进入<strong>自营待接单</strong>，请在「销售单自营」接单，接单时填写跟单人并选择采购供应商，进入自营执行（以销定采）。
+                  转自营路径：订单进入<strong>自营待接单</strong>，请在「销售单自营」接单并选择采购供应商，进入自营执行（以销定采）。
                 </div>
               )}
 

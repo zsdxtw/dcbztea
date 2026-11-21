@@ -230,12 +230,12 @@ const baseSeeds: ExternalOrder[] = [
     receiver: '交行采购中心', receiverPhone: '021-3138****', receiverAddress: '上海市黄浦区中山南路99号',
     entryTime: '2026-10-22', operator: '系统直连', sourceChannel: 'push',
     processStatus: 'processed',
-    path: 'self', follower: '周雨桐',
+    path: 'self',
     selfPo: { supplierId: '8', supplierName: '四川省茶业集团股份有限公司', mode: 'warehouse', purchaseDate: '2026-10-23' },
     history: [
       { time: '2026-10-22', action: '直连推送订单', detail: '京东平台 API 同步' },
       { time: '2026-10-22', action: '选择自营路径', detail: '进入自营工作台 · 等待接单' },
-      { time: '2026-10-23', action: '接单（自营）', detail: '跟单人 周雨桐 → 已接单' },
+      { time: '2026-10-23', action: '接单（自营）', detail: '履约已接单' },
       { time: '2026-10-23', action: '以销定采', detail: '竹叶青·品味级 缺口 40 件 → 入库制采购单 CG-SO-2610220001（四川省茶业集团）· 采购在途' },
     ],
   },
@@ -252,7 +252,7 @@ const baseSeeds: ExternalOrder[] = [
     entryTime: '2026-10-18', operator: '运营老陈', sourceChannel: 'manual',
     processStatus: 'processed',
     invoiceStatus: 'invoiced',
-    path: 'self', follower: '陈默',
+    path: 'self',
     selfShipments: [{
       id: 'ss_eo4_1', packageNo: 'SO-2610180001FH01',
       warehouseId: 'wh-ind-04', warehouseName: '福鼎分仓',
@@ -264,7 +264,7 @@ const baseSeeds: ExternalOrder[] = [
     history: [
       { time: '2026-10-18', action: '手工录入订单', detail: '天猫平台' },
       { time: '2026-10-18', action: '选择自营路径', detail: '进入自营工作台 · 等待接单' },
-      { time: '2026-10-19', action: '接单（自营）', detail: '跟单人 陈默 → 已接单' },
+      { time: '2026-10-19', action: '接单（自营）', detail: '履约已接单' },
       { time: '2026-10-22', action: '采购&发货（分仓直发）', detail: '福鼎分仓 直发 白毫银针·特级×10 · 京东物流 JD0031874520 → 履约运输中' },
       { time: '2026-10-23', action: '物流妥投', detail: 'JD0031874520 已完成投递 → 妥投' },
       { time: '2026-10-24', action: '客户确认收货', detail: '订单完成（确认收货）' },
@@ -349,7 +349,6 @@ const DEMO_PARTNERS: { id: string; name: string }[] = [
 ];
 
 const DEMO_OPERATORS = ['运营小周', '运营老陈', '运营小林', '系统直连'];
-const DEMO_FOLLOWERS = ['陈建国', '周敏', '林晓峰', '顾晓岚'];
 
 /** 简单确定性伪随机 */
 const lcg = (seed: number) => (n: number) => {
@@ -833,9 +832,9 @@ function buildDemoOrders(): ExternalOrder[] {
     const stage = i % 4; // 0 已接单·采购在途 / 1 已接单·到货待发 / 2 已发货运输中 / 3 妥投
     const hist: ExternalOrder['history'] = [
       { time: D(s), action: '选择自营路径', detail: '进入自营工作台 · 等待接单' },
-      { time: D(s), action: '接单（自营）', detail: `跟单人 ${DEMO_FOLLOWERS[i]} → 已接单` },
+      { time: D(s), action: '接单（自营）', detail: '履约已接单' },
     ];
-    const extra: Record<string, unknown> = { path: 'self', follower: DEMO_FOLLOWERS[i] };
+    const extra: Record<string, unknown> = { path: 'self' };
     if (stage === 0) {
       // 以销定采（入库制）：采购在途，无物流单号，留在已接单
       extra.processStatus = 'processed';

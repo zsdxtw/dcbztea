@@ -1,14 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { PageHead } from '../partner/PartnerUI';
 import { getSelfopAuth, clearSelfopAuth, SELFOP_ACCOUNTS } from './SelfopLayout';
-import { useMyFollowCount } from './selfopShared';
 
 /** 自营工作台 · 设置：当前运营人员（persona）信息、切换身份、退出登录 */
 export default function SelfopAccount() {
   const navigate = useNavigate();
   const auth = getSelfopAuth();
-  const myOrders = useMyFollowCount(auth?.name);
-
   const switchAccount = (name: string) => {
     const acc = SELFOP_ACCOUNTS.find((a) => a.name === name);
     if (!acc) return;
@@ -21,7 +18,7 @@ export default function SelfopAccount() {
       <PageHead
         eyebrow="设置"
         title="账号信息"
-        desc={<>当前登录的自营运营人员（persona）：接单时默认带出该跟单人</>}
+        desc={<>当前登录的自营运营人员（persona）</>}
       />
 
       <div className="pk-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
@@ -36,7 +33,6 @@ export default function SelfopAccount() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 20, marginTop: 12, fontSize: 13, color: 'var(--color-neutral-600)' }}>
-            <span>跟单中：<b className="mono">{myOrders}</b> 单</span>
             <span>终端：<b>自营工作台</b></span>
           </div>
           <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>

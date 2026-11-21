@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import Button from '../common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../common/DetailDrawer';
-import DeptEmployeeSelect from '../business/DeptEmployeeSelect';
 import { useOrderFlowStore, getSelfPurchaseEstimate } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, platformLabelOf } from '../../data/externalOrders';
 import { getWarehouseStock, WAREHOUSE_NAMES } from '../../data/stock';
-import { getEmployeeName, employees } from '../../data/organization';
 import { selfStageOf, acceptedSub, STAGE_META } from './selfStage';
 import {
   FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS, stageOfOrder, fulfillmentTimes,
@@ -32,8 +30,6 @@ export interface SelfOrderDetailDrawerProps {
   /** 订单 id（组件内部按 id 订阅 store，操作后实时刷新） */
   orderId: string;
   onClose: () => void;
-  /** 默认跟单人（自营工作台登录 persona：接单时预填/直接使用） */
-  defaultFollower?: string;
 }
 
 /**
@@ -41,7 +37,7 @@ export interface SelfOrderDetailDrawerProps {
  * 按状态提供操作：待接单（接单/退回，仅详情页）→ 已接单（拆单/采购&发货/到货入库/出库）
  * → 运输中（包裹妥投推进）→ 妥投（确认收货）。进入自营后不可修改订单内容。
  */
-export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollower }: SelfOrderDetailDrawerProps) {
+export default function SelfOrderDetailDrawer({ orderId, onClose }: SelfOrderDetailDrawerProps) {
   const store = useOrderFlowStore;
   const orders = useOrderFlowStore((s) => s.orders);
   const purchaseDocs = usePurchaseStore((s) => s.docs);
@@ -52,9 +48,6 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
     [purchaseDocs, current],
   );
 
-  /* 接单弹窗（跟单人） */
-  const [acceptFollower, setAcceptFollower] = useState('');
-  const [acceptError, setAcceptError] = useState('');
   /* 退回确认 */
   const [returning, setReturning] = useState(false);
   /* 拆单弹窗 */
@@ -73,11 +66,7 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
   const [outTracking, setOutTracking] = useState('');
   const [outOpen, setOutOpen] = useState(false);
 
-  const defaultFollowerEmpId = defaultFollower ? employees.find((e) => e.name === defaultFollower)?.id : undefined;
-
   useEffect(() => {
-    setAcceptFollower(defaultFollowerEmpId ?? '');
-    setAcceptError('');
     setReturning(false);
     setSplitQty({});
     setSplitOpen(false);
@@ -180,10 +169,7 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
   };
 
   const submitAccept = () => {
-    const followerName = acceptFollower ? getEmployeeName(acceptFollower) : defaultFollower;
-    if (!followerName) { setAcceptError('请选择跟单人'); return; }
-    const res = store.getState().acceptSelfOrder(current!.id, { follower: followerName });
-    if (res.ok) { setAcceptError(''); } else { setAcceptError(res.msg); }
+    store.getState().acceptSelfOrder(current!.id);
   };
 
   const ownShipments = current!.selfShipments ?? [];
@@ -243,7 +229,6 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
           <InfoItem label="销售单编号" mono emph>{current.code}</InfoItem>
           {current.parentCode && <InfoItem label="关联母销售单" mono>{current.parentCode}</InfoItem>}
           <InfoItem label="客户">{current.customerName}（{current.customerType}）</InfoItem>
-          <InfoItem label="跟单人">{current.follower ?? '—'}</InfoItem>
           <InfoItem label="订单金额" mono emph valueStyle={{ color: 'var(--color-module-current-base)' }}>{money(current.totalAmount)}</InfoItem>
           <InfoItem label="来源">{platformLabelOf(current)} · {EXTERNAL_CHANNEL_LABELS[current.sourceChannel]}</InfoItem>
           <InfoItem label="录入时间">{current.entryTime}</InfoItem>
@@ -298,13 +283,13 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
         </table>
       </DrawerSection>
 
-      {/* 待接单：接单（选跟单人）+ 退回分发（详情页专属操作） */}
+      {/* 待接单：接单 + 退回分发（详情页专属操作） */}
       {current.processStatus === 'self_pending' && (
         <DrawerSection title="接单（自营）">
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)', lineHeight: 1.7 }}>
             接单后订单进入<strong>已接单</strong>，可进行拆单与采购&amp;发货；退回则订单回到<strong>履约分配 · 分发-待处理</strong>（来源标注「自营退回」）。进入自营后不支持修改订单内容。
           </div>
-          {returning ? (
+          {returning && (
             <div style={{ padding: 'var(--space-3)', border: '1px solid #FBEDEF', background: '#FFF8F9', borderRadius: 'var(--radius-md)' }}>
               <div style={{ fontSize: 'var(--text-sm)', lineHeight: 1.7, marginBottom: 'var(--space-2)' }}>
                 确认退回 <strong className="mono">{current.code}</strong> 至履约分配？退回后重新进入<strong>分发-待处理</strong>，来源将标注「自营退回」。
@@ -313,22 +298,6 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
                 <Button variant="ghost" size="sm" onClick={() => setReturning(false)}>取消</Button>
                 <Button variant="danger" size="sm" onClick={() => { store.getState().returnToDistribute(current.id); setReturning(false); onClose(); }}>确认退回</Button>
               </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-              <div style={{ minWidth: 240, flex: 1 }}>
-                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>跟单人 *</label>
-                {defaultFollowerEmpId ? (
-                  <DeptEmployeeSelect value={acceptFollower} onChange={(v: string) => { setAcceptFollower(v); setAcceptError(''); }} placeholder="选择员工" style={{ width: '100%' }} />
-                ) : defaultFollower ? (
-                  <div style={{ padding: '6px 12px', border: '1px solid var(--color-border-primary)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-tertiary)', fontSize: 'var(--text-sm)' }}>
-                    {defaultFollower}（当前登录运营）
-                  </div>
-                ) : (
-                  <DeptEmployeeSelect value={acceptFollower} onChange={(v: string) => { setAcceptFollower(v); setAcceptError(''); }} placeholder="选择员工" style={{ width: '100%' }} />
-                )}
-              </div>
-              {acceptError && <span style={{ fontSize: 'var(--text-sm)', color: '#C62828', alignSelf: 'flex-end', paddingBottom: 6 }}>{acceptError}</span>}
             </div>
           )}
         </DrawerSection>

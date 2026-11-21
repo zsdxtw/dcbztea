@@ -410,7 +410,7 @@ export default function SalesOrders() {
                               <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-600)', whiteSpace: 'nowrap' }}>{pathLabel(u.underlying)}</span>
                               {/* 履约主体（跨 2 列，完整展示合作商全称） */}
                               <span style={{ fontSize: 'var(--text-sm)', gridColumn: 'span 2', overflow: 'hidden', textOverflow: 'ellipsis' }} title={u.underlying.partnerName ?? ''}>
-                                {u.underlying.partnerName ?? (u.underlying.path === 'self' ? `自营${u.underlying.follower ? ` · ${u.underlying.follower}` : ''}` : '—')}
+                                {u.underlying.partnerName ?? (u.underlying.path === 'self' ? '自营' : '—')}
                               </span>
                               {/* 物流进度 */}
                               <span style={{ minWidth: 0 }}>

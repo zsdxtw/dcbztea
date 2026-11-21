@@ -1968,8 +1968,6 @@ export interface ExternalOrder {
   settled?: boolean;
   /** 开票状态：未开票（缺省）/ 部分开票 / 已开票（前置条件：已确收） */
   invoiceStatus?: SalesInvoiceStatus;
-  /** 自营跟单人（销售单自营接单时填写） */
-  follower?: string;
   /** 自营以销定采信息（采购&发货时固化，缺口的采购去向） */
   selfPo?: SelfPurchase;
   /** 自营发货包裹（分仓发货 / 到货出库生成，按物流单号跟踪妥投） */

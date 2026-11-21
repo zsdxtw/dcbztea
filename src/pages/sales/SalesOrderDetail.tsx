@@ -108,7 +108,7 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3) var(--space-4)', marginBottom: 'var(--space-4)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)' }}>
         {infoItem('履约单编号', current.code, { mono: true, emph: true })}
         {infoItem('分发路径', pathLabel(current))}
-        {infoItem('合作商 / 跟单人', current.partnerName ?? (current.path === 'self' ? `自营${current.follower ? ` · ${current.follower}` : ''}` : '—'))}
+        {infoItem('履约主体', current.partnerName ?? (current.path === 'self' ? '自营' : '—'))}
         {infoItem('金额', <span style={{ fontWeight: 'var(--font-semibold)' }}>{money(current.totalAmount)}</span>, { mono: true })}
         {infoItem('分发状态', pill(distributeStateOf(current)))}
         {infoItem('履约状态', pill(fulfillStateOf(current, currentPos)))}

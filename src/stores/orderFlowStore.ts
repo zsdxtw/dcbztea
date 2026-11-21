@@ -183,8 +183,8 @@ interface OrderFlowState {
   partnerReturnOrder: (id: string) => { ok: boolean; msg: string };
 
   /* ── 自营执行（销售单自营菜单：接单 → 拆单 / 采购&发货 → 运输 → 妥投 → 确认收货） ── */
-  /** 接单（详情页）：填跟单人；分发状态置「分发已完成」，履约状态进入已接单 */
-  acceptSelfOrder: (id: string, input: { follower?: string }) => { ok: boolean; msg: string };
+  /** 接单（详情页）：分发状态置「分发已完成」，履约状态进入已接单 */
+  acceptSelfOrder: (id: string) => { ok: boolean; msg: string };
   /** 退回（详情页）：退回销售单分发重新待处理，来源标注「自营退回」 */
   returnToDistribute: (id: string) => { ok: boolean; msg: string };
   /** 采购&发货（详情页）：分仓直发包裹（每仓一快递单号）+ 缺口以销定采（直发/入库制），有物流单号即履约运输中 */
@@ -298,7 +298,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
     sourceTag: undefined,
     compare: undefined,
     partnerId: undefined, partnerName: undefined, transferSource: undefined, transferTime: undefined,
-    partnerStatus: undefined, settleOnTime: undefined, invoiceStatus: undefined, follower: undefined,
+    partnerStatus: undefined, settleOnTime: undefined, invoiceStatus: undefined,
     selfPo: undefined, selfShipments: undefined,
     processStatus: 'pending', path: undefined, distributeMode: undefined,
     ...extra,
@@ -556,7 +556,6 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         transferTime: undefined,
         partnerStatus: undefined,
         settleOnTime: undefined,
-        follower: undefined,
         selfPo: undefined,
         selfShipments: undefined,
         compare: undefined,
@@ -568,16 +567,15 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
     },
 
     /* ── 自营执行（销售单自营菜单） ── */
-    acceptSelfOrder: (id, input) => {
+    acceptSelfOrder: (id) => {
       const order = get().orders.find((o) => o.id === id);
       if (!order) return { ok: false, msg: '订单不存在' };
       if (order.processStatus !== 'self_pending') return { ok: false, msg: '订单不在自营待接单状态' };
       patchOrder(id, {
         processStatus: 'processed',
         path: 'self',
-        follower: input.follower,
         fulfillment: fulfil(order, { stage: 'accepted', acceptTime: nowMin() }),
-      }, { action: '接单（自营）', detail: `跟单人 ${input.follower || '—'} → 履约已接单 · 分发状态同步为分发已完成` });
+      }, { action: '接单（自营）', detail: '履约已接单 · 分发状态同步为分发已完成' });
       return { ok: true, msg: '已接单（履约状态已接单 · 分发状态分发已完成），可进行拆单或采购&发货' };
     },
 
@@ -589,7 +587,6 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         processStatus: 'pending',
         path: undefined,
         sourceTag: 'self_returned',
-        follower: undefined,
       }, { action: '自营退回', detail: '退回销售单分发 · 重新进入分发-待处理（来源标注：自营退回）' });
       return { ok: true, msg: '已退回销售单分发（分发-待处理），来源已标注「自营退回」' };
     },
@@ -616,7 +613,6 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
           transferTime: undefined,
           partnerStatus: undefined,
           distributeMode: undefined,
-          follower: undefined,
           fulfillment: undefined,
           sourceTag: src.tag,
         }, { action: src.label, detail: `从${from}整体取回 → 回到销售单分发（履约单编号 ${order.code} 不变）` });
@@ -662,7 +658,6 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         transferTime: undefined,
         partnerStatus: undefined,
         distributeMode: undefined,
-        follower: undefined,
         fulfillment: undefined,
         sourceTag: src.tag,
         reportMatches: undefined,
