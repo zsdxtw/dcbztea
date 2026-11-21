@@ -135,6 +135,12 @@ export default function ExternalOrders() {
   const [deleting, setDeleting] = useState<ExternalOrder | null>(null);
   const [cancelling, setCancelling] = useState<ExternalOrder | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+  /** 操作列选中态：点击即选中（primary 样式），全部对话框关闭后取消选中 */
+  const [activeAction, setActiveAction] = useState<{ id: string; act: string } | null>(null);
+  /** 操作按钮：未选中=ghost（参照拆单），选中=primary（参照分发） */
+  const actBtn = (o: ExternalOrder, act: string, label: string, onClick: () => void) => (
+    <Button size="sm" variant={activeAction?.id === o.id && activeAction?.act === act ? 'primary' : 'ghost'} onClick={() => { setActiveAction({ id: o.id, act }); onClick(); }}>{label}</Button>
+  );
   /** 报名情况弹窗 */
   const [enrollOf, setEnrollOf] = useState<string | null>(null);
   /** 直接选定弹窗 */
@@ -278,6 +284,12 @@ export default function ExternalOrders() {
 
   const current = selectedId ? orders.find((o) => o.id === selectedId) ?? null : null;
   const enrollOrder = enrollOf ? orders.find((o) => o.id === enrollOf) ?? null : null;
+
+  const noDialogOpen = !selectedId && !splitting && !deleting && !reflowing && !matchConfirming && !enrollOrder && !awarding && !cancelling;
+  useEffect(() => {
+    if (noDialogOpen) setActiveAction(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noDialogOpen]);
 
   useEffect(() => {
     if (current) {
@@ -598,44 +610,44 @@ export default function ExternalOrders() {
               <div key="act" className="row-actions" style={{ whiteSpace: 'nowrap' }}>
                 {o.processStatus === 'pending' && (
                   <>
-                    <Button size="sm" onClick={() => openFlow(o)}>分发</Button>
-                    {o.items.length >= 1 && <Button size="sm" variant="ghost" onClick={() => { setSplitting(o); setSplitQty({}); setQuickMsg(''); }}>拆单</Button>}
-                    {o.sourceChannel === 'manual' && <Button size="sm" variant="ghost" onClick={() => { setSelectedId(o.id); startEdit(o); }}>修改</Button>}
-                    {o.sourceChannel === 'manual' && <Button size="sm" variant="ghost" onClick={() => setDeleting(o)}>删除</Button>}
+                    {actBtn(o, 'flow', '分发', () => openFlow(o))}
+                    {o.items.length >= 1 && actBtn(o, 'split', '拆单', () => { setSplitting(o); setSplitQty({}); setQuickMsg(''); })}
+                    {o.sourceChannel === 'manual' && actBtn(o, 'edit', '修改', () => { setSelectedId(o.id); startEdit(o); })}
+                    {o.sourceChannel === 'manual' && actBtn(o, 'delete', '删除', () => setDeleting(o))}
                   </>
                 )}
                 {o.processStatus === 'report_match_pending' && (
                   <>
-                    <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
-                    <Button size="sm" onClick={() => setMatchConfirming(o)}>确认匹配</Button>
+                    {actBtn(o, 'view', '查看', () => openDetail(o.id))}
+                    {actBtn(o, 'match', '确认匹配', () => setMatchConfirming(o))}
                   </>
                 )}
                 {o.processStatus === 'self_pending' && (
                   <>
-                    <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
-                    <Button size="sm" variant="ghost" onClick={() => navigate('/selfop/orders')}>去自营工作台处理</Button>
+                    {actBtn(o, 'view', '查看', () => openDetail(o.id))}
+                    {actBtn(o, 'selfop', '去自营工作台处理', () => navigate('/selfop/orders'))}
                   </>
                 )}
                 {o.processStatus === 'distribute_pending' && (
                   <>
-                    <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
-                    <Button size="sm" variant="danger" onClick={() => startReflow(o)}>重新分发</Button>
+                    {actBtn(o, 'view', '查看', () => openDetail(o.id))}
+                    {actBtn(o, 'reflow', '重新分发', () => startReflow(o))}
                   </>
                 )}
                 {o.processStatus === 'comparing' && (
                   <>
-                    <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查单</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setEnrollOf(o.id)}>报名情况</Button>
+                    {actBtn(o, 'query', '查单', () => openDetail(o.id))}
+                    {actBtn(o, 'enroll', '报名情况', () => setEnrollOf(o.id))}
                   </>
                 )}
                 {o.processStatus === 'processed' && (
                   <>
-                    <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
-                    <Button size="sm" variant="danger" onClick={() => startReflow(o)}>重新分发</Button>
+                    {actBtn(o, 'view', '查看', () => openDetail(o.id))}
+                    {actBtn(o, 'reflow', '重新分发', () => startReflow(o))}
                   </>
                 )}
                 {o.processStatus === 'cancelled' && (
-                  <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
+                  actBtn(o, 'view', '查看', () => openDetail(o.id))
                 )}
               </div>,
             ])}
