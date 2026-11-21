@@ -413,6 +413,8 @@ body {
 }
 .btn svg { width: 16px; height: 16px; }
 .btn-primary { background: var(--color-module-current-base); color: var(--color-neutral-0); box-shadow: 0 1px 2px rgba(0,0,0,0.06); transition: var(--transition-module); }
+/* 分发列表操作按钮：未选中 ghost，悬停与选中均呈 primary 样式 */
+.btn-ghost.act-selectable:hover { background: var(--color-module-current-base); color: var(--color-neutral-0); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
 .btn-primary:hover { background: var(--color-module-current-dark); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 [data-module="statistics"] .btn-primary { color: var(--color-neutral-900); }
 .btn-secondary { background: transparent; color: var(--color-module-current-base); border: 1px solid var(--color-module-current-base); transition: var(--transition-module); }

@@ -138,9 +138,12 @@ export default function ExternalOrders() {
   /** 操作列选中态：点击即选中（primary 样式），全部对话框关闭后取消选中 */
   const [activeAction, setActiveAction] = useState<{ id: string; act: string } | null>(null);
   /** 操作按钮：未选中=ghost（参照拆单），选中=primary（参照分发） */
-  const actBtn = (o: ExternalOrder, act: string, label: string, onClick: () => void) => (
-    <Button size="sm" variant={activeAction?.id === o.id && activeAction?.act === act ? 'primary' : 'ghost'} onClick={() => { setActiveAction({ id: o.id, act }); onClick(); }}>{label}</Button>
-  );
+  const actBtn = (o: ExternalOrder, act: string, label: string, onClick: () => void) => {
+    const selected = activeAction?.id === o.id && activeAction?.act === act;
+    return (
+      <Button size="sm" variant={selected ? 'primary' : 'ghost'} className={selected ? undefined : 'act-selectable'} onClick={() => { setActiveAction({ id: o.id, act }); onClick(); }}>{label}</Button>
+    );
+  };
   /** 报名情况弹窗 */
   const [enrollOf, setEnrollOf] = useState<string | null>(null);
   /** 直接选定弹窗 */
