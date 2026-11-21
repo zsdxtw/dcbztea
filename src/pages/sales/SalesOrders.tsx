@@ -370,7 +370,7 @@ export default function SalesOrders() {
                           <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', alignItems: 'center', padding: 'var(--space-2) var(--space-4)', borderTop: '1px solid var(--color-neutral-150)', borderBottom: '1px solid var(--color-neutral-150)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-500)', background: 'var(--color-neutral-0)' }}>
                             <span /><span />
                             <span>履约单号（{units.length} 单）</span>
-                            <span>分发路径</span>
+                            <span>分发方式</span>
                             <span style={{ gridColumn: 'span 2' }}>履约主体</span>
                             <span>物流进度</span>
                             <span>商品数量</span>

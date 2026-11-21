@@ -528,7 +528,7 @@ export default function ExternalOrders() {
                 {listDistOpts.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
               <select className="filter-select" value={listPath} onChange={(e) => setListPath(e.target.value)}>
-                <option value="">全部分发路径</option>
+                <option value="">全部分发方式</option>
                 <option value="self">自营</option>
                 <option value="report">转派-报备</option>
                 <option value="assign">转派-指定</option>
@@ -548,21 +548,23 @@ export default function ExternalOrders() {
         {/* 子单平铺列表（逐单操作视图；母单聚合总览见「销售单管理 → 销售订单」） */}
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['序号', '销售履约单号', '销售单订单号', '来源', '销售路径', '客户', '地区', '收件人', '收件地址', '金额', '分发状态', '订单状态', '分发路径', '合作商', '录入时间', '操作']}
+            headers={['序号', '销售履约单号', '销售单号', '订单来源', '销售路径', '客户', '收件人 / 地区', '金额', '分发状态', '分发方式', '履约主体', '录入时间', '操作']}
             rows={pagedOrders.map((o, idx) => [
               <span key="no" className="mono cell-muted">{(page - 1) * pageSize + idx + 1}</span>,
-              <span key="c" className="cell-mono-emph">{fulfillmentCodeOf(o)}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.externalOrderNo ?? '—'}</span></span>,
+              <span key="c" className="cell-mono-emph" style={{ whiteSpace: 'nowrap' }}>{fulfillmentCodeOf(o)}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.externalOrderNo ?? '—'}</span></span>,
               <span
                 key="link"
                 className="mono"
-                style={{ fontSize: 'var(--text-sm)', color: 'var(--color-module-current-base)', cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted' }}
-                title="点击查看销售单订单信息"
+                style={{ fontSize: 'var(--text-sm)', color: 'var(--color-module-current-base)', cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', whiteSpace: 'nowrap' }}
+                title="点击查看销售单订单信息" 
                 onClick={() => setLinkOrderCode(salesOrderCodeOf(o))}
               >
                 {salesOrderCodeOf(o)}
               </span>,
               <span key="src">
-                {platformLabelOf(o)}
+                {o.salesPath === 'via_platform'
+                  ? (o.platformCustomerName ?? (o.platform ? EXTERNAL_PLATFORM_LABELS[o.platform] : '经平台销售'))
+                  : '淡茶半盏'}
                 <span style={{ display: 'block' }}>{pill(
                   o.sourceChannel === 'push' ? '#F3E5F5' : '#E3F2FD',
                   o.sourceChannel === 'push' ? '#7B1FA2' : '#0F64B5',
@@ -578,23 +580,21 @@ export default function ExternalOrders() {
               </span>,
               <span key="sp">
                 {o.salesPath === 'via_platform'
-                  ? <>{pill('#E3F2FD', '#0F64B5', '经平台销售')}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: '#0F64B5' }}>{o.platformCustomerName ?? '—'}</span></>
+                  ? pill('#E3F2FD', '#0F64B5', '经平台销售')
                   : pill('#E8F5E9', '#2E7D32', '直接销售')}
               </span>,
               <span key="cu" className="cell-emph">{o.customerName}</span>,
-              <span key="rg" style={{ whiteSpace: 'nowrap', fontSize: 'var(--text-sm)' }}>{regionText(o)}</span>,
-              <span key="rcv" className="cell-emph">{o.receiver}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.receiverPhone}</span></span>,
-              <span key="addr" className="cell-muted" style={{ fontSize: 'var(--text-sm)', minWidth: 160 }}>{o.receiverAddress}</span>,
+              <span key="rcv" style={{ minWidth: 0 }}>
+                <span className="cell-emph" style={{ fontSize: 'var(--text-sm)', display: 'block' }}>{o.receiver}</span>
+                <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', whiteSpace: 'nowrap' }}>{regionText(o)}</span>
+              </span>,
               <span key="a" className="mono" style={{ fontWeight: 'var(--font-semibold)' }}>{money(o.totalAmount)}</span>,
               <span key="s" style={{ whiteSpace: 'nowrap' }}>
                 {(() => { const d = distributeStateOf(o); return pill(d.bg, d.color, d.label); })()}
               </span>,
-              <span key="os" style={{ whiteSpace: 'nowrap' }}>
-                {(() => { const s2 = orderStateOf(o); return pill(s2.bg, s2.color, s2.label); })()}
-              </span>,
               <span key="pa" style={{ fontSize: 'var(--text-sm)' }}>{pathLabel(o)}</span>,
-              <span key="pt" style={{ fontSize: 'var(--text-sm)' }}>{o.partnerName ?? '—'}</span>,
-              <span key="t" className="cell-muted" style={{ whiteSpace: 'nowrap' }}>{o.entryTime}</span>,
+              <span key="pt" style={{ fontSize: 'var(--text-sm)' }}>{o.partnerName ?? (o.path === 'self' ? '淡茶半盏（自营）' : '待分发')}</span>,
+              <span key="t" className="cell-muted" style={{ whiteSpace: 'nowrap' }}>{o.entryTime.slice(0, 10)}</span>,
               <div key="act" className="row-actions" style={{ whiteSpace: 'nowrap' }}>
                 {o.processStatus === 'pending' && (
                   <>
@@ -748,7 +748,7 @@ export default function ExternalOrders() {
                   <InfoItem label="客户下单时间">{current.customerOrderTime ?? '—'}</InfoItem>
                   <InfoItem label="客户侧订单号" mono>{current.customerOrderNo ?? '—'}</InfoItem>
                   {current.platformCustomerName && <InfoItem label="平台客户">{current.platformCustomerName}</InfoItem>}
-                  <InfoItem label="当前路径">{pathLabel(current)}</InfoItem>
+                  <InfoItem label="分发方式">{pathLabel(current)}</InfoItem>
                   {current.parentCode && <InfoItem label="母销售单编号" mono>{current.parentCode}</InfoItem>}
                   {current.parentCode && <InfoItem label="母销售单编号" mono>{current.parentCode}</InfoItem>}
                 </InfoGrid>
@@ -768,7 +768,7 @@ export default function ExternalOrders() {
                         <span className="mono" style={{ fontWeight: 'var(--font-medium)', minWidth: 150 }}>{c.code}</span>
                         {statusPill(c.processStatus)}
                         <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', minWidth: 90 }}>{pathLabel(c)}</span>
-                        <span style={{ fontSize: 'var(--text-sm)', flex: 1 }}>{c.partnerName ?? (c.path === 'self' ? '自营' : '—')}</span>
+                        <span style={{ fontSize: 'var(--text-sm)', flex: 1 }}>{c.partnerName ?? (c.path === 'self' ? '淡茶半盏（自营）' : '待分发')}</span>
                         <span className="mono" style={{ fontSize: 'var(--text-sm)' }}>{money(c.totalAmount)}</span>
                         <Button size="sm" variant="ghost" onClick={() => setSelectedId(c.id)}>查看</Button>
                       </div>
@@ -890,7 +890,7 @@ export default function ExternalOrders() {
             {current.processStatus === 'distribute_pending' && current.partnerName && (
               <DrawerSection title="转派待接单">
                 <InfoGrid cols={4}>
-                  <InfoItem label="合作商">{current.partnerName}</InfoItem>
+                  <InfoItem label="履约主体">{current.partnerName}</InfoItem>
                   <InfoItem label="分发方式">{TRANSFER_SOURCE_LABELS[current.transferSource ?? '']}</InfoItem>
                   <InfoItem label="分发时间">{current.transferTime ?? '—'}</InfoItem>
                   {current.reportMatches?.[0] && <InfoItem label="命中报备" mono>{current.reportMatches[0].reportCode}</InfoItem>}
@@ -905,7 +905,7 @@ export default function ExternalOrders() {
             {current.processStatus === 'processed' && current.path === 'distribute' && current.partnerName && (
               <DrawerSection title="合作商履约">
                 <InfoGrid cols={4}>
-                  <InfoItem label="合作商">{current.partnerName}</InfoItem>
+                  <InfoItem label="履约主体">{current.partnerName}</InfoItem>
                   <InfoItem label="分发方式">{TRANSFER_SOURCE_LABELS[current.transferSource ?? '']}</InfoItem>
                   <InfoItem label="履约状态">{current.partnerStatus ? PARTNER_ORDER_STATUS_LABELS[current.partnerStatus] : '待接单'}</InfoItem>
                   <InfoItem label="结算履约">{current.settleOnTime === true ? '按时（积分 +5）' : current.settleOnTime === false ? '超时（积分 -5）' : '未结算'}</InfoItem>

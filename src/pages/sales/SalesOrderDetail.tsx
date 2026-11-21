@@ -181,7 +181,7 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
       <DrawerSection title="分发情况">
         <InfoGrid cols={4}>
           <InfoItem label="分发状态">{pill(distributeStateOf(current))}</InfoItem>
-          <InfoItem label="分发路径">{pathLabel(current)}</InfoItem>
+          <InfoItem label="分发方式">{pathLabel(current)}</InfoItem>
           <InfoItem label="履约主体">{current.partnerName ?? (current.path === 'self' ? '自营' : '待分发')}</InfoItem>
         </InfoGrid>
       </DrawerSection>
