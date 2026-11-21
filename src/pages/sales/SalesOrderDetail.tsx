@@ -83,7 +83,9 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
       <DrawerSection title="订单信息">
         <InfoGrid>
           <InfoItem label="销售单号" mono emph>{family.rootCode}</InfoItem>
-          <InfoItem label="订单来源">淡茶半盏<span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{EXTERNAL_CHANNEL_LABELS[mother.sourceChannel]}</span></InfoItem>
+          <InfoItem label="订单来源">{mother.salesPath === 'via_platform'
+            ? (mother.platformCustomerName ?? (mother.platform ? EXTERNAL_PLATFORM_LABELS[mother.platform] : '经平台销售'))
+            : '淡茶半盏'}（{EXTERNAL_CHANNEL_LABELS[mother.sourceChannel]}）</InfoItem>
           <InfoItem label="下单平台">{mother.platform ? EXTERNAL_PLATFORM_LABELS[mother.platform] : '—'}</InfoItem>
           <InfoItem label="平台订单号" mono>{mother.externalOrderNo}</InfoItem>
           <InfoItem label="客户" emph>{`${mother.customerName}（${mother.customerType}）`}</InfoItem>
