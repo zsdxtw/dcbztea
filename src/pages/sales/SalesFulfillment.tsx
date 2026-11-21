@@ -8,7 +8,7 @@ import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import SalesOrderInfoModal from '../../components/business/SalesOrderInfoModal';
 import {
-  FULFILLMENT_STAGES, FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS,
+  FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS,
   stageOfOrder, stageIndexOf,
 } from '../../utils/fulfillment';
 import type { ExternalOrder, FulfillmentStage } from '../../types';
@@ -19,16 +19,21 @@ const pill = (bg: string, color: string, text: string) => (
   <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: bg, color, whiteSpace: 'nowrap' }}>{text}</span>
 );
 
-/** 履约阶段链：待接单 → 已接单 → 运输中 / 妥投 → 已确收 */
-type StageKey = FulfillmentStage;
-const STAGE_CHAIN = FULFILLMENT_STAGES;
+/** 履约 TAB（对齐合作商工作台：「已发货」= 运输中 + 妥投 合并桶，行内仍显示细档） */
+const STAGE_CHAIN: { key: string; label: string }[] = [
+  { key: 'pending_accept', label: '待接单' },
+  { key: 'accepted', label: '已接单' },
+  { key: 'shipping', label: '已发货' },
+  { key: 'confirmed', label: '已确收' },
+  { key: 'cancelled', label: '已取消' },
+];
 
 /** 履约单元：子订单 + 未被拆分的母销售单（有子单的母单由其子单代表） */
 export default function SalesFulfillment() {
   const navigate = useNavigate();
   const orders = useOrderFlowStore((s) => s.orders);
   const purchaseDocs = usePurchaseStore((s) => s.docs);
-  const [tab, setTab] = useState<'' | StageKey>('');
+  const [tab, setTab] = useState<string>('');
   const [linkOrderCode, setLinkOrderCode] = useState<string | null>(null);
   /** 待接单取回弹窗 */
   const [recallOf, setRecallOf] = useState<ExternalOrder | null>(null);
@@ -78,8 +83,10 @@ export default function SalesFulfillment() {
       .sort((a, b) => b.stageIdx - a.stageIdx || b.order.entryTime.localeCompare(a.order.entryTime));
   }, [orders, purchaseDocs]);
 
-  const countOf = (k: '' | StageKey) => (k === '' ? units.length : units.filter((u) => u.stage === k).length);
-  const filtered = useMemo(() => (tab === '' ? units : units.filter((u) => u.stage === tab)), [units, tab]);
+  const inTab = (u: { stage: FulfillmentStage }, k: string) =>
+    k === 'shipping' ? u.stage === 'shipping' || u.stage === 'transit' : u.stage === k;
+  const countOf = (k: string) => (k === '' ? units.length : units.filter((u) => inTab(u, k)).length);
+  const filtered = useMemo(() => (tab === '' ? units : units.filter((u) => inTab(u, tab))), [units, tab]);
 
   return (
     <>
