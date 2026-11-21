@@ -1479,7 +1479,10 @@ export type PartnerDeliveryMode = 'direct' | 'warehouse';
 export type PartnerCoopMode = 'supplier' | 'service';
 
 /** 合作商订单状态 */
-export type PartnerOrderStatus = 'pending' | 'accepted' | 'shipping' | 'transit' | 'delivered' | 'settled' | 'rejected';
+export type PartnerOrderStatus = 'pending' | 'accepted' | 'shipping' | 'transit' | 'confirmed' | 'rejected' | 'cancelled';
+
+/** 销售单开票状态（销售单/履约单维度：未开票 / 部分开票 / 已开票；与财务发票枚举 InvoiceStatus 区分） */
+export type SalesInvoiceStatus = 'uninvoiced' | 'partial' | 'invoiced';
 
 /** 合作商订单 */
 export interface PartnerOrder {
@@ -1502,6 +1505,8 @@ export interface PartnerOrder {
   /** 合作模式：供应商模式 / 服务商模式 */
   coopMode: PartnerCoopMode;
   status: PartnerOrderStatus;
+  /** 结算状态派生标记（底层履约单发货单全部已结算时为 true；终端「已结算」TAB 过滤用） */
+  settled?: boolean;
   orderDate: string;
   expectedShipDate: string;
   receiver: string;
@@ -1734,36 +1739,38 @@ export type ExternalPlatform = 'tmall' | 'jd' | 'douyin' | 'pdd' | 'other';
 export type DistributeMode = 'assign' | 'compare';
 
 /**
- * 订单处理状态（状态机）
- * pending 待处理（手工录入/直连推送，流转弹窗选路径）
- *   ├ 自营（销售单自营菜单处理）：self_pending 自营待接单 → self_accepted 已接单（拆单 / 采购&发货）
- *   │     → self_shipped 已发货运输中（有物流单号）→ self_delivered 妥投（物流投递完成）→ completed 确认收货
- *   │     self_pending 可「退回」pending（来源标注自营退回）
- *   └ 分发：
- *       报备命中（录入/直连推送自动匹配）→ report_match_pending 报备-匹配待确认（人工确认）→ distribute_pending
- *       指定 / 报备匹配（人工选择）→ distribute_pending；比单 comparing 结束 → distribute_pending
- * distribute_pending 分发待接单（合作商终端接单）→ processed → completed
+ * 分发状态（状态机 · 只表达分发过程，不含物流/结算）
+ * pending 待分发（手工录入/直连推送，流转弹窗选路径）
+ *   ├ 报备命中（录入/直连推送自动匹配）→ report_match_pending 报备-匹配待确认（人工确认）→ distribute_pending
+ *   ├ 自营：self_pending 自营待接单（履约状态一般为待接单；可退回 pending，来源标注自营退回）
+ *   ├ 比单：comparing 分发比单中 → 定标后 distribute_pending
+ *   └ 分发：指定 / 报备匹配 → distribute_pending 转派待接单（履约状态一般为待接单）
+ * 履约状态进入已接单及后续 → 本状态自动置 processed 分发已完成；cancelled 已取消贯穿（分发/履约状态均变为已取消）。
  */
 export type ExternalProcessStatus =
   | 'pending'
   | 'report_match_pending'
   | 'self_pending'
-  | 'self_accepted'
-  | 'self_shipped'
-  | 'self_delivered'
   | 'comparing'
   | 'distribute_pending'
   | 'processed'
-  | 'completed';
+  | 'cancelled';
 
 /** 外部订单来源渠道：手工录入 / 平台直连推送 */
 export type ExternalChannel = 'manual' | 'push';
 
 /**
- * 销售履约状态（销售单分发完成后进入履约环节的统一口径）
- * 待接单 → 已接单 → 已发货 → 已签收/妥投 → 确认收货
+ * 履约状态（分发进入具体履约主体[自营/合作商]后的状态，自营与合作商统一口径）
+ * 待接单 → 已接单 → 运输中 / 妥投（已发货档，依物流信息）→ 已确收（客户确认收货，管理后台手工/联机操作）
+ * cancelled 已取消贯穿：订单取消后履约状态同步变为已取消。
  */
-export type FulfillmentStage = 'pending_accept' | 'accepted' | 'shipped' | 'delivered' | 'confirmed';
+export type FulfillmentStage =
+  | 'pending_accept'
+  | 'accepted'
+  | 'shipping'
+  | 'transit'
+  | 'confirmed'
+  | 'cancelled';
 
 /** 销售履约时间线（销售履约单五节点时间） */
 export interface FulfillmentTimeline {
@@ -1810,7 +1817,7 @@ export interface SelfShipmentItem {
 
 /**
  * 自营发货包裹（采购&发货 / 到货出库生成）
- * 一个仓库一次发运一个包裹、一个快递单号；状态由系统跟踪物流推进（shipped → delivered 妥投）。
+ * 一个仓库一次发运一个包裹、一个快递单号；状态由系统跟踪物流推进（shipped 运输中 → delivered 妥投 → confirmed 已确收）。
  */
 export interface SelfShipment {
   id: string;
@@ -1821,9 +1828,12 @@ export interface SelfShipment {
   logisticsCompany: string;
   trackingNo: string;
   items: SelfShipmentItem[];
-  status: 'shipped' | 'delivered';
+  status: 'shipped' | 'delivered' | 'confirmed';
   shippedAt: string;
   deliveredAt?: string;
+  confirmedAt?: string;
+  /** 结算标记（按发货单结算） */
+  settled?: boolean;
 }
 
 /** 自营以销定采信息（采购&发货时固化；seedDocs 由此派生采购单） */
@@ -1954,6 +1964,8 @@ export interface ExternalOrder {
   partnerStatus?: PartnerOrderStatus;
   /** 结算是否按时（超时扣积分） */
   settleOnTime?: boolean;
+  /** 开票状态：未开票（缺省）/ 部分开票 / 已开票 */
+  invoiceStatus?: SalesInvoiceStatus;
   /** 自营跟单人（销售单自营接单时填写） */
   follower?: string;
   /** 自营以销定采信息（采购&发货时固化，缺口的采购去向） */
@@ -2091,8 +2103,10 @@ export interface ShipmentPackage {
   shippedAt: string;
   /** 本包裹发货商品与数量 */
   items: { productId: string; productName: string; qty: number }[];
-  /** shipped=已发货 / delivered=已签收 / void=已作废（回退已发数量） */
-  status: 'shipped' | 'delivered' | 'void';
+  /** shipped=运输中 / delivered=妥投 / confirmed=已确收 / void=已作废（回退已发数量） */
+  status: 'shipped' | 'delivered' | 'confirmed' | 'void';
+  /** 结算标记（按发货单结算：部分发货单已结算 → 履约单部分结算） */
+  settled?: boolean;
   operator?: string;
 }
 

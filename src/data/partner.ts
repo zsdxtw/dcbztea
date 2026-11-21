@@ -100,7 +100,7 @@ export const partnerOrders: PartnerOrder[] = [
       { productName: '铁观音·清香一级', spec: '250g/罐', quantity: 40, price: 208 },
     ],
     totalAmount: 8320, deliveryMode: 'warehouse', coopMode: 'service',
-    status: 'delivered', orderDate: '2026-09-08', expectedShipDate: '2026-09-10',
+    status: 'transit', orderDate: '2026-09-08', expectedShipDate: '2026-09-10',
     receiver: '天福物流部', receiverPhone: '0592-566****', receiverAddress: '福建厦门市思明区莲前西路209号',
   },
   {
@@ -110,7 +110,7 @@ export const partnerOrders: PartnerOrder[] = [
       { productName: '祁门红茶·特级', spec: '100g/罐', quantity: 18, price: 368 },
     ],
     totalAmount: 12224, deliveryMode: 'direct', coopMode: 'supplier',
-    status: 'settled', orderDate: '2026-09-05', expectedShipDate: '2026-09-08',
+    status: 'confirmed', settled: true, orderDate: '2026-09-05', expectedShipDate: '2026-09-08',
     receiver: '交通银行总务处', receiverPhone: '021-3138****', receiverAddress: '上海市浦东新区银城中路188号',
   },
   {
@@ -119,7 +119,7 @@ export const partnerOrders: PartnerOrder[] = [
       { productName: '凤凰单丛·蜜兰香', spec: '100g/袋', quantity: 50, price: 374 },
     ],
     totalAmount: 18700, deliveryMode: 'direct', coopMode: 'service',
-    status: 'settled', orderDate: '2026-09-01', expectedShipDate: '2026-09-03',
+    status: 'confirmed', settled: true, orderDate: '2026-09-01', expectedShipDate: '2026-09-03',
     receiver: '茗香阁仓储', receiverPhone: '137****0912', receiverAddress: '广东广州市白云区黄石东路288号',
   },
   {
@@ -138,7 +138,7 @@ export const partnerOrders: PartnerOrder[] = [
       { productName: '太平猴魁·特级', spec: '100g/盒', quantity: 16, price: 530 },
     ],
     totalAmount: 8480, deliveryMode: 'direct', coopMode: 'supplier',
-    status: 'settled', orderDate: '2026-08-25', expectedShipDate: '2026-08-27',
+    status: 'confirmed', settled: true, orderDate: '2026-08-25', expectedShipDate: '2026-08-27',
     receiver: '品茗轩前厅', receiverPhone: '136****3345', receiverAddress: '安徽合肥市蜀山区长江西路888号',
   },
 ];
@@ -341,16 +341,16 @@ export const partnerAccounts: PartnerAccount[] = [
 export const PARTNER_DELIVERY_LABELS: Record<string, string> = { direct: '直送订单', warehouse: '入仓订单' };
 export const PARTNER_COOP_LABELS: Record<string, string> = { supplier: '差价模式', service: '扣点模式' };
 export const PARTNER_ORDER_STATUS_LABELS: Record<string, string> = {
-  pending: '待接单', accepted: '已接单', shipping: '发货中', transit: '妥投', delivered: '已签收', settled: '已结算', rejected: '已驳回',
+  pending: '待接单', accepted: '已接单', shipping: '运输中', transit: '妥投', confirmed: '已确收', rejected: '已驳回', cancelled: '已取消',
 };
 export const PARTNER_ORDER_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   pending: { bg: '#FFF3E0', color: '#E65100' },
   accepted: { bg: '#E3F2FD', color: '#0F64B5' },
   shipping: { bg: '#E8EAF6', color: '#3949AB' },
   transit: { bg: '#E0F2F1', color: '#00695C' },
-  delivered: { bg: '#E8F5E9', color: '#01795D' },
-  settled: { bg: '#F3E5F5', color: '#7B1FA2' },
+  confirmed: { bg: '#E8F5E9', color: '#01795D' },
   rejected: { bg: '#FFEBEE', color: '#C62828' },
+  cancelled: { bg: '#FFEBEE', color: '#C62828' },
 };
 export const PARTNER_REPORT_TYPE_LABELS: Record<string, string> = { order: '订单报备', product: '商品报备', region: '地区报备' };
 export const PARTNER_REPORT_STATUS_LABELS: Record<string, string> = { pending: '待审核', approved: '已通过', rejected: '已驳回' };

@@ -29,8 +29,8 @@ export default function FinancePayables() {
 
   const rows = useMemo(() => docs.map((d) => {
     const o = orderById.get(d.childOrderId);
-    // 应付确认节点：入库制 → 到货入库；直发 → 客户签收（delivered）；结算（settled）= 已付
-    const confirmPoint = d.deliveryMode === 'warehouse' ? '到货入库' : '客户签收';
+    // 应付确认节点：入库制 → 到货入库；直发 → 妥投（delivered）；结算（settled）= 已付
+    const confirmPoint = d.deliveryMode === 'warehouse' ? '到货入库' : '已妥投';
     const confirmed = d.deliveryMode === 'warehouse'
       ? ['received', 'partial_shipped', 'fully_shipped', 'delivered', 'settled'].includes(d.status)
       : ['delivered', 'settled'].includes(d.status);

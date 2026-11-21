@@ -5,8 +5,8 @@
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import type { ExternalOrder } from '../../types';
 
-/** 自营执行中状态集合（path=self 时 completed 也属于自营链终态） */
-export const SELF_STATUSES = ['self_pending', 'self_accepted', 'self_shipped', 'self_delivered'];
+/** 自营待接单分发状态（已接单及后续的分发状态均为「分发已完成」，自营订单以 path=self 识别） */
+export const SELF_STATUSES = ['self_pending'];
 
 /** 是否自营订单（分发转自营后的全链路） */
 export const isSelfOrder = (o: ExternalOrder): boolean =>

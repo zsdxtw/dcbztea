@@ -25,13 +25,13 @@ const salesTrendData = {
 
 /** 流程状态 → 概览分布项（顺序即流程图顺序） */
 const FLOW_BRIEF: { key: string; label: string }[] = [
-  { key: 'pending', label: '分发-待处理' },
+  { key: 'pending', label: '待分发' },
   { key: 'report_match_pending', label: '报备-匹配待确认' },
   { key: 'self_pending', label: '自营待接单' },
-  { key: 'self_doing', label: '自营执行中' },
-  { key: 'comparing', label: '比单中' },
+  { key: 'comparing', label: '分发比单中' },
   { key: 'distribute_pending', label: '转派待接单' },
-  { key: 'handled', label: '分发-已完成' },
+  { key: 'processed', label: '分发已完成' },
+  { key: 'cancelled', label: '已取消' },
 ];
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
@@ -57,14 +57,11 @@ export default function SalesOverview() {
   const navigate = useNavigate();
   const flowOrders = useOrderFlowStore((s) => s.orders);
 
-  /** 销售单分发各状态单数（已处理 = 已处理 + 已完成） */
+  /** 销售单分发各状态单数（分发状态 7 态直接分桶） */
   const statusCount = useMemo(() => {
     const c: Record<string, number> = {};
     flowOrders.forEach((o) => {
-      const key = o.processStatus === 'completed'
-        ? 'handled'
-        : ['self_accepted', 'self_shipped', 'self_delivered'].includes(o.processStatus) ? 'self_doing' : o.processStatus;
-      c[key] = (c[key] ?? 0) + 1;
+      c[o.processStatus] = (c[o.processStatus] ?? 0) + 1;
     });
     return c;
   }, [flowOrders]);
@@ -135,8 +132,8 @@ export default function SalesOverview() {
     (statusCount.self_pending ?? 0) > 0 && {
       text: `${statusCount.self_pending} 单自营订单待接单（接单 / 退回在自营工作台）`, tag: '自营', color: EXTERNAL_STATUS_COLORS.self_pending, to: '/selfop/orders',
     },
-    (statusCount.self_doing ?? 0) > 0 && {
-      text: `${statusCount.self_doing} 单自营订单执行中（已接单 / 运输 / 妥投）`, tag: '自营执行', color: EXTERNAL_STATUS_COLORS.self_shipped, to: '/selfop/orders',
+    (statusCount.cancelled ?? 0) > 0 && {
+      text: `${statusCount.cancelled} 单已取消（分发状态与履约状态均为已取消）`, tag: '取消', color: EXTERNAL_STATUS_COLORS.cancelled, to: '/sales/order-distribute',
     },
     (statusCount.comparing ?? 0) > 0 && {
       text: `${statusCount.comparing} 单比单报名中 · 已报名 ${compareQuotes} 家`, tag: '比单', color: EXTERNAL_STATUS_COLORS.comparing, to: '/sales/order-distribute',
@@ -214,7 +211,7 @@ export default function SalesOverview() {
               <span key="cu" style={{ fontWeight: 'var(--font-medium)' }}>{o.customerName}</span>,
               <span key="p">{pathLabel(o)}</span>,
               <span key="a" className="mono">{money(o.totalAmount)}</span>,
-              o.processStatus === 'completed' ? statusPill('completed', '已完成') : statusPill(o.processStatus),
+              statusPill(o.processStatus),
               <Button key="act" size="sm" variant="ghost" onClick={() => navigate('/sales/order-distribute')}>去处理</Button>,
             ])}
           />

@@ -8,7 +8,7 @@ import { usePurchaseStore } from '../../stores/purchaseStore';
 import { regionTextOf } from '../../data/regions';
 import { EXTERNAL_CHANNEL_LABELS, EXTERNAL_PLATFORM_LABELS, TRANSFER_SOURCE_LABELS } from '../../data/externalOrders';
 import {
-  buildFamilies, familyStatesOf, distributeStateOf, shipStateOf, settleStateOf, FAMILY_STATE_COLORS, fulfillmentUnitsOf,
+  buildFamilies, familyStatesOf, distributeStateOf, fulfillStateOf, settleStateOf, invoiceStateOf, FAMILY_STATE_COLORS, fulfillmentUnitsOf,
   type OrderFamily,
 } from '../../utils/salesOrderFamily';
 import {
@@ -69,12 +69,16 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
             {states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.distributed}/{states.total}</span>}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            {pill(states.ship)}
-            {states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.shipped}/{states.total}</span>}
+            {pill(states.fulfill)}
+            {states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.fulfilled}/{states.total}</span>}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {pill(states.settle)}
             {states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.settled}/{states.total}</span>}
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            {pill(states.invoice)}
+            {states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.invoiced}/{states.total}</span>}
           </span>
         </div>
       )}
@@ -117,8 +121,9 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
         {infoItem('合作商 / 跟单人', current.partnerName ?? (current.path === 'self' ? `自营${current.follower ? ` · ${current.follower}` : ''}` : '—'))}
         {infoItem('金额', <span style={{ fontWeight: 'var(--font-semibold)' }}>{money(current.totalAmount)}</span>, { mono: true })}
         {infoItem('分发状态', pill(distributeStateOf(current)))}
-        {infoItem('履约状态', pill(shipStateOf(current, currentPos)))}
-        {infoItem('结算状态', pill(settleStateOf(current)))}
+        {infoItem('履约状态', pill(fulfillStateOf(current, currentPos)))}
+        {infoItem('结算状态', pill(settleStateOf(current, currentPos)))}
+        {infoItem('开票状态', pill(invoiceStateOf(current)))}
         {infoItem(current.parentCode ? '关联销售单' : '单据性质', current.parentCode ?? (children.length > 0 ? '母销售单（已拆分）' : '母销售单（未拆分，即履约单）'))}
       </div>
 
@@ -127,7 +132,7 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)' }}>销售履约状态</span>
           {stagePill(stageOfOrder(current))}
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>待接单 → 已接单 → 已发货 → 已签收/妥投 → 确认收货</span>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>待接单 → 已接单 → 运输中 / 妥投 → 已确收</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 'var(--space-3)' }}>
           {fulfillmentTimes(current).map((t) => (
@@ -193,7 +198,7 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
               <span>{sh.warehouseName}</span>
               <span style={{ flex: 1 }}>{sh.items.map((i) => `${i.productName}×${i.qty}`).join('、')}</span>
               <span style={{ color: 'var(--color-neutral-500)' }}>{sh.logisticsCompany} <span className="mono">{sh.trackingNo}</span></span>
-              <span>{sh.status === 'delivered' ? '已妥投' : '运输中'}</span>
+              <span>{sh.status === 'confirmed' ? '已确收' : sh.status === 'delivered' ? '已妥投' : '运输中'}</span>
             </div>
           ))}
         </div>
@@ -201,8 +206,8 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
 
       {/* 发货情况（包裹1、包裹2…：该履约单下全部发货包裹，PO 包裹 + 自营分仓发货） */}
       {(() => {
-        const poPkgs = currentPos.flatMap((d) => d.packages.filter((x) => x.status !== 'void').map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, delivered: x.status === 'delivered', items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') })));
-        const selfPkgs = (current.selfShipments ?? []).map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, delivered: x.status === 'delivered', items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') }));
+        const poPkgs = currentPos.flatMap((d) => d.packages.filter((x) => x.status !== 'void').map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, status: x.status as string, settled: x.settled, items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') })));
+        const selfPkgs = (current.selfShipments ?? []).map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, status: x.status as string, settled: x.settled, items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') }));
         const all = [...poPkgs, ...selfPkgs];
         return (
           <div style={{ marginTop: 'var(--space-4)' }}>
@@ -219,7 +224,7 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
                       <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{x.no}</td>
                       <td style={{ fontSize: 'var(--text-sm)' }}>{x.company} <span className="mono">{x.tracking}</span></td>
                       <td style={{ fontSize: 'var(--text-sm)' }}>{x.items}</td>
-                      <td>{x.delivered ? pill('已妥投') : pill('运输中')}</td>
+                      <td>{pill(x.status === 'confirmed' ? '全部已确收' : x.status === 'delivered' ? '已妥投' : '运输中')}{x.settled && <span style={{ marginLeft: 4 }}>{pill('已结算')}</span>}</td>
                     </tr>
                   ))}
                 </tbody>

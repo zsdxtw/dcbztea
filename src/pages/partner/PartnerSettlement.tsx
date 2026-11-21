@@ -25,12 +25,12 @@ export default function PartnerSettlement() {
   const flowOrders = useMemo(() => {
     const myId = auth?.supplierId ?? suppliers.find((s) => s.terminal.enabled && s.terminal.username === auth?.username)?.id;
     return myId
-      ? flowVersion.filter((o) => o.partnerId === myId && ['processed', 'completed'].includes(o.processStatus))
+      ? flowVersion.filter((o) => o.partnerId === myId && o.processStatus === 'processed')
       : [];
   }, [flowVersion, suppliers, auth?.supplierId, auth?.username]);
-  const flowUnsettled = flowOrders.filter((o) => o.partnerStatus === 'delivered');
-  const flowDoing = flowOrders.filter((o) => o.partnerStatus === 'accepted' || o.partnerStatus === 'shipping');
-  const flowSettled = flowOrders.filter((o) => o.partnerStatus === 'settled');
+  const flowUnsettled = flowOrders.filter((o) => o.partnerStatus === 'confirmed' && o.settleOnTime === undefined);
+  const flowDoing = flowOrders.filter((o) => o.partnerStatus === 'pending' || o.partnerStatus === 'accepted' || o.partnerStatus === 'shipping' || o.partnerStatus === 'transit');
+  const flowSettled = flowOrders.filter((o) => o.settleOnTime !== undefined);
 
   const filtered = useMemo(() => settlements.filter(s => {
     if (filterStatus && s.status !== filterStatus) return false;
@@ -60,7 +60,7 @@ export default function PartnerSettlement() {
         <div className="pk-stat accent">
           <div className="pk-stat-label">待结算金额</div>
           <div className="pk-stat-value">{totalSettle.toLocaleString()}<small>元</small></div>
-          <div className="pk-stat-sub">含结算单与分发订单（已签收 {flowUnsettled.length} 单）</div>
+          <div className="pk-stat-sub">含结算单与分发订单（已确收 {flowUnsettled.length} 单）</div>
         </div>
         <div className="pk-stat">
           <div className="pk-stat-label">已结算金额</div>
@@ -131,9 +131,9 @@ export default function PartnerSettlement() {
                 <span key="a" className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--pk-accent)' }}>¥{o.totalAmount.toLocaleString()}</span>,
                 <span key="src">{o.transferSource ? TRANSFER_SOURCE_LABELS[o.transferSource] : '—'}</span>,
                 <span key="st">{PARTNER_ORDER_STATUS_LABELS[o.partnerStatus ?? 'pending']}</span>,
-                o.partnerStatus === 'settled'
+                o.settleOnTime !== undefined
                   ? <Pill key="set" tone="green">已结算 · {o.settleOnTime === false ? '超时 -5 分' : '按时 +5 分'}</Pill>
-                  : o.partnerStatus === 'delivered'
+                  : o.partnerStatus === 'confirmed'
                     ? <Pill key="set" tone="amber">待结算</Pill>
                     : <Pill key="set" tone="gray">履约中</Pill>,
               ])}

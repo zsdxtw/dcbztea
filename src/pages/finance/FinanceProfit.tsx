@@ -23,7 +23,7 @@ export default function FinanceProfit() {
   /** 已完结订单利润行 */
   const orderRows = useMemo(() => {
     return orders
-      .filter((o) => o.processStatus === 'completed')
+      .filter((o) => o.settleOnTime !== undefined && o.processStatus !== 'cancelled')
       .map((o) => {
         const pos = purchaseDocs.filter((d) => d.childOrderId === o.id);
         const purchaseCost = pos.reduce((s, d) => s + d.amount, 0);

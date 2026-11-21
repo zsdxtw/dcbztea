@@ -42,7 +42,7 @@ export default function PartnerDashboard() {
 
   const flowPending = flowOrders.filter((o) => o.status === 'pending').length;
   const flowDoing = flowOrders.filter((o) => o.status === 'accepted' || o.status === 'shipping').length;
-  const flowDelivered = flowOrders.filter((o) => o.status === 'delivered');
+  const flowDelivered = flowOrders.filter((o) => o.status === 'confirmed');
 
   const pendingCount = flowPending + transferred.filter(o => o.status === 'pending').length + partnerOrders.filter(o => o.status === 'pending').length;
   const shippingCount = flowDoing
@@ -69,7 +69,7 @@ export default function PartnerDashboard() {
 
   const todos = [
     { label: '待接单订单', count: pendingCount, path: '/partner/orders', desc: '请尽快确认接单并安排发货' },
-    { label: '履约中订单', count: shippingCount, path: '/partner/orders', desc: '跟进物流并确认客户签收' },
+    { label: '履约中订单', count: shippingCount, path: '/partner/orders', desc: '跟进物流（运输中 / 妥投）' },
     { label: '审核中报备', count: reportPending, path: '/partner/reports', desc: '报备审核中，请留意审核结果' },
   ];
 

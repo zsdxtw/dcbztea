@@ -45,15 +45,16 @@ const SOURCE_TONE: Record<string, 'green' | 'gray' | 'purple' | 'amber' | 'blue'
   'order-opportunity': 'gray',
 };
 
-/** 订单状态 Tab（已发货 TAB 含 发货中 / 妥投 两态） */
-const STATUS_TABS: { key: PartnerOrderStatus | ''; label: string; icon: ReactNode }[] = [
+/** 订单状态 Tab（已发货 TAB 含 运输中 / 妥投 两态；已确收/已结算由管理后台推进） */
+const STATUS_TABS: { key: string; label: string; icon: ReactNode }[] = [
   { key: '', label: '全部状态', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><rect x="3.5" y="4.5" width="13" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 8h7M6.5 11.5h4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
   { key: 'pending', label: '待接单', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M10 6v4l2.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
   { key: 'accepted', label: '已接单', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M7 10l2 2 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
   { key: 'shipping', label: '已发货', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><path d="M3 6.5h9V14H3zM12 9.5h3l2 3V14h-5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><circle cx="6.5" cy="15.5" r="1.6" stroke="currentColor" strokeWidth="1.3"/><circle cx="14.5" cy="15.5" r="1.6" stroke="currentColor" strokeWidth="1.3"/></svg> },
-  { key: 'delivered', label: '已签收', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><path d="M10 3l7 3v8l-7 3-7-3V6l7-3z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M7 10.5l2 2 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+  { key: 'confirmed', label: '已确收', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><path d="M10 3l7 3v8l-7 3-7-3V6l7-3z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M7 10.5l2 2 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
   { key: 'settled', label: '已结算', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M8 7l2 3 2-3M10 10v4.5M7.8 11h4.4M7.8 13h4.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
   { key: 'rejected', label: '已驳回', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 7.5l5 5M12.5 7.5l-5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
+  { key: 'cancelled', label: '已取消', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 7.5l5 5M12.5 7.5l-5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
 ];
 
 /** 状态药丸（已发货 TAB 内区分 发货中 / 妥投） */
@@ -420,13 +421,14 @@ export default function PartnerOrders() {
     return true;
   }), [allOrders, keyword, filterDelivery, filterCoop, filterCustomer, filterProv, filterCity, filterDist, dateFrom, dateTo]);
 
-  /** 各状态 Tab 的订单数（已发货 = 发货中 + 妥投 两态） */
+  /** 各状态 Tab 的订单数（已发货 = 运输中 + 妥投 两态；已结算按发货单结算标记） */
   const statusCounts = useMemo(() => {
     const c: Record<string, number> = {};
     STATUS_TABS.forEach(t => {
       c[t.key] = t.key === '' ? baseOrders.length
         : t.key === 'shipping' ? baseOrders.filter(o => o.status === 'shipping' || o.status === 'transit').length
-          : baseOrders.filter(o => o.status === t.key).length;
+          : t.key === 'settled' ? baseOrders.filter(o => o.settled).length
+            : baseOrders.filter(o => o.status === t.key).length;
     });
     return c;
   }, [baseOrders]);
@@ -434,7 +436,9 @@ export default function PartnerOrders() {
   const filtered = useMemo(
     () => (filterStatus === 'shipping'
       ? baseOrders.filter(o => o.status === 'shipping' || o.status === 'transit')
-      : filterStatus ? baseOrders.filter(o => o.status === filterStatus) : baseOrders),
+      : filterStatus === 'settled'
+        ? baseOrders.filter(o => o.settled)
+        : filterStatus ? baseOrders.filter(o => o.status === filterStatus) : baseOrders),
     [baseOrders, filterStatus],
   );
   const pagedRows = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -522,7 +526,7 @@ export default function PartnerOrders() {
     if (o.status === 'transit') {
       return (
         <>
-          <Button size="sm" onClick={() => updateStatus(o.id, 'delivered')}>确认签收</Button>
+          <span style={{ fontSize: 12, color: 'var(--color-neutral-400)', alignSelf: 'center' }}>已妥投 · 待管理后台确认收货</span>
           <Button size="sm" variant="ghost" onClick={() => setSelected(o)}>查看</Button>
         </>
       );
@@ -715,7 +719,7 @@ export default function PartnerOrders() {
               )}
               {selected.status === 'accepted' && <Button onClick={() => setShipOf({ order: selected, mode: 'logistics', company: '', trackingNo: '', qty: {}, err: '' })}>发货</Button>}
               {selected.status === 'shipping' && <Button onClick={() => updateStatus(selected.id, 'transit')}>确认妥投</Button>}
-              {selected.status === 'transit' && <Button onClick={() => updateStatus(selected.id, 'delivered')}>确认签收</Button>}
+              {selected.status === 'transit' && <span style={{ fontSize: 12, color: 'var(--color-neutral-400)', alignSelf: 'center' }}>已妥投 · 待管理后台确认收货</span>}
             </>
           )
         }
@@ -757,7 +761,7 @@ export default function PartnerOrders() {
                 <DrawerSection title="履约时间线">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                     <span style={{ padding: '2px 8px', borderRadius: '999px', fontSize: 12, fontWeight: 600, background: sc.bg, color: sc.color }}>{FULFILLMENT_STAGE_LABELS[stage]}</span>
-                    <span style={{ fontSize: 12, color: 'var(--color-neutral-400)' }}>待接单 → 已接单 → 已发货 → 已签收/妥投 → 确认收货</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-neutral-400)' }}>待接单 → 已接单 → 运输中 / 妥投 → 已确收（管理后台确认）</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 12 }}>
                     {fulfillmentTimes(fo).map((t) => (
@@ -807,7 +811,7 @@ export default function PartnerOrders() {
                           <td>{pkg.logisticsCompany} · <span className="mono">{pkg.trackingNo}</span></td>
                           <td style={{ fontSize: 'var(--text-sm)' }}>{pkg.items.map((x) => `${x.productName}×${x.qty}`).join('、')}</td>
                           <td className="mono">{pkg.shippedAt}</td>
-                          <td>{pkg.status === 'delivered' ? <Pill tone="green">已签收</Pill> : <Pill tone="blue">已发货</Pill>}</td>
+                          <td>{pkg.status === 'confirmed' ? <Pill tone="green">已确收</Pill> : pkg.status === 'delivered' ? <Pill tone="green">已妥投</Pill> : <Pill tone="blue">运输中</Pill>}</td>
                         </tr>
                       ))}
                     </tbody>

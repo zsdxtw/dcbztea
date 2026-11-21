@@ -29,8 +29,8 @@ export default function SelfopDashboard() {
     const toShip = accepted.filter((o) => (o.selfShipments?.length ?? 0) === 0 && !posOf(o).some((d) => d.status === 'received'));
     if (toOut.length > 0) list.push({ text: `${toOut.length} 单采购到货待出库发货`, tag: '待出库', color: '#3949AB', to: '/selfop/orders' });
     if (toShip.length > 0) list.push({ text: `${toShip.length} 单已接单待采购&发货`, tag: '待发货', color: '#3949AB', to: '/selfop/orders' });
-    const delivered = byStage('delivered');
-    if (delivered.length > 0) list.push({ text: `${delivered.length} 单已妥投待客户确认收货`, tag: '妥投', color: '#00695C', to: '/selfop/orders' });
+    const transit = byStage('transit');
+    if (transit.length > 0) list.push({ text: `${transit.length} 单已妥投待客户确认收货`, tag: '妥投', color: '#00695C', to: '/selfop/orders' });
     const inTransit = byStage('shipping');
     if (inTransit.length > 0) list.push({ text: `${inTransit.length} 单运输中（物流跟踪）`, tag: '运输中', color: '#0277BD', to: '/selfop/logistics' });
     return list;
@@ -53,7 +53,7 @@ export default function SelfopDashboard() {
       <PageHead
         eyebrow="工作台"
         title={`下午好，${auth?.name ?? '自营运营'}`}
-        desc={<>自营订单执行一览：待接单 → 已接单（拆单 / 采购&amp;发货）→ 已发货运输中 → 妥投 → 确认收货</>}
+        desc={<>自营订单执行一览：待接单 → 已接单（拆单 / 采购&amp;发货）→ 运输中 → 妥投 → 已确收</>}
       />
 
       {/* 统计带 */}

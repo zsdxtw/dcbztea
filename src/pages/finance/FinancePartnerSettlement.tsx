@@ -16,7 +16,7 @@ const pill = (bg: string, color: string, text: string) => (
 
 /**
  * 财务 · 合作商结算（承接原 销售·订单结算）
- * 两个视角：① 按合作商汇总（采购单数/金额/已签收/应付/已付）→ 生成周期结算单；
+ * 两个视角：① 按合作商汇总（采购单数/金额/已妥投/应付/已付）→ 生成周期结算单；
  * ② 待结算订单（妥投后）逐单结算（按时 +5 / 超时 -5 积分，联动合作商终端「结算」页）。
  */
 export default function FinancePartnerSettlement() {
@@ -26,14 +26,13 @@ export default function FinancePartnerSettlement() {
   const [view, setView] = useState<'partner' | 'pending' | 'settled'>('partner');
   const [statedPartners, setStatedPartners] = useState<Set<string>>(new Set());
 
-  /** 转派结算口径：已签收（待结算）与已结算 */
+  /** 转派结算口径：已确收（待结算）与已结算 */
   const settleOrders = useMemo(() => orders.filter((o) => o.path === 'distribute' && o.partnerName && (
-    (o.processStatus === 'processed' && o.partnerStatus === 'delivered')
-    || o.processStatus === 'completed'
+    o.processStatus === 'processed' && o.partnerStatus === 'confirmed'
   )), [orders]);
 
-  const pendingList = settleOrders.filter((o) => o.processStatus === 'processed' && o.partnerStatus === 'delivered');
-  const settledList = settleOrders.filter((o) => o.processStatus === 'completed');
+  const pendingList = settleOrders.filter((o) => (o.settleOnTime === undefined));
+  const settledList = settleOrders.filter((o) => (o.settleOnTime !== undefined));
 
   /** 按合作商汇总（转派 PO 口径） */
   const partnerRows = useMemo(() => {
@@ -64,7 +63,7 @@ export default function FinancePartnerSettlement() {
       <ContentHeader title="合作商结算" breadcrumbs={['财务', '对账结算', '合作商结算']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-          合作商作为平台供应商的<strong>采购结算</strong>：按合作商汇总直发采购（已签收 → 应付 → 已付）生成周期结算单；
+          合作商作为平台供应商的<strong>采购结算</strong>：按合作商汇总直发采购（已妥投 → 应付 → 已付）生成周期结算单；
           妥投订单<strong>逐单结算</strong>（按时 +5 / 超时 -5 积分，写入合作商积分台账并同步合作商工作台「结算」页）。
           自营订单无合作商结算环节（见「经营利润」）。
         </div>
@@ -81,7 +80,7 @@ export default function FinancePartnerSettlement() {
         {view === 'partner' ? (
           <Card style={{ padding: 0 }}>
             <Table
-              headers={['合作商', '采购单数', '采购总额', '已签收', '应付金额（已签收口径）', '已付金额', '未付金额', '结算单', '操作']}
+              headers={['合作商', '采购单数', '采购总额', '已妥投', '应付金额（已妥投口径）', '已付金额', '未付金额', '结算单', '操作']}
               rows={partnerRows.map((r) => {
                 const stated = statedPartners.has(r.name);
                 return [
@@ -124,8 +123,8 @@ export default function FinancePartnerSettlement() {
                 <div key="act" className="row-actions" style={{ whiteSpace: 'nowrap' }}>
                   {view === 'pending' && (
                     <>
-                      <Button size="sm" onClick={() => store.getState().advancePartner(o.id, 'settled', { onTime: true })}>结算（按时 · +5）</Button>
-                      <Button size="sm" variant="danger" onClick={() => store.getState().advancePartner(o.id, 'settled', { onTime: false })}>结算（超时 · -5）</Button>
+                      <Button size="sm" onClick={() => store.getState().settleOrder(o.id, { onTime: true })}>结算（按时 · +5）</Button>
+                      <Button size="sm" variant="danger" onClick={() => store.getState().settleOrder(o.id, { onTime: false })}>结算（超时 · -5）</Button>
                     </>
                   )}
                 </div>,

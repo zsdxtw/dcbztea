@@ -22,7 +22,7 @@ interface PackageRow {
   itemsText: string;
   logisticsCompany: string;
   trackingNo: string;
-  status: 'shipped' | 'delivered';
+  status: 'shipped' | 'delivered' | 'confirmed';
   time: string;
 }
 
@@ -43,7 +43,7 @@ export default function SelfopLogistics() {
           fromName: p.warehouseName,
           itemsText: p.items.map((i) => `${i.productName}×${i.qty}`).join('、'),
           logisticsCompany: p.logisticsCompany, trackingNo: p.trackingNo,
-          status: p.status, time: p.status === 'delivered' ? (p.deliveredAt ?? p.shippedAt) : p.shippedAt,
+          status: p.status, time: p.status !== 'shipped' ? (p.deliveredAt ?? p.shippedAt) : p.shippedAt,
         });
       }
       for (const d of purchaseDocs.filter((x) => x.childOrderId === o.id)) {

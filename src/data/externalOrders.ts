@@ -3,7 +3,7 @@
  * 来源渠道：手工录入（manual）/ 平台直连推送（push）
  * 基础种子覆盖全部状态 + 程序化生成的 53 条随机状态演示订单（buildDemoOrders）
  */
-import type { ExternalOrder, ExternalOrderItem, ExternalPlatform } from '../types';
+import type { ExternalOrder, ExternalOrderItem, ExternalPlatform, FulfillmentStage } from '../types';
 
 const minutesLater = (m: number) => Date.now() + m * 60 * 1000;
 
@@ -229,7 +229,7 @@ const baseSeeds: ExternalOrder[] = [
     totalAmount: 14240,
     receiver: '交行采购中心', receiverPhone: '021-3138****', receiverAddress: '上海市黄浦区中山南路99号',
     entryTime: '2026-10-22', operator: '系统直连', sourceChannel: 'push',
-    processStatus: 'self_accepted',
+    processStatus: 'processed',
     path: 'self', follower: '周雨桐',
     selfPo: { supplierId: '8', supplierName: '四川省茶业集团股份有限公司', mode: 'warehouse', purchaseDate: '2026-10-23' },
     history: [
@@ -250,20 +250,22 @@ const baseSeeds: ExternalOrder[] = [
     receiver: '浦发银行采购中心', receiverPhone: '021-5888****', receiverAddress: '上海市浦东新区浦东南路500号',
     remark: '走京东慧采平台，需提供随货同行单',
     entryTime: '2026-10-18', operator: '运营老陈', sourceChannel: 'manual',
-    processStatus: 'completed',
+    processStatus: 'processed',
+    invoiceStatus: 'invoiced',
     path: 'self', follower: '陈默',
     selfShipments: [{
       id: 'ss_eo4_1', packageNo: 'SO-2610180001FH01',
       warehouseId: 'wh-ind-04', warehouseName: '福鼎分仓',
       logisticsCompany: '京东物流', trackingNo: 'JD0031874520',
       items: [{ productId: 'p8', productName: '白毫银针·特级', qty: 10 }],
-      status: 'delivered', shippedAt: '2026-10-22 09:30', deliveredAt: '2026-10-23 14:00',
+      status: 'confirmed', settled: true, shippedAt: '2026-10-22 09:30', deliveredAt: '2026-10-23 14:00', confirmedAt: '2026-10-24 10:15',
     }],
+    fulfillment: { stage: 'confirmed', arriveTime: '2026-10-18 09:12', acceptTime: '2026-10-19 10:26', shipTime: '2026-10-22 09:30', deliverTime: '2026-10-23 14:00', confirmTime: '2026-10-24 10:15' },
     history: [
       { time: '2026-10-18', action: '手工录入订单', detail: '天猫平台' },
       { time: '2026-10-18', action: '选择自营路径', detail: '进入自营工作台 · 等待接单' },
       { time: '2026-10-19', action: '接单（自营）', detail: '跟单人 陈默 → 已接单' },
-      { time: '2026-10-22', action: '采购&发货（分仓直发）', detail: '福鼎分仓 直发 白毫银针·特级×10 · 京东物流 JD0031874520 → 已发货运输中' },
+      { time: '2026-10-22', action: '采购&发货（分仓直发）', detail: '福鼎分仓 直发 白毫银针·特级×10 · 京东物流 JD0031874520 → 履约运输中' },
       { time: '2026-10-23', action: '物流妥投', detail: 'JD0031874520 已完成投递 → 妥投' },
       { time: '2026-10-24', action: '客户确认收货', detail: '订单完成（确认收货）' },
     ],
@@ -277,18 +279,19 @@ const baseSeeds: ExternalOrder[] = [
     totalAmount: 9040,
     receiver: '林掌柜', receiverPhone: '138****6677', receiverAddress: '江苏南京市秦淮区夫子庙街道贡院街12号',
     entryTime: '2026-10-12', operator: '运营老陈', sourceChannel: 'manual',
-    processStatus: 'completed',
+    processStatus: 'processed',
+    invoiceStatus: 'invoiced',
     path: 'distribute', distributeMode: 'compare',
     partnerId: '3', partnerName: '八马茶业股份有限公司',
     transferSource: 'compare', transferTime: '2026-10-13',
-    partnerStatus: 'settled', settleOnTime: true,
+    partnerStatus: 'confirmed', settleOnTime: true,
     history: [
       { time: '2026-10-12', action: '手工录入订单', detail: '微信小店' },
       { time: '2026-10-12', action: '发起比单', detail: '公开报名 · 底价为订单金额 85 折 · 3 家报名' },
       { time: '2026-10-13', action: '比单定标', detail: '八马茶业 综合得分 92.5 中单 · 等待合作商接单' },
       { time: '2026-10-13', action: '合作商接单', detail: '→ 已处理' },
       { time: '2026-10-13', action: '合作商发货' },
-      { time: '2026-10-15', action: '客户签收' },
+      { time: '2026-10-15', action: '物流妥投' },
       { time: '2026-10-16', action: '结算完成', detail: '按时履约 · 积分 +5' },
     ],
   },
@@ -581,7 +584,7 @@ function buildDemoOrders(): ExternalOrder[] {
     ...famC, id: 'eo_famC_mother', code: motherCodeC, parentCode: undefined,
     items: [...famC.items, ...famC2.items],
     totalAmount: [...famC.items, ...famC2.items].reduce((s, it) => s + it.price * it.quantity, 0),
-    processStatus: 'completed',
+    processStatus: 'processed',
     history: [
       { time: D(20), action: '手工录入订单', detail: '母销售单' },
       { time: D(20), action: '发起比单', detail: '公开报名 · 按商品积分排名定标' },
@@ -601,7 +604,7 @@ function buildDemoOrders(): ExternalOrder[] {
     ...orphan, id: 'eo_orphan_mother', code: orphanMother, parentCode: undefined,
     items: [...orphan.items],
     totalAmount: orphan.items.reduce((s, it) => s + it.price * it.quantity, 0),
-    processStatus: 'completed',
+    processStatus: 'processed',
     history: [
       { time: D(9), action: '手工录入订单', detail: '母销售单' },
       { time: D(9), action: '发起比单', detail: '公开报名 · 按商品积分排名定标' },
@@ -650,12 +653,12 @@ function buildDemoOrders(): ExternalOrder[] {
     c1.path = 'distribute'; c1.distributeMode = 'assign';
     c1.partnerId = '3'; c1.partnerName = '八马茶业股份有限公司';
     c1.transferSource = 'assign'; c1.transferTime = mother.entryTime;
-    c1.partnerStatus = 'delivered';
+    c1.partnerStatus = 'confirmed';
     c1.history.push(
       { time: mother.entryTime, action: '指定转派', detail: '→ 八马茶业股份有限公司' },
       { time: mother.entryTime, action: '合作商接单', detail: '合作商终端接单' },
       { time: mother.entryTime, action: '合作商发货', detail: '2 个包裹发出' },
-      { time: mother.entryTime, action: '客户签收', detail: '全部包裹妥投并签收' },
+      { time: mother.entryTime, action: '确认收货', detail: '全部包裹妥投并确认收货' },
     );
     c2.code = `${mother.code}LY02`;
     c2.processStatus = 'processed';
@@ -710,16 +713,17 @@ function buildDemoOrders(): ExternalOrder[] {
       c.parentCode = mother.code;
     }
     c1.code = `${mother.code}LY01`;
-    c1.processStatus = 'completed';
+    c1.processStatus = 'processed';
+    c1.invoiceStatus = 'invoiced';
     c1.path = 'distribute'; c1.distributeMode = 'compare';
     c1.partnerId = '11'; c1.partnerName = '杭州云茶供应链管理有限公司';
     c1.transferSource = 'compare'; c1.transferTime = mother.entryTime;
-    c1.partnerStatus = 'settled'; c1.settleOnTime = true;
+    c1.partnerStatus = 'confirmed'; c1.settleOnTime = true;
     c1.history = [
       { time: mother.entryTime, action: '拆单生成子订单', detail: '按商品拆出（高客单组）' },
       { time: mother.entryTime, action: '比单定标（按商品·积分优先）', detail: '杭州云茶供应链管理有限公司中单' },
       { time: mother.entryTime, action: '合作商发货', detail: '1 个包裹发出' },
-      { time: mother.entryTime, action: '客户签收', detail: '包裹妥投并签收' },
+      { time: mother.entryTime, action: '确认收货', detail: '包裹妥投并确认收货' },
       { time: mother.entryTime, action: '结算完成', detail: '按时履约 · 积分 +5' },
     ];
     c2.code = `${mother.code}LY02`;
@@ -768,17 +772,18 @@ function buildDemoOrders(): ExternalOrder[] {
       c.parentCode = mother.code;
     }
     c1.code = `${mother.code}LY01`;
-    c1.processStatus = 'completed';
+    c1.processStatus = 'processed';
+    c1.invoiceStatus = 'partial';
     c1.path = 'distribute'; c1.distributeMode = 'assign';
     c1.partnerId = '2'; c1.partnerName = '福建正山堂茶业有限责任公司';
     c1.transferSource = 'assign'; c1.transferTime = mother.entryTime;
-    c1.partnerStatus = 'settled'; c1.settleOnTime = true;
+    c1.partnerStatus = 'confirmed'; c1.settleOnTime = true;
     c1.history = [
       { time: mother.entryTime, action: '拆单生成子订单', detail: '按商品拆出（龙井组）' },
       { time: mother.entryTime, action: '指定转派', detail: '→ 福建正山堂茶业有限责任公司' },
       { time: mother.entryTime, action: '合作商接单', detail: '合作商终端接单' },
       { time: mother.entryTime, action: '合作商发货', detail: '1 个包裹发出' },
-      { time: mother.entryTime, action: '客户签收', detail: '包裹妥投并签收' },
+      { time: mother.entryTime, action: '确认收货', detail: '包裹妥投并确认收货' },
       { time: mother.entryTime, action: '结算完成', detail: '按时履约 · 积分 +5' },
     ];
     c2.code = `${mother.code}LY02`;
@@ -814,12 +819,12 @@ function buildDemoOrders(): ExternalOrder[] {
     mother.processStatus = 'processed';
     mother.history = [
       { time: mother.entryTime, action: '手工录入订单', detail: '母销售单（四履约单家族演示）' },
-      { time: mother.entryTime, action: '按商品一键拆单', detail: '拆为 4 张子履约单：LY01 已结算 / LY02 发货中 / LY03 待接单 / LY04 比单未成退回待分发' },
+      { time: mother.entryTime, action: '按商品一键拆单', detail: '拆为 4 张子履约单：LY01 已确收已结算 / LY02 运输中 / LY03 待接单 / LY04 比单未成退回待分发' },
     ];
     orders.push(mother, c1, c2, c3, c4);
   }
 
-  /* ── 自营链种子 ×4：已接单（采购在途）/ 已接单（到货待发）/ 已发货运输中（分仓直发）/ 妥投（直发采购） ── */
+  /* ── 自营链种子 ×4：已接单（采购在途）/ 已接单（到货待发）/ 运输中（分仓直发）/ 妥投（直发采购） ── */
   for (let i = 0; i < 4; i++) {
     const s = next();
     const sup = DEMO_PARTNERS[(i + 3) % DEMO_PARTNERS.length];
@@ -833,18 +838,21 @@ function buildDemoOrders(): ExternalOrder[] {
     const extra: Record<string, unknown> = { path: 'self', follower: DEMO_FOLLOWERS[i] };
     if (stage === 0) {
       // 以销定采（入库制）：采购在途，无物流单号，留在已接单
-      extra.processStatus = 'self_accepted';
+      extra.processStatus = 'processed';
+      extra.fulfillment = { stage: 'accepted', arriveTime: `${D(s)} 09:12`, acceptTime: `${D(s)} 10:26` };
       extra.selfPo = { supplierId: sup.id, supplierName: sup.name, mode: 'warehouse', purchaseDate: D(s) };
       hist.push({ time: D(s), action: '以销定采', detail: `缺口 ${items.reduce((x, it) => x + it.quantity, 0)} 件 → 入库制采购单（${sup.name}）· 采购在途` });
     } else if (stage === 1) {
       // 以销定采（入库制）：已到货入库，待出库发货
-      extra.processStatus = 'self_accepted';
+      extra.processStatus = 'processed';
+      extra.fulfillment = { stage: 'accepted', arriveTime: `${D(s)} 09:12`, acceptTime: `${D(s)} 10:26` };
       extra.selfPo = { supplierId: sup.id, supplierName: sup.name, mode: 'warehouse', purchaseDate: D(s) };
       hist.push({ time: D(s), action: '以销定采', detail: `入库制采购单（${sup.name}）` });
       hist.push({ time: D(s), action: '到货入库', detail: '采购到货验收入库 · 待出库发货' });
     } else if (stage === 2) {
-      // 分仓直发：两仓两包裹（各自快递单号），已发货运输中
-      extra.processStatus = 'self_shipped';
+      // 分仓直发：两仓两包裹（各自快递单号），履约运输中
+      extra.processStatus = 'processed';
+      extra.fulfillment = { stage: 'shipping', arriveTime: `${D(s)} 09:12`, acceptTime: `${D(s)} 10:26`, shipTime: `${D(s)} 14:08` };
       const half = Math.floor(items[0].quantity / 2) || 1;
       extra.selfShipments = [
         {
@@ -868,16 +876,17 @@ function buildDemoOrders(): ExternalOrder[] {
       hist.push({ time: D(s), action: '采购&发货（分仓直发）', detail: `杭州总仓 顺丰 SF${7000000000 + s * 13579} + 苏州分仓 德邦 DB${7000000000 + s * 24681} → 已发货运输中` });
       hist.push({ time: D(s), action: '物流妥投', detail: `DB${7000000000 + s * 24681} 已投递（部分包裹在途）` });
     } else {
-      // 以销定采（直发客户）：供应商直发包裹已妥投，订单妥投待确认收货
-      extra.processStatus = 'self_delivered';
+      // 以销定采（直发客户）：供应商直发包裹已妥投，履约妥投待确认收货
+      extra.processStatus = 'processed';
+      extra.fulfillment = { stage: 'transit', arriveTime: `${D(s)} 09:12`, acceptTime: `${D(s)} 10:26`, shipTime: `${D(s)} 14:08`, deliverTime: `${D(s)} 18:40` };
       extra.selfPo = { supplierId: sup.id, supplierName: sup.name, mode: 'direct', purchaseDate: D(s) };
       hist.push({ time: D(s), action: '以销定采（直发客户）', detail: `直发采购单（${sup.name}）· 供应商直发客户` });
       hist.push({ time: D(s), action: '物流妥投', detail: '供应商直发包裹已全部投递 → 妥投' });
     }
-    orders.push(buildOne(s, { items, processStatus: 'self_accepted', history: hist, extra: extra as Partial<ExternalOrder> }));
+    orders.push(buildOne(s, { items, processStatus: 'processed', history: hist, extra: extra as Partial<ExternalOrder> }));
   }
-  const psList = ['accepted', 'accepted', 'shipping', 'shipping', 'delivered', 'delivered'] as const;
-  const psLabel: Record<string, string> = { accepted: '合作商接单', shipping: '合作商发货', delivered: '客户签收' };
+  const psList = ['accepted', 'accepted', 'shipping', 'shipping', 'transit', 'transit'] as const;
+  const psLabel: Record<string, string> = { accepted: '合作商接单', shipping: '合作商发货', transit: '物流妥投' };
   for (let i = 0; i < 6; i++) {
     const s = next();
     const p = DEMO_PARTNERS[(i + 5) % DEMO_PARTNERS.length];
@@ -907,7 +916,7 @@ function buildDemoOrders(): ExternalOrder[] {
     const onTime = i % 3 !== 0;
     orders.push(buildOne(s, {
       items: pickItems(s),
-      processStatus: 'completed',
+      processStatus: 'processed',
       history: [
         { time: D(s), action: { report: '报备匹配确认转出', assign: '指定转派', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name}` },
         { time: D(s), action: '结算完成', detail: onTime ? '按时履约 · 积分 +5' : '超时发货 · 积分 -5' },
@@ -916,7 +925,31 @@ function buildDemoOrders(): ExternalOrder[] {
         path: 'distribute', distributeMode: 'assign',
         partnerId: p.id, partnerName: p.name,
         transferSource: src, transferTime: D(s),
-        partnerStatus: 'settled', settleOnTime: onTime,
+        partnerStatus: 'confirmed', settleOnTime: onTime,
+        ...(i === 0 ? { invoiceStatus: 'invoiced' as const } : i === 1 ? { invoiceStatus: 'partial' as const } : {}),
+      },
+    }));
+  }
+
+  /* ── 已取消 ×2（分发环节 / 履约环节各 1，分发与履约状态均显示已取消） ── */
+  for (let i = 0; i < 2; i++) {
+    const s = next();
+    const hist = i === 0
+      ? [{ time: D(s), action: '手工录入订单', detail: '演示数据' },
+         { time: D(s), action: '取消订单', detail: '客户取消采购计划 → 分发状态与履约状态均为已取消' }]
+      : [{ time: D(s), action: '手工录入订单', detail: '演示数据' },
+         { time: D(s), action: '指定转派', detail: '→ 福建正山堂茶业有限责任公司' },
+         { time: D(s), action: '合作商接单', detail: '合作商终端接单' },
+         { time: D(s), action: '合作商发货', detail: '1 个包裹发出' },
+         { time: D(s), action: '取消订单', detail: '收货地址错误且无法送达 → 订单取消（履约状态同步已取消）' }];
+    orders.push(buildOne(s, {
+      items: pickItems(s),
+      processStatus: 'cancelled',
+      history: hist,
+      extra: i === 0 ? {} : {
+        path: 'distribute', distributeMode: 'assign',
+        partnerId: '2', partnerName: '福建正山堂茶业有限责任公司',
+        transferSource: 'assign', transferTime: D(s),
       },
     }));
   }
@@ -924,27 +957,32 @@ function buildDemoOrders(): ExternalOrder[] {
   return orders;
 }
 
-/** 演示种子补履约时间线：按已有状态推导五节点时间（真实流转由 orderFlowStore 写入） */
+/** 演示种子补履约时间线：按新枚举（分发 7 态 + 履约 6 态 + 发货单包裹）推导（真实流转由 orderFlowStore 写入） */
 const withSeedFulfillment = (o: ExternalOrder): ExternalOrder => {
-  if (o.fulfillment) return o;
+  if (o.fulfillment || o.processStatus === 'cancelled') return o;
   const st = o.processStatus;
   const d = o.entryTime;
-  const partnerSt = o.partnerStatus;
-  let stage: 'pending_accept' | 'accepted' | 'shipped' | 'delivered' | 'confirmed' = 'pending_accept';
-  if (st === 'completed' || partnerSt === 'settled') stage = 'confirmed';
-  else if (st === 'self_delivered' || partnerSt === 'delivered') stage = 'delivered';
-  else if (st === 'self_shipped' || partnerSt === 'shipping' || partnerSt === 'transit') stage = 'shipped';
-  else if (st === 'self_accepted' || partnerSt === 'accepted') stage = 'accepted';
-  if (stage === 'pending_accept' && !['self_pending', 'distribute_pending', 'processed'].includes(st)) return o;
-  const f: ExternalOrder['fulfillment'] = {
+  const mk = (stage: FulfillmentStage): ExternalOrder['fulfillment'] => ({
     stage,
     arriveTime: `${d} 09:12`,
     ...(stage !== 'pending_accept' ? { acceptTime: `${d} 10:26` } : {}),
-    ...(['shipped', 'delivered', 'confirmed'].includes(stage) ? { shipTime: `${d} 14:08` } : {}),
-    ...(['delivered', 'confirmed'].includes(stage) ? { deliverTime: `${d} 18:40` } : {}),
+    ...(['shipping', 'transit', 'confirmed'].includes(stage) ? { shipTime: `${d} 14:08` } : {}),
+    ...(['transit', 'confirmed'].includes(stage) ? { deliverTime: `${d} 18:40` } : {}),
     ...(stage === 'confirmed' ? { confirmTime: `${d} 20:15` } : {}),
-  };
-  return { ...o, fulfillment: f };
+  });
+  /* 已分发到履约主体 → 履约状态待接单（自营待接单 / 转派待接单） */
+  if (st === 'self_pending' || st === 'distribute_pending') return { ...o, fulfillment: mk('pending_accept') };
+  /* 合作商链：partnerStatus 与履约状态同枚举镜像 */
+  if (o.partnerStatus && o.partnerStatus !== 'rejected') return { ...o, fulfillment: mk(o.partnerStatus === 'pending' ? 'pending_accept' : o.partnerStatus) };
+  /* 自营链：按发货包裹推导（已接单[采购在途/到货待发] → 运输中 → 妥投） */
+  if (st === 'processed' && o.path === 'self') {
+    const pk = o.selfShipments ?? [];
+    const stage: FulfillmentStage = pk.some((x) => x.status === 'confirmed') ? 'confirmed'
+      : pk.length > 0 && pk.every((x) => x.status === 'delivered') ? 'transit'
+        : pk.length > 0 ? 'shipping' : 'accepted';
+    return { ...o, fulfillment: mk(stage) };
+  }
+  return o;
 };
 
 export const externalOrderSeeds: ExternalOrder[] = [...baseSeeds, ...buildDemoOrders()].map(withSeedFulfillment);
@@ -963,16 +1001,13 @@ export const EXTERNAL_CHANNEL_LABELS: Record<string, string> = {
 };
 
 export const EXTERNAL_STATUS_LABELS: Record<string, string> = {
-  pending: '分发-待处理',
+  pending: '待分发',
   report_match_pending: '报备-匹配待确认',
   self_pending: '自营待接单',
-  self_accepted: '已接单（自营）',
-  self_shipped: '已发货运输中',
-  self_delivered: '妥投',
-  comparing: '比单中',
+  comparing: '分发比单中',
   distribute_pending: '转派待接单',
-  processed: '分发-已完成',
-  completed: '已完成',
+  processed: '分发已完成',
+  cancelled: '已取消',
 };
 
 /** 来源附加标签（拆单后未成交商品子订单 / 退回 / 待接单取回） */
@@ -989,13 +1024,10 @@ export const EXTERNAL_STATUS_COLORS: Record<string, { bg: string; color: string 
   pending: { bg: '#FFF3E0', color: '#E65100' },
   report_match_pending: { bg: '#E0F7FA', color: '#00838F' },
   self_pending: { bg: '#E3F2FD', color: '#0F64B5' },
-  self_accepted: { bg: '#E8EAF6', color: '#3949AB' },
-  self_shipped: { bg: '#E1F5FE', color: '#0277BD' },
-  self_delivered: { bg: '#E0F2F1', color: '#00695C' },
   comparing: { bg: '#F3E5F5', color: '#7B1FA2' },
   distribute_pending: { bg: '#E0F2F1', color: '#00695C' },
   processed: { bg: '#E8F5E9', color: '#01795D' },
-  completed: { bg: '#ECEFF1', color: '#455A64' },
+  cancelled: { bg: '#FFEBEE', color: '#C62828' },
 };
 
 /** 分发路径标签（转派待接单/已处理展示） */

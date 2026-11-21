@@ -11,7 +11,7 @@ import { PROVINCE_NAMES, getCityNames, getDistricts, regionTextOf } from '../../
 import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS, TRANSFER_SOURCE_LABELS, platformLabelOf } from '../../data/externalOrders';
 import { PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
 import {
-  buildFamilies, familyStatesOf, shipStateOf, settleStateOf, FAMILY_STATE_COLORS, fulfillmentUnitsOf,
+  buildFamilies, familyStatesOf, fulfillStateOf, settleStateOf, invoiceStateOf, FAMILY_STATE_COLORS, fulfillmentUnitsOf,
 } from '../../utils/salesOrderFamily';
 import type { ExternalOrder } from '../../types';
 import { SalesOrderDetailTabs } from './SalesOrderDetail';
@@ -25,12 +25,10 @@ const pill = (text: string) => {
   );
 };
 
-/** 单笔状态（分发沿用状态机文案；发货/结算三态） */
+/** 单笔分发状态药丸（分发状态 7 态文案 + 配色） */
 const orderDistributePill = (o: ExternalOrder) => {
-  const key = o.processStatus === 'completed' ? '已分发·已完成' : EXTERNAL_STATUS_LABELS[o.processStatus] ?? o.processStatus;
-  const c = key === '已分发·已完成'
-    ? FAMILY_STATE_COLORS['已分发·已完成']
-    : { bg: EXTERNAL_STATUS_COLORS[o.processStatus]?.bg ?? '#F5F5F5', color: EXTERNAL_STATUS_COLORS[o.processStatus]?.color ?? '#9E9E9E' };
+  const key = EXTERNAL_STATUS_LABELS[o.processStatus] ?? o.processStatus;
+  const c = { bg: EXTERNAL_STATUS_COLORS[o.processStatus]?.bg ?? '#F5F5F5', color: EXTERNAL_STATUS_COLORS[o.processStatus]?.color ?? '#9E9E9E' };
   return (
     <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: c.bg, color: c.color, whiteSpace: 'nowrap' }}>{key}</span>
   );
@@ -62,8 +60,9 @@ export default function SalesOrders() {
   const [keyword, setKeyword] = useState('');
   const [filterChannel, setFilterChannel] = useState('');
   const [filterDistribute, setFilterDistribute] = useState('');
-  const [filterShip, setFilterShip] = useState('');
+  const [filterFulfill, setFilterFulfill] = useState('');
   const [filterSettle, setFilterSettle] = useState('');
+  const [filterInvoice, setFilterInvoice] = useState('');
   /* 新增筛选项:草稿态(输入)→ 点「查询」应用 */
   const [draftCustomer, setDraftCustomer] = useState('');
   const [draftReceiver, setDraftReceiver] = useState('');
@@ -96,8 +95,9 @@ export default function SalesOrders() {
     if (filterChannel && f.mother.sourceChannel !== filterChannel) return false;
     const st = familyStatesOf(f);
     if (filterDistribute && st.distribute !== filterDistribute) return false;
-    if (filterShip && st.ship !== filterShip) return false;
+    if (filterFulfill && st.fulfill !== filterFulfill) return false;
     if (filterSettle && st.settle !== filterSettle) return false;
+    if (filterInvoice && st.invoice !== filterInvoice) return false;
     // 新增筛选项(查询按钮应用)
     const a = applied;
     if (a.customer && f.mother.customerName !== a.customer) return false;
@@ -117,11 +117,11 @@ export default function SalesOrders() {
       if (a.orderTo && t > a.orderTo) return false;
     }
     return true;
-  }), [families, keyword, filterChannel, filterDistribute, filterShip, filterSettle, applied]);
+  }), [families, keyword, filterChannel, filterDistribute, filterFulfill, filterSettle, filterInvoice, applied]);
 
   const totalPages = Math.max(1, Math.ceil(filteredFamilies.length / pageSize));
   const pagedFamilies = filteredFamilies.slice((page - 1) * pageSize, page * pageSize);
-  useEffect(() => { setPage(1); }, [keyword, filterChannel, filterDistribute, filterShip, filterSettle, applied, pageSize]);
+  useEffect(() => { setPage(1); }, [keyword, filterChannel, filterDistribute, filterFulfill, filterSettle, filterInvoice, applied, pageSize]);
   useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
   useEffect(() => { setExpanded(new Set()); }, [tab]);
 
@@ -151,7 +151,7 @@ export default function SalesOrders() {
 
   
   /* 列表网格列定义（母单行 + 表头共用，保证对齐） */
-  const GRID = '34px 24px 168px 104px 96px 130px 160px 116px 104px 88px 112px 100px 100px 96px 64px';
+  const GRID = '34px 24px 168px 104px 96px 130px 160px 116px 104px 88px 112px 100px 100px 100px 96px 64px';
 
   const pageBtn = (n: number) => (
     <button
@@ -179,7 +179,7 @@ export default function SalesOrders() {
         {/* ── 全部销售单 Tab：母单一行 + 展开子单 ── */}
         {tab === 'all' && (<>
           <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-            展示<strong>全部母销售单</strong>：以<strong>手工录入</strong>或<strong>直连推送</strong>的母销售单（SO）为一行（三状态为该母销售单含全部子履约单的聚合），点击母销售单行展开其下全部子履约单（FO）；未拆分的母销售单即履约单；点击「查看」进入销售单履约详情页。
+            展示<strong>全部母销售单</strong>：以<strong>手工录入</strong>或<strong>直连推送</strong>的母销售单（SO）为一行（分发/履约/结算/开票四状态为该母销售单含全部子履约单的聚合），点击母销售单行展开其下全部子履约单（FO）；未拆分的母销售单即履约单；点击「查看」进入销售单履约详情页。
             逐单分发操作请前往「<strong>销售单管理 → 销售单分发</strong>」；履约进度跟踪见「销售单履约」。
           </div>
 
@@ -195,23 +195,36 @@ export default function SalesOrders() {
             <span className="so-f-label">分发状态：</span>
             <select className="filter-select" value={filterDistribute} onChange={(e) => setFilterDistribute(e.target.value)}>
               <option value="">全部分发状态</option>
-              <option value="待分发">待分发</option>
+              <option value="未分发">未分发</option>
               <option value="分发中">分发中</option>
-              <option value="已分发">已分发</option>
+              <option value="部分已完成">部分已完成</option>
+              <option value="全部已完成">全部已完成</option>
+              <option value="已取消">已取消</option>
             </select>
             <span className="so-f-label">履约状态：</span>
-            <select className="filter-select" value={filterShip} onChange={(e) => setFilterShip(e.target.value)}>
+            <select className="filter-select" value={filterFulfill} onChange={(e) => setFilterFulfill(e.target.value)}>
               <option value="">全部履约状态</option>
-              <option value="未发货">未发货</option>
-              <option value="部分发货">部分发货</option>
-              <option value="全部发货">全部发货</option>
+              <option value="未履约">未履约</option>
+              <option value="履约中">履约中</option>
+              <option value="部分已完成">部分已完成</option>
+              <option value="全部已完成">全部已完成</option>
+              <option value="已取消">已取消</option>
             </select>
             <span className="so-f-label">结算状态：</span>
             <select className="filter-select" value={filterSettle} onChange={(e) => setFilterSettle(e.target.value)}>
               <option value="">全部结算状态</option>
               <option value="未结算">未结算</option>
-              <option value="部分结算">部分结算</option>
-              <option value="已结算">已结算</option>
+              <option value="结算中">结算中</option>
+              <option value="部分已完成">部分已完成</option>
+              <option value="全部已完成">全部已完成</option>
+            </select>
+            <span className="so-f-label">开票状态：</span>
+            <select className="filter-select" value={filterInvoice} onChange={(e) => setFilterInvoice(e.target.value)}>
+              <option value="">全部开票状态</option>
+              <option value="未开票">未开票</option>
+              <option value="开票中">开票中</option>
+              <option value="部分已完成">部分已完成</option>
+              <option value="全部已完成">全部已完成</option>
             </select>
 
             {/* 客户:下拉选择 + 输入自动匹配 */}
@@ -265,7 +278,7 @@ export default function SalesOrders() {
 
           <Card style={{ padding: 0 }}>
             <div style={{ overflowX: 'auto' }}>
-              <div style={{ minWidth: 1670 }}>
+              <div style={{ minWidth: 1780 }}>
                 {/* 表头 */}
                 <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-4)', margin: 'var(--space-2) var(--space-3) 0', border: '1px solid var(--color-neutral-150)', borderRadius: 10, fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-500)', background: 'var(--color-neutral-50)' }}>
                   <span>序号</span>
@@ -281,6 +294,7 @@ export default function SalesOrders() {
                   <span>分发状态</span>
                   <span>履约状态</span>
                   <span>结算状态</span>
+                  <span>开票状态</span>
                   <span>录入时间</span>
                   <span style={{ textAlign: 'center' }}>操作</span>
                 </div>
@@ -319,13 +333,17 @@ export default function SalesOrders() {
                           {pill(st.distribute)}
                           <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.distributed}/{st.total}</span>
                         </span>
-                        <span key="sp" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          {pill(st.ship)}
-                          <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.shipped}/{st.total}</span>
+                        <span key="fu" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          {pill(st.fulfill)}
+                          <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.fulfilled}/{st.total}</span>
                         </span>
                         <span key="se" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           {pill(st.settle)}
                           <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.settled}/{st.total}</span>
+                        </span>
+                        <span key="in" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          {pill(st.invoice)}
+                          <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.invoiced}/{st.total}</span>
                         </span>
                         <span className="cell-muted" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{f.mother.entryTime}</span>
                         <span style={{ textAlign: 'center' }}>
@@ -351,6 +369,7 @@ export default function SalesOrders() {
                             <span>分发状态</span>
                             <span>履约状态</span>
                             <span>结算状态</span>
+                            <span>开票状态</span>
                             <span>生成时间</span>
                             <span style={{ textAlign: 'center' }}>操作</span>
                           </div>
@@ -359,13 +378,17 @@ export default function SalesOrders() {
                             const pkgs = pos.flatMap((d) => d.packages.filter((x) => x.status !== 'void'));
                             const selfPkgs = (u.underlying.selfShipments ?? []);
                             const pkgTotal = pkgs.length + selfPkgs.length;
-                            const delivered = pkgs.filter((x) => x.status === 'delivered').length
-                              + selfPkgs.filter((x) => x.status === 'delivered').length;
-                            const shipDone = shipStateOf(u.underlying, pos) === '已发货';
+                            const delivered = pkgs.filter((x) => x.status === 'delivered' || x.status === 'confirmed').length
+                              + selfPkgs.filter((x) => x.status === 'delivered' || x.status === 'confirmed').length;
+                            const fulText = fulfillStateOf(u.underlying, pos);
                             const pendingDist = u.underlying.processStatus === 'pending';
-                            /* 状态色：已发货=绿 / 分发中=琥珀 / 待分发=灰 */
-                            const accent = shipDone ? '#2E7D32' : pendingDist && u.virtual ? '#B0B7B0' : '#E6A23C';
-                            const badgeBg = shipDone ? '#E8F5E9' : pendingDist && u.virtual ? '#F0F2F0' : '#FFF8E9';
+                            /* 状态色：已确收/妥投=绿 / 履约中=琥珀 / 待分发默认履约=灰 / 已取消=红 */
+                            const accent = u.underlying.processStatus === 'cancelled' ? '#C62828'
+                              : ['全部已确收', '妥投'].includes(fulText) ? '#2E7D32'
+                                : pendingDist && u.virtual ? '#B0B7B0' : '#E6A23C';
+                            const badgeBg = accent === '#2E7D32' ? '#E8F5E9'
+                              : accent === '#C62828' ? '#FFEBEE'
+                                : pendingDist && u.virtual ? '#F0F2F0' : '#FFF8E9';
                             const isLast = ui === units.length - 1;
                             return (
                             <div key={u.code} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', alignItems: 'center', padding: 'var(--space-2) var(--space-4)', borderTop: ui === 0 ? 'none' : '1px solid var(--color-neutral-150)', background: 'var(--color-neutral-0)' }}>
@@ -413,8 +436,9 @@ export default function SalesOrders() {
                               </span>
                               {/* 分发 / 发货 / 结算状态（与母表头同列对齐） */}
                               {orderDistributePill(u.underlying)}
-                              {pill(shipStateOf(u.underlying, pos))}
-                              {pill(settleStateOf(u.underlying))}
+                              {pill(fulText)}
+                              {pill(settleStateOf(u.underlying, pos))}
+                              {pill(invoiceStateOf(u.underlying))}
                               {/* 生成时间（与母单「录入时间」列对齐） */}
                               <span className="cell-muted" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{u.createdAt}</span>
                               {/* 操作 */}
@@ -466,7 +490,7 @@ export default function SalesOrders() {
           const fam = families.find((f) => f.rootCode === view?.root);
           if (!fam) return null;
           const st = familyStatesOf(fam);
-          return <>{pill(st.distribute)}{pill(st.ship)}{pill(st.settle)}</>;
+          return <>{pill(st.distribute)}{pill(st.fulfill)}{pill(st.settle)}{pill(st.invoice)}</>;
         })()}
         subtitle={(() => {
           const fam = families.find((f) => f.rootCode === view?.root);

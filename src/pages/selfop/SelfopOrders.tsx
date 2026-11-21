@@ -35,12 +35,12 @@ export default function SelfopOrders() {
       <PageHead
         eyebrow="订单"
         title="订单管理"
-        desc={<>自营销售单全链路处理：待接单（接单 / 退回）→ 已接单（拆单 / 采购&amp;发货）→ 已发货运输中 → 妥投 → 确认收货；接单默认跟单人 <b>{auth?.name ?? '—'}</b></>}
+        desc={<>自营销售单全链路处理：待接单（接单 / 退回）→ 已接单（拆单 / 采购&amp;发货）→ 运输中 → 妥投 → 已确收；接单默认跟单人 <b>{auth?.name ?? '—'}</b></>}
       />
 
       {/* 状态阶段 Tab */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        {([['', '全部'], ['pending', '待接单'], ['accepted', '已接单'], ['shipping', '已发货运输中'], ['delivered', '妥投'], ['done', '确认收货']] as const).map(([k, label]) => (
+        {([['', '全部'], ['pending', '待接单'], ['accepted', '已接单'], ['shipping', '运输中'], ['transit', '妥投'], ['confirmed', '已确收']] as const).map(([k, label]) => (
           <button
             key={k || 'all'}
             onClick={() => setTab(k as typeof tab)}
@@ -84,7 +84,7 @@ export default function SelfopOrders() {
                 {st === 'accepted' && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>{acceptedSub(o, pos)}</span>}
               </span>,
               <span key="lg" style={{ fontSize: 'var(--text-sm)' }}>
-                {pkgs.total > 0 ? `${pkgs.total} 包裹 · ${pkgs.delivered} 妥投` : '—'}
+                {pkgs.total > 0 ? `${pkgs.total} 包裹 · ${pkgs.delivered + pkgs.confirmed} 妥投` : '—'}
               </span>,
               <div key="act" className="row-actions">
                 <Button size="sm" variant="ghost" onClick={() => setSelectedId(o.id)}>查看</Button>

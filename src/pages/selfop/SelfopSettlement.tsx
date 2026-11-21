@@ -20,7 +20,7 @@ export default function SelfopSettlement() {
   const poStore = usePurchaseStore;
 
   const doneOrders = useMemo(
-    () => orders.filter((o) => isSelfOrder(o) && o.processStatus === 'completed').sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
+    () => orders.filter((o) => isSelfOrder(o) && o.fulfillment?.stage === 'confirmed').sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
     [orders],
   );
 

@@ -238,7 +238,7 @@ export default function SalesReports() {
                 )}
                 <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>
                   {selected.type === 'order' && selected.orderKind === 'self' && '有货源订单报备：审批通过后，命中订单（客户+收件电话/商品/内部单号匹配）自动转入该合作商名下，由合作商供货履约。'}
-                  {selected.type === 'order' && selected.orderKind === 'no_supply' && '无货源订单报备：审批通过后，命中订单进入「报备-匹配待确认」，确认后退回分发-待处理，由平台自营或转派供货商（可指定 / 可比单）履约，合作商终端同步可见。'}
+                  {selected.type === 'order' && selected.orderKind === 'no_supply' && '无货源订单报备：审批通过后，命中订单进入「报备-匹配待确认」，确认后退回待分发，由平台自营或转派供货商（可指定 / 可比单）履约，合作商终端同步可见。'}
                   {selected.type === 'product' && '商品报备：审批通过后，该客户在报备地区内命中报备商品的新订单自动转给该合作商履约。'}
                   {selected.type === 'region' && '地区报备：审批通过后，该客户在报备地区内的新订单（含合作商未经营品牌）自动转给该合作商。'}
                   匹配优先级：订单报备 &gt; 商品报备 &gt; 地区报备。

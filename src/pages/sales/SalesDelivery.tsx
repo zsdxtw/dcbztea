@@ -37,7 +37,7 @@ interface DeliveryRow {
   logisticsCompany: string;
   trackingNo: string;
   shippedAt: string;
-  status: 'shipped' | 'delivered';
+  status: 'shipped' | 'delivered' | 'confirmed';
 }
 
 /**
@@ -80,7 +80,7 @@ export default function SalesDelivery() {
             itemsText: p.items.map((i) => `${i.productName}×${i.qty}`).join('、'),
             qty: p.items.reduce((s, i) => s + i.qty, 0),
             logisticsCompany: p.logisticsCompany, trackingNo: p.trackingNo,
-            shippedAt: p.shippedAt, status: p.status as 'shipped' | 'delivered',
+            shippedAt: p.shippedAt, status: p.status as 'shipped' | 'delivered' | 'confirmed',
           });
         }
       }
@@ -146,7 +146,7 @@ export default function SalesDelivery() {
               <span key="t" className="cell-muted" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{r.shippedAt}</span>,
               pill('#E1F5FE', '#0277BD', '已发货'),
               r.status === 'delivered'
-                ? pill('#E0F2F1', '#00695C', '已签收')
+                ? pill('#E0F2F1', '#00695C', '已妥投')
                 : pill('#FBF3E2', '#9A7A1C', '在途'),
               <div key="act" className="row-actions" style={{ whiteSpace: 'nowrap' }}>
                 {r.status !== 'delivered' && <Button size="sm" variant="ghost" onClick={() => deliver(r)}>模拟签收</Button>}

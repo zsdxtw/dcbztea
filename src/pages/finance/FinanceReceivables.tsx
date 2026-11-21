@@ -31,15 +31,16 @@ export default function FinanceReceivables() {
 
   /** 应收范围：已进入履约的订单（转派待接单起 / 自营已接单起）；确认节点=妥投以后 */
   const arOrders = useMemo(() => orders.filter((o) => {
-    if (o.path === 'self') return !['self_pending'].includes(o.processStatus);
-    return ['distribute_pending', 'processed', 'completed'].includes(o.processStatus);
+    if (o.processStatus === 'cancelled') return false;
+    if (o.path === 'self') return o.processStatus === 'processed';
+    return ['distribute_pending', 'processed'].includes(o.processStatus);
   }), [orders]);
 
   const rows = arOrders.map((o) => {
-    const confirmed = ['self_delivered', 'completed', 'processed'].includes(o.processStatus)
-      && (o.path === 'self' ? true : (o.partnerStatus ?? 'accepted') !== 'pending');
-    // 演示收款口径：确认收货/结算完成 → 全额已收；妥投 → 收 60%；确认前 → 未收
-    const settled = o.processStatus === 'completed';
+    const confirmed = o.fulfillment?.stage === 'transit' || o.fulfillment?.stage === 'confirmed'
+      || o.partnerStatus === 'transit' || o.partnerStatus === 'confirmed';
+    // 演示收款口径：已确收/已结算 → 全额已收；妥投 → 收 60%；确认前 → 未收
+    const settled = o.settleOnTime !== undefined;
     const received = settled ? o.totalAmount : confirmed ? Math.round(o.totalAmount * 0.6) : 0;
     const dueDate = addDays(o.entryTime, 30);
     const overdue = !settled && new Date(dueDate) < new Date('2026-11-30');

@@ -223,7 +223,7 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
                 <Button onClick={submitAccept}>接单</Button>
               </>
             )}
-          {current.processStatus === 'self_accepted' && (
+          {stage === 'accepted' && (
             <>
               <Button variant="ghost" onClick={() => { setSplitQty({}); setSplitOpen(true); }}>拆单</Button>
               <Button onClick={() => openShipDialog()}>采购&发货</Button>
@@ -232,8 +232,8 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
           {stage === 'shipping' && !allDelivered && (
             <Button onClick={() => store.getState().deliverSelfShipment(current.id)}>全部妥投（模拟物流）</Button>
           )}
-          {current.processStatus === 'self_delivered' && (
-            <Button onClick={() => store.getState().confirmSelfReceipt(current.id)}>确认收货</Button>
+          {stage === 'transit' && (
+            <Button onClick={() => store.getState().confirmReceipt(current.id)}>确认收货</Button>
           )}
         </>
       }
@@ -262,7 +262,7 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
               <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: sc.bg, color: sc.color }}>{FULFILLMENT_STAGE_LABELS[st]}</span>
             );
           })()}
-          <span style={{ fontSize: 12, color: 'var(--color-neutral-400)' }}>待接单 → 已接单 → 已发货 → 已签收/妥投 → 确认收货</span>
+          <span style={{ fontSize: 12, color: 'var(--color-neutral-400)' }}>待接单 → 已接单 → 运输中 / 妥投 → 已确收</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 12 }}>
           {fulfillmentTimes(current).map((t) => (
@@ -335,7 +335,7 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
       )}
 
       {/* 已接单：拆单 + 采购&发货 + 入库/出库 */}
-      {current.processStatus === 'self_accepted' && (
+      {stage === 'accepted' && (
         <DrawerSection title="执行操作（已接单）">
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-2)', lineHeight: 1.7 }}>
             可<strong>拆单</strong>（拆出后母子单在销售订单独立展示、各自发货），或<strong>采购&amp;发货</strong>（分仓直发 + 缺口以销定采）。
@@ -550,19 +550,19 @@ export default function SelfOrderDetailDrawer({ orderId, onClose, defaultFollowe
       )}
 
       {/* 妥投：确认收货 */}
-      {current.processStatus === 'self_delivered' && (
+      {stage === 'transit' && (
         <DrawerSection title="妥投 · 待确认收货">
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
-            全部包裹已投递，待客户确认收货。可由人工点击下方「确认收货」变更，或由联机（客户终端 / 对接系统）自动确认；确认后订单完成并结算关联采购单。
+            全部包裹已投递，待客户确认收货。可由人工点击下方「确认收货」变更，或由联机（客户终端 / 对接系统）自动确认；确收后可在财务结算按发货单结算。
           </div>
         </DrawerSection>
       )}
 
-      {/* 确认收货（完成） */}
-      {current.processStatus === 'completed' && (
-        <DrawerSection title="确认收货（已完成）">
+      {/* 已确收 */}
+      {stage === 'confirmed' && (
+        <DrawerSection title="已确收">
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
-            客户已确认收货，订单完成；关联采购单已同步结算。
+            客户已确认收货（履约状态已确收 · 分发状态分发已完成）；结算请前往「财务 → 合作商结算」按发货单结算。
           </div>
         </DrawerSection>
       )}

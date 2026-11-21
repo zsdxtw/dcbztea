@@ -63,8 +63,10 @@ interface PurchaseState {
   deliverPackage: (childCode: string, packageId: string) => void;
   /** 全部有效包裹签收（子单妥投） */
   deliverAllByChild: (childCode: string) => void;
-  /** 结算（订单分发结算动作联动） */
-  settleByChild: (childCode: string) => void;
+  /** 全部已妥投包裹确认收货（管理后台确收联动） */
+  confirmAllByChild: (childCode: string) => void;
+  /** 结算（按发货单粒度：不传 packageNos 全部结算；传入则部分结算） */
+  settleByChild: (childCode: string, packageNos?: string[]) => void;
   /** 入库制 PO 到货入库 */
   receiveByChild: (childCode: string) => void;
   /** 按子单查询其全部 PO（自营多源进度派生） */
@@ -78,7 +80,7 @@ const refreshStatus = (doc: PurchaseDoc): PurchaseDoc => {
   const anyShipped = doc.items.some((it) => it.shippedQty > 0);
   let status = doc.status;
   if (doc.status === 'pending') status = 'pending';
-  else if (allShipped && active.every((p) => p.status === 'delivered')) status = 'delivered';
+  else if (allShipped && active.every((p) => p.status === 'delivered' || p.status === 'confirmed')) status = 'delivered';
   else if (allShipped) status = 'fully_shipped';
   else if (anyShipped) status = 'partial_shipped';
   else status = 'confirmed';
@@ -90,20 +92,20 @@ const refreshStatus = (doc: PurchaseDoc): PurchaseDoc => {
 function seedDocs(): PurchaseDoc[] {
   const docs: PurchaseDoc[] = [];
   let pkgSeq = 1;
-  const mkPkg = (doc: PurchaseDoc, productId: string, productName: string, qty: number, company: string, prefix: number, delivered: boolean): ShipmentPackage => {
+  const mkPkg = (doc: PurchaseDoc, productId: string, productName: string, qty: number, company: string, prefix: number, pkgStatus: 'shipped' | 'delivered' | 'confirmed'): ShipmentPackage => {
     const pkg: ShipmentPackage = {
       id: `pkg_seed_${pkgSeq}`, packageNo: genDeliveryNo(doc.motherCode),
       logisticsCompany: company, trackingNo: `${company.includes('顺丰') ? 'SF' : 'DB'}${7000000000 + prefix}`,
       shippedAt: `${doc.createTime} 09:30`,
       items: [{ productId, productName, qty }],
-      status: delivered ? 'delivered' : 'shipped', operator: doc.supplierName,
+      status: pkgStatus, operator: doc.supplierName,
     };
     pkgSeq += 1;
     return pkg;
   };
   for (const o of externalOrderSeeds) {
     if (o.path === 'distribute' && o.partnerId && o.partnerName
-      && ['distribute_pending', 'processed', 'completed'].includes(o.processStatus)) {
+      && ['distribute_pending', 'processed'].includes(o.processStatus)) {
       const winQuote = o.compare?.quotes.find((q) => q.supplierId === o.partnerId);
       const priceOf = o.transferSource === 'compare' && winQuote
         ? (it: { productId: string; price: number; quantity: number }) => {
@@ -115,35 +117,43 @@ function seedDocs(): PurchaseDoc[] {
       // 状态按子单履约状态映射 + 生成对应包裹
       if (o.processStatus === 'distribute_pending') {
         doc.status = 'pending';
-      } else if (o.processStatus === 'completed') {
-        doc.status = 'settled';
       } else {
         const ps = o.partnerStatus;
         if (ps === 'accepted') {
           doc.status = 'confirmed';
         } else if (ps === 'shipping') {
-          // 演示行内多次发货：同一商品分 2 批
+          // 演示行内多次发货：同一商品分 2 批（包裹运输中）
           doc.status = 'fully_shipped';
           for (const it of doc.items) {
             const q1 = Math.max(1, Math.floor(it.quantity * 0.6));
             const q2 = it.quantity - q1;
             it.shippedQty = it.quantity;
-            doc.packages.push(mkPkg(doc, it.productId, it.productName, q1, '顺丰速运', pkgSeq * 13579, false));
-            if (q2 > 0) doc.packages.push(mkPkg(doc, it.productId, it.productName, q2, '德邦物流', pkgSeq * 24681, false));
+            doc.packages.push(mkPkg(doc, it.productId, it.productName, q1, '顺丰速运', pkgSeq * 13579, 'shipped'));
+            if (q2 > 0) doc.packages.push(mkPkg(doc, it.productId, it.productName, q2, '德邦物流', pkgSeq * 24681, 'shipped'));
           }
-        } else if (ps === 'delivered') {
+        } else if (ps === 'transit') {
+          // 履约妥投：包裹全部妥投
           doc.status = 'delivered';
           for (const it of doc.items) {
             it.shippedQty = it.quantity;
-            doc.packages.push(mkPkg(doc, it.productId, it.productName, it.quantity, '顺丰速运', pkgSeq * 13579, true));
+            doc.packages.push(mkPkg(doc, it.productId, it.productName, it.quantity, '顺丰速运', pkgSeq * 13579, 'delivered'));
           }
+        } else if (ps === 'confirmed') {
+          // 履约已确收：包裹全部已确收；订单已结算（settleOnTime 已写）→ 发货单全部结算标记
+          doc.status = 'delivered';
+          for (const it of doc.items) {
+            it.shippedQty = it.quantity;
+            doc.packages.push(mkPkg(doc, it.productId, it.productName, it.quantity, '顺丰速运', pkgSeq * 13579, 'confirmed'));
+          }
+          if (o.settleOnTime !== undefined) doc.packages.forEach((p) => { p.settled = true; });
+          if (o.settleOnTime !== undefined) doc.status = 'settled';
         } else {
           doc.status = 'pending';
         }
       }
       docs.push(doc);
     } else if (o.path === 'self' && o.selfPo
-      && ['self_accepted', 'self_shipped', 'self_delivered', 'completed'].includes(o.processStatus)) {
+      && o.processStatus === 'processed') {
       // 采购数量 = 订单数量 − 分仓直发数量；直发模式按妥投状态生成直发包裹
       const directMap = new Map<string, number>();
       for (const sh of o.selfShipments ?? []) {
@@ -155,14 +165,17 @@ function seedDocs(): PurchaseDoc[] {
       if (remain.length > 0) {
         const child = { ...o, items: remain };
         const doc = buildDoc(child, 'self', (it) => purchasePriceOf(it, o.selfPo!.supplierId), o.selfPo!.mode, o.selfPo!.purchaseDate);
-        const delivered = o.processStatus === 'self_delivered' || o.processStatus === 'completed';
-        if (o.selfPo!.mode === 'direct' && delivered) {
-          // 供应商直发客户：包裹已投递（妥投/确认收货）
+        const stage = o.fulfillment?.stage;
+        const confirmed = stage === 'confirmed';
+        if (o.selfPo!.mode === 'direct' && (stage === 'transit' || confirmed)) {
+          // 供应商直发客户：包裹妥投 / 已确收（自营发货单已结算则同步结算标记）
           doc.status = 'delivered';
           for (const it of doc.items) {
             it.shippedQty = it.quantity;
-            doc.packages.push(mkPkg(doc, it.productId, it.productName, it.quantity, '顺丰速运', pkgSeq * 97531, true));
+            doc.packages.push(mkPkg(doc, it.productId, it.productName, it.quantity, '顺丰速运', pkgSeq * 97531, confirmed ? 'confirmed' : 'delivered'));
           }
+          if (confirmed) doc.packages.forEach((p) => { p.settled = true; });
+          if (confirmed) doc.status = 'settled';
         } else if (o.selfPo!.mode === 'warehouse') {
           // 入库制：轨迹含「到货入库」→ 已入库待出库；否则已确认（采购在途）
           doc.status = o.history.some((h) => h.action === '到货入库') ? 'received' : 'confirmed';
@@ -298,8 +311,23 @@ export const usePurchaseStore = create<PurchaseState>((set, get) => {
       }));
     },
 
-    settleByChild: (childCode) => {
-      patchDoc(childCode, (d) => ({ ...d, status: 'settled' }));
+    confirmAllByChild: (childCode) => {
+      patchDoc(childCode, (d) => ({
+        ...d,
+        packages: d.packages.map((p) => (p.status === 'delivered' ? { ...p, status: 'confirmed' as const, confirmedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') } : p)),
+      }));
+    },
+
+    settleByChild: (childCode, packageNos) => {
+      patchDoc(childCode, (d) => {
+        const packages = d.packages.map((p) => (
+          (!packageNos || packageNos.includes(p.packageNo)) && (p.status === 'delivered' || p.status === 'confirmed')
+            ? { ...p, settled: true } : p
+        ));
+        const active = packages.filter((x) => x.status !== 'void');
+        const allSettled = active.length > 0 && active.every((x) => x.settled);
+        return { ...d, packages, status: allSettled ? ('settled' as const) : d.status };
+      });
     },
 
     /** 入库制 PO 到货入库（已确认/部分到货 → 已入库） */

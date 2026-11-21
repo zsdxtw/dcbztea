@@ -25,36 +25,35 @@ const pill = (bg: string, color: string, text: string) => (
 );
 
 const statusPill = (status: string) => {
-  // 已完成归并展示为已处理（子状态由调用方补充）
-  const key = status === 'completed' ? 'processed' : status;
-  const c = EXTERNAL_STATUS_COLORS[key] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
-  return pill(c.bg, c.color, EXTERNAL_STATUS_LABELS[key] ?? status);
+  const c = EXTERNAL_STATUS_COLORS[status] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
+  return pill(c.bg, c.color, EXTERNAL_STATUS_LABELS[status] ?? status);
 };
 
-/** 状态归并：已完成 / 自营执行中（已接单·运输·妥投）并入已处理（列表筛选/计数/展示统一） */
-const mergedStatus = (s: string) => (['completed', 'self_accepted', 'self_shipped', 'self_delivered'].includes(s) ? 'processed' : s);
+/** 状态键（分发状态 7 态直接使用，无归并） */
+const mergedStatus = (s: string) => s;
 
 /** 销售履约单号：子履约单取自身编号；未拆分的销售单本身即履约单，按规则展示为 LY01 */
 const fulfillmentCodeOf = (o: ExternalOrder): string => (o.parentCode ? o.code : `${o.code}LY01`);
 /** 销售单订单号（履约单上层订单编号）：子履约单指向母销售单；未拆分时为自身 */
 const salesOrderCodeOf = (o: ExternalOrder): string => o.parentCode ?? o.code;
 
-/** 分发状态：仅分发环节（待分发 / 报备待确认 / 比单中 / 待接单 / 已分发） */
+/** 分发状态：仅分发环节（待分发 / 报备待确认 / 分发比单中 / 待接单 / 分发已完成 / 已取消） */
 const DISTRIBUTE_STATE: Record<string, { label: string; bg: string; color: string }> = {
   pending: { label: '待分发', bg: '#FFF3E0', color: '#B26A00' },
   report_match_pending: { label: '报备待确认', bg: '#E0F7FA', color: '#00838F' },
-  comparing: { label: '比单中', bg: '#EDE7F6', color: '#5E35B1' },
+  comparing: { label: '分发比单中', bg: '#EDE7F6', color: '#5E35B1' },
   self_pending: { label: '自营待接单', bg: '#E3F2FD', color: '#0F64B5' },
   distribute_pending: { label: '转派待接单', bg: '#E8F1FB', color: '#0F64B5' },
-  processed: { label: '已分发', bg: '#E8F5E9', color: '#2E7D32' },
+  processed: { label: '分发已完成', bg: '#E8F5E9', color: '#2E7D32' },
+  cancelled: { label: '已取消', bg: '#FFEBEE', color: '#C62828' },
 };
 const distributeStateOf = (o: ExternalOrder) =>
   DISTRIBUTE_STATE[mergedStatus(o.processStatus)] ?? { label: '—', bg: '#F5F5F5', color: '#9E9E9E' };
 
-/** 订单状态：履约当前状态（接单 / 发货 / 妥投 / 确收 / 结算） */
+/** 订单状态：履约当前状态（未履约 / 待接单 / 已接单 / 运输中 / 妥投 / 已确收 / 已取消） */
 const orderStateOf = (o: ExternalOrder) => {
-  if (o.processStatus === 'completed' || o.partnerStatus === 'settled') return { label: '已结算（已完成）', bg: '#E8F5E9', color: '#2E7D32' };
-  if (!o.fulfillment) return { label: '未开始', bg: '#F5F5F5', color: '#9E9E9E' };
+  if (o.processStatus === 'cancelled') return { label: '已取消', bg: '#FFEBEE', color: '#C62828' };
+  if (!o.fulfillment && !['self_pending', 'distribute_pending'].includes(o.processStatus)) return { label: '未履约', bg: '#F5F5F5', color: '#9E9E9E' };
   const st = stageOfOrder(o);
   const c = FULFILLMENT_STAGE_COLORS[st];
   return { label: FULFILLMENT_STAGE_LABELS[st], bg: c.bg, color: c.color };
@@ -96,8 +95,8 @@ function processedWarnText(o: ExternalOrder): string {
     return '该订单已被接单（自营），重新分发将收回订单，请确认。';
   }
   const ps = o.partnerStatus;
-  if (ps === 'shipping') return `该订单合作商【已发货】，重新分发将中断合作商履约并可能产生违约责任，请谨慎确认！`;
-  if (ps === 'delivered' || ps === 'settled') return `该订单合作商【已签收/已结算】，重新分发将产生结算与积分回滚，请谨慎确认！`;
+  if (ps === 'shipping' || ps === 'transit') return `该订单合作商【已发货/妥投】，重新分发将中断合作商履约并可能产生违约责任，请谨慎确认！`;
+  if (ps === 'confirmed') return `该订单合作商【已确收】，重新分发将产生结算与积分回滚，请谨慎确认！`;
   return '该订单已被合作商接单，重新分发将收回订单并通知合作商，请确认。';
 }
 
@@ -134,6 +133,8 @@ export default function ExternalOrders() {
   const [reflowing, setReflowing] = useState<ExternalOrder | null>(null);
   /** 删除确认弹窗 */
   const [deleting, setDeleting] = useState<ExternalOrder | null>(null);
+  const [cancelling, setCancelling] = useState<ExternalOrder | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
   /** 报名情况弹窗 */
   const [enrollOf, setEnrollOf] = useState<string | null>(null);
   /** 直接选定弹窗 */
@@ -339,7 +340,7 @@ export default function ExternalOrders() {
   const confirmReflow = () => {
     if (!reflowing) return;
     const o = reflowing;
-    store.getState().resetToPending(o.id, ['processed', 'completed'].includes(o.processStatus) ? '管理后台重新分发（原执行信息作废）' : undefined);
+    store.getState().resetToPending(o.id, o.processStatus === 'processed' ? '管理后台重新分发（原执行信息作废）' : undefined);
     setReflowing(null);
     setSelectedId(null);
   };
@@ -390,7 +391,7 @@ export default function ExternalOrders() {
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           销售单分发决定<strong>销售订单由谁来供货发货</strong>（自营仓发货 / 合作商采购直发），均<strong>逐个展示子单</strong>（母单聚合总览请前往「销售单管理 → 销售订单」）。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>，保存后均自动与审批通过的报备比对。
           命中报备的订单先进入<strong>报备-匹配待确认</strong>，人工确认匹配后分发给报备合作商；其余订单点击「分发」在弹窗中选择：转自营（在销售单自营/自营工作台接单，接单时填跟单人）、转派-指定、转派-报备、转派-比单（积分优先）；比单可限定合作商地区。
-          待接单订单可「重新分发」回待处理重新选择路径；已接单的重新分发需二次确认。
+          履约状态进入已接单及后续后分发状态自动变为<strong>分发已完成</strong>；全部包裹妥投后由管理后台「确认收货」→ 履约已确收；待接单订单可「重新分发」回待分发重新选择路径，已接单的重新分发需二次确认。
         </div>
 
         {/* 状态栏流程图：待处理(左中) ─ 顶中出线→[自营]→[自营待接单]→已处理顶中 / 底中出线→[2×2虚线框]→[转派待接单]→已处理底中，两个待接单右缘对齐 */}
@@ -450,7 +451,7 @@ export default function ExternalOrders() {
               <i className="dn-h eop-arr-r" aria-hidden="true" />
               <span className="eop-lbl dn" aria-hidden="true">转派</span>
               <button className={`tab-card-simple${filterStatus === 'pending' ? ' active' : ''}`} onClick={() => setFilterStatus('pending')}>
-                分发-待处理
+                待分发
                 <span className="tab-card-simple-count">{countOf('pending')}</span>
               </button>
             </div>
@@ -479,7 +480,7 @@ export default function ExternalOrders() {
                   </button>
                   <button className="tab-card-simple eop-dim" disabled title="指定转派即时转出，无中间状态">指定</button>
                   <button className={`tab-card-simple${filterStatus === 'comparing' ? ' active' : ''}`} onClick={() => setFilterStatus('comparing')}>
-                    比单中
+                    分发比单中
                     <span className="tab-card-simple-count">{countOf('comparing')}</span>
                   </button>
                 </div>
@@ -498,10 +499,16 @@ export default function ExternalOrders() {
               <i className="dn-v eop-arr-u" aria-hidden="true" />
               <i className="dn-h" aria-hidden="true" />
               <button className={`tab-card-simple${filterStatus === 'processed' ? ' active' : ''}`} onClick={() => setFilterStatus('processed')}>
-                分发-已完成
+                分发已完成
                 <span className="tab-card-simple-count">{countOf('processed')}</span>
               </button>
             </div>
+
+            {/* 已取消（贯穿：取消后分发与履约状态均为已取消） */}
+            <button className={`tab-card-simple${filterStatus === 'cancelled' ? ' active' : ''}`} onClick={() => setFilterStatus('cancelled')}>
+              已取消
+              <span className="tab-card-simple-count">{countOf('cancelled')}</span>
+            </button>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
@@ -621,11 +628,14 @@ export default function ExternalOrders() {
                     <Button size="sm" variant="ghost" onClick={() => setEnrollOf(o.id)}>报名情况</Button>
                   </>
                 )}
-                {(o.processStatus === 'processed' || o.processStatus === 'completed') && (
+                {o.processStatus === 'processed' && (
                   <>
                     <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
                     <Button size="sm" variant="danger" onClick={() => startReflow(o)}>重新分发</Button>
                   </>
+                )}
+                {o.processStatus === 'cancelled' && (
+                  <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
                 )}
               </div>,
             ])}
@@ -671,11 +681,20 @@ export default function ExternalOrders() {
           ) : (
             <>
               <Button variant="ghost" onClick={() => setSelectedId(null)}>关闭</Button>
-              {current && current.processStatus !== 'pending' && current.processStatus !== 'self_pending' && current.processStatus !== 'processed' && current.processStatus !== 'completed' && (
+              {current && !['pending', 'self_pending', 'cancelled'].includes(current.processStatus) && (
                 <Button variant="danger" onClick={() => startReflow(current)}>重新分发</Button>
               )}
-              {current && current.sourceChannel === 'manual' && !['processed', 'completed'].includes(current.processStatus) && (
+              {current && current.sourceChannel === 'manual' && current.processStatus !== 'processed' && current.processStatus !== 'cancelled' && (
                 <Button onClick={() => startEdit()}>修改</Button>
+              )}
+              {current && current.processStatus !== 'cancelled' && current.fulfillment?.stage !== 'confirmed' && (
+                <Button variant="ghost" onClick={() => { setCancelling(current); setCancelReason(''); }}>取消订单</Button>
+              )}
+              {current && current.processStatus === 'processed' && (
+                <>
+                  {current.invoiceStatus !== 'invoiced' && <Button variant="ghost" onClick={() => store.getState().registerInvoice(current.id, 'partial')}>登记部分开票</Button>}
+                  {current.invoiceStatus !== 'invoiced' && <Button onClick={() => store.getState().registerInvoice(current.id, 'full')}>登记全额开票</Button>}
+                </>
               )}
             </>
           )
@@ -882,30 +901,40 @@ export default function ExternalOrders() {
               </DrawerSection>
             )}
 
-            {/* ── 已处理：合作商履约 ── */}
-            {(current.processStatus === 'processed' || current.processStatus === 'completed') && current.path === 'distribute' && current.partnerName && (
+            {/* ── 分发已完成：合作商履约（接单/发货/妥投由合作商终端推进；确收/结算在管理后台） ── */}
+            {current.processStatus === 'processed' && current.path === 'distribute' && current.partnerName && (
               <DrawerSection title="合作商履约">
                 <InfoGrid>
                   <InfoItem label="合作商">{current.partnerName}</InfoItem>
                   <InfoItem label="分发方式">{TRANSFER_SOURCE_LABELS[current.transferSource ?? '']}</InfoItem>
                   <InfoItem label="履约状态">{current.partnerStatus ? PARTNER_ORDER_STATUS_LABELS[current.partnerStatus] : '待接单'}</InfoItem>
-                  {current.processStatus === 'completed' && (
-                    <InfoItem label="结算履约">{current.settleOnTime === true ? '按时（积分 +5）' : current.settleOnTime === false ? '超时（积分 -5）' : '—'}</InfoItem>
-                  )}
+                  <InfoItem label="结算履约">{current.settleOnTime === true ? '按时（积分 +5）' : current.settleOnTime === false ? '超时（积分 -5）' : '未结算'}</InfoItem>
                 </InfoGrid>
-                {current.processStatus === 'processed' && (
-                  <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
-                    {current.partnerStatus === 'accepted' && <Button onClick={() => store.getState().advancePartner(current.id, 'shipping')}>推进：发货</Button>}
-                    {current.partnerStatus === 'shipping' && <Button onClick={() => store.getState().advancePartner(current.id, 'transit')}>推进：物流妥投</Button>}
-                    {current.partnerStatus === 'transit' && <Button onClick={() => store.getState().advancePartner(current.id, 'delivered')}>推进：客户签收</Button>}
-                    {current.partnerStatus === 'delivered' && (
-                      <>
-                        <Button onClick={() => store.getState().advancePartner(current.id, 'settled', { onTime: true })}>结算（按时 · 积分+5）</Button>
-                        <Button variant="danger" onClick={() => store.getState().advancePartner(current.id, 'settled', { onTime: false })}>结算（超时 · 积分-5）</Button>
-                      </>
-                    )}
-                  </div>
-                )}
+                <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
+                  {current.partnerStatus === 'accepted' && <Button onClick={() => store.getState().advancePartner(current.id, 'shipping')}>推进：发货</Button>}
+                  {current.partnerStatus === 'shipping' && <Button onClick={() => store.getState().advancePartner(current.id, 'transit')}>推进：物流妥投</Button>}
+                  {current.partnerStatus === 'transit' && <Button onClick={() => store.getState().confirmReceipt(current.id)}>确认收货（管理后台）</Button>}
+                  {current.partnerStatus === 'confirmed' && (
+                    <>
+                      <Button onClick={() => store.getState().settleOrder(current.id, { onTime: true })}>结算（按时 · 积分+5）</Button>
+                      <Button variant="danger" onClick={() => store.getState().settleOrder(current.id, { onTime: false })}>结算（超时 · 积分-5）</Button>
+                    </>
+                  )}
+                  {current.partnerStatus !== 'confirmed' && (
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', alignSelf: 'center' }}>
+                      接单/发货/妥投由合作商终端推进；全部包裹妥投后由管理后台「确认收货」，结算按发货单可部分结算
+                    </span>
+                  )}
+                </div>
+              </DrawerSection>
+            )}
+
+            {/* ── 已取消说明 ── */}
+            {current.processStatus === 'cancelled' && (
+              <DrawerSection title="订单已取消">
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
+                  该订单已取消：分发状态与履约状态均显示<strong>已取消</strong>，不再参与分发与履约流转（见处理轨迹中的取消原因）。
+                </div>
               </DrawerSection>
             )}
 
@@ -937,19 +966,40 @@ export default function ExternalOrders() {
         <div className="category-dialog-overlay" onClick={() => setReflowing(null)}>
           <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 480 }}>
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>重新分发</div>
-            {['processed', 'completed'].includes(reflowing.processStatus) && (
+            {reflowing.processStatus === 'processed' && (
               <div style={{ padding: '10px 14px', background: '#FFF3E0', color: '#E65100', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)', lineHeight: 1.7, fontWeight: 'var(--font-medium)' }}>
                 {processedWarnText(reflowing)}
               </div>
             )}
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
-              确认后订单 <strong className="mono">{reflowing.code}</strong> 将<strong>进入待处理状态重新选择路径</strong>
-              {['processed', 'completed'].includes(reflowing.processStatus) ? `，原有执行信息（${reflowing.path === 'self' ? '采购/出入库单据' : '合作商关联、履约进度'}）全部作废。` : '，可重新选择自营或分发路径。'}
+              确认后订单 <strong className="mono">{reflowing.code}</strong> 将<strong>进入待分发状态重新选择路径</strong>
+              {reflowing.processStatus === 'processed' ? `，原有执行信息（${reflowing.path === 'self' ? '采购/出入库单据' : '合作商关联、履约进度'}）全部作废。` : '，可重新选择自营或分发路径。'}
               {reflowing.transferSource === 'report' && ' 该订单原为报备转派，重新分发后报备匹配信息已清除，不会再自动按报备转派。'}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
               <Button variant="ghost" onClick={() => setReflowing(null)}>取消</Button>
-              <Button variant={['processed', 'completed'].includes(reflowing.processStatus) ? 'danger' : undefined} onClick={confirmReflow}>确认重新分发</Button>
+              <Button variant={reflowing.processStatus === 'processed' ? 'danger' : undefined} onClick={confirmReflow}>确认重新分发</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 取消订单弹窗 ── */}
+      {cancelling && (
+        <div className="category-dialog-overlay" onClick={() => setCancelling(null)}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 460 }}>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>取消订单</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
+              确认取消订单 <strong className="mono">{cancelling.code}</strong>（{cancelling.customerName} · {money(cancelling.totalAmount)}）？
+              取消后<strong>分发状态与履约状态均变为已取消</strong>，不再参与后续流转。
+            </div>
+            <div style={{ marginBottom: 'var(--space-3)' }}>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>取消原因（选填）</label>
+              <input className="filter-input" placeholder="如：客户取消采购计划 / 地址错误无法送达" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} style={{ width: '100%' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
+              <Button variant="ghost" onClick={() => setCancelling(null)}>返回</Button>
+              <Button variant="danger" onClick={() => { store.getState().cancelOrder(cancelling.id, cancelReason); setCancelling(null); setSelectedId(null); }}>确认取消</Button>
             </div>
           </div>
         </div>

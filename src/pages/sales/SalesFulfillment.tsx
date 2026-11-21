@@ -19,7 +19,7 @@ const pill = (bg: string, color: string, text: string) => (
   <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: bg, color, whiteSpace: 'nowrap' }}>{text}</span>
 );
 
-/** 履约阶段链：待接单 → 已接单 → 已发货 → 已签收/妥投 → 确认收货 */
+/** 履约阶段链：待接单 → 已接单 → 运输中 / 妥投 → 已确收 */
 type StageKey = FulfillmentStage;
 const STAGE_CHAIN = FULFILLMENT_STAGES;
 
@@ -64,7 +64,7 @@ export default function SalesFulfillment() {
         const stage = stageOfOrder(o);
         const doc = purchaseDocs.find((d) => d.childOrderCode === o.code);
         const pkgs = doc?.packages.filter((p) => p.status !== 'void') ?? [];
-        const delivered = pkgs.filter((p) => p.status === 'delivered').length;
+        const delivered = pkgs.filter((p) => p.status === 'delivered' || p.status === 'confirmed').length;
         return {
           order: o,
           rootCode: o.parentCode ?? o.code,
@@ -87,7 +87,7 @@ export default function SalesFulfillment() {
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           按<strong>子履约单 / 未拆分的母销售单</strong>维度跟踪每一张销售单的履约进度（未拆分时母销售单即履约单）：
-          待接单 → 已接单 → 已发货 → 已签收/妥投 → 确认收货，并记录<strong>来单 / 接单 / 发货 / 妥投 / 确收</strong>五个时间节点。
+          待接单 → 已接单 → 运输中 / 妥投 → 已确收，并记录<strong>来单 / 接单 / 发货 / 妥投 / 确收</strong>五个时间节点。
           已拆分的母销售单由其子履约单各自呈现；包裹物流与合作商发货登记实时联动。
         </div>
 
@@ -142,7 +142,7 @@ export default function SalesFulfillment() {
                 pill(sc.bg, sc.color, FULFILLMENT_STAGE_LABELS[u.stage]),
                 u.pkgCount > 0
                   ? <span key="pkg" style={{ fontSize: 'var(--text-sm)' }}>
-                      {u.pkgCount} 包裹 · {u.pkgDelivered} 签收
+                      {u.pkgCount} 包裹 · {u.pkgDelivered} 妥投
                       {u.lastTracking && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{u.lastTracking.logisticsCompany} {u.lastTracking.trackingNo}</span>}
                     </span>
                   : <span key="pkg" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>—</span>,
