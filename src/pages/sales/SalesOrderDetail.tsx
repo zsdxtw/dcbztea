@@ -97,6 +97,7 @@ function ProductItemsTable({ items, customerName, salesPath, platformCustomerId,
                 ? <span className="mono" style={{ color: 'var(--color-module-current-base)', fontWeight: 'var(--font-semibold)' }}>{money(quote)}</span>
                 : <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>—</span>}
               </td>
+              <td className="mono">{it.quantity}</td>
               <td className="mono">{money(it.price)}</td>
               {isVia && <td className="mono">{net !== undefined ? money(net) : '—'}</td>}
               <td className="mono" style={{ textAlign: 'right', fontWeight: 'var(--font-medium)' }}>{money(it.price * it.quantity)}</td>
