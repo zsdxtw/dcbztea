@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
-import { DrawerSection } from '../../components/common/DetailDrawer';
+import { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { regionTextOf } from '../../data/regions';
@@ -36,13 +36,6 @@ function pathLabel(o: ExternalOrder): string {
 }
 
 /** 信息项 */
-const infoItem = (label: string, value: React.ReactNode, opts?: { mono?: boolean; emph?: boolean; span?: number }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, gridColumn: opts?.span ? `span ${opts.span}` : undefined, minWidth: 0 }}>
-    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{label}</span>
-    <span className={`${opts?.mono ? 'mono ' : ''}${opts?.emph ? 'cell-emph' : ''}`} style={{ fontSize: 'var(--text-sm)', wordBreak: 'break-all' }}>{value}</span>
-  </div>
-);
-
 /* ──────────────────────────────────────────────
  * 共享区块：销售单详情页与销售单列表「查看」抽屉共用
  * ────────────────────────────────────────────── */
@@ -88,33 +81,33 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
         </div>
       )}
       <DrawerSection title="订单信息">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3) var(--space-4)' }}>
-          {infoItem('销售单号', family.rootCode, { mono: true, emph: true })}
-          {infoItem('订单来源', <>淡茶半盏<span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{EXTERNAL_CHANNEL_LABELS[mother.sourceChannel]}</span></>)}
-          {infoItem('下单平台', mother.platform ? EXTERNAL_PLATFORM_LABELS[mother.platform] : '—')}
-          {infoItem('平台订单号', mother.externalOrderNo, { mono: true })}
-          {infoItem('客户', `${mother.customerName}（${mother.customerType}）`, { emph: true })}
-          {infoItem('客户区域', regionTextOf(mother.customerRegion, mother.receiverAddress))}
-          {infoItem('总金额', <span style={{ color: 'var(--color-module-current-base)', fontWeight: 'var(--font-semibold)' }}>{money(amount)}</span>, { mono: true })}
-          {infoItem('履约单数', children.length > 0 ? `${children.length} 单` : '1 单（未拆分，母销售单即履约单）')}
-          {infoItem('销售路径', mother.salesPath === 'via_platform' ? '经平台销售' : '直接销售')}
-          {infoItem('客户下单时间', mother.customerOrderTime ?? '—')}
-          {infoItem('客户侧订单号', mother.customerOrderNo ?? '—', { mono: true })}
-          {infoItem('录入时间', fmtDateTime(mother.entryTime), { mono: true })}
-          {infoItem('录入人', mother.operator)}
-          {mother.platformCustomerName && infoItem('平台客户', mother.platformCustomerName)}
-        </div>
+        <InfoGrid>
+          <InfoItem label="销售单号" mono emph>{family.rootCode}</InfoItem>
+          <InfoItem label="订单来源">淡茶半盏<span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{EXTERNAL_CHANNEL_LABELS[mother.sourceChannel]}</span></InfoItem>
+          <InfoItem label="下单平台">{mother.platform ? EXTERNAL_PLATFORM_LABELS[mother.platform] : '—'}</InfoItem>
+          <InfoItem label="平台订单号" mono>{mother.externalOrderNo}</InfoItem>
+          <InfoItem label="客户" emph>{`${mother.customerName}（${mother.customerType}）`}</InfoItem>
+          <InfoItem label="客户区域">{regionTextOf(mother.customerRegion, mother.receiverAddress)}</InfoItem>
+          <InfoItem label="总金额" mono valueStyle={{ color: 'var(--color-module-current-base)', fontWeight: 'var(--font-semibold)' }}>{money(amount)}</InfoItem>
+          <InfoItem label="履约单数">{children.length > 0 ? `${children.length} 单` : '1 单（未拆分，母销售单即履约单）'}</InfoItem>
+          <InfoItem label="销售路径">{mother.salesPath === 'via_platform' ? '经平台销售' : '直接销售'}</InfoItem>
+          <InfoItem label="客户下单时间">{mother.customerOrderTime ?? '—'}</InfoItem>
+          <InfoItem label="客户侧订单号" mono>{mother.customerOrderNo ?? '—'}</InfoItem>
+          <InfoItem label="录入时间" mono>{fmtDateTime(mother.entryTime)}</InfoItem>
+          <InfoItem label="录入人">{mother.operator}</InfoItem>
+          {mother.platformCustomerName && <InfoItem label="平台客户">{mother.platformCustomerName}</InfoItem>}
+        </InfoGrid>
       </DrawerSection>
 
       <DrawerSection title="收货信息" style={{ marginTop: 'var(--space-7)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3) var(--space-4)' }}>
-          {infoItem('收货人', mother.receiver, { emph: true })}
-          {infoItem('联系电话', mother.receiverPhone, { mono: true })}
-          {infoItem('收货地区', regionTextOf(mother.customerRegion, mother.receiverAddress))}
-          {infoItem('销售路径', mother.salesPath === 'via_platform' ? '经平台销售' : '直接销售')}
-          {infoItem('收货地址', mother.receiverAddress, { span: 2 })}
-          {infoItem('备注', mother.remark || '—', { span: 2 })}
-        </div>
+        <InfoGrid>
+          <InfoItem label="收货人" emph>{mother.receiver}</InfoItem>
+          <InfoItem label="联系电话" mono>{mother.receiverPhone}</InfoItem>
+          <InfoItem label="收货地区">{regionTextOf(mother.customerRegion, mother.receiverAddress)}</InfoItem>
+          <InfoItem label="销售路径">{mother.salesPath === 'via_platform' ? '经平台销售' : '直接销售'}</InfoItem>
+          <InfoItem label="收货地址" span={2}>{mother.receiverAddress}</InfoItem>
+          <InfoItem label="备注" span={2}>{mother.remark || '—'}</InfoItem>
+        </InfoGrid>
       </DrawerSection>
 
       <DrawerSection title="商品信息" style={{ marginTop: 'var(--space-7)' }}>
@@ -149,19 +142,21 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
 
   return (
     <>
-      {/* 当前订单信息 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3) var(--space-4)', marginBottom: 'var(--space-4)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)' }}>
-        {infoItem('履约单编号', current.code, { mono: true, emph: true })}
-        {infoItem('分发路径', pathLabel(current))}
-        {infoItem('履约主体', current.partnerName ?? (current.path === 'self' ? '自营' : '—'))}
-        {infoItem('生成时间', fmtDateTime(current.history?.[0]?.time ?? current.entryTime), { mono: true })}
-        {infoItem('金额', <span style={{ fontWeight: 'var(--font-semibold)' }}>{money(current.totalAmount)}</span>, { mono: true })}
-        {infoItem('分发状态', pill(distributeStateOf(current)))}
-        {infoItem('履约状态', pill(fulfillStateOf(current, currentPos)))}
-        {infoItem('结算状态', pill(settleStateOf(current, currentPos)))}
-        {infoItem('开票状态', pill(invoiceStateOf(current)))}
-        {infoItem(current.parentCode ? '关联销售单' : '单据性质', current.parentCode ?? (children.length > 0 ? '母销售单（已拆分）' : '母销售单（未拆分，即履约单）'))}
-      </div>
+      {/* 履约单信息 */}
+      <DrawerSection title="履约单信息">
+        <InfoGrid>
+          <InfoItem label="履约单编号" mono emph>{current.code}</InfoItem>
+          <InfoItem label="分发路径">{pathLabel(current)}</InfoItem>
+          <InfoItem label="履约主体">{current.partnerName ?? (current.path === 'self' ? '自营' : '待分发')}</InfoItem>
+          <InfoItem label="生成时间" mono>{fmtDateTime(current.history?.[0]?.time ?? current.entryTime)}</InfoItem>
+          <InfoItem label="金额" mono valueStyle={{ fontWeight: 'var(--font-semibold)' }}>{money(current.totalAmount)}</InfoItem>
+          <InfoItem label="分发状态">{pill(distributeStateOf(current))}</InfoItem>
+          <InfoItem label="履约状态">{pill(fulfillStateOf(current, currentPos))}</InfoItem>
+          <InfoItem label="结算状态">{pill(settleStateOf(current, currentPos))}</InfoItem>
+          <InfoItem label="开票状态">{pill(invoiceStateOf(current))}</InfoItem>
+          <InfoItem label={current.parentCode ? '关联销售单' : '单据性质'}>{current.parentCode ?? (children.length > 0 ? '母销售单（已拆分）' : '母销售单（未拆分，即履约单）')}</InfoItem>
+        </InfoGrid>
+      </DrawerSection>
 
       {/* 履约时间线：来单 → 接单 → 发货 → 妥投 → 确收 */}
       <div style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)' }}>
