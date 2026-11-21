@@ -33,6 +33,7 @@ import {
 import type { FulfillmentTimeline } from '../types';
 
 const now = () => new Date().toISOString().slice(0, 10);
+const nowSec = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
 const nowTs = () => Date.now();
 const nowMin = () => new Date().toISOString().slice(0, 16).replace('T', ' ');
 
@@ -322,7 +323,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         sourceChannel: input.sourceChannel ?? 'manual',
         operator: input.operator || '运营人员',
         totalAmount: input.items.reduce((s, it) => s + it.price * it.quantity, 0),
-        entryTime: now(),
+        entryTime: nowSec(),
         processStatus: 'pending',
         history: [{
           time: now(),

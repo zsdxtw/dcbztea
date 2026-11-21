@@ -15,6 +15,8 @@ import { fulfillmentTimes } from '../../utils/fulfillment';
 import type { ExternalOrder, PurchaseDoc } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
+/** 详情页时间展示：日期+时分秒（演示数据无时分秒时补齐演示值） */
+const fmtDateTime = (v?: string) => (!v ? '—' : v.length > 10 ? v : `${v} 09:12:00`);
 
 const pill = (text: string) => {
   const c = (FAMILY_STATE_COLORS as Record<string, { bg: string; color: string }>)[text] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
@@ -86,7 +88,7 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
         {infoItem('销售路径', mother.salesPath === 'via_platform' ? '经平台销售' : '直接销售')}
         {infoItem('客户下单时间', mother.customerOrderTime ?? '—')}
         {infoItem('客户侧订单号', mother.customerOrderNo ?? '—', { mono: true })}
-        {infoItem('录入时间', mother.entryTime)}
+        {infoItem('录入时间', fmtDateTime(mother.entryTime), { mono: true })}
         {infoItem('录入人', mother.operator)}
         {mother.platformCustomerName && infoItem('平台客户', mother.platformCustomerName)}
         {infoItem('收货地址', mother.receiverAddress, { span: 2 })}
@@ -109,6 +111,7 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
         {infoItem('履约单编号', current.code, { mono: true, emph: true })}
         {infoItem('分发路径', pathLabel(current))}
         {infoItem('履约主体', current.partnerName ?? (current.path === 'self' ? '自营' : '—'))}
+        {infoItem('生成时间', fmtDateTime(current.history?.[0]?.time ?? current.entryTime), { mono: true })}
         {infoItem('金额', <span style={{ fontWeight: 'var(--font-semibold)' }}>{money(current.totalAmount)}</span>, { mono: true })}
         {infoItem('分发状态', pill(distributeStateOf(current)))}
         {infoItem('履约状态', pill(fulfillStateOf(current, currentPos)))}

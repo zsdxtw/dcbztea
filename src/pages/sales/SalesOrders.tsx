@@ -16,6 +16,9 @@ import type { ExternalOrder } from '../../types';
 import { SalesOrderDetailTabs } from './SalesOrderDetail';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
+/** 列表展示日期；详情页用 fmtDateTime 展示日期+时分秒（演示数据不足 10 位时补齐演示时分秒） */
+const fmtDate = (v?: string) => (v ?? '').slice(0, 10);
+const fmtDateTime = (v?: string) => (!v ? '—' : v.length > 10 ? v : `${v} 09:12:00`);
 
 const pill = (text: string) => {
   const c = (FAMILY_STATE_COLORS as Record<string, { bg: string; color: string }>)[text] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
@@ -369,7 +372,7 @@ export default function SalesOrders() {
                           {pill(st.invoice)}
                           {st.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.invoiced}/{st.active}</span>}
                         </span>
-                        <span className="cell-muted" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{f.mother.entryTime}</span>
+                        <span className="cell-muted" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{fmtDate(f.mother.entryTime)}</span>
                         <span style={{ textAlign: 'center' }}>
                           <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setView({ root: f.rootCode }); }}>查看</Button>
                         </span>
@@ -389,7 +392,7 @@ export default function SalesOrders() {
                             <span>物流进度</span>
                             <span>商品数量</span>
                             <span style={{ textAlign: 'right' }}>金额</span>
-                            <span style={{ textAlign: 'center' }}>属性 / 生成</span>
+                            <span>生成时间</span>
                             <span>分发状态</span>
                             <span>履约状态</span>
                             <span>结算状态</span>
@@ -451,13 +454,8 @@ export default function SalesOrders() {
                               </span>
                               {/* 履约单金额（与母单「总金额」列对齐） */}
                               <span className="mono" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', textAlign: 'right' }}>{money(u.amount)}</span>
-                              {/* 履约单属性 + 生成时间（合并一格） */}
-                              <span style={{ textAlign: 'center' }}>
-                                {u.virtual
-                                  ? <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#F5F5F5', color: '#9E9E9E', whiteSpace: 'nowrap' }}>默认履约</span>
-                                  : <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5', whiteSpace: 'nowrap' }}>拆单生成</span>}
-                                <span className="mono" style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 2 }}>{u.createdAt}</span>
-                              </span>
+                              {/* 生成时间（列表展示日期；详情页展示日期+时分秒） */}
+                              <span className="cell-muted mono" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{fmtDate(u.createdAt)}</span>
                               {/* 分发 / 发货 / 结算状态（与母表头同列对齐） */}
                               {orderDistributePill(u.underlying)}
                               {pill(fulText)}
