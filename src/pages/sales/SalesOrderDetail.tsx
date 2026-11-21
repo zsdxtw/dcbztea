@@ -81,7 +81,7 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
         </div>
       )}
       <DrawerSection title="订单信息">
-        <InfoGrid>
+        <InfoGrid cols={4}>
           <InfoItem label="销售单号" mono emph>{family.rootCode}</InfoItem>
           <InfoItem label="订单来源">{mother.salesPath === 'via_platform'
             ? (mother.platformCustomerName ?? (mother.platform ? EXTERNAL_PLATFORM_LABELS[mother.platform] : '经平台销售'))
@@ -102,7 +102,7 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
       </DrawerSection>
 
       <DrawerSection title="收货信息" style={{ marginTop: 'var(--space-7)' }}>
-        <InfoGrid>
+        <InfoGrid cols={4}>
           <InfoItem label="收货人" emph>{mother.receiver}</InfoItem>
           <InfoItem label="联系电话" mono>{mother.receiverPhone}</InfoItem>
           <InfoItem label="收货地区">{regionTextOf(mother.customerRegion, mother.receiverAddress)}</InfoItem>
@@ -146,7 +146,7 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
     <>
       {/* 履约单信息 */}
       <DrawerSection title="履约单信息">
-        <InfoGrid>
+        <InfoGrid cols={4}>
           <InfoItem label="履约单编号" mono emph>{current.code}</InfoItem>
           <InfoItem label="分发路径">{pathLabel(current)}</InfoItem>
           <InfoItem label="履约主体">{current.partnerName ?? (current.path === 'self' ? '自营' : '待分发')}</InfoItem>
