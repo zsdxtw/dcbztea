@@ -27,20 +27,23 @@ export default function SelfopOrders() {
   const [tab, setTab] = useState<SelfStage | ''>('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const countOf = (k: SelfStage | '') => (k === '' ? orders.length : orders.filter((o) => stageOf(o) === k).length);
-  const filtered = useMemo(() => (tab ? orders.filter((o) => stageOf(o) === tab) : orders), [orders, tab, purchaseDocs]);
+  /* TAB 口径对齐合作商工作台：「已发货」= 运输中 + 妥投 合并桶，行内仍显示细档 */
+  const inTab = (o: ExternalOrder, k: SelfStage | '') =>
+    k === '' ? true : k === 'shipping' ? stageOf(o) === 'shipping' || stageOf(o) === 'transit' : stageOf(o) === k;
+  const countOf = (k: SelfStage | '') => (k === '' ? orders.length : orders.filter((o) => inTab(o, k)).length);
+  const filtered = useMemo(() => (tab ? orders.filter((o) => inTab(o, tab)) : orders), [orders, tab, purchaseDocs]);
 
   return (
     <div className="pk-page">
       <PageHead
         eyebrow="订单"
         title="订单管理"
-        desc={<>自营销售单全链路处理：待接单（接单 / 退回）→ 已接单（拆单 / 采购&amp;发货）→ 运输中 → 妥投 → 已确收；接单默认跟单人 <b>{auth?.name ?? '—'}</b></>}
+        desc={<>自营销售单全链路处理：待接单（接单 / 退回）→ 已接单（拆单 / 采购&amp;发货）→ 已发货（运输中 / 妥投）→ 已确收；接单默认跟单人 <b>{auth?.name ?? '—'}</b></>}
       />
 
       {/* 状态阶段 Tab */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        {([['', '全部'], ['pending', '待接单'], ['accepted', '已接单'], ['shipping', '运输中'], ['transit', '妥投'], ['confirmed', '已确收']] as const).map(([k, label]) => (
+        {([['', '全部'], ['pending', '待接单'], ['accepted', '已接单'], ['shipping', '已发货'], ['confirmed', '已确收'], ['cancelled', '已取消']] as const).map(([k, label]) => (
           <button
             key={k || 'all'}
             onClick={() => setTab(k as typeof tab)}

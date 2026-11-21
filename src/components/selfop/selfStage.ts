@@ -1,14 +1,14 @@
 /**
  * 自营订单阶段推导（自营工作台统一口径）
  * 阶段由履约状态（fulfillment.stage）驱动：待接单 → 已接单 → 运输中 → 妥投 → 已确收；
- * 分发状态仅区分「自营待接单」（尚未接单）与「分发已完成」（已接单及后续）。
+ * 行内档位名对齐合作商工作台（待接单/已接单/运输中/妥投/已确收）；TAB 将运输中+妥投合并为「已发货」桶。
  */
 import type { ExternalOrder } from '../../types';
 
 export type SelfStage = 'pending' | 'accepted' | 'shipping' | 'transit' | 'confirmed' | 'cancelled';
 
 export const STAGE_META: Record<SelfStage, { label: string; bg: string; color: string }> = {
-  pending: { label: '自营待接单', bg: '#E3F2FD', color: '#0F64B5' },
+  pending: { label: '待接单', bg: '#E3F2FD', color: '#0F64B5' },
   accepted: { label: '已接单', bg: '#E8EAF6', color: '#3949AB' },
   shipping: { label: '运输中', bg: '#EEF0FB', color: '#4A4FA0' },
   transit: { label: '妥投', bg: '#E0F2F1', color: '#00695C' },

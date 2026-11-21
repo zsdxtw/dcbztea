@@ -53,7 +53,7 @@ export default function SelfopDashboard() {
       <PageHead
         eyebrow="工作台"
         title={`下午好，${auth?.name ?? '自营运营'}`}
-        desc={<>自营订单执行一览：待接单 → 已接单（拆单 / 采购&amp;发货）→ 运输中 → 妥投 → 已确收</>}
+        desc={<>自营订单执行一览：待接单 → 已接单（拆单 / 采购&amp;发货）→ 已发货（运输中 / 妥投）→ 已确收</>}
       />
 
       {/* 统计带 */}
