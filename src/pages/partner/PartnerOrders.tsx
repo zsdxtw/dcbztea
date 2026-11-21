@@ -45,7 +45,7 @@ const SOURCE_TONE: Record<string, 'green' | 'gray' | 'purple' | 'amber' | 'blue'
   'order-opportunity': 'gray',
 };
 
-/** 订单状态 Tab（已发货 TAB 含 运输中 / 妥投 两态；已确收/已结算由管理后台推进） */
+/** 订单状态 Tab（已发货 TAB 含 运输中 / 妥投 两态；已确收/已结算由管理后台推进；已驳回 TAB 已移除） */
 const STATUS_TABS: { key: string; label: string; icon: ReactNode }[] = [
   { key: '', label: '全部状态', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><rect x="3.5" y="4.5" width="13" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 8h7M6.5 11.5h4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
   { key: 'pending', label: '待接单', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M10 6v4l2.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
@@ -53,7 +53,6 @@ const STATUS_TABS: { key: string; label: string; icon: ReactNode }[] = [
   { key: 'shipping', label: '已发货', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><path d="M3 6.5h9V14H3zM12 9.5h3l2 3V14h-5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><circle cx="6.5" cy="15.5" r="1.6" stroke="currentColor" strokeWidth="1.3"/><circle cx="14.5" cy="15.5" r="1.6" stroke="currentColor" strokeWidth="1.3"/></svg> },
   { key: 'confirmed', label: '已确收', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><path d="M10 3l7 3v8l-7 3-7-3V6l7-3z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M7 10.5l2 2 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
   { key: 'settled', label: '已结算', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M8 7l2 3 2-3M10 10v4.5M7.8 11h4.4M7.8 13h4.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { key: 'rejected', label: '已驳回', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 7.5l5 5M12.5 7.5l-5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
   { key: 'cancelled', label: '已取消', icon: <svg viewBox="0 0 20 20" fill="none" style={{ width: 15, height: 15 }}><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 7.5l5 5M12.5 7.5l-5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
 ];
 
