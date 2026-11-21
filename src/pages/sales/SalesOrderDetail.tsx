@@ -230,7 +230,7 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
                       </span>
                     </td>
                     <td style={{ fontSize: 'var(--text-sm)' }}>{x.items}</td>
-                    <td>{pill(x.status === 'confirmed' ? '全部已确收' : x.status === 'delivered' ? '已妥投' : '运输中')}{x.settled && <span style={{ marginLeft: 4 }}>{pill('已结算')}</span>}</td>
+                    <td>{pill(x.status === 'confirmed' ? '已确收' : x.status === 'delivered' ? '妥投' : '运输中')}</td>
                   </tr>
                 ))}
               </tbody>
