@@ -288,7 +288,7 @@ export default function ExternalOrders() {
   const current = selectedId ? orders.find((o) => o.id === selectedId) ?? null : null;
   const enrollOrder = enrollOf ? orders.find((o) => o.id === enrollOf) ?? null : null;
 
-  const noDialogOpen = !selectedId && !splitting && !deleting && !reflowing && !matchConfirming && !enrollOrder && !awarding && !cancelling;
+  const noDialogOpen = !selectedId && !splitting && !deleting && !reflowing && !matchConfirming && !enrollOrder && !awarding && !cancelling && !flowingId && !reportListOpen && !compareMgmtOpen;
   useEffect(() => {
     if (noDialogOpen) setActiveAction(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
