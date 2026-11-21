@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
+import HScrollBox from './HScrollBox';
 
 interface TableProps {
   headers: ReactNode[];
@@ -44,7 +45,7 @@ export default function Table({ headers, rows }: TableProps) {
   }, []);
 
   return (
-    <div className="table-wrapper">
+    <HScrollBox className="table-wrapper">
       <table ref={tableRef}>
         <thead>
           <tr>
@@ -78,6 +79,6 @@ export default function Table({ headers, rows }: TableProps) {
           ))}
         </tbody>
       </table>
-    </div>
+    </HScrollBox>
   );
 }

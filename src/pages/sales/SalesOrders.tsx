@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import HScrollBox from '../../components/common/HScrollBox';
 import DetailDrawer from '../../components/common/DetailDrawer';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
@@ -153,23 +154,6 @@ export default function SalesOrders() {
   /* 列表网格列定义（母单行 + 表头共用，保证对齐） */
   const GRID = '34px 24px 168px 104px 96px 130px 140px 104px 88px 112px 100px 100px 100px 96px 64px';
 
-  /* 横向滚动条吸底常驻：表格滚动条隐藏，由 sticky 代理条双向同步 */
-  const gridScrollRef = useRef<HTMLDivElement>(null);
-  const barScrollRef = useRef<HTMLDivElement>(null);
-  const syncingScroll = useRef(false);
-  const onGridScroll = () => {
-    if (syncingScroll.current) return;
-    syncingScroll.current = true;
-    if (barScrollRef.current) barScrollRef.current.scrollLeft = gridScrollRef.current?.scrollLeft ?? 0;
-    syncingScroll.current = false;
-  };
-  const onBarScroll = () => {
-    if (syncingScroll.current) return;
-    syncingScroll.current = true;
-    if (gridScrollRef.current) gridScrollRef.current.scrollLeft = barScrollRef.current?.scrollLeft ?? 0;
-    syncingScroll.current = false;
-  };
-
   const pageBtn = (n: number) => (
     <button
       key={n}
@@ -193,7 +177,6 @@ export default function SalesOrders() {
         breadcrumbs={['销售', '销售单管理', '销售单列表']}
       />
       <div className="content-body">
-        <style>{`.so-grid-scroll{scrollbar-width:none;-ms-overflow-style:none;}.so-grid-scroll::-webkit-scrollbar{display:none;}.so-hscroll::-webkit-scrollbar{height:10px;}.so-hscroll::-webkit-scrollbar-thumb{background:var(--color-neutral-300);border-radius:5px;}.so-hscroll::-webkit-scrollbar-track{background:var(--color-neutral-100);}`}</style>
         {/* ── 母销售单一行 + 展开子履约单 ── */}
         <>          <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
             展示<strong>全部母销售单</strong>：以<strong>手工录入</strong>或<strong>直连推送</strong>的母销售单（SO）为一行（分发/履约/结算/开票四状态为该母销售单含全部子履约单的聚合），点击母销售单行展开其下全部子履约单（FO）；未拆分的母销售单即履约单；点击「查看」进入销售单履约详情页。
@@ -300,7 +283,7 @@ export default function SalesOrders() {
           </div>
 
           <Card style={{ padding: 0 }}>
-            <div ref={gridScrollRef} onScroll={onGridScroll} className="so-grid-scroll" style={{ overflowX: 'auto' }}>
+            <HScrollBox>
               <div style={{ minWidth: 1690 }}>
                 {/* 表头 */}
                 <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-4)', margin: 'var(--space-2) var(--space-3) 0', border: '1px solid var(--color-neutral-150)', borderRadius: 10, fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-500)', background: 'var(--color-neutral-50)' }}>
@@ -478,11 +461,7 @@ export default function SalesOrders() {
                   <div style={{ margin: 'var(--space-2) var(--space-3)', padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)', border: '1px dashed var(--color-neutral-150)', borderRadius: 10 }}>当前筛选条件下暂无销售订单</div>
                 )}
               </div>
-            </div>
-            {/* 吸底横向滚动条：sticky 常驻当前屏幕，与表格滚动双向同步 */}
-            <div ref={barScrollRef} onScroll={onBarScroll} className="so-hscroll" style={{ position: 'sticky', bottom: 12, marginBottom: 12, overflowX: 'auto', overflowY: 'hidden', background: 'var(--color-neutral-50)', borderTop: '1px solid var(--color-neutral-150)', borderRadius: '0 0 var(--radius-md) var(--radius-md)' }}>
-              <div style={{ width: 1690, height: 2 }} />
-            </div>
+            </HScrollBox>
           </Card>
 
           {/* 分页 */}
