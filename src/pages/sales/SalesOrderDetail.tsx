@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
+import { DrawerSection } from '../../components/common/DetailDrawer';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { regionTextOf } from '../../data/regions';
@@ -46,8 +47,8 @@ const infoItem = (label: string, value: React.ReactNode, opts?: { mono?: boolean
  * 共享区块：销售单详情页与销售单列表「查看」抽屉共用
  * ────────────────────────────────────────────── */
 
-/** 母销售单信息内容（拆分为 订单信息 / 收货信息 / 商品信息 三个标签） */
-function MotherOrderInfoSection({ family, showStates = true, section = 'order' }: { family: OrderFamily; showStates?: boolean; section: 'order' | 'receiver' | 'products' }) {
+/** 母销售单信息内容（「销售单信息」Tab 内分 订单信息 / 收货信息 / 商品信息 三段，参照分发详情页 DrawerSection 样式） */
+function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFamily; showStates?: boolean }) {
   const mother = family.mother;
   const children = family.children;
   const states = familyStatesOf(family);
@@ -66,7 +67,7 @@ function MotherOrderInfoSection({ family, showStates = true, section = 'order' }
   })();
   return (
     <>
-      {showStates && section === 'order' && (
+      {showStates && (
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {pill(states.distribute)}
@@ -86,7 +87,7 @@ function MotherOrderInfoSection({ family, showStates = true, section = 'order' }
           </span>
         </div>
       )}
-      {section === 'order' && (
+      <DrawerSection title="订单信息">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3) var(--space-4)' }}>
           {infoItem('销售单号', family.rootCode, { mono: true, emph: true })}
           {infoItem('订单来源', <>淡茶半盏<span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{EXTERNAL_CHANNEL_LABELS[mother.sourceChannel]}</span></>)}
@@ -103,8 +104,9 @@ function MotherOrderInfoSection({ family, showStates = true, section = 'order' }
           {infoItem('录入人', mother.operator)}
           {mother.platformCustomerName && infoItem('平台客户', mother.platformCustomerName)}
         </div>
-      )}
-      {section === 'receiver' && (
+      </DrawerSection>
+
+      <DrawerSection title="收货信息">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3) var(--space-4)' }}>
           {infoItem('收货人', mother.receiver, { emph: true })}
           {infoItem('联系电话', mother.receiverPhone, { mono: true })}
@@ -113,8 +115,9 @@ function MotherOrderInfoSection({ family, showStates = true, section = 'order' }
           {infoItem('收货地址', mother.receiverAddress, { span: 2 })}
           {infoItem('备注', mother.remark || '—', { span: 2 })}
         </div>
-      )}
-      {section === 'products' && (
+      </DrawerSection>
+
+      <DrawerSection title="商品信息">
         <table className="detail-inline-table">
           <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>单价</th><th>小计</th></tr></thead>
           <tbody>
@@ -133,7 +136,7 @@ function MotherOrderInfoSection({ family, showStates = true, section = 'order' }
             </tr>
           </tbody>
         </table>
-      )}
+      </DrawerSection>
     </>
   );
 }
@@ -278,10 +281,7 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
   );
 }
 
-/** 母销售单信息标签键（销售单信息拆分为三个标签） */
-const INFO_TAB_KEYS = ['info-order', 'info-receiver', 'info-products'];
-
-/** 销售单详情 Tab 视图：订单信息 / 收货信息 / 商品信息 / 履约单01 / 履约单02… 分开以 Tab 展示（列表「查看」抽屉与本详情页共用） */
+/** 销售单详情 Tab 视图：销售单信息 / 履约单01 / 履约单02… 分开以 Tab 展示（列表「查看」抽屉与本详情页共用） */
 export function SalesOrderDetailTabs({ family, poDocs, initialTab = 'info', showStates = true }: {
   family: OrderFamily;
   poDocs: PurchaseDoc[];
@@ -292,9 +292,7 @@ export function SalesOrderDetailTabs({ family, poDocs, initialTab = 'info', show
 }) {
   const units = useMemo(() => fulfillmentUnitsOf(family), [family]);
   const isUnitCode = (code: string) => units.some((u) => u.underlying.code === code);
-  /* 销售单信息拆分为三个标签（订单信息 / 收货信息 / 商品信息）；'info' 兼容旧入口 */
-  const normalizeTab = (t: string) => (INFO_TAB_KEYS.includes(t) || isUnitCode(t) ? t : 'info-order');
-  const [active, setActive] = useState<string>(normalizeTab(initialTab));
+  const [active, setActive] = useState<string>(initialTab === 'info' || isUnitCode(initialTab) ? initialTab : 'info');
 
   const tabBtn = (code: string, label: string) => (
     <button
@@ -312,20 +310,16 @@ export function SalesOrderDetailTabs({ family, poDocs, initialTab = 'info', show
     </button>
   );
 
-  const isInfoKey = (k: string) => INFO_TAB_KEYS.includes(k);
-  const showInfo = isInfoKey(active) || !isUnitCode(active);
-  const infoSection = isInfoKey(active) ? (active.replace('info-', '') as 'order' | 'receiver' | 'products') : 'order';
+  const showInfo = active === 'info' || !isUnitCode(active);
   return (
     <>
-      {/* 顶部 Tab：订单信息 / 收货信息 / 商品信息 + 各履约单 */}
+      {/* 顶部 Tab：销售单信息 + 各履约单 */}
       <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
-        {tabBtn('info-order', '订单信息')}
-        {tabBtn('info-receiver', '收货信息')}
-        {tabBtn('info-products', '商品信息')}
+        {tabBtn('info', '销售单信息')}
         {units.map((u) => tabBtn(u.underlying.code, `履约单${String(u.seq).padStart(2, '0')} · ${u.code}`))}
       </div>
       {showInfo
-        ? <MotherOrderInfoSection family={family} showStates={showStates} section={infoSection} />
+        ? <MotherOrderInfoSection family={family} showStates={showStates} />
         : <FulfillmentUnitDetail family={family} poDocs={poDocs} code={active} />}
     </>
   );
