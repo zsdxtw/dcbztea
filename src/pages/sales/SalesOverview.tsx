@@ -1,29 +1,32 @@
+/**
+ * 销售 · 销售概览（依据当前销售一级菜单内容重新设计，全部实时派生）
+ * 覆盖：销售单管理（新建/列表/分发/履约）+ 客户管理（客户/报品报调价/对账）+ 销售退货
+ * 结构：核心指标卡（6）→ 分发动态 | 履约动态 → 待办事项（跨页跳转）→ 最近母销售单（四状态聚合）
+ */
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
 import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
-import Tag from '../../components/common/Tag';
 import Button from '../../components/common/Button';
-import StatusTag, { orderStatusToVariant, orderStatusLabel } from '../../components/common/StatusTag';
-import LineChart from '../../components/charts/LineChart';
-import { salesOrders } from '../../data/mock';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
-import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS,
-  EXTERNAL_STATUS_COLORS, TRANSFER_SOURCE_LABELS, platformLabelOf } from '../../data/externalOrders';
+import { usePurchaseStore } from '../../stores/purchaseStore';
+import { customerItems } from '../../data/customers';
+import { EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS,
+  EXTERNAL_STATUS_COLORS, platformLabelOf } from '../../data/externalOrders';
+import { FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS, stageOfOrder } from '../../utils/fulfillment';
+import { buildFamilies, fulfillmentUnitsOf, familyStatesOf, fulfillStateOf,
+  settleStateOf, invoiceStateOf, FAMILY_STATE_COLORS } from '../../utils/salesOrderFamily';
 import type { StatCardData, ExternalOrder } from '../../types';
 
-/* ── 销售趋势数据（mock） ── */
-const salesTrendData = {
-  labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月'],
-  series: [
-    { name: '销售额', color: 'var(--color-module-current-base)', data: [82, 78, 95, 88, 105, 98, 128] },
-    { name: '去年同期', color: 'var(--color-neutral-300)', data: [65, 60, 75, 70, 82, 78, 85] },
-  ],
-};
+const money = (n: number) => `¥${n.toLocaleString()}`;
 
-/** 流程状态 → 概览分布项（顺序即流程图顺序） */
+const pill = (bg: string, color: string, text: string) => (
+  <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: bg, color, whiteSpace: 'nowrap' }}>{text}</span>
+);
+
+/** 分发状态 → 概览分布项（顺序即分发流程顺序） */
 const FLOW_BRIEF: { key: string; label: string }[] = [
   { key: 'pending', label: '待分发' },
   { key: 'report_match_pending', label: '报备-匹配待确认' },
@@ -34,7 +37,14 @@ const FLOW_BRIEF: { key: string; label: string }[] = [
   { key: 'cancelled', label: '已取消' },
 ];
 
-const money = (n: number) => `¥${n.toLocaleString()}`;
+/** 履约状态分布项（对齐销售单履约 TAB 口径：「已发货」= 运输中 + 妥投 合并桶） */
+const FULFILL_BRIEF: { key: string; label: string; keys: string[] }[] = [
+  { key: 'pending_accept', label: '待接单', keys: ['pending_accept'] },
+  { key: 'accepted', label: '已接单', keys: ['accepted'] },
+  { key: 'shipping', label: '已发货', keys: ['shipping', 'transit'] },
+  { key: 'confirmed', label: '已确收', keys: ['confirmed'] },
+  { key: 'cancelled', label: '已取消', keys: ['cancelled'] },
+];
 
 const statusPill = (status: string, label?: string) => {
   const c = EXTERNAL_STATUS_COLORS[status];
@@ -48,7 +58,7 @@ const statusPill = (status: string, label?: string) => {
 /** 路径标签（与销售单分发页口径一致：自营 / 转派-报备·指定·比单） */
 const pathLabel = (o: ExternalOrder): string => {
   if (o.path === 'self') return '自营';
-  if (o.transferSource) return TRANSFER_SOURCE_LABELS[o.transferSource];
+  if (o.transferSource) return o.transferSource === 'report' ? '转派-报备' : o.transferSource === 'compare' ? '转派-比单' : '转派-指定';
   if (o.distributeMode === 'compare') return '转派-比单';
   return '—';
 };
@@ -56,8 +66,9 @@ const pathLabel = (o: ExternalOrder): string => {
 export default function SalesOverview() {
   const navigate = useNavigate();
   const flowOrders = useOrderFlowStore((s) => s.orders);
+  const poDocs = usePurchaseStore((s) => s.docs);
 
-  /** 销售单分发各状态单数（分发状态 7 态直接分桶） */
+  /** 分发状态单数 */
   const statusCount = useMemo(() => {
     const c: Record<string, number> = {};
     flowOrders.forEach((o) => {
@@ -66,82 +77,129 @@ export default function SalesOverview() {
     return c;
   }, [flowOrders]);
 
-  const flowTodo = (statusCount.pending ?? 0) + (statusCount.report_match_pending ?? 0) + (statusCount.self_pending ?? 0) + (statusCount.distribute_pending ?? 0);
+  /** 母销售单家族（四状态聚合） */
+  const families = useMemo(() => buildFamilies(flowOrders), [flowOrders]);
+
+  /** 履约单维度（未拆分 = 默认履约单01；拆分后 = 全部子履约单） */
+  const units = useMemo(
+    () => families.flatMap((f) => fulfillmentUnitsOf(f).map((u) => u.underlying)),
+    [families],
+  );
+
+  /** 履约状态单数（已发货 = 运输中 + 妥投） */
+  const fulfillCount = useMemo(() => {
+    const c: Record<string, number> = {};
+    units.forEach((o) => {
+      const k = stageOfOrder(o);
+      c[k] = (c[k] ?? 0) + 1;
+    });
+    return c;
+  }, [units]);
+
+  const unitPos = (o: ExternalOrder) => poDocs.filter((d) => d.childOrderId === o.id);
+  const waitReceipt = units.filter((o) => stageOfOrder(o) === 'transit').length;
+  const waitSettle = units.filter((o) => stageOfOrder(o) === 'confirmed' && settleStateOf(o, unitPos(o)) !== '已结算').length;
+  const waitInvoice = units.filter((o) => stageOfOrder(o) === 'confirmed' && invoiceStateOf(o) !== '已开票').length;
+
   const compareQuotes = flowOrders
     .filter((o) => o.processStatus === 'comparing')
     .reduce((s, o) => s + (o.compare?.quotes.length ?? 0), 0);
   const monthKey = new Date().toISOString().slice(0, 7);
-  const monthFlowAmount = flowOrders
-    .filter((o) => o.entryTime.startsWith(monthKey))
-    .reduce((s, o) => s + o.totalAmount, 0);
+  const monthOrders = flowOrders.filter((o) => o.entryTime.startsWith(monthKey));
+  const monthFlowAmount = monthOrders.reduce((s, o) => s + o.totalAmount, 0);
+  const monthNewFamilies = monthOrders.filter((o) => !o.parentCode).length;
+  const totalAmount = flowOrders.filter((o) => o.processStatus !== 'cancelled').reduce((s, o) => s + o.totalAmount, 0);
   const recentFlow = useMemo(
     () => [...flowOrders].sort((a, b) => b.entryTime.localeCompare(a.entryTime) || b.code.localeCompare(a.code)).slice(0, 6),
     [flowOrders],
   );
+  const recentFamilies = useMemo(
+    () => [...families].sort((a, b) => b.mother.entryTime.localeCompare(a.mother.entryTime)).slice(0, 6),
+    [families],
+  );
 
-  /* ── 统计卡片（销售单分发待办来自分发中心实时数据） ── */
+  /* ── 核心指标卡（全部实时派生） ── */
   const statCards: StatCardData[] = [
     {
-      label: '本月销售额',
-      value: '1,285,600',
-      unit: '¥',
-      trend: { direction: 'up', value: '12.5%' },
-      icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-    },
-    {
-      label: '销售单数',
-      value: '58',
-      trend: { direction: 'up', value: '+8 单' },
+      label: '母销售单',
+      value: String(families.length),
+      unit: '张',
+      trend: { direction: 'up', value: `本月 +${monthNewFamilies} 张` },
       icon: <svg viewBox="0 0 18 18" fill="none"><rect x="4" y="2" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.3"/></svg>,
     },
     {
-      label: '销售单分发待办',
-      value: String(flowTodo),
-      trend: { direction: flowTodo > 0 ? 'up' : 'down', value: `比单报名 ${statusCount.comparing ?? 0} 单` },
+      label: '销售总金额',
+      value: money(totalAmount),
+      trend: { direction: 'up', value: `本月 ${money(monthFlowAmount)}` },
+      icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+    },
+    {
+      label: '待分发',
+      value: String(statusCount.pending ?? 0),
+      unit: '单',
+      trend: { direction: (statusCount.pending ?? 0) > 0 ? 'up' : 'down', value: `含报备确认 ${statusCount.report_match_pending ?? 0} 单` },
       icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M7 8h4M7 11h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
     },
     {
-      label: '客户数',
-      value: '25',
-      trend: { direction: 'up', value: '+3' },
-      icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M3 15a6 6 0 0112 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
+      label: '履约中',
+      value: String((fulfillCount.accepted ?? 0) + (fulfillCount.shipping ?? 0) + (fulfillCount.transit ?? 0)),
+      unit: '单',
+      trend: { direction: 'up', value: `已发货 ${(fulfillCount.shipping ?? 0) + (fulfillCount.transit ?? 0)} 单` },
+      icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 6.5h9V14H3zM12 9.5h3l2 3V14h-5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><circle cx="6.5" cy="15.5" r="1.6" stroke="currentColor" strokeWidth="1.3"/><circle cx="14.5" cy="15.5" r="1.6" stroke="currentColor" strokeWidth="1.3"/></svg>,
     },
     {
-      label: '本月退货额',
-      value: '28,960',
-      unit: '¥',
-      trend: { direction: 'down', value: '5.4%' },
-      icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 5h12l-1.2 8H4.2L3 5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M11 5l2-2M13 3l0 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
+      label: '待确收',
+      value: String(waitReceipt),
+      unit: '单',
+      trend: { direction: waitReceipt > 0 ? 'up' : 'down', value: '妥投订单待确认收货' },
+      icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 9.5l4 4 8-9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
     },
     {
-      label: '待对账',
-      value: '6',
-      trend: { direction: 'up', value: '需及时处理' },
-      icon: <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M6 8h6M6 11h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
+      label: '待结算 / 待开票',
+      value: `${waitSettle} / ${waitInvoice}`,
+      unit: '单',
+      trend: { direction: waitSettle + waitInvoice > 0 ? 'up' : 'down', value: '已确收订单' },
+      icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="3" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M6 7h6M6 10h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
     },
   ];
 
-  /* ── 待办事项：由销售单分发状态实时派生 ── */
+  /* ── 待办事项（跨页跳转） ── */
   const todoItems = [
     (statusCount.pending ?? 0) > 0 && {
-      text: `${statusCount.pending} 单外部订单待分流（自营 / 指定 · 比单）`, tag: '待处理', color: EXTERNAL_STATUS_COLORS.pending, to: '/sales/order-distribute',
+      text: `${statusCount.pending} 单待分发（分发 / 拆单 / 修改）`, tag: '待分发', color: EXTERNAL_STATUS_COLORS.pending, to: '/sales/order-distribute',
     },
     (statusCount.report_match_pending ?? 0) > 0 && {
       text: `${statusCount.report_match_pending} 单命中报备待确认匹配（确认后分发报备合作商）`, tag: '报备', color: EXTERNAL_STATUS_COLORS.report_match_pending, to: '/sales/order-distribute',
     },
+    (statusCount.comparing ?? 0) > 0 && {
+      text: `${statusCount.comparing} 单分发比单中 · 已报名 ${compareQuotes} 家`, tag: '比单', color: EXTERNAL_STATUS_COLORS.comparing, to: '/sales/order-distribute',
+    },
     (statusCount.self_pending ?? 0) > 0 && {
-      text: `${statusCount.self_pending} 单自营订单待接单（接单 / 退回在自营工作台）`, tag: '自营', color: EXTERNAL_STATUS_COLORS.self_pending, to: '/selfop/orders',
+      text: `${statusCount.self_pending} 单自营待接单（接单 / 退回在自营工作台）`, tag: '自营', color: EXTERNAL_STATUS_COLORS.self_pending, to: '/selfop/orders',
+    },
+    (statusCount.distribute_pending ?? 0) > 0 && {
+      text: `${statusCount.distribute_pending} 单转派待接单（等合作商终端接单）`, tag: '分发', color: EXTERNAL_STATUS_COLORS.distribute_pending, to: '/sales/order-distribute',
+    },
+    waitReceipt > 0 && {
+      text: `${waitReceipt} 张履约单已妥投待确认收货（管理后台确认收货）`, tag: '确收', color: FULFILLMENT_STAGE_COLORS.transit, to: '/sales/sales-fulfillment',
+    },
+    waitSettle > 0 && {
+      text: `${waitSettle} 张履约单已确收待结算（按发货单可部分结算）`, tag: '结算', color: FAMILY_STATE_COLORS['结算中'], to: '/sales/order-distribute',
+    },
+    waitInvoice > 0 && {
+      text: `${waitInvoice} 张履约单已确收未开票（详情抽屉登记开票）`, tag: '开票', color: FAMILY_STATE_COLORS['开票中'], to: '/sales/order-distribute',
     },
     (statusCount.cancelled ?? 0) > 0 && {
       text: `${statusCount.cancelled} 单已取消（分发状态与履约状态均为已取消）`, tag: '取消', color: EXTERNAL_STATUS_COLORS.cancelled, to: '/sales/order-distribute',
     },
-    (statusCount.comparing ?? 0) > 0 && {
-      text: `${statusCount.comparing} 单比单报名中 · 已报名 ${compareQuotes} 家`, tag: '比单', color: EXTERNAL_STATUS_COLORS.comparing, to: '/sales/order-distribute',
-    },
-    (statusCount.distribute_pending ?? 0) > 0 && {
-      text: `${statusCount.distribute_pending} 单已分发待合作商接单`, tag: '分发', color: EXTERNAL_STATUS_COLORS.distribute_pending, to: '/sales/order-distribute',
-    },
   ].filter(Boolean) as { text: string; tag: string; color: { bg: string; color: string }; to: string }[];
+
+  const fp = (t: string) => {
+    const c = (FAMILY_STATE_COLORS as Record<string, { bg: string; color: string }>)[t] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
+    return (
+      <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: c.bg, color: c.color, whiteSpace: 'nowrap' }}>{t}</span>
+    );
+  };
 
   return (
     <>
@@ -152,83 +210,133 @@ export default function SalesOverview() {
           {statCards.map((s, i) => <StatCard key={i} data={s} />)}
         </div>
 
-        {/* 销售趋势 + 待办事项 */}
+        {/* 分发动态 + 履约动态 */}
         <div className="grid-2">
-          <Card title="销售趋势">
-            <LineChart data={salesTrendData} />
+          <Card
+            title="销售单分发动态"
+            headerRight={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>本月分发金额 <span className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)' }}>{money(monthFlowAmount)}</span></span>}
+          >
+            <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-3)' }}>
+              {FLOW_BRIEF.map((b) => {
+                const c = EXTERNAL_STATUS_COLORS[b.key] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
+                const count = statusCount[b.key] ?? 0;
+                return (
+                  <button
+                    key={b.key}
+                    onClick={() => navigate('/sales/order-distribute')}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 'var(--radius-full)', border: '1px solid var(--color-neutral-100)', background: 'var(--color-neutral-50)', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-600)', cursor: 'pointer' }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.color }} />
+                    {b.label}
+                    <span className="mono" style={{ fontWeight: 'var(--font-semibold)', color: count > 0 ? c.color : 'var(--color-neutral-400)' }}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <Table
+              headers={['销售履约单号', '客户', '分发方式', '金额', '分发状态']}
+              rows={recentFlow.map((o) => [
+                <span key="c" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{o.parentCode ? o.code : `${o.code}LY01`}</span>,
+                <span key="cu" style={{ fontWeight: 'var(--font-medium)' }}>{o.customerName}</span>,
+                <span key="p">{pathLabel(o)}</span>,
+                <span key="a" className="mono">{money(o.totalAmount)}</span>,
+                statusPill(o.processStatus),
+              ])}
+            />
           </Card>
-          <Card title="待办事项" headerRight={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-module-sales-secondary)' }}>{todoItems.length} 项待处理 · 来自销售单分发中心</span>}>
-            <div style={{ padding: 'var(--space-2) 0' }}>
-              {todoItems.map((item, i) => (
-                <div
-                  key={i}
-                  onClick={() => navigate(item.to)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-2) 0', borderBottom: i < todoItems.length - 1 ? '1px solid var(--color-neutral-100)' : 'none', cursor: 'pointer' }}
-                >
-                  <span style={{ padding: '1px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: item.color.bg, color: item.color.color, flexShrink: 0 }}>{item.tag}</span>
-                  <span style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--color-neutral-700)' }}>{item.text}</span>
-                  <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14, color: 'var(--color-neutral-300)', flexShrink: 0 }}><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </div>
-              ))}
-              {todoItems.length === 0 && (
-                <div style={{ padding: 'var(--space-4) 0', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)', textAlign: 'center' }}>销售单分发暂无待办</div>
-              )}
+
+          <Card title="履约动态" headerRight={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>履约单 {units.length} 张 · 点击前往销售单履约</span>}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-3)' }}>
+              {FULFILL_BRIEF.map((b) => {
+                const c = FULFILLMENT_STAGE_COLORS[b.keys[0] as keyof typeof FULFILLMENT_STAGE_COLORS];
+                const count = b.keys.reduce((s, k) => s + (fulfillCount[k] ?? 0), 0);
+                return (
+                  <button
+                    key={b.key}
+                    onClick={() => navigate('/sales/sales-fulfillment')}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 'var(--radius-full)', border: '1px solid var(--color-neutral-100)', background: 'var(--color-neutral-50)', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-600)', cursor: 'pointer' }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: c?.color ?? 'var(--color-neutral-400)' }} />
+                    {b.label}
+                    <span className="mono" style={{ fontWeight: 'var(--font-semibold)', color: count > 0 ? c?.color ?? 'var(--color-neutral-400)' : 'var(--color-neutral-400)' }}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {units.slice(0, 6).map((o) => {
+                const stage = stageOfOrder(o);
+                const c = FULFILLMENT_STAGE_COLORS[stage];
+                return (
+                  <div
+                    key={o.id}
+                    onClick={() => navigate('/sales/sales-fulfillment')}
+                    style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--color-neutral-100)', cursor: 'pointer' }}
+                  >
+                    <span className="mono" style={{ fontWeight: 'var(--font-medium)', flexShrink: 0 }}>{o.code}</span>
+                    <span style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--color-neutral-700)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.customerName}</span>
+                    <span style={{ flexShrink: 0 }}>{pill(c?.bg ?? '#F5F5F5', c?.color ?? '#9E9E9E', FULFILLMENT_STAGE_LABELS[stage])}</span>
+                  </div>
+                );
+              })}
             </div>
           </Card>
         </div>
 
-        {/* 销售单分发动态（分发中心实时数据） */}
+        {/* 待办事项（跨页跳转） */}
         <Card
-          title="销售单分发动态"
+          title="待办事项"
           style={{ marginTop: 'var(--space-4)' }}
-          headerRight={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>本月分发金额 <span className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)' }}>{money(monthFlowAmount)}</span></span>}
+          headerRight={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-module-sales-secondary)' }}>{todoItems.length} 项待处理 · 来自销售单管理 / 客户管理</span>}
         >
-          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-3)' }}>
-            {FLOW_BRIEF.map((b) => {
-              // 聚合桶映射到具体状态色：handled→processed、self_doing→self_shipped（自营执行中）
-              const c = EXTERNAL_STATUS_COLORS[
-                b.key === 'handled' ? 'processed' : b.key === 'self_doing' ? 'self_shipped' : b.key
-              ] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
-              const count = statusCount[b.key] ?? 0;
-              return (
-                <button
-                  key={b.key}
-                  onClick={() => navigate('/sales/order-distribute')}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 'var(--radius-full)', border: '1px solid var(--color-neutral-100)', background: 'var(--color-neutral-50)', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-600)', cursor: 'pointer' }}
-                >
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.color }} />
-                  {b.label}
-                  <span className="mono" style={{ fontWeight: 'var(--font-semibold)', color: count > 0 ? c.color : 'var(--color-neutral-400)' }}>{count}</span>
-                </button>
-              );
-            })}
+          <div style={{ padding: 'var(--space-2) 0' }}>
+            {todoItems.map((item, i) => (
+              <div
+                key={i}
+                onClick={() => navigate(item.to)}
+                style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-2) 0', borderBottom: i < todoItems.length - 1 ? '1px solid var(--color-neutral-100)' : 'none', cursor: 'pointer' }}
+              >
+                <span style={{ padding: '1px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: item.color.bg, color: item.color.color, flexShrink: 0 }}>{item.tag}</span>
+                <span style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--color-neutral-700)' }}>{item.text}</span>
+                <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14, color: 'var(--color-neutral-300)', flexShrink: 0 }}><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>
+            ))}
+            {todoItems.length === 0 && (
+              <div style={{ padding: 'var(--space-4) 0', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)', textAlign: 'center' }}>暂无待办</div>
+            )}
           </div>
-          <Table
-            headers={['销售单编号', '来源', '客户', '路径', '金额', '状态', '操作']}
-            rows={recentFlow.map((o) => [
-              <span key="c" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{o.code}</span>,
-              <span key="src">{platformLabelOf(o)} · {EXTERNAL_CHANNEL_LABELS[o.sourceChannel]}</span>,
-              <span key="cu" style={{ fontWeight: 'var(--font-medium)' }}>{o.customerName}</span>,
-              <span key="p">{pathLabel(o)}</span>,
-              <span key="a" className="mono">{money(o.totalAmount)}</span>,
-              statusPill(o.processStatus),
-              <Button key="act" size="sm" variant="ghost" onClick={() => navigate('/sales/order-distribute')}>去处理</Button>,
-            ])}
-          />
         </Card>
 
-        {/* 近期销售单 */}
-        <Card title="近期销售单" style={{ marginTop: 'var(--space-4)' }}>
+        {/* 最近母销售单（四状态聚合，实时） */}
+        <Card
+          title="最近母销售单"
+          style={{ marginTop: 'var(--space-4)' }}
+          headerRight={<Button size="sm" variant="ghost" onClick={() => navigate('/sales/sales-orders')}>前往销售单列表</Button>}
+        >
           <Table
-            headers={['销售单编号', '客户', '商品', '茶类', '金额', '状态']}
-            rows={salesOrders.map(order => [
-              <span className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{order.code}</span>,
-              <span>{order.partner}</span>,
-              <span style={{ fontWeight: 'var(--font-medium)' }}>{order.product}</span>,
-              <Tag category={order.teaCategory} />,
-              <span className="mono">{order.amount}</span>,
-              <StatusTag variant={orderStatusToVariant(order.status)} label={orderStatusLabel(order.status)} />,
-            ])}
+            headers={['销售单号', '来源', '客户', '履约单数', '总金额', '分发状态', '履约状态', '结算状态', '开票状态', '录入时间', '操作']}
+            rows={recentFamilies.map((f) => {
+              const st = familyStatesOf(f);
+              const amount = (f.children.length > 0 ? f.children : f.all).reduce((s, o) => s + o.totalAmount, 0);
+              return [
+                <span key="c" className="cell-mono-emph">{f.rootCode}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{f.mother.externalOrderNo}</span></span>,
+                <span key="src">
+                  {f.mother.salesPath === 'via_platform'
+                    ? (f.mother.platformCustomerName ?? (f.mother.platform ? platformLabelOf(f.mother) : '经平台销售'))
+                    : '淡茶半盏'}
+                  <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: f.mother.sourceChannel === 'push' ? '#7B1FA2' : '#0F64B5' }}>{EXTERNAL_CHANNEL_LABELS[f.mother.sourceChannel]}</span>
+                </span>,
+                <span key="cu" style={{ fontWeight: 'var(--font-medium)' }}>{f.mother.customerName}</span>,
+                <span key="n" style={{ textAlign: 'center' }}>{st.total} 单</span>,
+                <span key="a" className="mono" style={{ fontWeight: 'var(--font-semibold)' }}>{money(amount)}</span>,
+                <span key="st1">{fp(st.distribute)}</span>,
+                <span key="st2">{fp(st.fulfill)}</span>,
+                <span key="st3">{fp(st.settle)}</span>,
+                <span key="st4">{fp(st.invoice)}</span>,
+                <span key="t" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>{f.mother.entryTime.slice(0, 10)}</span>,
+                <Button key="act" size="sm" variant="ghost" onClick={() => navigate('/sales/sales-orders')}>查看</Button>,
+              ];
+            })}
           />
         </Card>
       </div>
