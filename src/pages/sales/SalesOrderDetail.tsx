@@ -6,6 +6,9 @@ import Button from '../../components/common/Button';
 import { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
+import { usePriceStore, effectiveCustomerQuote } from '../../stores/priceStore';
+import { calcPlatformNetPrice } from '../../data/prices';
+import { customerItems } from '../../data/customers';
 import { regionTextOf } from '../../data/regions';
 import { EXTERNAL_CHANNEL_LABELS, EXTERNAL_PLATFORM_LABELS, TRANSFER_SOURCE_LABELS } from '../../data/externalOrders';
 import {
@@ -36,6 +39,81 @@ function pathLabel(o: ExternalOrder): string {
 }
 
 /** 信息项 */
+/** 商品明细表（字段参照新建销售单：序号/图片/名称/品牌/规格/市场价+京东天猫价/销售报价/数量/销售实价/小计；经平台订单多一列销平台实价） */
+function ProductItemsTable({ items, customerName, salesPath, platformCustomerId, platform, footerAmount }: {
+  items: ExternalOrder['items'];
+  customerName: string;
+  salesPath?: ExternalOrder['salesPath'];
+  platformCustomerId?: string;
+  platform?: ExternalOrder['platform'];
+  footerAmount?: number;
+}) {
+  const products = usePriceStore((s) => s.products);
+  const customerQuotes = usePriceStore((s) => s.customerQuotes);
+  const isVia = salesPath === 'via_platform';
+  const customer = customerItems.find((c) => c.name === customerName);
+  const rate = isVia && platformCustomerId
+    ? customerItems.find((c) => c.id === platformCustomerId)?.platformCommissionRates?.[platformCustomerId]
+    : undefined;
+  return (
+    <table className="detail-inline-table">
+      <thead><tr>
+        <th style={{ width: 44 }}>序号</th>
+        <th style={{ width: 60 }}>图片</th>
+        <th>商品名称</th>
+        <th style={{ width: 90 }}>品牌</th>
+        <th style={{ width: 110 }}>规格</th>
+        <th style={{ width: 130 }}>市场价</th>
+        <th style={{ width: 100 }}>销售报价</th>
+        <th style={{ width: 80 }}>数量</th>
+        <th style={{ width: 100 }}>销售实价</th>
+        {isVia && <th style={{ width: 110 }}>销平台实价</th>}
+        <th style={{ width: 100, textAlign: 'right' }}>小计</th>
+      </tr></thead>
+      <tbody>
+        {items.map((it, i) => {
+          /* 价格档案优先按 productId 匹配；演示种子使用旧编号时按商品名称兜底 */
+          const p = products.find((x) => x.id === it.productId) ?? products.find((x) => x.name === it.productName);
+          const img = p?.mainImages?.[0];
+          const quote = customer && customer.type !== 'personal'
+            ? effectiveCustomerQuote(customerQuotes, customer.id, p ? p.id : it.productId, products)
+            : undefined;
+          const net = rate !== undefined ? calcPlatformNetPrice(it.price, rate) : undefined;
+          return (
+            <tr key={i}>
+              <td className="mono" style={{ color: 'var(--color-neutral-400)' }}>{i + 1}</td>
+              <td>{img
+                ? <img src={img} alt={it.productName} style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-neutral-100)' }} />
+                : <span style={{ display: 'inline-flex', width: 40, height: 40, borderRadius: 'var(--radius-sm)', background: 'var(--color-neutral-100)', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--color-neutral-400)' }}>无图</span>}
+              </td>
+              <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
+              <td>{p?.brand ?? '—'}</td>
+              <td style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>{it.spec}</td>
+              <td>
+                <div className="mono" style={{ fontSize: 'var(--text-sm)' }}>{p ? money(p.marketPrice) : '—'}</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>京东价：{p?.jdPrice ?? '—'} / 天猫价：{p?.tmallPrice ?? '—'}</div>
+              </td>
+              <td>{quote !== undefined
+                ? <span className="mono" style={{ color: 'var(--color-module-current-base)', fontWeight: 'var(--font-semibold)' }}>{money(quote)}</span>
+                : <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>—</span>}
+              </td>
+              <td className="mono">{money(it.price)}</td>
+              {isVia && <td className="mono">{net !== undefined ? money(net) : '—'}</td>}
+              <td className="mono" style={{ textAlign: 'right', fontWeight: 'var(--font-medium)' }}>{money(it.price * it.quantity)}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+      {footerAmount !== undefined && (
+        <tfoot><tr style={{ fontWeight: 'var(--font-semibold)' }}>
+          <td colSpan={isVia ? 10 : 9} style={{ textAlign: 'right', color: 'var(--color-text-secondary)' }}>合计</td>
+          <td className="mono" style={{ textAlign: 'right', color: 'var(--color-module-current-base)' }}>{money(footerAmount)}</td>
+        </tr></tfoot>
+      )}
+    </table>
+  );
+}
+
 /* ──────────────────────────────────────────────
  * 共享区块：销售单详情页与销售单列表「查看」抽屉共用
  * ────────────────────────────────────────────── */
@@ -49,12 +127,12 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
   /* 商品信息：按商品规格聚合（拆单家族合并全部子履约单商品行） */
   const productRows = (() => {
     const rows = children.length > 0 ? children.flatMap((c) => c.items) : mother.items;
-    const map = new Map<string, { productName: string; spec: string; quantity: number; price: number }>();
+    const map = new Map<string, { productId: string; productName: string; spec: string; quantity: number; price: number }>();
     for (const it of rows) {
       const key = `${it.productName}|${it.spec}`;
       const cur = map.get(key);
       if (cur) cur.quantity += it.quantity;
-      else map.set(key, { productName: it.productName, spec: it.spec, quantity: it.quantity, price: it.price });
+      else map.set(key, { productId: it.productId, productName: it.productName, spec: it.spec, quantity: it.quantity, price: it.price });
     }
     return [...map.values()];
   })();
@@ -112,24 +190,14 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
       </DrawerSection>
 
       <DrawerSection title="商品明细">
-        <table className="detail-inline-table">
-          <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>单价</th><th>小计</th></tr></thead>
-          <tbody>
-            {productRows.map((it, i) => (
-              <tr key={i}>
-                <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
-                <td>{it.spec}</td>
-                <td className="mono">{it.quantity}</td>
-                <td className="mono">{money(it.price)}</td>
-                <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(it.price * it.quantity)}</td>
-              </tr>
-            ))}
-            <tr style={{ fontWeight: 'var(--font-semibold)' }}>
-              <td colSpan={4} style={{ textAlign: 'right', color: 'var(--color-text-secondary)' }}>合计</td>
-              <td className="mono" style={{ color: 'var(--color-module-current-base)' }}>{money(amount)}</td>
-            </tr>
-          </tbody>
-        </table>
+        <ProductItemsTable
+          items={productRows}
+          customerName={mother.customerName}
+          salesPath={mother.salesPath}
+          platformCustomerId={mother.platformCustomerId}
+          platform={mother.platform}
+          footerAmount={amount}
+        />
       </DrawerSection>
     </>
   );
@@ -157,24 +225,14 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
           <InfoItem label="生成时间" mono>{fmtDateTime(current.history?.[0]?.time ?? current.entryTime)}</InfoItem>
           <InfoItem label="金额" mono valueStyle={{ fontWeight: 'var(--font-semibold)' }}>{money(current.totalAmount)}</InfoItem>
         </InfoGrid>
-        <table className="detail-inline-table" style={{ marginTop: 'var(--space-3)' }}>
-          <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>单价</th><th>小计</th></tr></thead>
-          <tbody>
-            {current.items.map((it, i) => (
-              <tr key={i}>
-                <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
-                <td>{it.spec}</td>
-                <td className="mono">{it.quantity}</td>
-                <td className="mono">{money(it.price)}</td>
-                <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(it.price * it.quantity)}</td>
-              </tr>
-            ))}
-            <tr style={{ fontWeight: 'var(--font-semibold)' }}>
-              <td colSpan={4} style={{ textAlign: 'right', color: 'var(--color-text-secondary)' }}>合计</td>
-              <td className="mono" style={{ color: 'var(--color-module-current-base)' }}>{money(current.totalAmount)}</td>
-            </tr>
-          </tbody>
-        </table>
+        <ProductItemsTable
+          items={current.items}
+          customerName={current.customerName}
+          salesPath={current.salesPath ?? 'direct'}
+          platformCustomerId={current.platformCustomerId}
+          platform={current.platform}
+          footerAmount={current.totalAmount}
+        />
       </DrawerSection>
 
       <DrawerSection title="分发情况">
