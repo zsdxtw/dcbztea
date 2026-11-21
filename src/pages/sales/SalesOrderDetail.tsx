@@ -144,42 +144,15 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
 
   return (
     <>
-      {/* 履约单信息 */}
+      {/* 履约单信息（含商品明细） */}
       <DrawerSection title="履约单信息">
         <InfoGrid cols={4}>
           <InfoItem label="履约单编号" mono emph>{current.code}</InfoItem>
-          <InfoItem label="分发路径">{pathLabel(current)}</InfoItem>
-          <InfoItem label="履约主体">{current.partnerName ?? (current.path === 'self' ? '自营' : '待分发')}</InfoItem>
+          <InfoItem label={current.parentCode ? '关联销售单' : '单据性质'}>{current.parentCode ?? (children.length > 0 ? '母销售单（已拆分）' : '母销售单（未拆分，即履约单）')}</InfoItem>
           <InfoItem label="生成时间" mono>{fmtDateTime(current.history?.[0]?.time ?? current.entryTime)}</InfoItem>
           <InfoItem label="金额" mono valueStyle={{ fontWeight: 'var(--font-semibold)' }}>{money(current.totalAmount)}</InfoItem>
-          <InfoItem label="分发状态">{pill(distributeStateOf(current))}</InfoItem>
-          <InfoItem label="履约状态">{pill(fulfillStateOf(current, currentPos))}</InfoItem>
-          <InfoItem label="结算状态">{pill(settleStateOf(current, currentPos))}</InfoItem>
-          <InfoItem label="开票状态">{pill(invoiceStateOf(current))}</InfoItem>
-          <InfoItem label={current.parentCode ? '关联销售单' : '单据性质'}>{current.parentCode ?? (children.length > 0 ? '母销售单（已拆分）' : '母销售单（未拆分，即履约单）')}</InfoItem>
         </InfoGrid>
-      </DrawerSection>
-
-      {/* 履约时间线：来单 → 接单 → 发货 → 妥投 → 确收 */}
-      <div style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)' }}>销售履约状态</span>
-          {pill(fulfillStateOf(current, currentPos))}
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>待接单 → 已接单 → 运输中 / 妥投 → 已确收</span>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 'var(--space-3)' }}>
-          {fulfillmentTimes(current).map((t) => (
-            <div key={t.label} style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', marginBottom: 2 }}>{t.label}</div>
-              <div className="mono" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: t.value === '—' ? 'var(--color-neutral-400)' : 'var(--color-neutral-800)', whiteSpace: 'nowrap' }}>{t.value}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 商品明细（参考履约单信息段样式） */}
-      <DrawerSection title={`商品明细（${current.items.length} 种）`}>
-        <table className="detail-inline-table">
+        <table className="detail-inline-table" style={{ marginTop: 'var(--space-3)' }}>
           <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>单价</th><th>小计</th></tr></thead>
           <tbody>
             {current.items.map((it, i) => (
@@ -197,6 +170,78 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
             </tr>
           </tbody>
         </table>
+      </DrawerSection>
+
+      <DrawerSection title="分发情况">
+        <InfoGrid cols={4}>
+          <InfoItem label="分发状态">{pill(distributeStateOf(current))}</InfoItem>
+          <InfoItem label="分发路径">{pathLabel(current)}</InfoItem>
+          <InfoItem label="履约主体">{current.partnerName ?? (current.path === 'self' ? '自营' : '待分发')}</InfoItem>
+        </InfoGrid>
+      </DrawerSection>
+
+      <DrawerSection title="履约情况">
+        <div style={{ marginBottom: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)' }}>销售履约状态</span>
+            {pill(fulfillStateOf(current, currentPos))}
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>待接单 → 已接单 → 运输中 / 妥投 → 已确收</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 'var(--space-3)' }}>
+            {fulfillmentTimes(current).map((t) => (
+              <div key={t.label} style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', marginBottom: 2 }}>{t.label}</div>
+                <div className="mono" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: t.value === '—' ? 'var(--color-neutral-400)' : 'var(--color-neutral-800)', whiteSpace: 'nowrap' }}>{t.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 发货情况（包裹1、包裹2…：该履约单下全部发货包裹，PO 包裹 + 自营分仓发货；不单独成标签组） */}
+        {(() => {
+          const poPkgs = currentPos.flatMap((d) => d.packages.filter((x) => x.status !== 'void').map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, status: x.status as string, settled: x.settled, items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') })));
+          const selfPkgs = (current.selfShipments ?? []).map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, status: x.status as string, settled: x.settled, items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') }));
+          const all = [...poPkgs, ...selfPkgs];
+          return all.length === 0 ? (
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)', padding: 'var(--space-2) 0' }}>暂无发货包裹（发货后此处按包裹 1、包裹 2… 展示物流信息）</div>
+          ) : (
+            <table className="detail-inline-table">
+              <thead><tr><th style={{ width: 70 }}>包裹</th><th style={{ width: 170 }}>发货单号</th><th>物流公司 / 单号</th><th>商品</th><th style={{ width: 90 }}>状态</th></tr></thead>
+              <tbody>
+                {all.map((x, i) => (
+                  <tr key={x.no + i}>
+                    <td style={{ fontWeight: 'var(--font-medium)' }}>包裹{i + 1}</td>
+                    <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{x.no}</td>
+                    <td style={{ fontSize: 'var(--text-sm)' }}>{x.company} <span className="mono">{x.tracking}</span></td>
+                    <td style={{ fontSize: 'var(--text-sm)' }}>{x.items}</td>
+                    <td>{pill(x.status === 'confirmed' ? '全部已确收' : x.status === 'delivered' ? '已妥投' : '运输中')}{x.settled && <span style={{ marginLeft: 4 }}>{pill('已结算')}</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          );
+        })()}
+      </DrawerSection>
+
+      <DrawerSection title="结算 & 开票情况">
+        <InfoGrid cols={4}>
+          <InfoItem label="结算状态">{pill(settleStateOf(current, currentPos))}</InfoItem>
+          <InfoItem label="开票状态">{pill(invoiceStateOf(current))}</InfoItem>
+          <InfoItem label="结算履约">{current.settleOnTime === true ? '按时（积分 +5）' : current.settleOnTime === false ? '超时（积分 -5）' : '未结算'}</InfoItem>
+        </InfoGrid>
+      </DrawerSection>
+
+      {/* 处理轨迹 */}
+      <DrawerSection title="处理轨迹">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: 320, overflowY: 'auto' }}>
+          {current.history.map((h, i) => (
+            <div key={i} style={{ display: 'flex', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', alignItems: 'baseline' }}>
+              <span className="mono" style={{ color: 'var(--color-neutral-400)', flexShrink: 0 }}>{h.time}</span>
+              <span style={{ fontWeight: 'var(--font-medium)', flexShrink: 0 }}>{h.action}</span>
+              {h.detail && <span style={{ color: 'var(--color-neutral-500)' }}>{h.detail}</span>}
+            </div>
+          ))}
+        </div>
       </DrawerSection>
 
       {/* 自营执行信息（采购&发货 / 物流跟踪） */}
@@ -219,48 +264,6 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
           ))}
         </div>
       )}
-
-      {/* 发货情况（包裹1、包裹2…：该履约单下全部发货包裹，PO 包裹 + 自营分仓发货） */}
-      {(() => {
-        const poPkgs = currentPos.flatMap((d) => d.packages.filter((x) => x.status !== 'void').map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, status: x.status as string, settled: x.settled, items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') })));
-        const selfPkgs = (current.selfShipments ?? []).map((x) => ({ no: x.packageNo, company: x.logisticsCompany, tracking: x.trackingNo, status: x.status as string, settled: x.settled, items: x.items.map((i) => `${i.productName}×${i.qty}`).join('、') }));
-        const all = [...poPkgs, ...selfPkgs];
-        return (
-          <DrawerSection title={`发货情况（${all.length} 个包裹）`}>
-            {all.length === 0 ? (
-              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)', padding: 'var(--space-2) 0' }}>暂无发货包裹（发货后此处按包裹 1、包裹 2… 展示物流信息）</div>
-            ) : (
-              <table className="detail-inline-table">
-                <thead><tr><th style={{ width: 70 }}>包裹</th><th style={{ width: 170 }}>发货单号</th><th>物流公司 / 单号</th><th>商品</th><th style={{ width: 90 }}>状态</th></tr></thead>
-                <tbody>
-                  {all.map((x, i) => (
-                    <tr key={x.no + i}>
-                      <td style={{ fontWeight: 'var(--font-medium)' }}>包裹{i + 1}</td>
-                      <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{x.no}</td>
-                      <td style={{ fontSize: 'var(--text-sm)' }}>{x.company} <span className="mono">{x.tracking}</span></td>
-                      <td style={{ fontSize: 'var(--text-sm)' }}>{x.items}</td>
-                      <td>{pill(x.status === 'confirmed' ? '全部已确收' : x.status === 'delivered' ? '已妥投' : '运输中')}{x.settled && <span style={{ marginLeft: 4 }}>{pill('已结算')}</span>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </DrawerSection>
-        );
-      })()}
-
-      {/* 处理轨迹（展示在发货情况下面） */}
-      <DrawerSection title="处理轨迹">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: 320, overflowY: 'auto' }}>
-          {current.history.map((h, i) => (
-            <div key={i} style={{ display: 'flex', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', alignItems: 'baseline' }}>
-              <span className="mono" style={{ color: 'var(--color-neutral-400)', flexShrink: 0 }}>{h.time}</span>
-              <span style={{ fontWeight: 'var(--font-medium)', flexShrink: 0 }}>{h.action}</span>
-              {h.detail && <span style={{ color: 'var(--color-neutral-500)' }}>{h.detail}</span>}
-            </div>
-          ))}
-        </div>
-      </DrawerSection>
 
       {/* 报备命中 */}
       {current.reportMatches && current.reportMatches.length > 0 && (
