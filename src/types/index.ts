@@ -1962,9 +1962,11 @@ export interface ExternalOrder {
   transferTime?: string;
   /** 转出后履约状态（合作商订单链） */
   partnerStatus?: PartnerOrderStatus;
-  /** 结算是否按时（超时扣积分） */
+  /** 结算是否按时（超时扣积分；纯质量标记，不承担"是否已结算"语义） */
   settleOnTime?: boolean;
-  /** 开票状态：未开票（缺省）/ 部分开票 / 已开票 */
+  /** 订单级结算标记（P6：全部已妥投发货单结算 / 无发货单订单级结算后置位） */
+  settled?: boolean;
+  /** 开票状态：未开票（缺省）/ 部分开票 / 已开票（前置条件：已确收） */
   invoiceStatus?: SalesInvoiceStatus;
   /** 自营跟单人（销售单自营接单时填写） */
   follower?: string;

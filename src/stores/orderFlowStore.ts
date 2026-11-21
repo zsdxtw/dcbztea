@@ -21,6 +21,7 @@ import type {
 } from '../types';
 import { partnerInRegion } from '../types';
 import { externalOrderSeeds } from '../data/externalOrders';
+import { settleStateOf } from '../utils/salesOrderFamily';
 import { matchesReport, reportPriority, useReportStore } from './reportStore';
 import { useSupplierStore } from './supplierStore';
 import { usePriceStore } from './priceStore';
@@ -218,7 +219,8 @@ interface OrderFlowState {
   awardCompare: (id: string, supplierId: string, reason: string) => { ok: boolean; msg: string };
 
   /* ── 履约与结算 ── */
-  advancePartner: (id: string, status: PartnerOrderStatus, opts?: { onTime?: boolean }) => void;
+  /** 履约推进（partnerStatus/processStatus 由 patchOrder 收口自动镜像，仅写履约时间线） */
+  advancePartner: (id: string, status: PartnerOrderStatus) => void;
 
   /* ── 设置 ── */
   updateSettings: (patch: Partial<FlowSettings>) => void;
@@ -226,13 +228,28 @@ interface OrderFlowState {
 
 export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
   /** 内部：更新单笔订单并追加轨迹 */
+  /** 履约状态镜像表（P1：fulfillment.stage 为单真源，分发链 partnerStatus 由此派生） */
+  const PARTNER_STAGE_MIRROR: Record<string, PartnerOrderStatus> = {
+    pending_accept: 'pending', accepted: 'accepted', shipping: 'shipping',
+    transit: 'transit', confirmed: 'confirmed', cancelled: 'cancelled',
+  };
   const patchOrder = (id: string, patch: Partial<ExternalOrder>, history?: { action: string; detail?: string }) => {
     set((s) => ({
-      orders: s.orders.map((o) =>
-        o.id === id
-          ? { ...o, ...patch, history: history ? [...o.history, { time: now(), ...history }] : o.history }
-          : o,
-      ),
+      orders: s.orders.map((o) => {
+        if (o.id !== id) return o;
+        const next = { ...o, ...patch, history: history ? [...o.history, { time: now(), ...history }] : o.history };
+        /* P2 收口：履约状态进入已接单及后续 → 分发状态自动置为分发已完成（不再依赖各 action 手写） */
+        const stage = next.fulfillment?.stage;
+        if (stage && ['accepted', 'shipping', 'transit', 'confirmed'].includes(stage)
+          && next.processStatus !== 'processed' && next.processStatus !== 'cancelled') {
+          next.processStatus = 'processed';
+        }
+        /* P1 收口：分发链履约状态镜像同步 partnerStatus（单真源 fulfillment.stage，双写不再靠各 action 自觉） */
+        if (next.path === 'distribute' && stage && stage in PARTNER_STAGE_MIRROR) {
+          next.partnerStatus = PARTNER_STAGE_MIRROR[stage];
+        }
+        return next;
+      }),
     }));
   };
 
@@ -862,7 +879,6 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         selfShipments: order.selfShipments?.length
           ? order.selfShipments.map((x) => (x.status === 'delivered' ? { ...x, status: 'confirmed' as const, confirmedAt: nowMin() } : x))
           : order.selfShipments,
-        partnerStatus: order.path === 'distribute' ? ('confirmed' as const) : order.partnerStatus,
         fulfillment: fulfil(order, { stage: 'confirmed', confirmTime: nowMin() }),
       }, { action: '客户确认收货', detail: '管理后台对妥投订单人工/联机确认收货 → 履约已确收（结算请前往财务结算，按发货单可部分结算）' });
       pos.forEach((d) => usePurchaseStore.getState().confirmAllByChild(d.childOrderCode));
@@ -885,29 +901,47 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         ))
         : order.selfShipments;
       const pkgs = [...(selfShipments ?? []), ...pos.flatMap((d) => d.packages.filter((x) => x.status !== 'void'))];
+      /* P6 结算分母 = 已妥投/已确收包裹（未发货包裹不进分母，补发不影响已结算状态） */
       const eligible = pkgs.filter((x) => x.status === 'delivered' || x.status === 'confirmed');
-      /* 无发货单的订单（如未发货已取消场景之外的单）走订单级结算；指定发货单但无可结算对象时报错 */
+      /* 无发货单的订单走订单级结算；指定发货单但无可结算对象时报错 */
       if (eligible.length === 0 && targetNos) return { ok: false, msg: '暂无已妥投/已确收的发货单可结算' };
       pos.forEach((d) => usePurchaseStore.getState().settleByChild(d.childOrderCode, targetNos));
-      patchOrder(id, { selfShipments, settleOnTime: onTime }, {
+      /* 结算标记落库后重读最新包裹状态判定订单级 settled（避免使用结算前快照） */
+      const freshPkgs = [...(selfShipments ?? []), ...usePurchaseStore.getState().listByChildOrder(id).flatMap((d) => d.packages.filter((x) => x.status !== 'void'))];
+      const freshEligible = freshPkgs.filter((x) => x.status === 'delivered' || x.status === 'confirmed');
+      const orderSettled = freshEligible.length === 0 || freshEligible.every((x) => x.settled);
+      patchOrder(id, {
+        selfShipments,
+        settleOnTime: onTime,
+        ...(orderSettled ? { settled: true as const } : {}),
+      }, {
         action: '结算完成',
         detail: `${targetNos ? `按发货单结算 ${targetNos.length} 张` : eligible.length > 0 ? '全部发货单结算' : '订单级结算'}（${onTime ? '按时履约' : '超时履约'}）`,
       });
       if (eligible.length === 0) return { ok: true, msg: '已结算（订单级，无发货单）' };
-      const allSettled = eligible.every((x) => x.settled);
       const settledCount = eligible.filter((x) => x.settled).length;
-      return { ok: true, msg: allSettled ? '已结算（全部发货单）' : `部分结算（${settledCount}/${eligible.length} 张发货单）` };
+      return { ok: true, msg: orderSettled ? '已结算（全部已妥投发货单）' : `部分结算（${settledCount}/${eligible.length} 张已妥投发货单）` };
     },
 
     cancelOrder: (id, reason) => {
       const order = get().orders.find((o) => o.id === id);
       if (!order) return { ok: false, msg: '订单不存在' };
       if (order.processStatus === 'cancelled') return { ok: false, msg: '订单已取消' };
-      if (order.fulfillment?.stage === 'confirmed') return { ok: false, msg: '订单已确认收货，不可取消' };
+      if (order.fulfillment?.stage === 'confirmed') return { ok: false, msg: '订单已确认收货，不可取消（如需退回请走销售退货）' };
+      /* P4：拆分家族母单不可直接取消——母单状态不参与聚合，直接取消会造成不可见矛盾 */
+      if (!order.parentCode && get().orders.some((o) => o.parentCode === order.code)) {
+        return { ok: false, msg: '该销售单已拆分为多张履约单，请逐张取消其下履约单' };
+      }
+      /* P3 逆向联动：比单中清 compare 会话（终端倒计时/报名随之消失）；在途包裹记录召回提示 */
+      const pos = usePurchaseStore.getState().listByChildOrder(id);
+      const inTransit = [...(order.selfShipments ?? []), ...pos.flatMap((d) => d.packages.filter((x) => x.status !== 'void'))]
+        .filter((x) => x.status === 'shipped').length;
+      const recallNote = inTransit > 0 ? ` · 在途包裹 ${inTransit} 个需线下召回处理` : '';
       patchOrder(id, {
         processStatus: 'cancelled',
         fulfillment: fulfil(order, { stage: 'cancelled' }),
-      }, { action: '取消订单', detail: `${reason?.trim() || '管理后台取消订单'} · 分发状态与履约状态均变为已取消` });
+        ...(order.compare ? { compare: undefined } : {}),
+      }, { action: '取消订单', detail: `${reason?.trim() || '管理后台取消订单'} · 分发状态与履约状态均变为已取消${recallNote}` });
       return { ok: true, msg: '订单已取消（分发状态与履约状态均为已取消）' };
     },
 
@@ -915,6 +949,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       const order = get().orders.find((o) => o.id === id);
       if (!order) return { ok: false, msg: '订单不存在' };
       if (order.processStatus === 'cancelled') return { ok: false, msg: '已取消订单不可开票' };
+      if (order.fulfillment?.stage !== 'confirmed') return { ok: false, msg: '仅已确收订单可登记开票（预开票场景待业务确认）' };
       patchOrder(id, { invoiceStatus: mode === 'full' ? 'invoiced' : 'partial' }, {
         action: mode === 'full' ? '登记开票（全部）' : '登记开票（部分）',
         detail: mode === 'full' ? '全额开票完成 → 已开票' : '部分金额开票 → 部分开票',
@@ -1096,9 +1131,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
             : status === 'transit' ? { stage: 'transit', deliverTime: nowMin() }
               : {};
       patchOrder(id, {
-        partnerStatus: status,
-        // 接单、或比单中单订单首次推进（跳过接单直入运输中）时，分发状态同步为分发已完成
-        ...(status === 'accepted' || order.processStatus === 'distribute_pending' ? { processStatus: 'processed' as const } : {}),
+        // partnerStatus / processStatus 由 patchOrder 收口自动镜像（P1/P2），此处只写履约时间线
         ...(Object.keys(stagePatch).length > 0 ? { fulfillment: fulfil(order, stagePatch) } : {}),
       }, { action: actionLabels[status] ?? '履约推进', detail: status === 'accepted' ? '合作商终端接单 · 分发状态同步为分发已完成' : undefined });
       // PO 状态联动：接单→已确认；妥投→全部包裹妥投
@@ -1120,12 +1153,10 @@ const TRANSFER_KIND_MAP: Record<string, 'order-self' | 'product' | 'region' | 'a
   compare: 'compare',
 };
 
-/** 履约单结算状态派生（按发货单 settled 标记；无发货单时按订单级结算标记） */
+/** 履约单结算状态派生（复用 settleStateOf 统一口径：分母=已妥投/已确收包裹 + 订单级 settled） */
 const settledOf = (o: ExternalOrder): boolean => {
   const docs = usePurchaseStore.getState().docs.filter((d) => d.childOrderId === o.id);
-  const pkgs = [...(o.selfShipments ?? []), ...docs.flatMap((d) => d.packages.filter((x) => x.status !== 'void'))];
-  if (pkgs.length === 0) return o.settleOnTime !== undefined;
-  return pkgs.every((x) => x.settled);
+  return settleStateOf(o, docs) === '已结算';
 };
 
 /** 某合作商名下的订单分发订单（映射为合作商订单结构，合作商终端展示/接单/报名） */

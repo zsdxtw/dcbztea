@@ -690,7 +690,7 @@ export default function ExternalOrders() {
               {current && current.processStatus !== 'cancelled' && current.fulfillment?.stage !== 'confirmed' && (
                 <Button variant="ghost" onClick={() => { setCancelling(current); setCancelReason(''); }}>取消订单</Button>
               )}
-              {current && current.processStatus === 'processed' && (
+              {current && current.processStatus === 'processed' && current.fulfillment?.stage === 'confirmed' && (
                 <>
                   {current.invoiceStatus !== 'invoiced' && <Button variant="ghost" onClick={() => store.getState().registerInvoice(current.id, 'partial')}>登记部分开票</Button>}
                   {current.invoiceStatus !== 'invoiced' && <Button onClick={() => store.getState().registerInvoice(current.id, 'full')}>登记全额开票</Button>}

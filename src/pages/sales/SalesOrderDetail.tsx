@@ -11,10 +11,8 @@ import {
   buildFamilies, familyStatesOf, distributeStateOf, fulfillStateOf, settleStateOf, invoiceStateOf, FAMILY_STATE_COLORS, fulfillmentUnitsOf,
   type OrderFamily,
 } from '../../utils/salesOrderFamily';
-import {
-  FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS, stageOfOrder, fulfillmentTimes,
-} from '../../utils/fulfillment';
-import type { ExternalOrder, FulfillmentStage, PurchaseDoc } from '../../types';
+import { fulfillmentTimes } from '../../utils/fulfillment';
+import type { ExternalOrder, PurchaseDoc } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -22,14 +20,6 @@ const pill = (text: string) => {
   const c = (FAMILY_STATE_COLORS as Record<string, { bg: string; color: string }>)[text] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
   return (
     <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: c.bg, color: c.color, whiteSpace: 'nowrap' }}>{text}</span>
-  );
-};
-
-/** 履约状态标签（统一五状态口径） */
-const stagePill = (stage: FulfillmentStage) => {
-  const c = FULFILLMENT_STAGE_COLORS[stage];
-  return (
-    <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: c.bg, color: c.color, whiteSpace: 'nowrap' }}>{FULFILLMENT_STAGE_LABELS[stage]}</span>
   );
 };
 
@@ -66,19 +56,19 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {pill(states.distribute)}
-            {states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.distributed}/{states.total}</span>}
+            {states.active > 0 && states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.distributed}/{states.active}</span>}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {pill(states.fulfill)}
-            {states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.fulfilled}/{states.total}</span>}
+            {states.active > 0 && states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.fulfilled}/{states.active}</span>}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {pill(states.settle)}
-            {states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.settled}/{states.total}</span>}
+            {states.active > 0 && states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.settled}/{states.active}</span>}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {pill(states.invoice)}
-            {states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.invoiced}/{states.total}</span>}
+            {states.active > 0 && states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.invoiced}/{states.active}</span>}
           </span>
         </div>
       )}
@@ -131,7 +121,7 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
       <div style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)' }}>销售履约状态</span>
-          {stagePill(stageOfOrder(current))}
+          {pill(fulfillStateOf(current, currentPos))}
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>待接单 → 已接单 → 运输中 / 妥投 → 已确收</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 'var(--space-3)' }}>

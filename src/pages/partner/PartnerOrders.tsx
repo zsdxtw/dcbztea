@@ -467,7 +467,7 @@ export default function PartnerOrders() {
   const updateStatus = (id: string, status: PartnerOrderStatus) => {
     if (id.startsWith('ext_')) {
       // 外部订单分发中心转入的订单：状态回写 orderFlowStore（结算自动写积分台账）
-      useOrderFlowStore.getState().advancePartner(id.replace('ext_', ''), status, { onTime: true });
+      useOrderFlowStore.getState().advancePartner(id.replace('ext_', ''), status);
     } else if (id.startsWith('transfer_')) {
       setTransferOverrides((prev) => ({ ...prev, [id]: status }));
     } else {

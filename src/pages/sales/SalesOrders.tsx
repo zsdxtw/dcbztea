@@ -331,19 +331,19 @@ export default function SalesOrders() {
                         </span>
                         <span key="dg" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           {pill(st.distribute)}
-                          <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.distributed}/{st.total}</span>
+                          {st.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.distributed}/{st.active}</span>}
                         </span>
                         <span key="fu" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           {pill(st.fulfill)}
-                          <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.fulfilled}/{st.total}</span>
+                          {st.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.fulfilled}/{st.active}</span>}
                         </span>
                         <span key="se" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           {pill(st.settle)}
-                          <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.settled}/{st.total}</span>
+                          {st.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.settled}/{st.active}</span>}
                         </span>
                         <span key="in" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           {pill(st.invoice)}
-                          <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.invoiced}/{st.total}</span>
+                          {st.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.invoiced}/{st.active}</span>}
                         </span>
                         <span className="cell-muted" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{f.mother.entryTime}</span>
                         <span style={{ textAlign: 'center' }}>

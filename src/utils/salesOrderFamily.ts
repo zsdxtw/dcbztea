@@ -138,11 +138,13 @@ export function fulfillStateOf(o: ExternalOrder, pos?: { packages: PkgLike[] }[]
  * 有发货单时按包裹 settled 标记推导；无发货单时按订单级结算标记（settleOnTime 已写入即已结算）。
  */
 export function settleStateOf(o: ExternalOrder, pos?: { packages: PkgLike[] }[]): '未结算' | '部分结算' | '已结算' {
-  const pkgs = packagesOf(o, pos);
-  if (pkgs.length === 0) return o.settleOnTime !== undefined ? '已结算' : '未结算';
-  const settled = pkgs.filter((p) => p.settled).length;
+  /* P6 结算分母 = 已妥投/已确收包裹：未发货包裹不进分母，补发不影响已结算状态；
+     无已妥投包裹时回退订单级 settled 标记（settleOrder 全部结算/订单级结算后置位） */
+  const eligible = packagesOf(o, pos).filter((p) => p.status === 'delivered' || p.status === 'confirmed');
+  if (eligible.length === 0) return (o.settled ?? o.settleOnTime !== undefined) ? '已结算' : '未结算';
+  const settled = eligible.filter((p) => p.settled).length;
   if (settled === 0) return '未结算';
-  return settled === pkgs.length ? '已结算' : '部分结算';
+  return settled === eligible.length ? '已结算' : '部分结算';
 }
 
 /** 单笔开票状态：未开票 / 部分开票 / 已开票 */
@@ -167,8 +169,10 @@ export interface FamilyStates {
   settle: '未结算' | '结算中' | '部分已完成' | '全部已完成';
   /** 开票状态聚合：未开票 / 开票中 / 部分已完成 / 全部已完成 */
   invoice: '未开票' | '开票中' | '部分已完成' | '全部已完成';
-  /** 履约单总数 */
+  /** 履约单总数（含已取消） */
   total: number;
+  /** 参与聚合的履约单数（剔除已取消；x/y 数值分母口径，P8） */
+  active: number;
   /** 分发已完成履约单数 */
   distributed: number;
   /** 全部已确收履约单数 */
@@ -245,7 +249,7 @@ export function familyStatesOf(family: OrderFamily): FamilyStates {
           ? '开票中'
           : '未开票';
 
-  return { distribute, fulfill, settle, invoice, total, distributed, fulfilled, settled, invoiced };
+  return { distribute, fulfill, settle, invoice, total, active: active.length, distributed, fulfilled, settled, invoiced };
 }
 
 /** 四维状态色板（列表/详情统一，按显示文案取色） */
