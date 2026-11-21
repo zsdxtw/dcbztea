@@ -8,6 +8,7 @@ import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
+import { usePriceStore } from '../../stores/priceStore';
 import { customerItems } from '../../data/customers';
 import { PROVINCE_NAMES, getCityNames, getDistricts, regionTextOf } from '../../data/regions';
 import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS, TRANSFER_SOURCE_LABELS, platformLabelOf } from '../../data/externalOrders';
@@ -191,6 +192,7 @@ export default function SalesOrders() {
   });
 
   const poDocs = usePurchaseStore((st) => st.docs);
+  const priceProducts = usePriceStore((st) => st.products);
 
   
   /* 列表网格列定义（母单行 + 表头共用，保证对齐） */
@@ -421,7 +423,7 @@ export default function SalesOrders() {
                             <span>分发方式</span>
                             <span style={{ gridColumn: 'span 2' }}>履约主体</span>
                             <span>物流进度</span>
-                            <span>商品数量</span>
+                            <span>品牌数 / 总数量</span>
                             <span style={{ textAlign: 'right' }}>金额</span>
                             <span>生成时间</span>
                             <span>分发状态</span>
@@ -479,9 +481,9 @@ export default function SalesOrders() {
                                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', whiteSpace: 'nowrap' }}>暂无发货包裹</span>
                                 )}
                               </span>
-                              {/* 商品数量（x 种 x 份） */}
-                              <span style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>
-                                <span className="mono">{u.underlying.items.length}</span> 种 <span className="mono">{u.underlying.items.reduce((s, it) => s + it.quantity, 0)}</span> 份
+                              {/* 品牌数 / 总数量：x=本单商品去重品牌数，y=本单商品总数量 */}
+                              <span className="mono" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>
+                                {new Set(u.underlying.items.map((it) => priceProducts.find((x) => x.id === it.productId)?.brand ?? priceProducts.find((x) => x.name === it.productName)?.brand ?? '—')).size}/{u.underlying.items.reduce((s, it) => s + it.quantity, 0)}
                               </span>
                               {/* 履约单金额（与母单「总金额」列对齐） */}
                               <span className="mono" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', textAlign: 'right' }}>{money(u.amount)}</span>
