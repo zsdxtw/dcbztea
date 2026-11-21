@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
-import { MODULE_CONFIGS, moduleMenuPath } from '../../data/modules';
+import { MODULE_CONFIGS, moduleMenuPath, resolveMenuByPath } from '../../data/modules';
 import clsx from 'clsx';
 import type { MenuItem } from '../../types';
 
@@ -9,7 +9,23 @@ import type { MenuItem } from '../../types';
 export default function Sidebar() {
   const navigate = useNavigate();
   const currentModule = useAppStore((s) => s.currentModule);
+  const switchModule = useAppStore((s) => s.switchModule);
   const currentSubMenu = useAppStore((s) => s.currentSubMenu);
+  const location = useLocation();
+
+  /* 页面内跳转（navigate）时同步侧边栏选中态：路由反查模块与子菜单，分组自动展开 */
+  useEffect(() => {
+    const r = resolveMenuByPath(location.pathname);
+    if (!r) return;
+    if (r.module !== currentModule) {
+      switchModule(r.module, r.subMenu);
+    } else if (r.subMenu !== currentSubMenu) {
+      switchSubMenu(r.subMenu);
+      const parent = config?.menus.find((m) => m.children?.some((c) => c.key === r.subMenu));
+      if (parent) setExpandedKeys((prev) => new Set([...prev, parent.key]));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const switchSubMenu = useAppStore((s) => s.switchSubMenu);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);

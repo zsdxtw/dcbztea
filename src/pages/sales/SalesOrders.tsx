@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import HScrollBox from '../../components/common/HScrollBox';
 import DetailDrawer, { DrawerSection } from '../../components/common/DetailDrawer';
 import ContentHeader from '../../components/layout/ContentHeader';
@@ -57,6 +58,7 @@ function regionText(o: ExternalOrder): string {
  * 母销售单行含三状态（分发 / 发货 / 结算），「查看」进入销售单履约详情页。分发订单 Tab 保留自营接单与履约跟踪。
  */
 export default function SalesOrders() {
+  const navigate = useNavigate();
 
   /* ── 全部销售单（母单聚合） ── */
   const flowOrders = useOrderFlowStore((s) => s.orders);
@@ -320,6 +322,9 @@ export default function SalesOrders() {
               查询
             </Button>
             <Button size="sm" variant="ghost" onClick={resetFilters}>重置</Button>
+            <span style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)' }}>
+              <Button onClick={() => navigate('/sales/order-entry')}>+ 新建销售单</Button>
+            </span>
           </div>
 
           <Card style={{ padding: 0 }}>

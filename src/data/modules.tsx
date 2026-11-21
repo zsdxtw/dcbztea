@@ -427,6 +427,23 @@ export const moduleMenuPath = (module: ModuleKey, menuKey: string): string => {
 };
 
 /** 一级菜单落地页(首个菜单;分组菜单取其第一个子项) */
+/** 按路由路径反查模块与子菜单（精确匹配菜单路径；参数路由/未知路径返回 null 不变更选中态） */
+export function resolveMenuByPath(path: string): { module: ModuleKey; subMenu: string } | null {
+  const clean = path.replace(/\/+$/, '') || '/';
+  for (const m of Object.values(MODULE_CONFIGS)) {
+    for (const menu of m.menus) {
+      if (menu.children && menu.children.length > 0) {
+        for (const child of menu.children) {
+          if (moduleMenuPath(m.key, child.key) === clean) return { module: m.key, subMenu: child.key };
+        }
+      } else if (moduleMenuPath(m.key, menu.key) === clean) {
+        return { module: m.key, subMenu: menu.key };
+      }
+    }
+  }
+  return null;
+}
+
 export const MODULE_HOME_PATH: Record<ModuleKey, string> = {
   [ModuleKey.DASHBOARD]: '/dashboard/overview',
   [ModuleKey.PURCHASE]: '/purchase/purchase-overview',
