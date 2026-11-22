@@ -41,7 +41,6 @@ const orderDistributePill = (o: ExternalOrder) => {
 
 /** 路径标签（与销售单分发页口径一致） */
 function pathLabel(o: ExternalOrder): string {
-  if (o.processStatus === 'report_match_pending') return '转派-报备';
   if (o.path === 'self') return '自营';
   if (o.transferSource) return TRANSFER_SOURCE_LABELS[o.transferSource];
   if (o.distributeMode === 'compare') return '转派-比单';
@@ -168,7 +167,7 @@ export default function SalesOrders() {
       customerOrderNo: orderEdit.customerOrderNo || undefined,
       customerOrderTime: orderEdit.customerOrderTime || undefined,
     };
-    const coreEditable = (fam.mother.processStatus === 'pending' || fam.mother.processStatus === 'unprocessed' || fam.mother.processStatus === 'report_match_pending') && fam.children.length === 0;
+    const coreEditable = (fam.mother.processStatus === 'pending' || fam.mother.processStatus === 'unprocessed') && fam.children.length === 0;
     if (coreEditable) {
       patch.receiver = orderEdit.receiver;
       patch.receiverPhone = orderEdit.receiverPhone;
@@ -419,7 +418,7 @@ export default function SalesOrders() {
                             <span>分发方式</span>
                             <span style={{ gridColumn: 'span 2' }}>履约主体</span>
                             <span>物流进度</span>
-                            <span>品牌数/总数量</span>
+                            <span>品牌/数量</span>
                             <span style={{ textAlign: 'right' }}>金额</span>
                             <span>生成时间</span>
                             <span>分发状态</span>
@@ -582,7 +581,7 @@ export default function SalesOrders() {
           const fam = families.find((f) => f.rootCode === view?.root);
           if (!fam) return null;
           const m = fam.mother;
-          const coreEditable = (m.processStatus === 'pending' || m.processStatus === 'unprocessed' || m.processStatus === 'report_match_pending') && fam.children.length === 0;
+          const coreEditable = (m.processStatus === 'pending' || m.processStatus === 'unprocessed') && fam.children.length === 0;
           if (view?.edit && orderEdit) {
             return (
               <>

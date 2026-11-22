@@ -67,8 +67,8 @@ export default function SalesFulfillment() {
     const childCodes = new Set(orders.filter((o) => o.parentCode).map((o) => o.code));
     const rootHasChild = new Set(orders.filter((o) => childCodes.has(o.code) || o.parentCode).map((o) => o.parentCode ?? o.code));
     return orders
-      // 履约环节仅含已分发订单（未分发 / 待分发 / 报备待确认 / 比单中仍留在销售单处理 / 履约单分发）
-      .filter((o) => !['unprocessed', 'pending', 'report_match_pending', 'comparing'].includes(o.processStatus))
+      // 履约环节仅含已分发订单（未分发 / 待分发 / 比单中仍留在销售单处理 / 履约单分发）
+      .filter((o) => !['unprocessed', 'pending', 'comparing'].includes(o.processStatus))
       .filter((o) => !o.parentCode && !rootHasChild.has(o.code) || o.parentCode)
       .map((o) => {
         const stage = stageOfOrder(o);

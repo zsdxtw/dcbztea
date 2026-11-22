@@ -110,8 +110,8 @@ export function distributeStateOf(o: ExternalOrder): string {
 export function fulfillStateOf(o: ExternalOrder, pos?: { packages: PkgLike[] }[]): string {
   if (o.processStatus === 'cancelled') return '已取消';
   const d = o.processStatus;
-  /* 未进入履约主体：未分发 / 待分发 / 报备确认 / 比单中 / 已分发待接单 → 履约状态均为未履约 */
-  if (d === 'unprocessed' || d === 'pending' || d === 'report_match_pending' || d === 'comparing' || d === 'self_pending' || d === 'distribute_pending') return '未履约';
+  /* 未进入履约主体：未分发 / 待分发 / 比单中 / 已分发待接单 → 履约状态均为未履约 */
+  if (d === 'unprocessed' || d === 'pending' || d === 'comparing' || d === 'self_pending' || d === 'distribute_pending') return '未履约';
   /* 分发已完成（父单已接单）：按发货单包裹推导档位 */
   const pkgs = packagesOf(o, pos);
   if (pkgs.length === 0) {
@@ -221,7 +221,7 @@ export function familyStatesOf(family: OrderFamily): FamilyStates {
     ? '已取消'
     : distributed === active.length
       ? '分发完成'
-      : distributed > 0 || active.some((o) => ['pending', 'report_match_pending', 'comparing', 'self_pending', 'distribute_pending'].includes(o.processStatus))
+      : distributed > 0 || active.some((o) => ['pending', 'comparing', 'self_pending', 'distribute_pending'].includes(o.processStatus))
         ? '分发中'
         : '未分发';
 

@@ -28,10 +28,12 @@ interface Props {
   remainderTab?: boolean;
   /** 已确定分发方式的 TAB id（显示已配置标记） */
   configuredIds?: string[];
+  /** 隐藏底部的快速拆单按钮（改由调用方在标题行展示） */
+  hideQuickSplit?: boolean;
 }
 
 /** 商品明细 + 拆出数量 + 预生成履约单 TAB（销售单处理 / 分发弹窗共用） */
-export default function SplitDraftBuilder({ items, drafts, onChange, selectedId, onSelect, compact = false, externalError, remainderTab = false, configuredIds }: Props) {
+export default function SplitDraftBuilder({ items, drafts, onChange, selectedId, onSelect, compact = false, externalError, remainderTab = false, configuredIds, hideQuickSplit = false }: Props) {
   const products = usePriceStore((s) => s.products);
   const [qty, setQty] = useState<Record<string, string>>({});
   const [err, setErr] = useState('');
@@ -156,9 +158,13 @@ export default function SplitDraftBuilder({ items, drafts, onChange, selectedId,
             : '未拆完的剩余数量会在确认时自动合并为最后一张履约单'}
         </span>
         <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>快速拆单：</span>
-          <Button size="sm" variant="ghost" onClick={() => quickSplit('brand')}>按品牌拆单</Button>
-          <Button size="sm" variant="ghost" onClick={() => quickSplit('product')}>按商品拆单</Button>
+          {!hideQuickSplit && (
+            <>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>快速拆单：</span>
+              <Button size="sm" onClick={() => quickSplit('brand')}>按品牌拆单</Button>
+              <Button size="sm" onClick={() => quickSplit('product')}>按商品拆单</Button>
+            </>
+          )}
           <Button size="sm" onClick={generate}>拆出</Button>
         </span>
       </div>
@@ -174,19 +180,21 @@ export default function SplitDraftBuilder({ items, drafts, onChange, selectedId,
                 onClick={() => onSelect(d.id)}
                 style={{ padding: '3px 10px', minHeight: 26, fontSize: 'var(--text-xs)' }}
               >
-                {configuredIds?.includes(d.id) && <span title="已确定分发方式" style={{ color: '#01795D', marginRight: 3 }}>●</span>}
+                {configuredIds?.includes(d.id) && <span title="已确定分发方式" style={{ color: 'var(--color-module-current-secondary)', marginRight: 3 }}>●</span>}
                 履约单{String(i + 1).padStart(2, '0')}
                 <span className="tab-card-simple-count">{d.items.reduce((s, x) => s + x.quantity, 0)} 份</span>
               </button>
-              <button
-                title="删除该拆单，数量归还"
-                onClick={(e) => { e.stopPropagation(); removeDraft(d.id); }}
-                style={{
-                  position: 'absolute', top: -5, right: -5, width: 16, height: 16, borderRadius: '50%',
-                  border: '1px solid var(--color-neutral-200)', background: 'var(--color-neutral-0)',
-                  color: 'var(--color-neutral-500)', cursor: 'pointer', fontSize: 10, lineHeight: '14px', padding: 0,
-                }}
-              >×</button>
+              {!configuredIds?.includes(d.id) && (
+                <button
+                  title="删除该拆单，数量归还"
+                  onClick={(e) => { e.stopPropagation(); removeDraft(d.id); }}
+                  style={{
+                    position: 'absolute', top: -5, right: -5, width: 16, height: 16, borderRadius: '50%',
+                    border: '1px solid var(--color-neutral-200)', background: 'var(--color-neutral-0)',
+                    color: 'var(--color-neutral-500)', cursor: 'pointer', fontSize: 10, lineHeight: '14px', padding: 0,
+                  }}
+                >×</button>
+              )}
             </span>
           ))}
           {showRemainderTab && (
@@ -196,8 +204,12 @@ export default function SplitDraftBuilder({ items, drafts, onChange, selectedId,
               title="未拆出的剩余数量（作为末尾履约单，可单独分发）"
               style={{ padding: '3px 10px', minHeight: 26, fontSize: 'var(--text-xs)', borderStyle: 'dashed' }}
             >
-              {configuredIds?.includes(REMAINDER_DRAFT_ID) && <span title="已确定分发方式" style={{ color: '#01795D', marginRight: 3 }}>●</span>}
-              {drafts.length === 0 ? '整单（剩余）' : '剩余部分'}
+              {configuredIds?.includes(REMAINDER_DRAFT_ID) && <span title="已确定分发方式" style={{ color: 'var(--color-module-current-secondary)', marginRight: 3 }}>●</span>}
+              {drafts.length === 0
+                ? '整单（剩余）'
+                : configuredIds?.includes(REMAINDER_DRAFT_ID)
+                  ? `履约单${String(drafts.length + 1).padStart(2, '0')}`
+                  : '剩余部分'}
               <span className="tab-card-simple-count">{remainderQty} 份</span>
             </button>
           )}

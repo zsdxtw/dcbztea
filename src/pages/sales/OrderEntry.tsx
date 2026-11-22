@@ -286,13 +286,16 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
     { label: '收货地址', value: createdOrder.receiverAddress, span: true },
   ] : [];
 
+  /** 表单最低宽度：宽度不足时整体横向滚动（经平台销售多一列「销平台实价」） */
+  const formMinWidth = isVia ? 1140 : 1020;
+
   /** 表单主体：独立页面与销售单列表弹窗共用 */
   const formContent = (
     <>
       <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
         新建销售单用于创建<strong>手工录入</strong>类型的销售订单（三个入口：<strong>本页手工录入</strong> / <strong>平台直连推送</strong> / <strong>报备商机转入</strong>）。
         首先选择<strong>销售路径</strong>：直接销售（直营 / 渠道 / 平台 / 个人客户）或经平台销售（淡茶 → 平台客户 → 直营客户）；
-        保存后进入「销售单处理」；录入时自动与审批通过的报备比对，命中报备的可在送去分发后选择报备转派。
+        保存后进入「销售单处理」；订单进入不自动匹配报备，如需报备转派请在分发弹窗中人工匹配。
       </div>
 
         <Card title="订单信息">
@@ -529,9 +532,9 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
               <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginLeft: 8 }}>共 {pickerProducts.length} 款 · 第 {pickerPage} / {pickerTotalPages} 页</span>
             </div>
           )}
-          {/* 已选商品列表：图片 + 数量 + 销售实价 + 删除（表头常显，未添加时仅显示提示行） */}
-          <table className="detail-inline-table">
-              <thead><tr><th style={{ width: 44 }}>序号</th><th style={{ width: 60 }}>图片</th><th>商品名称</th><th style={{ width: 90 }}>品牌</th><th style={{ width: 110 }}>规格</th><th style={{ width: 130 }}>市场价</th><th style={{ width: 120 }}>销售报价</th><th style={{ width: 90 }}>数量</th><th style={{ width: 110 }}>销售实价</th>{isVia && <th style={{ width: 120 }}>销平台实价</th>}<th style={{ width: 110, textAlign: 'right' }}>小计</th><th style={{ width: 60 }} /></tr></thead>
+          {/* 已选商品列表：列宽按容器压缩，不再出现左右滚动条 */}
+          <table className="detail-inline-table order-entry-items" style={{ tableLayout: 'fixed' }}>
+              <thead><tr><th style={{ width: 46 }}>序号</th><th style={{ width: 50 }}>图片</th><th>商品名称</th><th style={{ width: 72 }}>品牌</th><th style={{ width: 72 }}>规格</th><th style={{ width: 92 }}>市场价</th><th style={{ width: 90 }}>销售报价</th><th style={{ width: 68 }}>数量</th><th style={{ width: 90 }}>销售实价</th>{isVia && <th style={{ width: 90 }}>销平台实价</th>}<th style={{ width: 88, textAlign: 'right' }}>小计</th><th style={{ width: 58 }} /></tr></thead>
               <tbody>
                 {items.length === 0 && (
                   <tr><td colSpan={isVia ? 10 : 9} style={{ textAlign: 'center', color: 'var(--color-neutral-400)', padding: 'var(--space-3)' }}>尚未添加商品，点击上方商品卡片即可添加（可按品牌筛选或搜索）</td></tr>
@@ -548,11 +551,11 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
                         <div style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</div>
                         {warn && <div style={{ fontSize: 'var(--text-xs)', color: '#CB405D' }}>⚠ {warn}</div>}
                       </td>
-                      <td>{p?.brand ?? '—'}</td>
-                      <td style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>{it.spec}</td>
+                      <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p?.brand ?? ''}>{p?.brand ?? '—'}</td>
+                      <td style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={it.spec}>{it.spec}</td>
                       <td>
                         <div className="mono" style={{ fontSize: 'var(--text-sm)' }}>{p ? money(p.marketPrice) : '—'}</div>
-                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>京东价：{p?.jdPrice ?? '—'} / 天猫价：{p?.tmallPrice ?? '—'}</div>
+                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`京东价：${p?.jdPrice ?? '—'} / 天猫价：${p?.tmallPrice ?? '—'}`}>京东 {p?.jdPrice ?? '—'} / 天猫 {p?.tmallPrice ?? '—'}</div>
                       </td>
                       <td>
                         {(() => {
@@ -562,8 +565,8 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
                             : <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>—（未配置报价）</span>;
                         })()}
                       </td>
-                      <td><input className="filter-input mono" type="number" min={1} value={it.quantity} onChange={(e) => setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, quantity: Number(e.target.value) } : x)))} style={{ width: '100%' }} /></td>
-                      <td><input className="filter-input mono" type="number" min={0} value={it.price} onChange={(e) => setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, price: Number(e.target.value) } : x)))} style={{ width: '100%', borderColor: warn ? '#CB405D' : undefined }} /></td>
+                      <td><input className="filter-input mono" type="number" min={1} value={it.quantity} onChange={(e) => setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, quantity: Number(e.target.value) } : x)))} style={{ width: '100%', boxSizing: 'border-box' }} /></td>
+                      <td><input className="filter-input mono" type="number" min={0} value={it.price} onChange={(e) => setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, price: Number(e.target.value) } : x)))} style={{ width: '100%', boxSizing: 'border-box', borderColor: warn ? '#CB405D' : undefined }} /></td>
                       {isVia && (() => {
                         const pn = platformNetOf(it.price);
                         return (
@@ -584,29 +587,49 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
           <div style={{ fontSize: 'var(--text-sm)', textAlign: 'right', borderTop: '1px solid var(--color-neutral-100)', paddingTop: 'var(--space-3)' }}>
             合计：<strong className="mono" style={{ color: 'var(--color-module-current-base)', fontSize: 'var(--text-md)' }}>{money(entryTotal)}</strong>
           </div>
-
-          {/* 操作按钮：合计下一行，居中，间距加宽（重置=辅色调实心，创建=主色调） */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-6)', marginTop: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
-            {embedded && onClose && <Button variant="ghost" onClick={onClose}>关闭</Button>}
-            <Button onClick={saveOrder}>创建订单并匹配报备</Button>
-            <Button style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)' }} onClick={resetForm}>重置</Button>
-          </div>
         </Card>
-
-        {error && (
-          <div style={{ padding: '8px 12px', background: '#FFEBEE', color: '#C62828', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginTop: 'var(--space-4)' }}>{error}</div>
-        )}
     </>
+  );
+
+  /** 底部操作栏：与分发弹窗一致（左侧信息、右侧按钮），贴在弹窗最下方（非悬浮） */
+  const formFooter = (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 'var(--space-3)',
+        padding: embedded ? 'var(--space-3) var(--space-6)' : 'var(--space-4) 0',
+        borderTop: '1px solid var(--color-neutral-100)',
+        background: 'var(--color-neutral-0)',
+        flexShrink: 0,
+      }}
+    >
+      <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-sm)', color: '#C62828' }}>{error}</span>
+      <span style={{ display: 'flex', gap: 'var(--space-3)', flexShrink: 0 }}>
+        {embedded && onClose && <Button variant="ghost" onClick={onClose}>关闭</Button>}
+        <Button variant="ghost" className="btn-secondary-fill" onClick={resetForm}>重置</Button>
+        <Button onClick={saveOrder}>创建订单并匹配报备</Button>
+      </span>
+    </div>
   );
 
   return (
     <>
       {embedded ? (
-        formContent
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+          {/* 中间内容整体横向滚动：宽度不足时保持表单最低宽度并出现底部横向滚动条 */}
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 'var(--space-5) var(--space-6)' }}>
+            <div style={{ minWidth: formMinWidth }}>{formContent}</div>
+          </div>
+          {formFooter}
+        </div>
       ) : (
         <>
           <ContentHeader title="新建销售单" breadcrumbs={['销售', '销售单管理', '新建销售单']} />
-          <div className="content-body">{formContent}</div>
+          <div className="content-body" style={{ overflowX: 'auto' }}>
+            <div style={{ minWidth: formMinWidth }}>{formContent}{formFooter}</div>
+          </div>
         </>
       )}
 
@@ -629,7 +652,7 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
               </div>
               <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginTop: 'var(--space-2)', textAlign: 'center', lineHeight: 1.7 }}>
                 {createdHitReport
-                  ? '已进入「销售单处理」；录入时命中审批通过的报备，送去分发后可选择报备转派'
+                  ? '已进入「销售单处理」；如需报备转派，请在分发弹窗中选择「转派-报备」人工匹配'
                   : '已进入「销售单处理」，送去分发后生成履约单并进入「履约单分发-待分发」'}
               </div>
             </div>

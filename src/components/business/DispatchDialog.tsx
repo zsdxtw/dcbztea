@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Button from '../common/Button';
 import SplitDraftBuilder, { type DraftFulfillment, REMAINDER_DRAFT_ID } from './SplitDraftBuilder';
-import ReportMatchDialog from './ReportMatchDialog';
+import { ReportMatchPicker } from './ReportMatchDialog';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePriceStore } from '../../stores/priceStore';
 import { useSupplierStore } from '../../stores/supplierStore';
@@ -27,8 +27,8 @@ interface TabConfig {
   floorType?: 'discount' | 'price';
   floorValue?: string;
   scope?: { province?: string; city?: string; district?: string };
-  /** 报备匹配：订单报备编号（空=按商品/地区报备自动分组） */
-  reportCode?: string;
+  /** 报备匹配：人工勾选的报备编号（可多选，转给首家勾选报备的合作商） */
+  reportCodes?: string[];
 }
 
 interface Props {
@@ -39,6 +39,8 @@ interface Props {
   onClose: () => void;
   /** 分发完成提示（页面顶部 flash） */
   onDone: (msg: string) => void;
+  /** 先去拆单（履约单分发模式）：关闭分发弹窗并打开拆单弹窗 */
+  onGoSplit?: () => void;
 }
 
 const partnerTypeLabel = (s: SupplierItem) =>
@@ -48,13 +50,12 @@ const partnerTypeLabel = (s: SupplierItem) =>
     .join(' / ');
 
 /**
- * 共用分发弹窗：
- * 上方拆单预生成履约单 TAB（剩余部分以虚线 TAB 排在末尾），下方四方向「转去自营 / 转派-报备 / 转派-比单 / 转派指定」。
- * 每个 TAB 可分别确定分发方式；点击确认后不关闭，继续配置下一张，全部确定后统一落库分发。
- * - sales：由销售单生成 1..n 张履约单（未拆时销售单本身即一张履约单）；
- * - fulfillment：在原履约单下拆出 1..n 张履约单（未拆时针对当前履约单本身）。
+ * 共用分发弹窗，下方四方向「自营（淡茶半盏）/ 转派-报备 / 转派-比单 / 转派-指定」：
+ * - sales：上方可先拆单预生成履约单 TAB（剩余部分以虚线 TAB 排在末尾），每个 TAB 可「预确定」分发方式（锁定该 TAB），
+ *   点击「确认拆单并分发」生成全部履约单：已预确定的同步分发，未预确定的进入待分发；
+ * - fulfillment：不展示拆单与预确定，仅对当前履约单整单选择方向并分发。
  */
-export default function DispatchDialog({ order, mode, onClose, onDone }: Props) {
+export default function DispatchDialog({ order, mode, onClose, onDone, onGoSplit }: Props) {
   const products = usePriceStore((s) => s.products);
   const purchaseRules = usePriceStore((s) => s.purchaseRules);
   const suppliers = useSupplierStore((s) => s.suppliers);
@@ -92,9 +93,6 @@ export default function DispatchDialog({ order, mode, onClose, onDone }: Props) 
   const [supplierType, setSupplierType] = useState<'' | 'brand' | 'service' | 'supplier'>('');
   const [supplierPage, setSupplierPage] = useState(1);
 
-  /** 报备匹配弹窗（对某个 TAB 单独确认） */
-  const [reportFor, setReportFor] = useState<string | null>(null);
-
   const loadCfg = (c?: TabConfig) => {
     setDirection(c?.direction ?? 'self');
     setSupplierId(c?.supplierId ?? '');
@@ -108,6 +106,19 @@ export default function DispatchDialog({ order, mode, onClose, onDone }: Props) 
     setScopeDist(c?.scope?.district ?? '');
   };
 
+  /** 重置：清空拆单草稿与全部分发配置，恢复为未拆分的整单状态 */
+  const resetAll = () => {
+    setDrafts([]);
+    setSelected(REMAINDER_DRAFT_ID);
+    setConfirmedIds([]);
+    setConfigs({});
+    setNoticeOk(true);
+    setNotice('已重置，拆单与分发配置已清空');
+    loadCfg(undefined);
+    setSupplierProv(''); setSupplierCity(''); setSupplierDist(''); setSupplierKw('');
+    setSupplierBrand(''); setSupplierType(''); setSupplierPage(1);
+  };
+
   /* 每次打开新的分发对象时重置 */
   useEffect(() => {
     setDrafts([]);
@@ -116,10 +127,10 @@ export default function DispatchDialog({ order, mode, onClose, onDone }: Props) 
     setConfigs({});
     setNotice('');
     setNoticeOk(false);
-    setReportFor(null);
     loadCfg(undefined);
     setSupplierProv(''); setSupplierCity(''); setSupplierDist(''); setSupplierKw('');
     setSupplierBrand(''); setSupplierType(''); setSupplierPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order?.id]);
 
   /** 未拆出的剩余数量（作为末尾虚线 TAB） */
@@ -144,16 +155,18 @@ export default function DispatchDialog({ order, mode, onClose, onDone }: Props) 
     if (remainderItems.length > 0) {
       list.push({
         id: REMAINDER_DRAFT_ID,
-        label: drafts.length === 0 ? '整单（剩余）' : '剩余部分',
+        label: drafts.length === 0 ? (mode === 'fulfillment' ? '当前履约单' : '整单（剩余）') : '剩余部分',
         items: remainderItems,
       });
     }
     return list;
-  }, [drafts, remainderItems]);
+  }, [drafts, remainderItems, mode]);
 
   const selectedKey = selected && tabs.some((t) => t.id === selected) ? selected : (tabs[0]?.id ?? null);
   const currentTab = tabs.find((t) => t.id === selectedKey);
   const unitItems: ExternalOrderItem[] = currentTab?.items ?? order?.items ?? [];
+
+  const labelOf = (id: string) => tabs.find((t) => t.id === id)?.label ?? '当前履约单';
 
   /** 选中 TAB 的商品变更后，若原选中已不存在则回落到末尾 TAB */
   useEffect(() => {
@@ -216,21 +229,20 @@ export default function DispatchDialog({ order, mode, onClose, onDone }: Props) 
     scope: { province: scopeProv || undefined, city: scopeCity || undefined, district: scopeDist || undefined },
   });
 
-  /** 切换 TAB：暂存当前编辑态，载入目标 TAB 的配置 */
+  /** 切换 TAB：暂存未预确定 TAB 的编辑态，载入目标 TAB 的已选配置 */
   const selectTab = (id: string | null) => {
     if (!id) { setSelected(null); return; }
-    if (selectedKey && id !== selectedKey) {
+    if (selectedKey && id !== selectedKey && !confirmedIds.includes(selectedKey)) {
       const next = { ...configs, [selectedKey]: workingCfg() };
       setConfigs(next);
       setSelected(id);
       loadCfg(next[id]);
     } else {
       setSelected(id);
+      if (id !== selectedKey) loadCfg(configs[id]);
     }
     setNotice('');
   };
-
-  const labelOf = (id: string) => tabs.find((t) => t.id === id)?.label ?? '当前履约单';
 
   /** 单张 TAB 配置校验 */
   const validate = (): string => {
@@ -272,123 +284,129 @@ export default function DispatchDialog({ order, mode, onClose, onDone }: Props) 
       });
       return r.ok ? '' : r.msg;
     }
-    const r = store.getState().applyReportMatchToFulfillment(targetId, cfg.reportCode);
+    const r = store.getState().matchReportManual(targetId, cfg.reportCodes ?? []);
     return r.ok ? '' : r.msg;
   };
 
-  /** 配置完整性校验（提交前逐张复核，避免部分落库） */
-  const configError = (c?: TabConfig): string => {
-    if (!c) return '尚未确定分发方式';
-    if (c.direction === 'assign') {
-      if (!c.supplierMode) return '请选择本单合作模式（差价 / 扣点）';
-      if (!c.supplierId) return '请选择合作商';
+  /** 快速拆单：按品牌 / 按商品整单分组，直接生成对应数量的预生成 TAB */
+  const quickSplit = (by: 'brand' | 'product') => {
+    if (!order) return;
+    const groups = new Map<string, ExternalOrderItem[]>();
+    for (const it of order.items) {
+      const p = products.find((x) => x.id === it.productId) ?? products.find((x) => x.name === it.productName);
+      const key = by === 'brand' ? (p?.brand ?? '其他') : it.productName;
+      groups.set(key, [...(groups.get(key) ?? []), { ...it }]);
     }
-    if (c.direction === 'compare') {
-      if (!c.compareMode) return '请选择本单合作模式（差价 / 扣点）';
-      if (!(Number(c.floorValue) > 0)) return '请填写有效底价';
+    const next: DraftFulfillment[] = [...groups.entries()].map(([, its], i) => ({
+      id: `draft_q_${Date.now()}_${i}`,
+      items: its,
+    }));
+    setDrafts(next);
+    setSelected(next[0]?.id ?? null);
+    /* 重新生成 TAB 后，原有预确定全部失效 */
+    if (confirmedIds.length > 0) {
+      setConfirmedIds([]);
+      setConfigs({});
+      setNoticeOk(true);
+      setNotice('已按' + (by === 'brand' ? '品牌' : '商品') + '重新拆单，原预确定的分发方式已清空');
+    } else {
+      setNotice('');
     }
-    return '';
   };
 
-  /** 全部 TAB 配置完成：统一落库并逐张执行分发 */
-  const commitAll = (finalConfigs: Record<string, TabConfig>) => {
+  /** 预确定当前 TAB 的分发方式：TAB 锁定（实心圆、不可删除）；不预确定也可确认拆单 */
+  const preConfirm = () => {
+    if (!selectedKey) { setNoticeOk(false); setNotice('请先生成或选择履约单 TAB'); return; }
+    const err = validate();
+    if (err) { setNoticeOk(false); setNotice(err); return; }
+    setConfigs((c) => ({ ...c, [selectedKey]: workingCfg() }));
+    setConfirmedIds((ids) => (ids.includes(selectedKey) ? ids : [...ids, selectedKey]));
+    setNoticeOk(true);
+    setNotice(`已预确定「${labelOf(selectedKey)}」的分发方式`);
+  };
+
+  /** 预确定当前 TAB：报备方向需先勾选报备记录，其他方向按当前选择校验 */
+  const handlePreConfirm = () => {
+    if (!selectedKey) { setNoticeOk(false); setNotice('请先生成或选择履约单 TAB'); return; }
+    if (direction === 'report') {
+      const codes = configs[selectedKey]?.reportCodes ?? [];
+      if (codes.length === 0) { setNoticeOk(false); setNotice('请先勾选要匹配的报备记录'); return; }
+      setConfigs((c) => ({ ...c, [selectedKey]: { direction: 'report' as const, reportCodes: codes } }));
+      setConfirmedIds((ids) => (ids.includes(selectedKey) ? ids : [...ids, selectedKey]));
+      setNoticeOk(true);
+      setNotice(`已预确定「${labelOf(selectedKey)}」的分发方式（${codes.length} 条报备）`);
+      return;
+    }
+    preConfirm();
+  };
+
+  /** 报备勾选变化：暂存勾选的报备编号（是否锁定由「预确定」决定） */
+  const handleReportCodesChange = (codes: string[]) => {
+    if (!selectedKey) return;
+    setConfigs((c) => ({ ...c, [selectedKey]: { ...(c[selectedKey] ?? workingCfg()), direction: 'report' as const, reportCodes: codes } }));
+    setNotice('');
+  };
+
+  /** 销售单处理：生成全部履约单；已预确定分发方式的同步分发，其余进入待分发 */
+  const commitSales = () => {
     const o = order;
     if (!o) return;
-    const missing = tabs.find((t) => !finalConfigs[t.id]);
-    if (missing) {
-      setSelected(missing.id);
-      loadCfg(undefined);
-      setNoticeOk(false);
-      setNotice(`「${missing.label}」尚未确定分发方式`);
-      return;
-    }
-    const invalid = tabs.find((t) => configError(finalConfigs[t.id]));
-    if (invalid) {
-      setSelected(invalid.id);
-      loadCfg(finalConfigs[invalid.id]);
-      setNoticeOk(false);
-      setNotice(`「${invalid.label}」${configError(finalConfigs[invalid.id])}`);
-      return;
-    }
+    const cfgOf = (tabId: string) => (confirmedIds.includes(tabId) ? configs[tabId] : undefined);
 
-    /* 未拆单：仅剩余 TAB，直接分发销售单 / 当前履约单本身 */
+    /* 未拆单：销售单本身作为一张履约单 */
     if (drafts.length === 0) {
-      if (mode === 'sales') {
-        const r = store.getState().dispatchSalesOrder(o.id);
-        if (!r.ok) { setNoticeOk(false); setNotice(r.msg); return; }
+      const r = store.getState().dispatchSalesOrder(o.id);
+      if (!r.ok) { setNoticeOk(false); setNotice(r.msg); return; }
+      const cfg = cfgOf(REMAINDER_DRAFT_ID);
+      if (cfg) {
+        const err = applyOne(o.id, cfg);
+        if (err) { setNoticeOk(false); setNotice(`「${labelOf(REMAINDER_DRAFT_ID)}」分发失败：${err}`); return; }
+        onDone('已整单分发（该销售单即一张履约单）');
+      } else {
+        onDone(`已生成 1 张履约单（${o.code}LY01），进入待分发`);
       }
-      const err = applyOne(o.id, finalConfigs[REMAINDER_DRAFT_ID]);
-      if (err) { setNoticeOk(false); setNotice(err); return; }
-      onDone(mode === 'sales' ? '已整单分发（该销售单即一张履约单）' : '已完成当前履约单分发');
       onClose();
       return;
     }
 
     const groups = drafts.map((d) => d.items);
-    const res = mode === 'sales'
-      ? store.getState().splitSalesOrderToFulfillments(o.id, groups)
-      : store.getState().splitFulfillmentByDrafts(o.id, groups);
+    const res = store.getState().splitSalesOrderToFulfillments(o.id, groups);
     if (!res.ok || !res.created?.length) { setNoticeOk(false); setNotice(res.msg); return; }
 
     const orderedIds = [...drafts.map((d) => d.id), ...(remainderItems.length > 0 ? [REMAINDER_DRAFT_ID] : [])];
+    let dispatched = 0;
     for (let i = 0; i < res.created.length; i += 1) {
-      const tabId = orderedIds[i] ?? orderedIds[orderedIds.length - 1];
-      const err = applyOne(res.created[i].id, finalConfigs[tabId]);
-      if (err) {
-        setNoticeOk(false);
-        setNotice(`「${labelOf(tabId)}」分发失败：${err}`);
-        return;
-      }
+      const tabId = orderedIds[i];
+      const cfg = tabId ? cfgOf(tabId) : undefined;
+      if (!cfg) continue;
+      const err = applyOne(res.created[i].id, cfg);
+      if (err) { setNoticeOk(false); setNotice(`「${labelOf(tabId)}」分发失败：${err}`); return; }
+      dispatched += 1;
     }
-    onDone(`已完成 ${res.created.length} 张履约单的分发`);
+    const pending = res.created.length - dispatched;
+    onDone(`已生成 ${res.created.length} 张履约单，${dispatched} 张已分发${pending > 0 ? `，${pending} 张进入待分发` : ''}`);
     onClose();
   };
 
-  /** 确认当前 TAB 后继续下一张；全部确认后统一提交 */
-  const advanceOrCommit = (key: string, nextConfigs: Record<string, TabConfig>, nextConfirmed: string[]) => {
-    setConfigs(nextConfigs);
-    setConfirmedIds(nextConfirmed);
-    const rest = tabs.filter((t) => !nextConfirmed.includes(t.id));
-    if (rest.length > 0) {
-      const nextTab = rest[0];
-      setSelected(nextTab.id);
-      loadCfg(nextConfigs[nextTab.id]);
-      setNoticeOk(true);
-      setNotice(`已确定「${labelOf(key)}」的分发方式，请继续配置「${nextTab.label}」`);
-      return;
-    }
-    commitAll(nextConfigs);
-  };
-
-  const pendingOtherCount = selectedKey
-    ? tabs.filter((t) => t.id !== selectedKey && !confirmedIds.includes(t.id)).length
-    : 0;
-  const currentConfirmed = selectedKey ? confirmedIds.includes(selectedKey) : false;
-  const allConfirmed = tabs.length > 0 && confirmedIds.length >= tabs.length;
-  const primaryLabel = tabs.length <= 1
-    ? '确认分发'
-    : (!currentConfirmed && pendingOtherCount === 0) || (currentConfirmed && allConfirmed)
-      ? '确认全部分发'
-      : '确认并继续下一履约单';
+  const primaryLabel = mode === 'sales' ? '确认拆单并分发' : '确认分发';
 
   const handlePrimary = () => {
-    if (!selectedKey) { setNoticeOk(false); setNotice('请先生成或选择履约单 TAB'); return; }
-    if (direction === 'report') { setNotice(''); setReportFor(selectedKey); return; }
+    if (mode === 'sales') { commitSales(); return; }
+    if (direction === 'report') {
+      const codes = configs[REMAINDER_DRAFT_ID]?.reportCodes ?? [];
+      if (codes.length === 0) { setNoticeOk(false); setNotice('请先勾选要匹配的报备记录'); return; }
+      const err = applyOne(order!.id, { direction: 'report', reportCodes: codes });
+      if (err) { setNoticeOk(false); setNotice(err); return; }
+      onDone('已完成当前履约单分发（报备转出）');
+      onClose();
+      return;
+    }
     const err = validate();
     if (err) { setNoticeOk(false); setNotice(err); return; }
-    const nextConfigs = { ...configs, [selectedKey]: workingCfg() };
-    const nextConfirmed = confirmedIds.includes(selectedKey) ? confirmedIds : [...confirmedIds, selectedKey];
-    advanceOrCommit(selectedKey, nextConfigs, nextConfirmed);
-  };
-
-  /** 报备 TAB 确认：记录订单报备编号（空=自动分组），再继续 / 提交 */
-  const handleReportConfirm = (code?: string) => {
-    const key = reportFor;
-    setReportFor(null);
-    if (!key) return;
-    const nextConfigs = { ...configs, [key]: { ...workingCfg(), direction: 'report' as const, reportCode: code } };
-    const nextConfirmed = confirmedIds.includes(key) ? confirmedIds : [...confirmedIds, key];
-    advanceOrCommit(key, nextConfigs, nextConfirmed);
+    const err2 = applyOne(order!.id, workingCfg());
+    if (err2) { setNoticeOk(false); setNotice(err2); return; }
+    onDone('已完成当前履约单分发');
+    onClose();
   };
 
   if (!order) return null;
@@ -402,38 +420,51 @@ export default function DispatchDialog({ order, mode, onClose, onDone }: Props) 
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginTop: 2 }}>
               {order.customerName} · {regionTextOf(order.customerRegion, order.receiverAddress)} · {money(order.totalAmount)} · 当前分发单元：
               <strong> {currentTab?.label ?? '整单'}</strong>
-              <span style={{ marginLeft: 8 }}>已确定 {confirmedIds.length} / {tabs.length} 张</span>
+              <span style={{ marginLeft: 8 }}>{mode === 'sales' ? '已预确定' : '已确定'} {confirmedIds.length} / {tabs.length} 张</span>
             </div>
           </div>
 
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 'var(--space-4) var(--space-5)' }}>
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>拆单（可选；每个 TAB 可分别确定分发方式）</div>
-            <SplitDraftBuilder
-              compact
-              items={order.items}
-              drafts={drafts}
-              onChange={(next) => { setDrafts(next); setNotice(''); }}
-              selectedId={selectedKey}
-              onSelect={selectTab}
-              remainderTab
-              configuredIds={confirmedIds}
-            />
-            <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>
-              {drafts.length === 0
-                ? (mode === 'sales'
-                  ? `未拆出履约单 TAB：本次分发针对整个销售单，分发后该销售单本身即为一张履约单（${order.code}LY01）。`
-                  : `未拆出履约单 TAB：本次分发针对当前履约单本身（${order.code}）。`)
-                : (mode === 'sales'
-                  ? '剩余部分以虚线 TAB 排在末尾，可与其他 TAB 分别确定分发方式；全部 TAB 确定后统一生成履约单并分发。'
-                  : '剩余部分以虚线 TAB 排在末尾，可与其他 TAB 分别确定分发方式；全部 TAB 确定后在当前销售单下生成履约单并分发。')}
-            </div>
+            {mode === 'sales' ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)' }}>拆单（可选；每个 TAB 可分别确定分发方式）</div>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>快速拆单：</span>
+                    <Button size="sm" onClick={() => quickSplit('brand')}>按品牌拆单</Button>
+                    <Button size="sm" onClick={() => quickSplit('product')}>按商品拆单</Button>
+                  </span>
+                </div>
+                <SplitDraftBuilder
+                  compact
+                  items={order.items}
+                  drafts={drafts}
+                  onChange={(next) => { setDrafts(next); setNotice(''); }}
+                  selectedId={selectedKey}
+                  onSelect={selectTab}
+                  remainderTab
+                  configuredIds={confirmedIds}
+                  hideQuickSplit
+                />
+                <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>
+                  {drafts.length === 0
+                    ? `未拆出履约单 TAB：确认后整个销售单作为一张履约单（${order.code}LY01）；未预确定分发方式的进入待分发。`
+                    : '剩余部分以虚线 TAB 排在末尾，可与其他 TAB 分别预确定分发方式；未预确定的履约单确认后进入待分发。'}
+                </div>
+              </>
+            ) : (
+              <div style={{ padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-600)', lineHeight: 1.8 }}>
+                本次分发针对整个履约单 <strong>{order.code}</strong>（{order.items.reduce((s, it) => s + it.quantity, 0)} 份商品，共 {order.items.length} 个商品）。
+                如需拆分后再分发，请先关闭本弹窗，使用该履约单的「拆单」功能拆出履约单，再分别分发。
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
               {([
-                ['self', '转去自营'],
+                ['self', '自营（淡茶半盏）'],
                 ['report', '转派-报备'],
                 ['compare', '转派-比单'],
-                ['assign', '转派指定'],
+                ['assign', '转派-指定'],
               ] as const).map(([k, label]) => (
                 <button key={k} className={`tab-card-simple${direction === k ? ' active' : ''}`} onClick={() => setDirection(k)} style={{ padding: '5px 28px', minWidth: 132, justifyContent: 'center' }}>
                   {label}
@@ -615,10 +646,30 @@ export default function DispatchDialog({ order, mode, onClose, onDone }: Props) 
             )}
 
             {direction === 'report' && (
-              <div style={{ padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-600)', lineHeight: 1.8 }}>
-                点击「匹配并转出」后进入报备匹配：<strong>先人工确认订单报备</strong>，未命中再按商品报备 / 地区报备自动分组。
-                匹配到的商品按合作商生成履约单并进入「报备-匹配待确认」，未匹配商品生成待分发履约单。
-                报备确认后记为当前 TAB 的分发方式，可继续配置其他 TAB。
+              <div>
+                <div style={{ padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-600)', lineHeight: 1.8, marginBottom: 'var(--space-3)' }}>
+                  报备匹配由<strong>人工处理</strong>：下方直接展示全部已通过的报备记录（订单报备 / 商品报备 / 地区报备），请人工勾选命中的报备。
+                  {mode === 'sales'
+                    ? '勾选报备后点击「预确定」锁定该履约单 TAB；确认拆单时同步转出报备合作商。'
+                    : '点击底部「确认分发」后整单直接转出至所选报备合作商。'}
+                  无货源订单报备确认后订单退回待分发，由平台自营或转派供货商。
+                </div>
+                <ReportMatchPicker
+                  order={order}
+                  items={unitItems}
+                  checked={configs[selectedKey ?? REMAINDER_DRAFT_ID]?.reportCodes ?? []}
+                  onCheckedChange={handleReportCodesChange}
+                />
+              </div>
+            )}
+
+            {/* 预确定当前履约单的分发方式（履约单分发场景不展示） */}
+            {mode === 'sales' && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>
+                  预确定后「{currentTab?.label ?? '当前履约单'}」TAB 将锁定不可删除；也可不预确定，确认拆单后该履约单进入待分发
+                </span>
+                <Button onClick={handlePreConfirm}>预确定</Button>
               </div>
             )}
           </div>
@@ -627,25 +678,19 @@ export default function DispatchDialog({ order, mode, onClose, onDone }: Props) 
             <span style={{ fontSize: 'var(--text-sm)', color: noticeOk ? '#01795D' : '#C62828' }}>{notice}</span>
             <span style={{ display: 'flex', gap: 'var(--space-3)' }}>
               <Button variant="ghost" onClick={onClose}>关闭</Button>
-              <Button
-                disabled={direction === 'assign' && (!supplierId || !supplierMode)}
-                onClick={handlePrimary}
-              >
+              {mode === 'sales' && (
+                <Button variant="ghost" className="btn-secondary-fill" onClick={resetAll}>重置</Button>
+              )}
+              <Button onClick={handlePrimary}>
                 {primaryLabel}
               </Button>
+              {mode === 'fulfillment' && (
+                <Button onClick={() => { onClose(); onGoSplit?.(); }}>先去拆单</Button>
+              )}
             </span>
           </div>
         </div>
       </div>
-
-      <ReportMatchDialog
-        open={!!reportFor}
-        order={order}
-        items={reportFor ? (tabs.find((t) => t.id === reportFor)?.items ?? unitItems) : unitItems}
-        onClose={() => setReportFor(null)}
-        onConfirm={handleReportConfirm}
-        confirmLabel="确定该履约单的报备匹配"
-      />
     </>
   );
 }

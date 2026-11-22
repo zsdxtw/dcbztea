@@ -9,7 +9,7 @@ import SalesOrderEntryModal from '../../components/business/SalesOrderEntryModal
 import SplitDraftBuilder, { type DraftFulfillment } from '../../components/business/SplitDraftBuilder';
 import ReportMatchDialog from '../../components/business/ReportMatchDialog';
 import DispatchDialog from '../../components/business/DispatchDialog';
-import { useOrderFlowStore, previewReportMatch } from '../../stores/orderFlowStore';
+import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePriceStore } from '../../stores/priceStore';
 import { buildFamilies } from '../../utils/salesOrderFamily';
 import { SalesOrderDetailTabs } from './SalesOrderDetail';
@@ -189,20 +189,16 @@ export default function SalesOrderProcessing() {
     setReportCtx({ orderId: o.id, items: o.items });
   };
 
-  const confirmReport = (code?: string) => {
+  const confirmReport = (codes: string[]) => {
     if (!reportCtx) return;
     const order = orders.find((o) => o.id === reportCtx.orderId);
     if (!order) { setReportCtx(null); return; }
-    const preview = previewReportMatch(order, reportCtx.items);
-    if (!code && preview.groups.length === 0) {
-      setReportCtx(null);
-      flash('未匹配到订单报备或商品/地区报备');
-      return;
-    }
+    if (codes.length === 0) { setReportCtx(null); flash('请至少勾选一条报备记录'); return; }
+    // 人工匹配：整单生成一张履约单后直接转出至所选报备合作商（无中间待确认状态）
     const res = store.getState().splitSalesOrderToFulfillments(order.id, [reportCtx.items]);
     const child = res.created?.[0];
     if (!res.ok || !child) { setReportCtx(null); window.alert(res.msg); return; }
-    const r = store.getState().applyReportMatchToFulfillment(child.id, code);
+    const r = store.getState().matchReportManual(child.id, codes);
     setReportCtx(null);
     flash(r.ok ? r.msg : `${r.msg}（履约单保持待分发）`);
   };
@@ -215,8 +211,8 @@ export default function SalesOrderProcessing() {
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           销售单处理是销售订单进入系统的<strong>第一站</strong>：<strong>手工录入</strong>与<strong>平台直连推送</strong>的订单一律先进入本页。
-          可查看详情、修改（手工单）、取消；<strong>拆单</strong>先预生成履约单 TAB，确认后落库；<strong>分发</strong>未拆出 TAB 时针对整张销售单，分发后该销售单本身即一张履约单，拆出 TAB 后可选择某张履约单单独转去自营 / 转派-报备 / 转派-比单 / 转派指定；
-          <strong>匹配报备</strong>先人工确认订单报备，再按商品 / 地区报备自动分组。未送分发的销售单不进入履约单分发。
+          可查看详情、修改（手工单）、取消；<strong>拆单</strong>先预生成履约单 TAB，确认后落库；<strong>分发</strong>可先拆单，再为每张履约单 TAB 预确定分发方式（自营（淡茶半盏）/ 转派-报备 / 转派-比单 / 转派-指定），点击「确认拆单并分发」后生成全部履约单：已预确定的同步分发，未预确定的进入待分发；
+          <strong>匹配报备</strong>由人工处理：打开报备匹配弹窗人工勾选命中的报备记录（订单 / 商品 / 地区），确认后整单直接转出至报备合作商。未送分发的销售单不进入履约单分发。
         </div>
 
         {msg && (
@@ -242,7 +238,7 @@ export default function SalesOrderProcessing() {
 
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['序号', '销售单号', '订单来源', '销售路径', '客户', '收货人 / 地区', '品牌数/总数量', '总金额', '录入时间', '操作']}
+            headers={['序号', '销售单号', '订单来源', '销售路径', '客户', '收货人 / 地区', '品牌/数量', '总金额', '录入时间', '操作']}
             rows={pagedRows.map((o, idx) => [
               <span key="no" className="mono cell-muted">{(page - 1) * pageSize + idx + 1}</span>,
               <span key="c" className="cell-mono-emph" style={{ whiteSpace: 'nowrap' }}>
@@ -476,7 +472,7 @@ export default function SalesOrderProcessing() {
         items={reportCtx?.items ?? []}
         onClose={() => setReportCtx(null)}
         onConfirm={confirmReport}
-        confirmLabel="匹配并转出"
+        confirmLabel="确认匹配并转出"
       />
 
       {/* ── 取消销售单（必填原因，辅助色） ── */}

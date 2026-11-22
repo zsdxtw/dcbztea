@@ -422,6 +422,9 @@ body {
 .btn-secondary:hover { background: var(--color-module-current-lightest); }
 .btn-ghost { background: transparent; color: var(--color-neutral-600); }
 .btn-ghost:hover { background: var(--color-neutral-100); }
+/* 辅助色实心按钮：与 primary 同形，色调取当前模块辅助色 */
+.btn-secondary-fill { background: var(--color-module-current-secondary); color: var(--color-neutral-0); box-shadow: 0 1px 2px rgba(0,0,0,0.06); transition: var(--transition-module); }
+.btn-secondary-fill:hover { background: var(--color-module-current-secondary); filter: brightness(0.9); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 .btn-sm { height: 28px; padding: 0 var(--space-3); font-size: var(--text-sm); }
 
 /* ── 列表筛选标签(筛选项名称) ── */
@@ -861,3 +864,8 @@ div:hover > .img-hover-label { opacity: 1 !important; }
 .detail-inline-table thead th { background: var(--color-neutral-100); padding: var(--space-2) var(--space-3); text-align: left; font-weight: var(--font-medium); color: var(--color-neutral-600); font-size: var(--text-sm); white-space: nowrap; }
 .detail-inline-table tbody td { padding: var(--space-2) var(--space-3); border-top: 1px solid var(--color-neutral-150); color: var(--color-neutral-700); }
 .detail-inline-table tbody tr:hover { background: var(--color-neutral-50); }
+/* 新建销售单商品明细：列多，压缩单元格左右内边距，避免窄屏出现横向滚动条 */
+.order-entry-items thead th,
+.order-entry-items tbody td { padding-left: 6px; padding-right: 6px; }
+.order-entry-items thead th:first-child,
+.order-entry-items tbody td:first-child { padding-left: var(--space-3); }

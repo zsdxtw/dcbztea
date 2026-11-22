@@ -158,7 +158,7 @@ const baseSeeds: ExternalOrder[] = [
     ],
   },
 
-  /* ── 报备-匹配待确认（录入即命中云茶商品报备，待人工确认后分发） ── */
+  /* ── 转派待接单（报备转出：人工匹配云茶商品报备后直接转出） ── */
   {
     id: 'eo12', code: 'SO-2610250005', platform: 'pdd', externalOrderNo: 'PDD-3355660-2',
     customerName: '无锡梅园茶舍', customerType: '直营客户', customerRegion: '江苏无锡',
@@ -167,17 +167,18 @@ const baseSeeds: ExternalOrder[] = [
     receiver: '梅园茶舍采购部', receiverPhone: '0510-8230****', receiverAddress: '江苏无锡市滨湖区梁溪路88号',
     remark: '拼多多百亿补贴订单',
     entryTime: '2026-10-25', operator: '运营小周', sourceChannel: 'push',
-    processStatus: 'report_match_pending',
+    processStatus: 'distribute_pending',
     reportMatches: [{ reportCode: 'BB20260910003', reportType: 'product', partnerId: '11', partnerName: '杭州云茶供应链管理有限公司' }],
     path: 'distribute',
     partnerId: '11', partnerName: '杭州云茶供应链管理有限公司',
+    transferSource: 'report',
     history: [
       { time: '2026-10-25', action: '直连推送订单', detail: '拼多多 API 自动同步' },
-      { time: '2026-10-25', action: '命中报备，待确认匹配', detail: '命中商品报备 BB20260910003（水金龟 · 江苏区域）→ 杭州云茶供应链管理有限公司 · 待人工确认后分发' },
+      { time: '2026-10-25', action: '人工匹配报备并转出', detail: '人工勾选商品报备 BB20260910003（水金龟 · 江苏区域）→ 杭州云茶供应链管理有限公司 · 等待合作商接单' },
     ],
   },
 
-  /* ── 转派待接单（报备转派：命中云茶商品报备自动转出） ── */
+  /* ── 转派待接单（报备转派：人工匹配云茶商品报备后转出） ── */
   {
     id: 'eo2', code: 'SO-2610240002', platform: 'jd', externalOrderNo: 'JD-20581773',
     customerName: '苏州吴门茶事', customerType: '个人客户', customerRegion: '江苏苏州',
@@ -192,7 +193,7 @@ const baseSeeds: ExternalOrder[] = [
     transferSource: 'report', transferTime: '2026-10-24',
     history: [
       { time: '2026-10-24', action: '手工录入订单', detail: '京东平台' },
-      { time: '2026-10-24', action: '报备命中自动转出', detail: '命中商品报备 BB20260910003（水金龟 · 江苏区域）→ 杭州云茶供应链管理有限公司 · 等待合作商接单' },
+      { time: '2026-10-24', action: '人工匹配报备并转出', detail: '人工勾选商品报备 BB20260910003（水金龟 · 江苏区域）→ 杭州云茶供应链管理有限公司 · 等待合作商接单' },
     ],
   },
 
@@ -479,17 +480,16 @@ function buildDemoOrders(): ExternalOrder[] {
   orders[orders.length - 6].parentCode = famBMother.code;
   orders[orders.length - 6].code = `${famBMother.code}LY02`;
 
-  /* ── 报备-匹配待确认 ×4（命中两条已审批报备） ── */
+  /* ── 待分发 ×4（含人工匹配报备候选商品，报备匹配为人工操作不再自动流转） ── */
   for (let i = 0; i < 4; i++) {
     const s = next();
     const useJs = i % 2 === 0;
     const cust = DEMO_CUSTOMERS[(s * 3) % DEMO_CUSTOMERS.length];
     const prod = useJs ? DEMO_REPORT_PRODUCTS.jsRock : DEMO_REPORT_PRODUCTS.national;
-    const reportCode = useJs ? 'BB20260910003' : 'BB20260901006';
     const order = buildOne(s, {
       items: [{ productId: prod.productId, productName: prod.name, spec: prod.spec, quantity: 10 + i * 6, price: prod.price }],
-      processStatus: 'report_match_pending',
-      history: [{ time: D(s), action: '命中报备，待确认匹配', detail: `命中商品报备 ${reportCode} → 杭州云茶供应链管理有限公司 · 待人工确认后分发` }],
+      processStatus: 'pending',
+      history: [{ time: D(s), action: '送去分发', detail: '进入履约单分发 · 待选择分发路径（报备匹配需人工处理）' }],
     });
     order.customerName = useJs ? cust.name : order.customerName;
     order.customerRegion = useJs ? `江苏${['苏州', '南京', '无锡', '常州'][i]}` : order.customerRegion;
@@ -497,10 +497,6 @@ function buildDemoOrders(): ExternalOrder[] {
       const c = DEMO_CUSTOMERS[(i * 3) % 4];
       order.receiverAddress = `江苏${['苏州市', '南京市', '无锡市', '常州市'][i]}${c.dist}${c.street}`;
     }
-    order.reportMatches = [{ reportCode, reportType: 'product', partnerId: '11', partnerName: '杭州云茶供应链管理有限公司' }];
-    order.path = 'distribute';
-    order.partnerId = '11';
-    order.partnerName = '杭州云茶供应链管理有限公司';
     orders.push(order);
   }
 
@@ -1018,7 +1014,6 @@ export const EXTERNAL_CHANNEL_LABELS: Record<string, string> = {
 export const EXTERNAL_STATUS_LABELS: Record<string, string> = {
   unprocessed: '未分发',
   pending: '待分发',
-  report_match_pending: '报备-匹配待确认',
   self_pending: '自营待接单',
   comparing: '分发比单中',
   distribute_pending: '转派待接单',
@@ -1039,7 +1034,6 @@ export const SOURCE_TAG_LABELS: Record<string, { label: string; bg: string; colo
 export const EXTERNAL_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   unprocessed: { bg: '#F5F5F5', color: '#9E9E9E' },
   pending: { bg: '#FFF3E0', color: '#E65100' },
-  report_match_pending: { bg: '#E0F7FA', color: '#00838F' },
   self_pending: { bg: '#E3F2FD', color: '#0F64B5' },
   comparing: { bg: '#F3E5F5', color: '#7B1FA2' },
   distribute_pending: { bg: '#E0F2F1', color: '#00695C' },

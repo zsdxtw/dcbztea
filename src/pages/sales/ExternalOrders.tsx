@@ -9,11 +9,11 @@ import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../component
 import { useOrderFlowStore, getSelfPurchaseEstimate } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { useSupplierStore } from '../../stores/supplierStore';
+import { usePriceStore } from '../../stores/priceStore';
 import { useScoreStore, getScoreSummary } from '../../stores/scoreStore';
-import { useReportStore } from '../../stores/reportStore';
 import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS,
   TRANSFER_SOURCE_LABELS, SOURCE_TAG_LABELS, platformLabelOf } from '../../data/externalOrders';
-import { PARTNER_ORDER_STATUS_LABELS, PARTNER_REPORT_TYPE_LABELS } from '../../data/partner';
+import { PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
 import { REGIONS, getCities, getDistricts, regionTextOf } from '../../data/regions';
 import { ProductItemsTable, FulfillmentProgressBlock, SettleInvoiceBlock } from './SalesOrderDetail';
 import { FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS, stageOfOrder } from '../../utils/fulfillment';
@@ -41,10 +41,9 @@ const fulfillmentCodeOf = (o: ExternalOrder): string => (o.parentCode ? o.code :
 /** 销售单订单号（履约单上层订单编号）：子履约单指向母销售单；未拆分时为自身 */
 const salesOrderCodeOf = (o: ExternalOrder): string => o.parentCode ?? o.code;
 
-/** 分发状态：仅分发环节（待分发 / 报备待确认 / 分发比单中 / 待接单 / 分发已完成 / 已取消） */
+/** 分发状态：仅分发环节（待分发 / 分发比单中 / 待接单 / 分发已完成 / 已取消） */
 const DISTRIBUTE_STATE: Record<string, { label: string; bg: string; color: string }> = {
   pending: { label: '待分发', bg: '#FFF3E0', color: '#B26A00' },
-  report_match_pending: { label: '报备待确认', bg: '#E0F7FA', color: '#00838F' },
   comparing: { label: '分发比单中', bg: '#EDE7F6', color: '#5E35B1' },
   self_pending: { label: '自营待接单', bg: '#E3F2FD', color: '#0F64B5' },
   distribute_pending: { label: '转派待接单', bg: '#E8F1FB', color: '#0F64B5' },
@@ -68,9 +67,8 @@ const money = (n: number) => `¥${n.toLocaleString()}`;
 /** 省份选项（地区筛选/范围共用） */
 const PROVINCE_OPTS = REGIONS.map((r) => r.name);
 
-/** 路径标签（转派待接单显示来源路径；报备-匹配待确认属转派-报备） */
+/** 路径标签（转派待接单显示来源路径） */
 function pathLabel(o: ExternalOrder): string {
-  if (o.processStatus === 'report_match_pending') return '转派-报备';
   if (o.path === 'self') return '自营';
   if (o.transferSource) return TRANSFER_SOURCE_LABELS[o.transferSource];
   if (o.distributeMode === 'compare') return '转派-比单';
@@ -79,7 +77,6 @@ function pathLabel(o: ExternalOrder): string {
 
 /** 路径筛选键（列表分发路径筛选用） */
 function pathKey(o: ExternalOrder): string {
-  if (o.processStatus === 'report_match_pending') return 'report';
   if (o.path === 'self') return 'self';
   if (o.transferSource) return o.transferSource;
   if (o.distributeMode === 'compare') return 'compare';
@@ -111,6 +108,15 @@ export default function ExternalOrders() {
   const store = useOrderFlowStore;
   const suppliers = useSupplierStore((s) => s.suppliers);
   const scoreEntries = useScoreStore((s) => s.entries);
+  const products = usePriceStore((s) => s.products);
+
+  /** 品牌/数量：本单商品去重品牌数 + 商品总数量 */
+  const brandQtyOf = (o: ExternalOrder) => {
+    const brands = new Set(o.items.map((it) => products.find((p) => p.id === it.productId)?.brand
+      ?? products.find((p) => p.name === it.productName)?.brand ?? '其他'));
+    const qty = o.items.reduce((s, it) => s + it.quantity, 0);
+    return `${brands.size}种/${qty}份`;
+  };
 
   const [filterStatus, setFilterStatus] = useState('');
   /** 母销售单家族（销售单号弹窗：订单信息/收货信息/商品明细三段） */
@@ -158,14 +164,8 @@ export default function ExternalOrders() {
   /** 履约单分发弹窗（与销售单处理共用：拆单 + 四方向） */
   const [flowingId, setFlowingId] = useState<string | null>(null);
   const [flowMsg, setFlowMsg] = useState('');
-  /** 确认报备匹配弹窗（报备-匹配待确认状态订单） */
-  const [matchConfirming, setMatchConfirming] = useState<ExternalOrder | null>(null);
-  /** 管理弹窗：报备清单 / 比单管理 */
-  const [reportListOpen, setReportListOpen] = useState(false);
+  /** 管理弹窗：比单管理 */
   const [compareMgmtOpen, setCompareMgmtOpen] = useState(false);
-  /** 报备管理筛选 */
-  const [reportStatusFilter, setReportStatusFilter] = useState('');
-  const [reportKw, setReportKw] = useState('');
   const [compareMsg, setCompareMsg] = useState('');
 
   /** 修改抽屉编辑态 */
@@ -177,9 +177,6 @@ export default function ExternalOrders() {
     return () => clearInterval(t);
   }, []);
   const scoreOf = (id: string, name: string) => getScoreSummary({ entries: scoreEntries, supplierId: id, supplierName: name });
-
-  /** 全部报备记录（报备清单弹窗用） */
-  const allReports = useReportStore((s) => s.reports);
 
   const flowing = flowingId ? orders.find((o) => o.id === flowingId) ?? null : null;
 
@@ -194,7 +191,7 @@ export default function ExternalOrders() {
   const currentPos = useMemo(() => (current ? purchaseDocs.filter((d) => d.childOrderId === current.id) : []), [purchaseDocs, current]);
   const enrollOrder = enrollOf ? orders.find((o) => o.id === enrollOf) ?? null : null;
 
-  const noDialogOpen = !selectedId && !splitting && !deleting && !reflowing && !matchConfirming && !enrollOrder && !awarding && !cancelling && !flowingId && !reportListOpen && !compareMgmtOpen;
+  const noDialogOpen = !selectedId && !splitting && !deleting && !reflowing && !enrollOrder && !awarding && !cancelling && !flowingId && !compareMgmtOpen;
   useEffect(() => {
     if (noDialogOpen) setActiveAction(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -309,8 +306,8 @@ export default function ExternalOrders() {
       <ContentHeader title="履约单分发" breadcrumbs={['销售', '销售单管理', '履约单分发']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-          履约单分发决定<strong>销售订单由谁来供货发货</strong>（自营仓发货 / 合作商采购直发），均<strong>逐个展示子单</strong>（母单聚合总览请前往「销售单管理 → 销售订单」）。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>，保存后均自动与审批通过的报备比对。
-          命中报备的订单先进入<strong>报备-匹配待确认</strong>，人工确认匹配后分发给报备合作商；其余订单点击「分发」，弹窗与销售单处理一致：上方可先拆单，未拆出 TAB 时针对当前履约单本身，拆出 TAB 后在原履约单下拆出 1 张或多张履约单，仅对选中的执行方向；方向为转去自营 / 转派-报备 / 转派-比单 / 转派指定，比单可限定合作商地区。
+          履约单分发决定<strong>销售订单由谁来供货发货</strong>（自营仓发货 / 合作商采购直发），均<strong>逐个展示子单</strong>（母单聚合总览请前往「销售单管理 → 销售订单」）。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>，订单进入系统不做自动报备匹配，均由管理员人工处理。
+          报备匹配由<strong>人工处理</strong>：点击「分发」后在弹窗中选择「转派-报备」，人工勾选命中的报备记录（订单 / 商品 / 地区），确认后整单直接转出报备合作商；其余分发方向为自营（淡茶半盏）/ 转派-指定 / 转派-比单，比单可限定合作商地区。
           履约状态进入已接单及后续后分发状态自动变为<strong>分发已完成</strong>；全部包裹妥投后由管理后台「确认收货」→ 履约已确收；待接单订单可「重新分发」回待分发重新选择路径，已接单的重新分发需二次确认。
           尚未送去分发的销售单在「销售单管理 → 销售单处理」中，送去分发生成履约单后才会出现在本页。
         </div>
@@ -387,17 +384,10 @@ export default function ExternalOrders() {
                 </button>
               </div>
               <div className="eop-midgap" />
-              {/* 下路：分发方式（报备-匹配待确认 / 指定 / 比单中）→ 转派待接单 */}
+              {/* 下路：分发方式（报备 / 指定 / 比单中）→ 转派待接单 */}
               <div className="eop-botrow">
                 <div className="eop-box">
-                  <button
-                    className={`tab-card-simple${filterStatus === 'report_match_pending' ? ' active' : ''}`}
-                    title="录入/直连推送时自动匹配报备，命中即进入此状态，人工确认后分发"
-                    onClick={() => setFilterStatus('report_match_pending')}
-                  >
-                    报备-匹配待确认
-                    <span className="tab-card-simple-count">{countOf('report_match_pending')}</span>
-                  </button>
+                  <button className="tab-card-simple eop-dim" disabled title="报备转派直接转出，无中间状态">报备</button>
                   <button className="tab-card-simple eop-dim" disabled title="指定转派即时转出，无中间状态">指定</button>
                   <button className={`tab-card-simple${filterStatus === 'comparing' ? ' active' : ''}`} onClick={() => setFilterStatus('comparing')}>
                     分发比单中
@@ -459,7 +449,6 @@ export default function ExternalOrders() {
           )}
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)' }}>
             {/* 管理按钮仅在对应状态页面展示 */}
-            {filterStatus === 'report_match_pending' && <Button onClick={() => setReportListOpen(true)}>报备管理</Button>}
             {filterStatus === 'comparing' && <Button onClick={() => setCompareMgmtOpen(true)}>比单管理</Button>}
           </span>
         </div>
@@ -467,7 +456,7 @@ export default function ExternalOrders() {
         {/* 子单平铺列表（逐单操作视图；母单聚合总览见「销售单管理 → 销售订单」） */}
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['序号', '销售履约单号', '销售单号', '订单来源', '销售路径', '客户', '收件人 / 地区', '金额', '分发状态', '分发方式', '履约主体', '录入时间', '操作']}
+            headers={['序号', '销售履约单号', '销售单号', '订单来源', '销售路径', '客户', '收件人 / 地区', '品牌/数量', '金额', '分发状态', '分发方式', '履约主体', '录入时间', '操作']}
             rows={pagedOrders.map((o, idx) => [
               <span key="no" className="mono cell-muted">{(page - 1) * pageSize + idx + 1}</span>,
               <span key="c" className="cell-mono-emph" style={{ whiteSpace: 'nowrap' }}>{fulfillmentCodeOf(o)}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.externalOrderNo ?? '—'}</span></span>,
@@ -507,6 +496,7 @@ export default function ExternalOrders() {
                 <span className="cell-emph" style={{ fontSize: 'var(--text-sm)', display: 'block' }}>{o.receiver}</span>
                 <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', whiteSpace: 'nowrap' }}>{regionText(o)}</span>
               </span>,
+              <span key="bq" className="mono" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{brandQtyOf(o)}</span>,
               <span key="a" className="mono" style={{ fontWeight: 'var(--font-semibold)' }}>{money(o.totalAmount)}</span>,
               <span key="s" style={{ whiteSpace: 'nowrap' }}>
                 {(() => { const d = distributeStateOf(o); return pill(d.bg, d.color, d.label); })()}
@@ -522,12 +512,6 @@ export default function ExternalOrders() {
                     {o.items.length >= 1 && actBtn(o, 'split', '拆单', () => { setSplitting(o); setSplitDrafts([]); setSplitSelected(null); setSplitNotice(''); })}
                     {o.sourceChannel === 'manual' && actBtn(o, 'edit', '修改', () => { setSelectedId(o.id); startEdit(o); })}
                     {o.sourceChannel === 'manual' && actBtn(o, 'delete', '删除', () => setDeleting(o))}
-                  </>
-                )}
-                {o.processStatus === 'report_match_pending' && (
-                  <>
-                    {actBtn(o, 'view', '查看', () => openDetail(o.id))}
-                    {actBtn(o, 'match', '确认匹配', () => setMatchConfirming(o))}
                   </>
                 )}
                 {o.processStatus === 'self_pending' && (
@@ -755,25 +739,8 @@ export default function ExternalOrders() {
               <DrawerSection title="分发处理">
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
                   订单待分发：请点击列表行操作「<strong>分发</strong>」按钮，在<strong>履约单分发弹窗</strong>中选择自营或分发（指定 / 报备匹配 / 比单）路径完成分发。
+                  报备匹配由人工处理：在分发弹窗中选择「转派-报备」，人工勾选命中的报备记录后直接转出报备合作商。
                   本抽屉用于查看订单信息与处理轨迹，不做分发操作。
-                </div>
-              </DrawerSection>
-            )}
-
-            {/* ── 报备-匹配待确认 ── */}
-            {current.processStatus === 'report_match_pending' && (
-              <DrawerSection title="报备匹配（待确认）">
-                <InfoGrid cols={4}>
-                  {current.reportMatches?.map((m) => (
-                    <InfoItem key={m.reportCode} label={`命中报备（${PARTNER_REPORT_TYPE_LABELS[m.reportType]}）`} mono>{m.reportCode}</InfoItem>
-                  ))}
-                  {current.reportMatches?.[0] && <InfoItem label="拟分发合作商">{current.reportMatches[0].partnerName}</InfoItem>}
-                </InfoGrid>
-                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginTop: 'var(--space-2)', lineHeight: 1.7 }}>
-                  系统在订单保存（手工录入 / 直连推送）时自动与审批通过的报备规则比对，命中即进入本状态。请人工<strong>确认匹配</strong>后分发给报备合作商，进入转派待接单等待接单。
-                </div>
-                <div style={{ marginTop: 'var(--space-3)' }}>
-                  <Button onClick={() => setMatchConfirming(current)}>确认匹配并转出</Button>
                 </div>
               </DrawerSection>
             )}
@@ -1025,12 +992,19 @@ export default function ExternalOrders() {
         </div>
       )}
 
-      {/* ── 履约单分发弹窗（与销售单处理共用：拆单 + 四方向） ── */}
+      {/* ── 履约单分发弹窗（仅整单分发 + 四方向，报备方向内嵌人工匹配；可跳转拆单） ── */}
       <DispatchDialog
         order={flowing}
         mode="fulfillment"
         onClose={() => setFlowingId(null)}
         onDone={(m) => setFlowMsg(m)}
+        onGoSplit={() => {
+          if (!flowing) return;
+          setSplitting(flowing);
+          setSplitDrafts([]);
+          setSplitSelected(null);
+          setSplitNotice('');
+        }}
       />
 
       {/* ── 拆单弹窗（预生成，与销售单处理一致） ── */}
@@ -1069,35 +1043,6 @@ export default function ExternalOrders() {
                 }}
               >确认拆单生成履约单</Button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 确认报备匹配弹窗（报备-匹配待确认） ── */}
-      {matchConfirming && (
-        <div className="category-dialog-overlay" onClick={() => setMatchConfirming(null)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 440 }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>确认报备匹配</div>
-            {matchConfirming.reportMatches?.[0] ? (
-              <>
-                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
-                  订单 <strong className="mono">{matchConfirming.code}</strong>（{matchConfirming.customerName} · {money(matchConfirming.totalAmount)}）命中报备
-                  <strong className="mono"> {matchConfirming.reportMatches[0].reportCode} </strong>
-                  （{PARTNER_REPORT_TYPE_LABELS[matchConfirming.reportMatches[0].reportType]}），拟分发合作商：<strong>{matchConfirming.reportMatches[0].partnerName}</strong>。
-                  确认后订单进入<strong>转派待接单</strong>，等待合作商接单。
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-                  <Button variant="ghost" onClick={() => setMatchConfirming(null)}>关闭</Button>
-                  <Button onClick={() => {
-                    store.getState().confirmReportMatch(matchConfirming.id);
-                    setMatchConfirming(null);
-                    setSelectedId(null);
-                  }}>匹配并转出</Button>
-                </div>
-              </>
-            ) : (
-              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>未找到报备匹配信息</div>
-            )}
           </div>
         </div>
       )}
@@ -1171,68 +1116,6 @@ export default function ExternalOrders() {
           </div>
         );
       })()}
-      {/* ── 报备管理弹窗（报备-匹配待确认节点） ── */}
-      {reportListOpen && (
-        <div className="category-dialog-overlay" onClick={() => setReportListOpen(false)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 860, maxWidth: '94vw', height: 'min(80vh, 720px)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>报备管理</div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7, flexShrink: 0 }}>
-              合作商提交的全部报备记录（商机 / 客户 / 商品 / 订单报备）。<strong>已通过</strong>的报备参与订单保存时的自动匹配，命中进入「报备-匹配待确认」；
-              报备审批在「采购 → 合作商管理 → 报备管理」。
-            </div>
-            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>
-              <select className="filter-select" value={reportStatusFilter} onChange={(e) => setReportStatusFilter(e.target.value)}>
-                <option value="">全部状态</option>
-                <option value="pending">待审核</option>
-                <option value="approved">已通过</option>
-                <option value="rejected">已驳回</option>
-              </select>
-              <input className="filter-input" placeholder="搜索报备编号/标题/合作商..." value={reportKw} onChange={(e) => setReportKw(e.target.value)} style={{ width: 240 }} />
-              <span style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', alignSelf: 'center' }}>共 {allReports.filter((r) => (!reportStatusFilter || r.status === reportStatusFilter) && (!reportKw.trim() || r.code.includes(reportKw.trim()) || r.title.includes(reportKw.trim()) || r.partnerName.includes(reportKw.trim()))).length} 条</span>
-            </div>
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-              <table className="detail-inline-table">
-                <thead><tr><th>报备编号</th><th>类型</th><th>标题</th><th>合作商</th><th>报备商品/订单</th><th>状态</th><th>提交时间</th><th>命中待确认订单</th></tr></thead>
-                <tbody>
-                  {allReports
-                    .filter((r) => (!reportStatusFilter || r.status === reportStatusFilter) && (!reportKw.trim() || r.code.includes(reportKw.trim()) || r.title.includes(reportKw.trim()) || r.partnerName.includes(reportKw.trim())))
-                    .sort((a, b) => b.submitTime.localeCompare(a.submitTime))
-                    .map((r) => {
-                      const matchedOrders = orders.filter((o) => o.processStatus === 'report_match_pending' && o.reportMatches?.some((m) => m.reportCode === r.code));
-                      return (
-                        <tr key={r.id}>
-                          <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{r.code}</td>
-                          <td>{PARTNER_REPORT_TYPE_LABELS[r.type]}</td>
-                          <td style={{ fontSize: 'var(--text-sm)' }}>{r.title}</td>
-                          <td style={{ fontSize: 'var(--text-sm)' }}>{r.partnerName}</td>
-                          <td style={{ fontSize: 'var(--text-sm)' }}>{r.productNames?.length ? r.productNames.join('、') : r.type === 'order' ? `预计 ${r.expectOrderDate ?? '—'} 下单 · ${r.contactName ?? ''} ${r.contactPhone ?? ''}`.trim() : (r.regions?.join('、') ?? '—')}</td>
-                          <td>{pill(
-                            r.status === 'approved' ? '#E8F5E9' : r.status === 'pending' ? '#FBF3E2' : '#FBEDEF',
-                            r.status === 'approved' ? '#01795D' : r.status === 'pending' ? '#9A7A1C' : '#C13A54',
-                            r.status === 'approved' ? '已通过' : r.status === 'pending' ? '待审核' : '已驳回',
-                          )}</td>
-                          <td className="mono" style={{ fontSize: 'var(--text-sm)' }}>{r.submitTime}</td>
-                          <td style={{ fontSize: 'var(--text-sm)' }}>
-                            {matchedOrders.length > 0
-                              ? <span className="mono" style={{ color: 'var(--color-module-current-base)' }}>{matchedOrders.map((o) => o.code).join('、')}</span>
-                              : <span style={{ color: 'var(--color-neutral-400)' }}>—</span>}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-              {allReports.filter((r) => (!reportStatusFilter || r.status === reportStatusFilter) && (!reportKw.trim() || r.code.includes(reportKw.trim()) || r.title.includes(reportKw.trim()) || r.partnerName.includes(reportKw.trim()))).length === 0 && (
-                <div style={{ padding: 'var(--space-5)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>当前筛选条件下暂无报备记录</div>
-              )}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-3)', flexShrink: 0 }}>
-              <Button variant="ghost" onClick={() => setReportListOpen(false)}>关闭</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── 比单管理弹窗（比单中节点） ── */}
       {compareMgmtOpen && (
         <div className="category-dialog-overlay" onClick={() => setCompareMgmtOpen(false)}>

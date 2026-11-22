@@ -3,12 +3,11 @@
  *
  * 状态机（分发状态只表达分发过程，履约进度见 fulfillment.stage 履约状态）：
  * pending 待分发（手工录入 / 直连推送，订单分发弹窗选路径；支持按商品+数量拆单）
- *   ├ 命中审批通过的报备（保存即自动匹配）→ report_match_pending 报备-匹配待确认
- *   │    └ 人工「确认匹配」→ distribute_pending（报备转派；一笔订单可匹配多条报备，一条报备可服务多笔订单）
  *   ├ 自营：self_pending 自营待接单（履约状态一般为待接单）→ 接单后分发状态置 processed 分发已完成
- *   └ 分发：指定 / 报备匹配（人工选报备，可多选）→ distribute_pending 转派待接单（履约状态一般为待接单）
+ *   └ 分发：指定 / 报备匹配（纯人工选报备，可多选，确认后直接转出报备合作商）→ distribute_pending 转派待接单（履约状态一般为待接单）
  *       比单 comparing 分发比单中（按商品报名、底价限制、可限地区）：截止后按商品维度积分排名定标；
  *            同一合作商多商品合并生成一个子订单，未报名商品合并子订单退回待分发+「比单未成」标签
+ * 订单进入不自动匹配报备：所有订单先进销售单处理待人工处理，报备匹配均由管理员手动发起，无中间待确认状态。
  * 履约状态：pending_accept 待接单 → accepted 已接单 → shipping 运输中 / transit 妥投 → confirmed 已确收
  *           （履约状态进入已接单及后续 → 分发状态自动置 processed；cancelled 已取消贯穿分发与履约状态）
  * 结算：按发货单（包裹）粒度 settled 标记 → 履约单 未结算/部分结算/已结算；开票：invoiceStatus 未开票/部分开票/已开票
@@ -17,12 +16,12 @@
 import { create } from 'zustand';
 import type {
   CompareFloorRule, ExternalOrder, ExternalOrderItem, ExternalPlatform, FlowSettings, PartnerCoopMode, PartnerOrder,
-  PartnerOrderStatus, PartnerReport, PlatformOrder, RegionScope, ReportMatchInfo, TransferSource,
+  PartnerOrderStatus, PartnerReport, PlatformOrder, RegionScope, TransferSource,
 } from '../types';
 import { partnerInRegion } from '../types';
 import { externalOrderSeeds } from '../data/externalOrders';
 import { settleStateOf } from '../utils/salesOrderFamily';
-import { matchesReport, reportPriority, useReportStore } from './reportStore';
+import { matchesReport, useReportStore } from './reportStore';
 import { useSupplierStore } from './supplierStore';
 import { usePriceStore } from './priceStore';
 import { useScoreStore, getScoreSummary } from './scoreStore';
@@ -99,100 +98,9 @@ const toPlatformOrder = (o: ExternalOrder): PlatformOrder => ({
   remark: o.remark,
 });
 
-/** 匹配审批通过的报备（复用 reportStore.matchesReport） */
-export function matchExternalOrder(order: ExternalOrder): ReportMatchInfo[] {
-  const reports = useReportStore.getState().reports.filter((r) => r.status === 'approved');
-  const suppliers = useSupplierStore.getState().suppliers;
-  return reports
-    .filter((r) => matchesReport(toPlatformOrder(order), r))
-    // 优先级：订单报备 > 商品报备 > 地区报备（首个匹配即自动分发对象）
-    .sort((a, b) => reportPriority(a) - reportPriority(b))
-    .map((r) => ({
-      reportCode: r.code,
-      reportType: r.type,
-      partnerId: suppliers.find((s) => s.name === r.partnerName)?.id,
-      partnerName: r.partnerName,
-    }));
-}
-
-/** 报备记录是否命中该订单（订单分发弹窗·报备匹配列表标记「匹配」用） */
+/** 报备记录是否命中该订单（人工匹配弹窗·命中提示参考，仅作展示不作自动流转） */
 export function reportMatchesOrder(order: ExternalOrder, report: PartnerReport): boolean {
   return matchesReport(toPlatformOrder(order), report);
-}
-
-/** 商品/地区报备自动匹配分组（按合作商归并；未匹配商品作为剩余） */
-export interface ReportMatchGroup {
-  partnerId?: string;
-  partnerName: string;
-  reportCodes: string[];
-  reportType: 'product' | 'region';
-  items: ExternalOrderItem[];
-}
-
-export interface ReportMatchPreview {
-  /** 订单报备命中（需人工确认，优先级最高） */
-  orderReports: ReportMatchInfo[];
-  /** 商品 / 地区报备自动匹配分组 */
-  groups: ReportMatchGroup[];
-  /** 未匹配商品（生成待分发履约单） */
-  remainderItems: ExternalOrderItem[];
-}
-
-const reportInfoOf = (r: PartnerReport, partnerId?: string): ReportMatchInfo => ({
-  reportCode: r.code,
-  reportType: r.type,
-  partnerId,
-  partnerName: r.partnerName,
-});
-
-/** 预览某批商品可命中的报备：订单报备人工确认；商品报备按商品、地区报备按地区自动分组 */
-export function previewReportMatch(order: ExternalOrder, items: ExternalOrderItem[]): ReportMatchPreview {
-  const suppliers = useSupplierStore.getState().suppliers;
-  const approved = useReportStore.getState().reports
-    .filter((r) => r.status === 'approved')
-    .sort((a, b) => reportPriority(a) - reportPriority(b) || a.submitTime.localeCompare(b.submitTime));
-  const pseudo = (its: ExternalOrderItem[]) => toPlatformOrder({
-    ...order,
-    items: its,
-    totalAmount: its.reduce((s, it) => s + it.price * it.quantity, 0),
-  });
-  const orderReports = approved
-    .filter((r) => r.type === 'order' && matchesReport(pseudo(items), r))
-    .map((r) => reportInfoOf(r, suppliers.find((s) => s.name === r.partnerName)?.id));
-
-  let remaining = items.map((it) => ({ ...it }));
-  const groups: ReportMatchGroup[] = [];
-  const addGroup = (r: PartnerReport, matched: ExternalOrderItem[], type: 'product' | 'region') => {
-    const partnerId = suppliers.find((s) => s.name === r.partnerName)?.id;
-    const cur = groups.find((g) => g.partnerName === r.partnerName);
-    if (cur) {
-      cur.items = [...cur.items, ...matched];
-      cur.reportCodes = [...new Set([...cur.reportCodes, r.code])];
-    } else {
-      groups.push({ partnerId, partnerName: r.partnerName, reportCodes: [r.code], reportType: type, items: matched });
-    }
-  };
-
-  // 商品报备优先：逐商品命中（同一商品被多份报备命中时按报备优先级/提交时间先到先得）
-  for (const r of approved.filter((x) => x.type === 'product')) {
-    if (!r.productNames?.length) continue;
-    const matched = remaining.filter((it) => matchesReport(pseudo([it]), r));
-    if (matched.length === 0) continue;
-    addGroup(r, matched, 'product');
-    const keys = new Set(matched.map((it) => it.productId));
-    remaining = remaining.filter((it) => !keys.has(it.productId));
-  }
-
-  // 地区报备兜底：首位命中的地区合作商承接剩余全部商品
-  for (const r of approved.filter((x) => x.type === 'region')) {
-    if (remaining.length === 0) break;
-    if (!matchesReport(pseudo(remaining), r)) continue;
-    addGroup(r, remaining, 'region');
-    remaining = [];
-    break;
-  }
-
-  return { orderReports, groups, remainderItems: remaining };
 }
 
 /** 比单底价金额 */
@@ -237,8 +145,6 @@ interface OrderFlowState {
   splitSalesOrderToFulfillments: (id: string, groups: ExternalOrderItem[][]) => { ok: boolean; msg: string; created?: ExternalOrder[] };
   /** 履约单分发：按拆单草稿生成子履约单（原订单为子单时替换，为母单时保留） */
   splitFulfillmentByDrafts: (id: string, groups: ExternalOrderItem[][]) => { ok: boolean; msg: string; created?: ExternalOrder[] };
-  /** 报备匹配：对指定履约单应用订单报备（手动确认）或商品/地区报备自动分组 */
-  applyReportMatchToFulfillment: (id: string, orderReportCode?: string) => { ok: boolean; msg: string };
   /** 删除订单（仅手工录入的待处理订单） */
   deleteOrder: (id: string) => { ok: boolean; msg: string };
   /** 修改订单信息（待处理/待接单/比单中可改） */
@@ -247,9 +153,7 @@ interface OrderFlowState {
   /* ── 路径选择与分发 ── */
   chooseSelfPath: (id: string) => void;
   assignPartner: (id: string, supplierId: string, supplierName: string, coopMode?: PartnerCoopMode) => void;
-  /** 报备-匹配待确认：人工确认命中报备，分发给报备合作商 */
-  confirmReportMatch: (id: string) => { ok: boolean; msg: string };
-  /** 待处理订单人工匹配报备（订单分发弹窗·报备匹配），转出报备合作商 */
+  /** 人工匹配报备（订单分发弹窗·报备匹配，可多选），确认后直接转出报备合作商 */
   matchReportManual: (id: string, reportCodes: string[]) => { ok: boolean; msg: string };
   /** 分发-待处理订单按商品+数量拆单：拆出履约单（母销售单编号+FO01/02…），母子在列表独立展示 */
   splitOrder: (id: string, parts: { productName: string; quantity: number }[]) => { ok: boolean; msg: string };
@@ -349,7 +253,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       transferTime: now(),
       partnerStatus: undefined,
       fulfillment: fulfil(cur, { stage: 'pending_accept', arriveTime: nowMin() }),
-    }, { action: source === 'report' ? '报备命中自动转出' : source === 'assign' ? '指定转派' : '比单转派', detail: `${detail} → ${supplierName} · 等待合作商接单` });
+    }, { action: source === 'report' ? '报备匹配转出' : source === 'assign' ? '指定转派' : '比单转派', detail: `${detail} → ${supplierName} · 等待合作商接单` });
     // 三单联动：转派定案自动生成直送采购单（比单按中单价口径）
     const after = get().orders.find((o) => o.id === id);
     if (after) {
@@ -421,16 +325,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
             + ' · 进入销售单处理',
         }],
       };
-      // 录入时记录报备命中（不自动转出；送去分发后可在履约单分发中选择报备转派）
-      const matches = matchExternalOrder(order);
-      if (matches.length > 0) {
-        order.reportMatches = matches;
-        order.history.push({
-          time: now(),
-          action: '命中报备',
-          detail: `命中 ${matches.map((m) => m.reportCode).join('、')} → ${matches.map((m) => m.partnerName).join('、')} · 待送去分发时选择报备转派`,
-        });
-      }
+      // 订单进入不自动匹配报备：一律先进销售单处理，由管理员人工发起报备匹配
       set({ orders: [order, ...orders] });
       return order;
     },
@@ -607,99 +502,6 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       return { ok: true, msg: `已拆为 ${created.length} 张子履约单（${created.map((c) => c.code).join('、')}）`, created };
     },
 
-    applyReportMatchToFulfillment: (id, orderReportCode) => {
-      const child = get().orders.find((o) => o.id === id);
-      if (!child) return { ok: false, msg: '履约单不存在' };
-      if (child.processStatus !== 'pending') return { ok: false, msg: '仅待分发履约单可匹配报备' };
-      const suppliers = useSupplierStore.getState().suppliers;
-      const reports = useReportStore.getState().reports;
-      const supplierByName = (name: string) => suppliers.find((s) => s.name === name);
-
-      // 订单报备：人工确认后整单转出
-      if (orderReportCode) {
-        const r = reports.find((x) => x.code === orderReportCode && x.type === 'order' && x.status === 'approved');
-        if (!r) return { ok: false, msg: '订单报备不存在或未审批通过' };
-        const supplier = supplierByName(r.partnerName);
-        if (!supplier) return { ok: false, msg: `未找到合作商档案：${r.partnerName}` };
-        transfer(id, supplier.id, supplier.name, 'report', `人工确认订单报备 ${r.code}`);
-        patchOrder(id, {
-          reportMatches: [reportInfoOf(r, supplier.id)],
-        }, { action: '订单报备匹配', detail: `人工确认订单报备 ${r.code} → ${r.partnerName} · 转派待接单` });
-        return { ok: true, msg: `已按订单报备 ${r.code} 转出至 ${r.partnerName}` };
-      }
-
-      const preview = previewReportMatch(child, child.items);
-      if (preview.groups.length === 0) {
-        return { ok: false, msg: '未匹配到商品 / 地区报备' };
-      }
-      const motherCode = child.parentCode ?? child.code;
-      const created: ExternalOrder[] = [];
-      for (const g of preview.groups) {
-        const code = genFulfillmentCode(motherCode, [...get().orders, ...created]);
-        const matches: ReportMatchInfo[] = g.reportCodes
-          .map((c) => reports.find((r) => r.code === c))
-          .filter((r): r is PartnerReport => !!r)
-          .map((r) => reportInfoOf(r, g.partnerId));
-        created.push({
-          ...child,
-          id: `eo_${nowTs()}_r${created.length + 1}_${Math.floor(Math.random() * 1000)}`,
-          code,
-          parentCode: motherCode,
-          items: g.items.map((it) => ({ ...it })),
-          totalAmount: g.items.reduce((s, it) => s + it.price * it.quantity, 0),
-          processStatus: 'report_match_pending',
-          dispatchState: undefined,
-          path: 'distribute',
-          partnerId: g.partnerId,
-          partnerName: g.partnerName,
-          transferSource: undefined,
-          transferTime: undefined,
-          partnerStatus: undefined,
-          fulfillment: undefined,
-          compare: undefined,
-          reportMatches: matches,
-          history: [{
-            time: now(),
-            action: g.reportType === 'product' ? '商品报备匹配' : '地区报备匹配',
-            detail: `命中 ${g.reportCodes.join('、')} → ${g.partnerName} · 待确认匹配后转出`,
-          }],
-        });
-      }
-      const remainder = preview.remainderItems;
-      set((s) => ({
-        orders: [
-          ...created,
-          ...s.orders
-            .filter((o) => !(o.id === id && remainder.length === 0))
-            .map((o) => {
-              if (o.id !== id) return o;
-              return {
-                ...o,
-                items: remainder,
-                totalAmount: remainder.reduce((sum, it) => sum + it.price * it.quantity, 0),
-                processStatus: 'pending' as const,
-                path: undefined,
-                partnerId: undefined,
-                partnerName: undefined,
-                reportMatches: undefined,
-                history: [...o.history, { time: now(), action: '报备匹配后剩余', detail: `剩余 ${remainder.map((it) => `${it.productName}×${it.quantity}`).join('、')} · 保持待分发` }],
-              };
-            }),
-          ...s.orders
-            .filter((o) => o.code === motherCode && !o.parentCode)
-            .map((o) => ({
-              ...o,
-              history: [...o.history, {
-                time: now(),
-                action: '报备自动匹配',
-                detail: `商品/地区报备按合作商拆分 ${created.length} 张履约单${remainder.length ? `，剩余 ${remainder.reduce((sum, it) => sum + it.quantity, 0)} 份待分发` : ''}`,
-              }],
-            })),
-        ],
-      }));
-      return { ok: true, msg: `已按报备匹配 ${created.length} 张履约单${remainder.length ? '，剩余商品待分发' : ''}` };
-    },
-
     deleteOrder: (id) => {
       const order = get().orders.find((o) => o.id === id);
       if (!order) return { ok: false, msg: '订单不存在' };
@@ -715,7 +517,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       if (order.sourceChannel !== 'manual') return { ok: false, msg: '直连推送订单仅支持接口推送修改，不支持在管理后台修改' };
       if (order.processStatus === 'cancelled') return { ok: false, msg: '已取消订单不可修改' };
       /* 权限：客户侧订单号/客户下单时间任意状态可改；收货信息/商品明细需未进入待接单（且不在比单中、未拆分） */
-      const coreEditable = order.processStatus === 'pending' || order.processStatus === 'unprocessed' || order.processStatus === 'report_match_pending';
+      const coreEditable = order.processStatus === 'pending' || order.processStatus === 'unprocessed';
       const hasChildren = get().orders.some((o) => o.parentCode === order.code);
       const coreKeys = ['receiver', 'receiverPhone', 'receiverAddress', 'remark', 'items'];
       const coreTouched = Object.keys(patch).some((k) => coreKeys.includes(k));
@@ -748,28 +550,6 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
           detail: `本单与合作商 ${supplierName} 按${coopMode === 'service' ? '扣点模式' : '差价模式'}合作`,
         });
       }
-    },
-
-    confirmReportMatch: (id) => {
-      const order = get().orders.find((o) => o.id === id);
-      if (!order) return { ok: false, msg: '订单不存在' };
-      if (order.processStatus !== 'report_match_pending') return { ok: false, msg: '订单不在报备-匹配待确认状态' };
-      const match = order.reportMatches?.find((m) => m.partnerId && m.partnerName);
-      if (!match?.partnerId || !match.partnerName) return { ok: false, msg: '未找到可分发的报备匹配合作商' };
-      // 无货源订单报备：不转合作商履约，退回分发-待处理由平台选择自营 / 指定 / 比单
-      const matchReport = useReportStore.getState().reports.find((r) => r.code === match.reportCode);
-      if (matchReport?.type === 'order' && matchReport.orderKind === 'no_supply') {
-        patchOrder(id, {
-          processStatus: 'pending', reportMatches: undefined,
-          partnerId: undefined, partnerName: undefined, path: undefined, distributeMode: undefined,
-        }, {
-          action: '确认报备匹配（无货源）',
-          detail: `命中 ${match.partnerName} 的无货源订单报备 ${match.reportCode} → 退回分发-待处理，由平台自营或转派供货商（可指定 / 可比单）`,
-        });
-        return { ok: true, msg: `已确认匹配（无货源报备），订单退回分发-待处理由平台分发` };
-      }
-      transfer(id, match.partnerId, match.partnerName, 'report', `确认报备匹配 ${match.reportCode}`);
-      return { ok: true, msg: `已确认匹配并转出 ${match.partnerName}，等待合作商接单` };
     },
 
     matchReportManual: (id, reportCodes) => {

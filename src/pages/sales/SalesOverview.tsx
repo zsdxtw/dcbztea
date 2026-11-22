@@ -29,7 +29,6 @@ const pill = (bg: string, color: string, text: string) => (
 /** 分发状态 → 概览分布项（顺序即分发流程顺序） */
 const FLOW_BRIEF: { key: string; label: string }[] = [
   { key: 'pending', label: '待分发' },
-  { key: 'report_match_pending', label: '报备-匹配待确认' },
   { key: 'self_pending', label: '自营待接单' },
   { key: 'comparing', label: '分发比单中' },
   { key: 'distribute_pending', label: '转派待接单' },
@@ -137,7 +136,7 @@ export default function SalesOverview() {
       label: '待分发',
       value: String(statusCount.pending ?? 0),
       unit: '单',
-      trend: { direction: (statusCount.pending ?? 0) > 0 ? 'up' : 'down', value: `含报备确认 ${statusCount.report_match_pending ?? 0} 单` },
+      trend: { direction: (statusCount.pending ?? 0) > 0 ? 'up' : 'down', value: '报备匹配为人工操作' },
       icon: <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M7 8h4M7 11h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
     },
     {
@@ -167,9 +166,6 @@ export default function SalesOverview() {
   const todoItems = [
     (statusCount.pending ?? 0) > 0 && {
       text: `${statusCount.pending} 单待分发（分发 / 拆单 / 修改）`, tag: '待分发', color: EXTERNAL_STATUS_COLORS.pending, to: '/sales/order-distribute',
-    },
-    (statusCount.report_match_pending ?? 0) > 0 && {
-      text: `${statusCount.report_match_pending} 单命中报备待确认匹配（确认后分发报备合作商）`, tag: '报备', color: EXTERNAL_STATUS_COLORS.report_match_pending, to: '/sales/order-distribute',
     },
     (statusCount.comparing ?? 0) > 0 && {
       text: `${statusCount.comparing} 单分发比单中 · 已报名 ${compareQuotes} 家`, tag: '比单', color: EXTERNAL_STATUS_COLORS.comparing, to: '/sales/order-distribute',

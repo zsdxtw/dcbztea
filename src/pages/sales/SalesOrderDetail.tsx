@@ -31,7 +31,6 @@ const pill = (text: string) => {
 
 /** 路径标签（与销售单分发页口径一致） */
 function pathLabel(o: ExternalOrder): string {
-  if (o.processStatus === 'report_match_pending') return '转派-报备';
   if (o.path === 'self') return '自营';
   if (o.transferSource) return TRANSFER_SOURCE_LABELS[o.transferSource];
   if (o.distributeMode === 'compare') return '转派-比单';

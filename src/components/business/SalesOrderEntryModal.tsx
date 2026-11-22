@@ -22,7 +22,7 @@ export default function SalesOrderEntryModal({ open, onClose }: { open: boolean;
             <svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
           </button>
         </div>
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 'var(--space-5) var(--space-6)' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <OrderEntry embedded onClose={onClose} />
         </div>
       </div>
