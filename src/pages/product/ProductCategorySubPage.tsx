@@ -336,7 +336,7 @@ export default function ProductCategorySubPage({ categoryType, rootNode, hideHea
                   <div style={{ marginTop: 'var(--space-5)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--color-neutral-200)', display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
                     {editing ? (
                       <>
-                        <Button variant="ghost" onClick={handleCancelEdit}>取消</Button>
+                        <Button variant="ghost" onClick={handleCancelEdit}>关闭</Button>
                         <Button onClick={handleSaveEdit}>保存</Button>
                       </>
                     ) : (
@@ -366,7 +366,7 @@ export default function ProductCategorySubPage({ categoryType, rootNode, hideHea
                 <input id="add-category-input" className="detail-input" placeholder="请输入分类名称" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmAdd(); }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-                <Button variant="ghost" onClick={() => setShowAddDialog(null)}>取消</Button>
+                <Button variant="ghost" onClick={() => setShowAddDialog(null)}>关闭</Button>
                 <Button onClick={handleConfirmAdd}>确认</Button>
               </div>
             </div>

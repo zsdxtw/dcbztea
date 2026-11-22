@@ -190,7 +190,7 @@ export default function ProductTeaList() {
                   <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14 }}><path d="M2 4h12M5.33 4V2.67a1.33 1.33 0 011.34-1.34h2.66a1.33 1.33 0 011.34 1.34V4m2 0v9.33a1.33 1.33 0 01-1.34 1.34H4.67a1.33 1.33 0 01-1.34-1.34V4h9.34z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   删除所选({selectedForDelete.size})
                 </Button>
-                <Button variant="ghost" onClick={handleCancelDeleteMode} style={{ color: 'var(--color-neutral-500)' }}>取消</Button>
+                <Button variant="ghost" onClick={handleCancelDeleteMode} style={{ color: 'var(--color-neutral-500)' }}>关闭</Button>
               </>
             ) : (
               <Button onClick={handleEnterDeleteMode} style={{ background: '#eb5c20', borderColor: '#eb5c20' }}>
@@ -304,7 +304,7 @@ export default function ProductTeaList() {
               确定要删除选中的 {selectedForDelete.size} 个茶种吗？此操作不可撤销。
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-              <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>关闭</Button>
               <Button onClick={() => { handleConfirmDelete(); setShowDeleteConfirm(false); }} style={{ background: '#eb5c20', borderColor: '#eb5c20' }}>确认删除</Button>
             </div>
           </div>
@@ -420,7 +420,7 @@ export default function ProductTeaList() {
               </div>
             </div>
             <div className="drawer-footer">
-              <Button variant="ghost" onClick={() => setShowDrawer(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setShowDrawer(false)}>关闭</Button>
               <Button onClick={handleSave}>{drawerMode === 'add' ? '确认新增' : '保存修改'}</Button>
             </div>
           </div>

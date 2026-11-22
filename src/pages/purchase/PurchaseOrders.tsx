@@ -311,7 +311,7 @@ export default function PurchaseOrders() {
         {tab === 'flow' && (
           <>
             <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-              分发采购单由<strong>销售 → 销售单分发</strong>自动生成：转派子单 1:1 生成<strong>直送采购单</strong>（合作商直发客户，免入库）；自营子单接单后生成<strong>入库制采购单</strong>（以销定采）。
+              分发采购单由<strong>销售 → 履约单分发</strong>自动生成：转派子单 1:1 生成<strong>直送采购单</strong>（合作商直发客户，免入库）；自营子单接单后生成<strong>入库制采购单</strong>（以销定采）。
               合作商在终端<strong>发货登记</strong>（同一商品可分多批），每批生成一个包裹，物流信息同时关联采购单与销售订单。
             </div>
 
@@ -351,7 +351,7 @@ export default function PurchaseOrders() {
               />
               {filteredFlowPurchases.length === 0 && (
                 <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>
-                  暂无分发采购单。在「销售 → 销售单分发」完成转派或自营接单后，将自动生成对应采购单。
+                  暂无分发采购单。在「销售 → 履约单分发」完成转派或自营接单后，将自动生成对应采购单。
                 </div>
               )}
             </Card>
@@ -745,7 +745,7 @@ function CreatePurchaseDrawer({ nextNumber, onCancel, onSave }: {
         </div>
 
         <div className="drawer-footer">
-          <Button variant="ghost" onClick={onCancel}>取消</Button>
+          <Button variant="ghost" onClick={onCancel}>关闭</Button>
           <Button onClick={handleSave} disabled={!canSave}>确认下单</Button>
         </div>
       </div>

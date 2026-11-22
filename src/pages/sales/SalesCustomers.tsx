@@ -536,7 +536,7 @@ export default function SalesCustomers() {
                     <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14 }}><path d="M2 4h12M5.33 4V2.67a1.33 1.33 0 011.34-1.34h2.66a1.33 1.33 0 011.34 1.34V4m2 0v9.33a1.33 1.33 0 01-1.34 1.34H4.67a1.33 1.33 0 01-1.34-1.34V4h9.34z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     删除所选({selectedForDelete.size})
                   </Button>
-                  <Button variant="ghost" onClick={exitDeleteMode}>取消</Button>
+                  <Button variant="ghost" onClick={exitDeleteMode}>关闭</Button>
                 </>
               ) : (
                 <Button style={{ background: SECONDARY, borderColor: SECONDARY }} onClick={enterDeleteMode}>
@@ -597,7 +597,7 @@ export default function SalesCustomers() {
                     <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14 }}><path d="M2 4h12M5.33 4V2.67a1.33 1.33 0 011.34-1.34h2.66a1.33 1.33 0 011.34 1.34V4m2 0v9.33a1.33 1.33 0 01-1.34 1.34H4.67a1.33 1.33 0 01-1.34-1.34V4h9.34z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     删除所选({selectedForDelete.size})
                   </Button>
-                  <Button variant="ghost" onClick={exitDeleteMode}>取消</Button>
+                  <Button variant="ghost" onClick={exitDeleteMode}>关闭</Button>
                 </>
               ) : (
                 <Button style={{ background: SECONDARY, borderColor: SECONDARY }} onClick={enterDeleteMode}>
@@ -710,11 +710,11 @@ export default function SalesCustomers() {
 
         {showDeleteConfirm && (
           <div className="category-dialog-overlay" onClick={() => setShowDeleteConfirm(false)}>
-            <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 440 }}>
               <h3 style={{ marginBottom: 'var(--space-3)' }}>确认删除</h3>
               <p style={{ color: 'var(--color-neutral-600)', marginBottom: 'var(--space-4)' }}>确定要删除选中的 {selectedForDelete.size} 个{activeTab === 'platform' ? '平台' : '客户'}吗？</p>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
-                <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>取消</Button>
+                <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>关闭</Button>
                 <Button style={{ background: SECONDARY, borderColor: SECONDARY }} onClick={confirmDelete}>确认删除</Button>
               </div>
             </div>
@@ -765,7 +765,7 @@ export default function SalesCustomers() {
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
-                  <Button variant="ghost" onClick={() => setPoolDialog(null)}>取消</Button>
+                  <Button variant="ghost" onClick={() => setPoolDialog(null)}>关闭</Button>
                   <Button onClick={() => {
                     const rate = Number(poolDialog.dachaDraft);
                     if (poolDialog.dachaDraft.trim() === '' || Number.isNaN(rate) || rate < 0 || rate > 100) {
@@ -783,7 +783,7 @@ export default function SalesCustomers() {
 
         {showConvertConfirm && customerToConvert && (
           <div className="category-dialog-overlay" onClick={() => setShowConvertConfirm(false)}>
-            <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 440 }}>
               <h3 style={{ marginBottom: 'var(--space-3)' }}>确认转换</h3>
               <p style={{ color: 'var(--color-neutral-600)', marginBottom: 'var(--space-2)' }}>确定将个人客户 <strong>{customerToConvert.name}</strong> 转换为直营客户吗？</p>
               <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-4)' }}>转换后：</p>
@@ -794,7 +794,7 @@ export default function SalesCustomers() {
                 <li>客户将从「个人客户」分组移动到「企业客户」分组</li>
               </ul>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
-                <Button variant="ghost" onClick={() => setShowConvertConfirm(false)}>取消</Button>
+                <Button variant="ghost" onClick={() => setShowConvertConfirm(false)}>关闭</Button>
                 <Button onClick={confirmConvert}>确认转换</Button>
               </div>
             </div>
@@ -826,7 +826,7 @@ export default function SalesCustomers() {
                 })}>编辑</Button>
               ) : (
                 <>
-                  <Button variant="ghost" onClick={() => setEditBasic(null)}>取消</Button>
+                  <Button variant="ghost" onClick={() => setEditBasic(null)}>关闭</Button>
                   <Button onClick={() => {
                     if (!editBasic) return;
                     const updated: CustomerItem = {
@@ -857,7 +857,7 @@ export default function SalesCustomers() {
                 })}>编辑</Button>
               ) : (
                 <>
-                  <Button variant="ghost" onClick={() => setEditFinance(null)}>取消</Button>
+                  <Button variant="ghost" onClick={() => setEditFinance(null)}>关闭</Button>
                   <Button onClick={() => {
                     if (!editFinance) return;
                     const updated: CustomerItem = {
@@ -878,7 +878,7 @@ export default function SalesCustomers() {
                 <Button onClick={() => setPlatformForm({ editingId: null, platformId: '', rate: '' })}>+ 新增平台</Button>
               ) : (
                 <>
-                  <Button variant="ghost" onClick={() => setPlatformForm(null)}>取消</Button>
+                  <Button variant="ghost" onClick={() => setPlatformForm(null)}>关闭</Button>
                   <Button
                     disabled={!platformForm.platformId}
                     onClick={() => {
@@ -914,7 +914,7 @@ export default function SalesCustomers() {
                     <Button onClick={() => setProcOpenForm({ username: `cg${(detailCustomer.customerCode || '').replace(/\D/g, '').slice(-4) || '001'}`, password: '123456', name: detailCustomer.contactPerson || '', phone: detailCustomer.contactPhone || '' })}>开通客户采买平台</Button>
                   ) : (
                     <>
-                      <Button variant="ghost" onClick={() => setProcOpenForm(null)}>取消</Button>
+                      <Button variant="ghost" onClick={() => setProcOpenForm(null)}>关闭</Button>
                       <Button
                         disabled={!procOpenForm.username.trim() || !procOpenForm.password.trim() || !procOpenForm.name.trim()}
                         onClick={() => {
@@ -1432,7 +1432,7 @@ export default function SalesCustomers() {
                             </div>
                           ))}
                           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-                            <Button variant="ghost" onClick={() => setRuleForm(null)}>取消</Button>
+                            <Button variant="ghost" onClick={() => setRuleForm(null)}>关闭</Button>
                             <Button onClick={() => {
                               update({ coopRule: Object.fromEntries(COOP_RULE_FIELDS.map(({ key }) => [key, (ruleForm[key] ?? '').trim() || undefined])) });
                               addOpRecord(detailCustomer.customerCode || '—', '修改合作规则', '设置合作商与该客户的合作规则（' + COOP_RULE_FIELDS.map(({ label }) => label).join(' / ') + '）');
@@ -1731,7 +1731,7 @@ export default function SalesCustomers() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
-                        <Button variant="ghost" onClick={() => setPlatTermForm(null)}>取消</Button>
+                        <Button variant="ghost" onClick={() => setPlatTermForm(null)}>关闭</Button>
                         <Button
                           disabled={!platTermForm.username.trim() || !platTermForm.password.trim() || !platTermForm.name.trim()}
                           onClick={() => {
@@ -2092,7 +2092,7 @@ function CreateDrawer({ customerType, platforms, sequence, onCancel, onSave, onQ
           )}
         </div>
         <div className="drawer-footer">
-          <Button variant="ghost" onClick={onCancel}>取消</Button>
+          <Button variant="ghost" onClick={onCancel}>关闭</Button>
           <Button onClick={handleSave} disabled={!canSave}>保存</Button>
         </div>
       </div>
@@ -2215,7 +2215,7 @@ function AddPlatformDrawer({ onCancel, onSave, sequence }: { onCancel: () => voi
           )}
         </div>
         <div className="drawer-footer">
-          <Button variant="ghost" onClick={onCancel}>取消</Button>
+          <Button variant="ghost" onClick={onCancel}>关闭</Button>
           <Button onClick={handleSave} disabled={!canSave}>保存</Button>
         </div>
       </div>

@@ -16,7 +16,7 @@
  */
 import { create } from 'zustand';
 import type {
-  CompareFloorRule, ExternalOrder, ExternalOrderItem, ExternalPlatform, FlowSettings, PartnerOrder,
+  CompareFloorRule, ExternalOrder, ExternalOrderItem, ExternalPlatform, FlowSettings, PartnerCoopMode, PartnerOrder,
   PartnerOrderStatus, PartnerReport, PlatformOrder, RegionScope, ReportMatchInfo, TransferSource,
 } from '../types';
 import { partnerInRegion } from '../types';
@@ -120,6 +120,81 @@ export function reportMatchesOrder(order: ExternalOrder, report: PartnerReport):
   return matchesReport(toPlatformOrder(order), report);
 }
 
+/** 商品/地区报备自动匹配分组（按合作商归并；未匹配商品作为剩余） */
+export interface ReportMatchGroup {
+  partnerId?: string;
+  partnerName: string;
+  reportCodes: string[];
+  reportType: 'product' | 'region';
+  items: ExternalOrderItem[];
+}
+
+export interface ReportMatchPreview {
+  /** 订单报备命中（需人工确认，优先级最高） */
+  orderReports: ReportMatchInfo[];
+  /** 商品 / 地区报备自动匹配分组 */
+  groups: ReportMatchGroup[];
+  /** 未匹配商品（生成待分发履约单） */
+  remainderItems: ExternalOrderItem[];
+}
+
+const reportInfoOf = (r: PartnerReport, partnerId?: string): ReportMatchInfo => ({
+  reportCode: r.code,
+  reportType: r.type,
+  partnerId,
+  partnerName: r.partnerName,
+});
+
+/** 预览某批商品可命中的报备：订单报备人工确认；商品报备按商品、地区报备按地区自动分组 */
+export function previewReportMatch(order: ExternalOrder, items: ExternalOrderItem[]): ReportMatchPreview {
+  const suppliers = useSupplierStore.getState().suppliers;
+  const approved = useReportStore.getState().reports
+    .filter((r) => r.status === 'approved')
+    .sort((a, b) => reportPriority(a) - reportPriority(b) || a.submitTime.localeCompare(b.submitTime));
+  const pseudo = (its: ExternalOrderItem[]) => toPlatformOrder({
+    ...order,
+    items: its,
+    totalAmount: its.reduce((s, it) => s + it.price * it.quantity, 0),
+  });
+  const orderReports = approved
+    .filter((r) => r.type === 'order' && matchesReport(pseudo(items), r))
+    .map((r) => reportInfoOf(r, suppliers.find((s) => s.name === r.partnerName)?.id));
+
+  let remaining = items.map((it) => ({ ...it }));
+  const groups: ReportMatchGroup[] = [];
+  const addGroup = (r: PartnerReport, matched: ExternalOrderItem[], type: 'product' | 'region') => {
+    const partnerId = suppliers.find((s) => s.name === r.partnerName)?.id;
+    const cur = groups.find((g) => g.partnerName === r.partnerName);
+    if (cur) {
+      cur.items = [...cur.items, ...matched];
+      cur.reportCodes = [...new Set([...cur.reportCodes, r.code])];
+    } else {
+      groups.push({ partnerId, partnerName: r.partnerName, reportCodes: [r.code], reportType: type, items: matched });
+    }
+  };
+
+  // 商品报备优先：逐商品命中（同一商品被多份报备命中时按报备优先级/提交时间先到先得）
+  for (const r of approved.filter((x) => x.type === 'product')) {
+    if (!r.productNames?.length) continue;
+    const matched = remaining.filter((it) => matchesReport(pseudo([it]), r));
+    if (matched.length === 0) continue;
+    addGroup(r, matched, 'product');
+    const keys = new Set(matched.map((it) => it.productId));
+    remaining = remaining.filter((it) => !keys.has(it.productId));
+  }
+
+  // 地区报备兜底：首位命中的地区合作商承接剩余全部商品
+  for (const r of approved.filter((x) => x.type === 'region')) {
+    if (remaining.length === 0) break;
+    if (!matchesReport(pseudo(remaining), r)) continue;
+    addGroup(r, remaining, 'region');
+    remaining = [];
+    break;
+  }
+
+  return { orderReports, groups, remainderItems: remaining };
+}
+
 /** 比单底价金额 */
 const floorAmount = (totalAmount: number, rule: CompareFloorRule) =>
   rule.type === 'discount' ? Math.round(totalAmount * rule.value) / 100 : rule.value;
@@ -154,8 +229,16 @@ interface OrderFlowState {
   orders: ExternalOrder[];
   settings: FlowSettings;
 
-  /* ── 录入 / 删除 / 修改 ── */
+  /* ── 录入 / 处理 / 删除 / 修改 ── */
   addExternalOrder: (input: AddExternalInput) => ExternalOrder;
+  /** 销售单处理：未拆单时整单送去分发（销售单本身即一张履约单，不生成子单） */
+  dispatchSalesOrder: (id: string) => { ok: boolean; msg: string };
+  /** 销售单处理：按拆单草稿（含剩余合并组）生成履约单，母单标记已分发 */
+  splitSalesOrderToFulfillments: (id: string, groups: ExternalOrderItem[][]) => { ok: boolean; msg: string; created?: ExternalOrder[] };
+  /** 履约单分发：按拆单草稿生成子履约单（原订单为子单时替换，为母单时保留） */
+  splitFulfillmentByDrafts: (id: string, groups: ExternalOrderItem[][]) => { ok: boolean; msg: string; created?: ExternalOrder[] };
+  /** 报备匹配：对指定履约单应用订单报备（手动确认）或商品/地区报备自动分组 */
+  applyReportMatchToFulfillment: (id: string, orderReportCode?: string) => { ok: boolean; msg: string };
   /** 删除订单（仅手工录入的待处理订单） */
   deleteOrder: (id: string) => { ok: boolean; msg: string };
   /** 修改订单信息（待处理/待接单/比单中可改） */
@@ -163,7 +246,7 @@ interface OrderFlowState {
 
   /* ── 路径选择与分发 ── */
   chooseSelfPath: (id: string) => void;
-  assignPartner: (id: string, supplierId: string, supplierName: string) => void;
+  assignPartner: (id: string, supplierId: string, supplierName: string, coopMode?: PartnerCoopMode) => void;
   /** 报备-匹配待确认：人工确认命中报备，分发给报备合作商 */
   confirmReportMatch: (id: string) => { ok: boolean; msg: string };
   /** 待处理订单人工匹配报备（订单分发弹窗·报备匹配），转出报备合作商 */
@@ -177,7 +260,7 @@ interface OrderFlowState {
   /**
    * 待接单取回（管理后台）：从自营 / 合作商主动取回订单。
    * 不传 parts = 整体取回（履约单编号不变）；传 parts = 部分取回（剩余部分沿用原编号，取回部分生成新履约单）。
-   * 取回后进入销售单分发，来源标注「自营/指定/报备/比单 取回」。
+   * 取回后进入履约单分发，来源标注「自营/指定/报备/比单 取回」。
    */
   recallPendingOrder: (id: string, parts?: { productName: string; quantity: number }[]) => { ok: boolean; msg: string };
   /** 合作商退回（整单）：待接单 → 分发-待处理 */
@@ -186,7 +269,7 @@ interface OrderFlowState {
   /* ── 自营执行（销售单自营菜单：接单 → 拆单 / 采购&发货 → 运输 → 妥投 → 确认收货） ── */
   /** 接单（详情页）：分发状态置「分发已完成」，履约状态进入已接单 */
   acceptSelfOrder: (id: string) => { ok: boolean; msg: string };
-  /** 退回（详情页）：退回销售单分发重新待处理，来源标注「自营退回」 */
+  /** 退回（详情页）：退回履约单分发重新待处理，来源标注「自营退回」 */
   returnToDistribute: (id: string) => { ok: boolean; msg: string };
   /** 采购&发货（详情页）：分仓直发包裹（每仓一快递单号）+ 缺口以销定采（直发/入库制），有物流单号即履约运输中 */
   shipSelfOrder: (id: string, input: {
@@ -209,7 +292,7 @@ interface OrderFlowState {
   registerInvoice: (id: string, mode: 'partial' | 'full') => { ok: boolean; msg: string };
 
   /* ── 比单（公开报名制） ── */
-  startCompare: (id: string, floorRule: CompareFloorRule, region?: RegionScope) => { ok: boolean; msg: string };
+  startCompare: (id: string, floorRule: CompareFloorRule, region?: RegionScope, filters?: { partnerTypes?: ('service' | 'supplier')[]; coopMode?: 'supplier' | 'service' }) => { ok: boolean; msg: string };
   /** 合作商报名（报价不得低于底价） */
   signUpCompare: (id: string, supplierId: string, supplierName: string, amount: number, itemNames?: string[]) => { ok: boolean; msg: string };
   /** 延长报名截止时间（分钟） */
@@ -298,6 +381,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
     reportMatches: undefined,
     sourceTag: undefined,
     compare: undefined,
+    dispatchState: undefined,
     partnerId: undefined, partnerName: undefined, transferSource: undefined, transferTime: undefined,
     partnerStatus: undefined, settleOnTime: undefined, invoiceStatus: undefined,
     selfPo: undefined, selfShipments: undefined,
@@ -324,7 +408,8 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         operator: input.operator || '运营人员',
         totalAmount: input.items.reduce((s, it) => s + it.price * it.quantity, 0),
         entryTime: nowSec(),
-        processStatus: 'pending',
+        processStatus: 'unprocessed',
+        dispatchState: 'unprocessed',
         history: [{
           time: now(),
           action: input.sourceChannel === 'push' ? '直连推送订单' : '手工录入订单',
@@ -332,22 +417,287 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
             + (input.salesPath === 'via_platform'
               ? ` · 经平台销售（${input.platformCustomerName ?? '—'}）`
               : ' · 直接销售')
-            + (input.customerOrderNo ? ` · 客户侧单号 ${input.customerOrderNo}` : ''),
+            + (input.customerOrderNo ? ` · 客户侧单号 ${input.customerOrderNo}` : '')
+            + ' · 进入销售单处理',
         }],
       };
-      // 保存即匹配：命中审批通过的报备 → 进入报备-匹配待确认（人工确认后分发）
+      // 录入时记录报备命中（不自动转出；送去分发后可在履约单分发中选择报备转派）
       const matches = matchExternalOrder(order);
-      const match = matches.find((m) => m.partnerId);
-      if (match?.partnerId) {
+      if (matches.length > 0) {
         order.reportMatches = matches;
-        order.processStatus = 'report_match_pending';
-        order.path = 'distribute';
-        order.partnerId = match.partnerId;
-        order.partnerName = match.partnerName;
-        order.history.push({ time: now(), action: '命中报备，待确认匹配', detail: `命中 ${matches.map((m) => m.reportCode).join('、')} → ${match.partnerName} · 待人工确认后分发` });
+        order.history.push({
+          time: now(),
+          action: '命中报备',
+          detail: `命中 ${matches.map((m) => m.reportCode).join('、')} → ${matches.map((m) => m.partnerName).join('、')} · 待送去分发时选择报备转派`,
+        });
       }
       set({ orders: [order, ...orders] });
       return order;
+    },
+
+    dispatchSalesOrder: (id) => {
+      const order = get().orders.find((o) => o.id === id);
+      if (!order) return { ok: false, msg: '销售单不存在' };
+      if (order.dispatchState !== 'unprocessed' || order.processStatus !== 'unprocessed') {
+        return { ok: false, msg: '仅未分发的销售单可送去分发' };
+      }
+      if (get().orders.some((o) => o.parentCode === order.code)) {
+        return { ok: false, msg: '该销售单已生成履约单，请勿重复送去分发' };
+      }
+      patchOrder(id, { dispatchState: 'dispatched', processStatus: 'pending' }, {
+        action: '送去分发',
+        detail: `未拆单，整单作为一张履约单（${order.code}LY01）进入履约单分发（待分发）`,
+      });
+      return { ok: true, msg: `销售单 ${order.code} 已整单送去分发（该销售单即一张履约单）` };
+    },
+
+    splitSalesOrderToFulfillments: (id, groups) => {
+      const order = get().orders.find((o) => o.id === id);
+      if (!order) return { ok: false, msg: '销售单不存在' };
+      if (order.dispatchState !== 'unprocessed' || order.processStatus !== 'unprocessed') {
+        return { ok: false, msg: '仅未分发的销售单可生成履约单' };
+      }
+      if (get().orders.some((o) => o.parentCode === order.code)) {
+        return { ok: false, msg: '该销售单已生成履约单' };
+      }
+      // 校验并归并拆单组
+      const normalized: ExternalOrderItem[][] = [];
+      const used = new Map<string, number>();
+      for (const g of groups) {
+        const its = g.filter((it) => it.quantity > 0);
+        if (its.length === 0) continue;
+        for (const it of its) {
+          const src = order.items.find((x) => x.productId === it.productId);
+          if (!src) return { ok: false, msg: `商品 ${it.productName} 不在销售单内` };
+          const next = (used.get(it.productId) ?? 0) + it.quantity;
+          if (next > src.quantity) return { ok: false, msg: `${it.productName} 拆出数量超出销售单数量` };
+          used.set(it.productId, next);
+        }
+        normalized.push(its.map((it) => ({ ...it })));
+      }
+      // 剩余数量合并为最后一张履约单；未拆单时整单生成一张
+      const remainder = order.items
+        .map((it) => ({ ...it, quantity: it.quantity - (used.get(it.productId) ?? 0) }))
+        .filter((it) => it.quantity > 0);
+      const finalGroups = normalized.length === 0
+        ? [order.items.map((it) => ({ ...it }))]
+        : [...normalized, ...(remainder.length > 0 ? [remainder] : [])];
+
+      const created: ExternalOrder[] = [];
+      for (const items of finalGroups) {
+        const code = genFulfillmentCode(order.code, [...get().orders, ...created]);
+        created.push({
+          ...order,
+          id: `eo_${nowTs()}_${created.length + 1}_${Math.floor(Math.random() * 1000)}`,
+          code,
+          parentCode: order.code,
+          items,
+          totalAmount: items.reduce((s, it) => s + it.price * it.quantity, 0),
+          processStatus: 'pending',
+          dispatchState: undefined,
+          path: undefined,
+          distributeMode: undefined,
+          partnerId: undefined,
+          partnerName: undefined,
+          transferSource: undefined,
+          transferTime: undefined,
+          partnerStatus: undefined,
+          fulfillment: undefined,
+          compare: undefined,
+          sourceTag: undefined,
+          settleOnTime: undefined,
+          settled: undefined,
+          invoiceStatus: undefined,
+          selfPo: undefined,
+          selfShipments: undefined,
+          history: [{
+            time: now(),
+            action: '拆单生成履约单',
+            detail: `由销售单 ${order.code} 拆出 · ${items.map((i) => `${i.productName}×${i.quantity}`).join('、')} · 进入履约单分发（待分发）`,
+          }],
+        });
+      }
+      set((s) => ({
+        orders: [
+          ...created,
+          ...s.orders.map((o) => (o.id === id
+            ? {
+              ...o,
+              dispatchState: 'dispatched' as const,
+              history: [...o.history, {
+                time: now(),
+                action: '拆单送分发',
+                detail: `生成 ${created.length} 张履约单 ${created.map((c) => c.code).join('、')} · 原销售单保留`,
+              }],
+            }
+            : o)),
+        ],
+      }));
+      return { ok: true, msg: `已生成 ${created.length} 张履约单（${created.map((c) => c.code).join('、')}），进入履约单分发（待分发）`, created };
+    },
+
+    splitFulfillmentByDrafts: (id, groups) => {
+      const order = get().orders.find((o) => o.id === id);
+      if (!order) return { ok: false, msg: '订单不存在' };
+      const isAcceptedSelf = order.path === 'self' && order.processStatus === 'processed';
+      if (order.processStatus !== 'pending' && !isAcceptedSelf) {
+        return { ok: false, msg: '仅待分发或自营已接单订单可拆单' };
+      }
+      const normalized: ExternalOrderItem[][] = [];
+      const used = new Map<string, number>();
+      for (const g of groups) {
+        const its = g.filter((it) => it.quantity > 0);
+        if (its.length === 0) continue;
+        for (const it of its) {
+          const src = order.items.find((x) => x.productId === it.productId);
+          if (!src) return { ok: false, msg: `商品 ${it.productName} 不在订单内` };
+          const next = (used.get(it.productId) ?? 0) + it.quantity;
+          if (next > src.quantity) return { ok: false, msg: `${it.productName} 拆出数量超出订单数量` };
+          used.set(it.productId, next);
+        }
+        normalized.push(its.map((it) => ({ ...it })));
+      }
+      if (normalized.length === 0) return { ok: false, msg: '请至少生成 1 张履约单' };
+      const remainder = order.items
+        .map((it) => ({ ...it, quantity: it.quantity - (used.get(it.productId) ?? 0) }))
+        .filter((it) => it.quantity > 0);
+      const finalGroups = [...normalized, ...(remainder.length > 0 ? [remainder] : [])];
+      const rootCode = order.parentCode ?? order.code;
+      const childStatus = isAcceptedSelf ? 'processed' as const : 'pending' as const;
+      const childPath = isAcceptedSelf ? 'self' as const : order.path;
+      const created: ExternalOrder[] = [];
+      for (const items of finalGroups) {
+        const code = genFulfillmentCode(rootCode, [...get().orders, ...created]);
+        created.push({
+          ...order,
+          id: `eo_${nowTs()}_s${created.length + 1}_${Math.floor(Math.random() * 1000)}`,
+          code,
+          parentCode: rootCode,
+          items,
+          totalAmount: items.reduce((s, it) => s + it.price * it.quantity, 0),
+          processStatus: childStatus,
+          dispatchState: undefined,
+          path: childPath,
+          reportMatches: undefined,
+          sourceTag: undefined,
+          compare: undefined,
+          transferSource: undefined,
+          transferTime: undefined,
+          partnerStatus: undefined,
+          settleOnTime: undefined,
+          settled: undefined,
+          invoiceStatus: undefined,
+          history: [{
+            time: now(),
+            action: '拆单生成履约单',
+            detail: `从 ${order.code} 拆出 · ${items.map((i) => `${i.productName}×${i.quantity}`).join('、')}${isAcceptedSelf ? ' · 继承自营已接单' : ' · 待分发'}`,
+          }],
+        });
+      }
+      set((s) => ({
+        orders: [
+          ...created,
+          ...s.orders
+            .filter((o) => !(order.parentCode && o.id === id))
+            .map((o) => (o.id === id
+              ? { ...o, history: [...o.history, { time: now(), action: '拆单', detail: `生成 ${created.length} 张子履约单 ${created.map((c) => c.code).join('、')}` }] }
+              : o)),
+        ],
+      }));
+      return { ok: true, msg: `已拆为 ${created.length} 张子履约单（${created.map((c) => c.code).join('、')}）`, created };
+    },
+
+    applyReportMatchToFulfillment: (id, orderReportCode) => {
+      const child = get().orders.find((o) => o.id === id);
+      if (!child) return { ok: false, msg: '履约单不存在' };
+      if (child.processStatus !== 'pending') return { ok: false, msg: '仅待分发履约单可匹配报备' };
+      const suppliers = useSupplierStore.getState().suppliers;
+      const reports = useReportStore.getState().reports;
+      const supplierByName = (name: string) => suppliers.find((s) => s.name === name);
+
+      // 订单报备：人工确认后整单转出
+      if (orderReportCode) {
+        const r = reports.find((x) => x.code === orderReportCode && x.type === 'order' && x.status === 'approved');
+        if (!r) return { ok: false, msg: '订单报备不存在或未审批通过' };
+        const supplier = supplierByName(r.partnerName);
+        if (!supplier) return { ok: false, msg: `未找到合作商档案：${r.partnerName}` };
+        transfer(id, supplier.id, supplier.name, 'report', `人工确认订单报备 ${r.code}`);
+        patchOrder(id, {
+          reportMatches: [reportInfoOf(r, supplier.id)],
+        }, { action: '订单报备匹配', detail: `人工确认订单报备 ${r.code} → ${r.partnerName} · 转派待接单` });
+        return { ok: true, msg: `已按订单报备 ${r.code} 转出至 ${r.partnerName}` };
+      }
+
+      const preview = previewReportMatch(child, child.items);
+      if (preview.groups.length === 0) {
+        return { ok: false, msg: '未匹配到商品 / 地区报备' };
+      }
+      const motherCode = child.parentCode ?? child.code;
+      const created: ExternalOrder[] = [];
+      for (const g of preview.groups) {
+        const code = genFulfillmentCode(motherCode, [...get().orders, ...created]);
+        const matches: ReportMatchInfo[] = g.reportCodes
+          .map((c) => reports.find((r) => r.code === c))
+          .filter((r): r is PartnerReport => !!r)
+          .map((r) => reportInfoOf(r, g.partnerId));
+        created.push({
+          ...child,
+          id: `eo_${nowTs()}_r${created.length + 1}_${Math.floor(Math.random() * 1000)}`,
+          code,
+          parentCode: motherCode,
+          items: g.items.map((it) => ({ ...it })),
+          totalAmount: g.items.reduce((s, it) => s + it.price * it.quantity, 0),
+          processStatus: 'report_match_pending',
+          dispatchState: undefined,
+          path: 'distribute',
+          partnerId: g.partnerId,
+          partnerName: g.partnerName,
+          transferSource: undefined,
+          transferTime: undefined,
+          partnerStatus: undefined,
+          fulfillment: undefined,
+          compare: undefined,
+          reportMatches: matches,
+          history: [{
+            time: now(),
+            action: g.reportType === 'product' ? '商品报备匹配' : '地区报备匹配',
+            detail: `命中 ${g.reportCodes.join('、')} → ${g.partnerName} · 待确认匹配后转出`,
+          }],
+        });
+      }
+      const remainder = preview.remainderItems;
+      set((s) => ({
+        orders: [
+          ...created,
+          ...s.orders
+            .filter((o) => !(o.id === id && remainder.length === 0))
+            .map((o) => {
+              if (o.id !== id) return o;
+              return {
+                ...o,
+                items: remainder,
+                totalAmount: remainder.reduce((sum, it) => sum + it.price * it.quantity, 0),
+                processStatus: 'pending' as const,
+                path: undefined,
+                partnerId: undefined,
+                partnerName: undefined,
+                reportMatches: undefined,
+                history: [...o.history, { time: now(), action: '报备匹配后剩余', detail: `剩余 ${remainder.map((it) => `${it.productName}×${it.quantity}`).join('、')} · 保持待分发` }],
+              };
+            }),
+          ...s.orders
+            .filter((o) => o.code === motherCode && !o.parentCode)
+            .map((o) => ({
+              ...o,
+              history: [...o.history, {
+                time: now(),
+                action: '报备自动匹配',
+                detail: `商品/地区报备按合作商拆分 ${created.length} 张履约单${remainder.length ? `，剩余 ${remainder.reduce((sum, it) => sum + it.quantity, 0)} 份待分发` : ''}`,
+              }],
+            })),
+        ],
+      }));
+      return { ok: true, msg: `已按报备匹配 ${created.length} 张履约单${remainder.length ? '，剩余商品待分发' : ''}` };
     },
 
     deleteOrder: (id) => {
@@ -365,7 +715,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       if (order.sourceChannel !== 'manual') return { ok: false, msg: '直连推送订单仅支持接口推送修改，不支持在管理后台修改' };
       if (order.processStatus === 'cancelled') return { ok: false, msg: '已取消订单不可修改' };
       /* 权限：客户侧订单号/客户下单时间任意状态可改；收货信息/商品明细需未进入待接单（且不在比单中、未拆分） */
-      const coreEditable = order.processStatus === 'pending' || order.processStatus === 'report_match_pending';
+      const coreEditable = order.processStatus === 'pending' || order.processStatus === 'unprocessed' || order.processStatus === 'report_match_pending';
       const hasChildren = get().orders.some((o) => o.parentCode === order.code);
       const coreKeys = ['receiver', 'receiverPhone', 'receiverAddress', 'remark', 'items'];
       const coreTouched = Object.keys(patch).some((k) => coreKeys.includes(k));
@@ -390,8 +740,14 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       }, { action: '选择自营路径', detail: '背对背采购 · 等待管理后台接单（销售订单 → 分发订单）' });
     },
 
-    assignPartner: (id, supplierId, supplierName) => {
+    assignPartner: (id, supplierId, supplierName, coopMode) => {
       transfer(id, supplierId, supplierName, 'assign', '运营指定转派');
+      if (coopMode) {
+        patchOrder(id, { coopMode }, {
+          action: '设置合作模式',
+          detail: `本单与合作商 ${supplierName} 按${coopMode === 'service' ? '扣点模式' : '差价模式'}合作`,
+        });
+      }
     },
 
     confirmReportMatch: (id) => {
@@ -453,7 +809,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       const order = get().orders.find((o) => o.id === id);
       if (!order) return { ok: false, msg: '订单不存在' };
       const isAcceptedSelf = order.path === 'self' && order.processStatus === 'processed';
-      if (order.processStatus !== 'pending' && !isAcceptedSelf) return { ok: false, msg: '仅待分发或自营已接单订单可拆单' };
+      if (!['pending', 'unprocessed'].includes(order.processStatus) && !isAcceptedSelf) return { ok: false, msg: '仅待分发 / 未分发或自营已接单订单可拆单' };
       const valid = parts.filter((p) => p.quantity > 0);
       if (valid.length === 0) return { ok: false, msg: '请填写要拆出的商品数量' };
       for (const p of valid) {
@@ -479,6 +835,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
           items,
           totalAmount: items.reduce((s, it) => s + it.price * it.quantity, 0),
           processStatus: childStatus,
+          dispatchState: undefined,
           path: childPath,
           reportMatches: undefined,
           sourceTag: undefined,
@@ -495,7 +852,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
           splitFo,
           remainFo,
           ...s.orders.map((o) => (o.id === id
-            ? { ...o, history: [...o.history, { time: now(), action: '拆单', detail: `拆出子履约单 ${splitFo.code}，剩余部分生成子履约单 ${remainFo.code}，均挂本母销售单下` }] }
+            ? { ...o, dispatchState: 'dispatched' as const, history: [...o.history, { time: now(), action: '拆单', detail: `拆出子履约单 ${splitFo.code}，剩余部分生成子履约单 ${remainFo.code}，均挂本母销售单下` }] }
             : o)),
         ],
       }));
@@ -506,7 +863,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       const order = get().orders.find((o) => o.id === id);
       if (!order) return { ok: false, msg: '订单不存在' };
       const isAcceptedSelf = order.path === 'self' && order.processStatus === 'processed';
-      if (order.processStatus !== 'pending' && !isAcceptedSelf) return { ok: false, msg: '仅待分发或自营已接单订单可拆单' };
+      if (!['pending', 'unprocessed'].includes(order.processStatus) && !isAcceptedSelf) return { ok: false, msg: '仅待分发 / 未分发或自营已接单订单可拆单' };
       if (order.items.length < 2) return { ok: false, msg: '订单仅 1 种商品，无需拆单' };
       const products = usePriceStore.getState().products;
       const groups: { key: string; items: { productName: string; quantity: number }[] }[] = [];
@@ -535,6 +892,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
           items: g.items.map((p) => ({ ...order.items.find((x) => x.productName === p.productName)!, quantity: p.quantity })),
           totalAmount: g.items.reduce((s, p) => s + (order.items.find((x) => x.productName === p.productName)!.price * p.quantity), 0),
           processStatus: childStatus,
+          dispatchState: undefined,
           path: childPath,
           reportMatches: undefined,
           sourceTag: undefined,
@@ -547,7 +905,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         orders: [
           ...fos,
           ...s.orders.map((o) => (o.id === id
-            ? { ...o, history: [...o.history, { time: now(), action: `快速拆单（按${modeLabel}）`, detail: `${groups.length} 个分组各生成子履约单 ${fos.map((f) => f.code).join('、')}，均挂本母销售单下` }] }
+            ? { ...o, dispatchState: 'dispatched' as const, history: [...o.history, { time: now(), action: `快速拆单（按${modeLabel}）`, detail: `${groups.length} 个分组各生成子履约单 ${fos.map((f) => f.code).join('、')}，均挂本母销售单下` }] }
             : o)),
         ],
       }));
@@ -596,8 +954,8 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         processStatus: 'pending',
         path: undefined,
         sourceTag: 'self_returned',
-      }, { action: '自营退回', detail: '退回销售单分发 · 重新进入分发-待处理（来源标注：自营退回）' });
-      return { ok: true, msg: '已退回销售单分发（分发-待处理），来源已标注「自营退回」' };
+      }, { action: '自营退回', detail: '退回履约单分发 · 重新进入分发-待处理（来源标注：自营退回）' });
+      return { ok: true, msg: '已退回履约单分发（分发-待处理），来源已标注「自营退回」' };
     },
 
     /* ── 待接单取回 / 合作商退回 ── */
@@ -624,7 +982,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
           distributeMode: undefined,
           fulfillment: undefined,
           sourceTag: src.tag,
-        }, { action: src.label, detail: `从${from}整体取回 → 回到销售单分发（履约单编号 ${order.code} 不变）` });
+        }, { action: src.label, detail: `从${from}整体取回 → 回到履约单分发（履约单编号 ${order.code} 不变）` });
         return { ok: true, msg: `已整体取回，订单进入分发-待处理（来源：${src.label}）` };
       }
 
@@ -962,7 +1320,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
     },
 
     /* ── 比单（公开报名制） ── */
-    startCompare: (id, floorRule, region) => {
+    startCompare: (id, floorRule, region, filters) => {
       const order = get().orders.find((o) => o.id === id);
       if (!order) return { ok: false, msg: '订单不存在' };
       const minutes = get().settings.compareMinutes;
@@ -971,6 +1329,12 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         ? `报名报价不得低于订单金额的 ${floorRule.value} 折（¥${floor.toLocaleString()}）`
         : `报名报价不得低于 ¥${floor.toLocaleString()}`;
       const hasScope = region && (region.province || region.city || region.district);
+      const partnerTypes = filters?.partnerTypes?.length ? filters.partnerTypes : undefined;
+      const coopMode = filters?.coopMode;
+      const typeNote = partnerTypes?.length
+        ? ` · 限${partnerTypes.map((t) => (t === 'service' ? '服务商' : '供应商')).join(' / ')}`
+        : '';
+      const modeNote = coopMode ? ` · 限${coopMode === 'service' ? '扣点模式' : '差价模式'}` : '';
       patchOrder(id, {
         path: 'distribute',
         distributeMode: 'compare',
@@ -982,8 +1346,10 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
           quotes: [],
           scored: false,
           region: hasScope ? region : undefined,
+          partnerTypes,
+          coopMode,
         },
-      }, { action: '发起比单', detail: `公开报名 · ${floorNote} · 评分 = 报价 ${get().settings.compareWeights.quote}0% + 积分 ${get().settings.compareWeights.score}0%${hasScope ? ` · 限 ${[region!.province, region!.city, region!.district].filter(Boolean).join(' ')} 地区合作商` : ''}` });
+      }, { action: '发起比单', detail: `公开报名 · ${floorNote} · 评分 = 报价 ${get().settings.compareWeights.quote}0% + 积分 ${get().settings.compareWeights.score}0%${hasScope ? ` · 限 ${[region!.province, region!.city, region!.district].filter(Boolean).join(' ')} 地区合作商` : ''}${typeNote}${modeNote}` });
       return { ok: true, msg: '比单已发起，等待合作商报名' };
     },
 
@@ -992,6 +1358,10 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       if (!order?.compare || order.processStatus !== 'comparing') return { ok: false, msg: '比单已结束' };
       if (order.compare.quotes.some((q) => q.supplierId === supplierId)) return { ok: false, msg: '您已报名过' };
       if (nowTs() > order.compare.deadline) return { ok: false, msg: '报名已截止' };
+      const supplier = useSupplierStore.getState().suppliers.find((s) => s.id === supplierId);
+      if (order.compare.partnerTypes?.length && !order.compare.partnerTypes.some((t) => supplier?.types.includes(t))) {
+        return { ok: false, msg: '本单比单仅限指定合作商类型参与' };
+      }
       const names = [...new Set(itemNames ?? order.items.map((i) => i.productName))].filter((n) => order.items.some((i) => i.productName === n));
       if (names.length === 0) return { ok: false, msg: '请选择要报名的商品' };
       // 底价按所选商品金额占比折算
@@ -1178,7 +1548,7 @@ export function getPartnerFlowOrders(supplierId: string): PartnerOrder[] {
     items: o.items.map((it) => ({ productName: it.productName, spec: it.spec, quantity: it.quantity, price: it.price })),
     totalAmount: o.totalAmount,
     deliveryMode: 'direct' as const,
-    coopMode: 'supplier' as const,
+    coopMode: (o.coopMode ?? 'supplier') as PartnerCoopMode,
     status: o.processStatus === 'cancelled'
       ? ('cancelled' as const)
       : o.processStatus === 'distribute_pending' ? ('pending' as const) : (o.partnerStatus ?? ('pending' as const)),
@@ -1206,6 +1576,11 @@ export function getPartnerFlowOrders(supplierId: string): PartnerOrder[] {
   const openCompares = state.orders
     .filter((o) => o.processStatus === 'comparing' && o.compare && o.compare.deadline > now)
     .filter((o) => partnerInRegion(supplier, o.compare?.region))
+    .filter((o) => {
+      const cmp = o.compare!;
+      if (cmp.partnerTypes?.length && !cmp.partnerTypes.some((t) => supplier?.types.includes(t))) return false;
+      return true;
+    })
     .map((o) => {
       const myQuote = o.compare!.quotes.find((q) => q.supplierId === supplierId);
       return base(o, {

@@ -228,7 +228,7 @@ export default function PartnerAccountPage() {
             {error && <div style={{ fontSize: 'var(--text-xs)', color: '#CB405D', marginBottom: 'var(--space-3)' }}>{error}</div>}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-              <Button variant="ghost" onClick={() => setEditing(null)}>取消</Button>
+              <Button variant="ghost" onClick={() => setEditing(null)}>关闭</Button>
               <Button onClick={saveEdit}>保存</Button>
             </div>
           </div>
@@ -261,7 +261,7 @@ export default function PartnerAccountPage() {
             {error && <div style={{ fontSize: 'var(--text-xs)', color: '#CB405D', marginBottom: 'var(--space-3)' }}>{error}</div>}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-              <Button variant="ghost" onClick={() => setShowAdd(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setShowAdd(false)}>关闭</Button>
               <Button onClick={saveAdd}>保存</Button>
             </div>
           </div>
@@ -277,7 +277,7 @@ export default function PartnerAccountPage() {
               账号 <b className="mono">{deleting.username}</b>（{deleting.name || '未命名'}）删除后无法恢复，确认删除？
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-              <Button variant="ghost" onClick={() => setDeleting(null)}>取消</Button>
+              <Button variant="ghost" onClick={() => setDeleting(null)}>关闭</Button>
               <Button variant="danger" onClick={confirmDelete}>确认删除</Button>
             </div>
           </div>

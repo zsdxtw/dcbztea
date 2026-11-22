@@ -184,7 +184,7 @@ export default function CooperationNotices() {
               {formError && <div style={{ fontSize: 'var(--text-sm)', color: '#C62828' }}>{formError}</div>}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-4)', flexShrink: 0 }}>
-              <Button variant="ghost" onClick={() => setDialogOpen(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setDialogOpen(false)}>关闭</Button>
               <Button onClick={saveDraft}>{editingId ? '保存修改' : '保存草稿'}</Button>
             </div>
           </div>
@@ -223,7 +223,7 @@ export default function CooperationNotices() {
               确定要删除公告 <strong>{deleting.title}</strong>（{deleting.code}）吗？{deleting.status === 'published' && ' 已发布公告删除后将从合作商工作台下架。'}此操作不可撤销。
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
-              <Button variant="ghost" onClick={() => setDeleting(null)}>取消</Button>
+              <Button variant="ghost" onClick={() => setDeleting(null)}>关闭</Button>
               <Button style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)' }} onClick={() => { removeNotice(deleting.id); setDeleting(null); }}>确认删除</Button>
             </div>
           </div>

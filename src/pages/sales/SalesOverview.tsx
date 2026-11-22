@@ -213,7 +213,7 @@ export default function SalesOverview() {
         {/* 分发动态 + 履约动态 */}
         <div className="grid-2">
           <Card
-            title="销售单分发动态"
+            title="履约单分发动态"
             headerRight={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>本月分发金额 <span className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)' }}>{money(monthFlowAmount)}</span></span>}
           >
             <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-3)' }}>
@@ -245,7 +245,7 @@ export default function SalesOverview() {
             />
           </Card>
 
-          <Card title="履约动态" headerRight={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>履约单 {units.length} 张 · 点击前往销售单履约</span>}>
+          <Card title="履约动态" headerRight={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>履约单 {units.length} 张 · 点击前往履约单履约</span>}>
             <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-3)' }}>
               {FULFILL_BRIEF.map((b) => {
                 const c = FULFILLMENT_STAGE_COLORS[b.keys[0] as keyof typeof FULFILLMENT_STAGE_COLORS];
@@ -314,7 +314,7 @@ export default function SalesOverview() {
           headerRight={<Button size="sm" variant="ghost" onClick={() => navigate('/sales/sales-orders')}>前往销售单列表</Button>}
         >
           <Table
-            headers={['销售单号', '来源', '客户', '履约单数', '总金额', '分发状态', '履约状态', '结算状态', '开票状态', '录入时间', '操作']}
+            headers={['销售单号', '来源', '客户', '履约单数', '总金额', '分发进度', '履约进度', '结算进度', '开票进度', '录入时间', '操作']}
             rows={recentFamilies.map((f) => {
               const st = familyStatesOf(f);
               const amount = (f.children.length > 0 ? f.children : f.all).reduce((s, o) => s + o.totalAmount, 0);

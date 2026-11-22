@@ -394,7 +394,7 @@ export default function PartnerQuotes() {
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
-              <button className="pk-reg-cancel" style={{ height: 34, padding: '0 16px', fontSize: 13 }} onClick={() => setOverrideDialog(null)}>取消</button>
+              <button className="pk-reg-cancel" style={{ height: 34, padding: '0 16px', fontSize: 13 }} onClick={() => setOverrideDialog(null)}>关闭</button>
               <button className="pk-reg-submit" style={{ height: 34, padding: '0 18px', fontSize: 13, letterSpacing: 'normal', textIndent: 0 }} onClick={saveOverride}>保存</button>
             </div>
           </div>
@@ -428,7 +428,7 @@ export default function PartnerQuotes() {
               {reminderMsg && <div style={{ fontSize: 'var(--text-xs)', color: '#CB405D' }}>{reminderMsg}</div>}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-5)' }}>
-              <button className="pk-reg-cancel" style={{ height: 34, padding: '0 16px', fontSize: 13 }} onClick={() => setReminderOpen(false)}>取消</button>
+              <button className="pk-reg-cancel" style={{ height: 34, padding: '0 16px', fontSize: 13 }} onClick={() => setReminderOpen(false)}>关闭</button>
               <button className="pk-reg-submit" style={{ height: 34, padding: '0 18px', fontSize: 13, letterSpacing: 'normal', textIndent: 0 }} onClick={submitReminder}>提交提报</button>
             </div>
           </div>

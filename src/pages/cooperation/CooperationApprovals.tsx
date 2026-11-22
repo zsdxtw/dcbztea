@@ -277,7 +277,7 @@ export default function PurchaseSupplierApprovals() {
                 onChange={e => setNote(e.target.value)} style={{ width: '100%', minHeight: 70, resize: 'vertical', padding: '10px 12px' }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-              <Button variant="ghost" onClick={() => setReviewing(null)}>取消</Button>
+              <Button variant="ghost" onClick={() => setReviewing(null)}>关闭</Button>
               <Button variant={reviewing.action === 'approved' ? 'primary' : 'danger'} onClick={confirmReview}>
                 确认{reviewing.action === 'approved' ? '通过' : '驳回'}
               </Button>

@@ -591,7 +591,7 @@ export default function PartnerProfile({ section }: { section: ProfileSectionKey
               </>
             )}
             <div className="pk-reg-footer" style={{ marginTop: 18 }}>
-              <button className="pk-reg-cancel" onClick={() => setEditing(false)}>取消</button>
+              <button className="pk-reg-cancel" onClick={() => setEditing(false)}>关闭</button>
               <button className="pk-reg-submit" onClick={handleSubmit}>{conf.direct ? '保存' : '提交修改申请'}</button>
             </div>
           </div>

@@ -260,7 +260,7 @@ export default function SalesReports() {
       {/* 审批弹窗 */}
       {reviewing && (
         <div className="category-dialog-overlay" onClick={() => setReviewing(null)}>
-          <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 480 }}>
+          <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 500 }}>
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>
               {reviewAction === 'approved' ? '审批通过' : '驳回报备'}
             </div>
@@ -274,7 +274,7 @@ export default function SalesReports() {
                 onChange={e => setNote(e.target.value)} style={{ width: '100%', minHeight: 80, resize: 'vertical', padding: '10px 12px' }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-              <Button variant="ghost" onClick={() => setReviewing(null)}>取消</Button>
+              <Button variant="ghost" onClick={() => setReviewing(null)}>关闭</Button>
               <Button variant={reviewAction === 'approved' ? 'primary' : 'danger'} onClick={confirmReview}>
                 确定{reviewAction === 'approved' ? '通过' : '驳回'}
               </Button>

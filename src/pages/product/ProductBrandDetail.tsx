@@ -159,7 +159,7 @@ export default function ProductBrandDetail() {
         actions={
           editing ? (
             <>
-              <Button variant="ghost" onClick={() => setEditing(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setEditing(false)}>关闭</Button>
               <Button onClick={() => setEditing(false)}>保存</Button>
             </>
           ) : (
@@ -347,7 +347,7 @@ export default function ProductBrandDetail() {
                     {showSeriesInput ? (
                       <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                         <input className="detail-input" value={newSeries} onChange={(e) => setNewSeries(e.target.value)} placeholder="输入系列名称" style={{ flex: 1 }} onKeyDown={(e) => { if (e.key === 'Enter') handleAddSeries(); }} />
-                        <Button variant="ghost" size="sm" onClick={() => { setShowSeriesInput(false); setNewSeries(''); }} style={{ color: 'var(--color-neutral-400)' }}>取消</Button>
+                        <Button variant="ghost" size="sm" onClick={() => { setShowSeriesInput(false); setNewSeries(''); }} style={{ color: 'var(--color-neutral-400)' }}>关闭</Button>
                         <Button size="sm" onClick={handleAddSeries}>确认</Button>
                       </div>
                     ) : (
@@ -373,7 +373,7 @@ export default function ProductBrandDetail() {
                     {showSeriesInput ? (
                       <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                         <input className="detail-input" value={newSeries} onChange={(e) => setNewSeries(e.target.value)} placeholder="输入系列名称" style={{ flex: 1 }} onKeyDown={(e) => { if (e.key === 'Enter') handleAddSeries(); }} />
-                        <Button variant="ghost" size="sm" onClick={() => { setShowSeriesInput(false); setNewSeries(''); }} style={{ color: 'var(--color-neutral-400)' }}>取消</Button>
+                        <Button variant="ghost" size="sm" onClick={() => { setShowSeriesInput(false); setNewSeries(''); }} style={{ color: 'var(--color-neutral-400)' }}>关闭</Button>
                         <Button size="sm" onClick={handleAddSeries}>确认</Button>
                       </div>
                     ) : (

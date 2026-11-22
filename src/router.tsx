@@ -31,8 +31,8 @@ import SalesOrders from './pages/sales/SalesOrders';
 import SalesOrderDetail from './pages/sales/SalesOrderDetail';
 import ExternalOrders from './pages/sales/ExternalOrders';
 import OrderEntry from './pages/sales/OrderEntry';
+import SalesOrderProcessing from './pages/sales/SalesOrderProcessing';
 import SalesFulfillment from './pages/sales/SalesFulfillment';
-import SalesDelivery from './pages/sales/SalesDelivery';
 import SalesPricing from './pages/sales/SalesPricing';
 import SalesReconciliation from './pages/sales/SalesReconciliation';
 import SalesCustomers from './pages/sales/SalesCustomers';
@@ -179,13 +179,13 @@ export const router = createBrowserRouter([
       { path: 'sales/sales-overview', element: <SalesOverview /> },
       { path: 'sales/sales-order-create', element: <Navigate to="/sales/order-entry" replace /> },
       { path: 'sales/order-entry', element: <OrderEntry /> },
-      { path: 'sales/order-processing', element: <Navigate to="/sales/order-distribute" replace /> },
+      { path: 'sales/sales-order-processing', element: <SalesOrderProcessing /> },
+      { path: 'sales/order-processing', element: <SalesOrderProcessing /> },
       { path: 'sales/order-distribute', element: <ExternalOrders /> },
       { path: 'sales/order-shipping', element: <Navigate to="/selfop/orders" replace /> },
       { path: 'sales/sales-fulfillment', element: <SalesFulfillment /> },
       { path: 'sales/fulfillment-orders', element: <Navigate to="/sales/sales-fulfillment" replace /> },
       { path: 'sales/order-settlement', element: <Navigate to="/finance/finance-partner-settlement" replace /> },
-      { path: 'sales/sales-delivery', element: <SalesDelivery /> },
       { path: 'sales/sales-orders', element: <SalesOrders /> },
       { path: 'sales/sales-orders/:rootCode', element: <SalesOrderDetail /> },
       { path: 'sales/sales-reports', element: <Navigate to="/cooperation/cooperation-reports" replace /> },

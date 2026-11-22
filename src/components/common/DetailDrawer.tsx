@@ -86,7 +86,7 @@ export default function DetailDrawer({
     </>
   ) : (
     <>
-      <Button variant="ghost" onClick={handleCancelEdit}>取消</Button>
+      <Button variant="ghost" onClick={handleCancelEdit}>关闭</Button>
       <Button onClick={onSave} disabled={saveDisabled}>保存</Button>
     </>
   );

@@ -67,8 +67,8 @@ export default function SalesFulfillment() {
     const childCodes = new Set(orders.filter((o) => o.parentCode).map((o) => o.code));
     const rootHasChild = new Set(orders.filter((o) => childCodes.has(o.code) || o.parentCode).map((o) => o.parentCode ?? o.code));
     return orders
-      // 履约环节仅含已分发订单（待分发 / 报备待确认 / 比单中仍留在销售单分发）
-      .filter((o) => !['pending', 'report_match_pending', 'comparing'].includes(o.processStatus))
+      // 履约环节仅含已分发订单（未分发 / 待分发 / 报备待确认 / 比单中仍留在销售单处理 / 履约单分发）
+      .filter((o) => !['unprocessed', 'pending', 'report_match_pending', 'comparing'].includes(o.processStatus))
       .filter((o) => !o.parentCode && !rootHasChild.has(o.code) || o.parentCode)
       .map((o) => {
         const stage = stageOfOrder(o);
@@ -95,7 +95,7 @@ export default function SalesFulfillment() {
 
   return (
     <>
-      <ContentHeader title="销售单履约" breadcrumbs={['销售', '销售单管理', '销售单履约']} />
+      <ContentHeader title="履约单履约" breadcrumbs={['销售', '销售单管理', '履约单履约']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           按<strong>子履约单 / 未拆分的母销售单</strong>维度跟踪每一张销售单的履约进度（未拆分时母销售单即履约单）：
@@ -182,7 +182,7 @@ export default function SalesFulfillment() {
           <div className="category-dialog" style={{ width: 640 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 4 }}>取回订单 · {recallOf.code}</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7, marginBottom: 'var(--space-4)' }}>
-              从 <strong>{recallOf.path === 'self' ? '自营' : (recallOf.partnerName ?? '合作商')}</strong> 取回，取回后进入销售单分发。
+              从 <strong>{recallOf.path === 'self' ? '自营' : (recallOf.partnerName ?? '合作商')}</strong> 取回，取回后进入履约单分发。
               整体取回时履约单编号不变；部分取回时<strong>剩余部分沿用原编号 {recallOf.code}</strong>，取回部分按规则生成新履约单。
               留空或 0 表示不取回该商品。
             </div>
@@ -214,7 +214,7 @@ export default function SalesFulfillment() {
               <div style={{ marginTop: 'var(--space-3)', padding: '8px 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', background: '#FFF3E0', color: '#B26A00' }}>{recallMsg}</div>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-5)' }}>
-              <Button variant="ghost" onClick={() => setRecallOf(null)}>取消</Button>
+              <Button variant="ghost" onClick={() => setRecallOf(null)}>关闭</Button>
               <Button variant="ghost" onClick={() => submitRecall(true)}>整体取回</Button>
               <Button onClick={() => submitRecall(false)}>确认部分取回</Button>
             </div>

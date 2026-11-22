@@ -733,8 +733,8 @@ tbody tr:last-child td { border-bottom: none; }
 .category-breadcrumb-sep { color: var(--color-neutral-300); margin: 0 var(--space-1); }
 
 /* ── 新增弹窗 ── */
-.category-dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.category-dialog { background: var(--color-neutral-0); border-radius: var(--radius-xl); padding: var(--space-6); width: 400px; box-shadow: var(--shadow-lg); }
+.category-dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 24px; }
+.category-dialog { background: var(--color-neutral-0); border-radius: var(--radius-xl); padding: var(--space-6); width: 400px; max-width: 94vw; max-height: calc(100vh - 48px); overflow-y: auto; box-shadow: var(--shadow-lg); }
 .category-dialog-title { font-size: var(--text-lg); font-weight: 'var(--font-semibold)'; color: var(--color-neutral-800); margin-bottom: var(--space-5); }
 
 @media (max-width: 1023px) {

@@ -300,7 +300,7 @@ export default function CooperationScores() {
                 </div>
                 {adjustError && <div style={{ padding: '8px 12px', background: '#FFEBEE', color: '#C62828', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>{adjustError}</div>}
                 <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                  <Button variant="ghost" onClick={() => setAdjusting(false)}>取消</Button>
+                  <Button variant="ghost" onClick={() => setAdjusting(false)}>关闭</Button>
                   <Button onClick={confirmAdjust}>确认入账</Button>
                 </div>
               </DrawerSection>
@@ -359,7 +359,7 @@ export default function CooperationScores() {
               </DrawerSection>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-5)' }}>
-                <Button variant="ghost" onClick={() => setReviewing(null)}>取消</Button>
+                <Button variant="ghost" onClick={() => setReviewing(null)}>关闭</Button>
                 <Button variant="ghost" onClick={() => confirmReview(claim.id, false)}>驳回</Button>
                 <Button onClick={() => confirmReview(claim.id, true)}>通过并入账</Button>
               </div>

@@ -184,7 +184,7 @@ export default function CooperationNewArrivals() {
                 onChange={e => setDialog(d => d ? { ...d, note: e.target.value } : d)}
               />
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
-                <Button variant="ghost" onClick={() => setDialog(null)}>取消</Button>
+                <Button variant="ghost" onClick={() => setDialog(null)}>关闭</Button>
                 <Button variant={dialog.action === 'listed' ? 'primary' : 'danger'} onClick={confirmHandle}>
                   {dialog.action === 'listed' ? '确认上架' : '确认忽略'}
                 </Button>

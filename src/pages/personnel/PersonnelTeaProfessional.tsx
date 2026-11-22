@@ -130,7 +130,7 @@ export default function PersonnelTeaProfessional() {
               <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14 }}><path d="M2 4h12M5.33 4V2.67a1.33 1.33 0 011.34-1.34h2.66a1.33 1.33 0 011.34 1.34V4m2 0v9.33a1.33 1.33 0 01-1.34 1.34H4.67a1.33 1.33 0 01-1.34-1.34V4h9.34z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
               删除所选({selectedForDelete.size})
             </Button>
-            <Button variant="ghost" onClick={handleCancelDeleteMode}>取消</Button>
+            <Button variant="ghost" onClick={handleCancelDeleteMode}>关闭</Button>
           </>
         ) : (
           <Button style={{ background: '#C4A830', borderColor: '#C4A830' }} onClick={handleEnterDeleteMode}>
@@ -212,7 +212,7 @@ export default function PersonnelTeaProfessional() {
               确定要删除选中的 {selectedForDelete.size} 位茶人吗？此操作不可撤销。
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
-              <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>关闭</Button>
               <Button style={{ background: '#C4A830', borderColor: '#C4A830' }} onClick={handleConfirmDelete}>确认删除</Button>
             </div>
           </div>
@@ -457,7 +457,7 @@ export default function PersonnelTeaProfessional() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
-              <Button variant="ghost" onClick={() => setShowDrawer(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setShowDrawer(false)}>关闭</Button>
               <Button onClick={handleSave}>保存</Button>
             </div>
           </div>

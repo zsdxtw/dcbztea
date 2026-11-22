@@ -638,7 +638,7 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
       {/* 单品报价设置弹窗(参照合作商终端:跟随品牌 / 单独折扣 / 单独报价) */}
       {overrideDialog && (
         <div className="category-dialog-overlay" onClick={() => setOverrideDialog(null)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: allowPlatformQuotes && customer.platforms.length > 0 ? 640 : 440, maxWidth: '94vw' }}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: allowPlatformQuotes && customer.platforms.length > 0 ? 720 : 480, maxWidth: '94vw' }}>
             <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 4 }}>报价报编号</h3>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-4)', lineHeight: 1.8 }}>
               {overrideDialog.product.name} · {overrideDialog.product.brand} · 市场价 {formatMoney(overrideDialog.product.marketPrice)}{cfg.brandDiscounts[overrideDialog.product.brand] !== undefined ? ` · 品牌折扣 ${cfg.brandDiscounts[overrideDialog.product.brand]}%` : ''}
@@ -743,7 +743,7 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
             )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
-              <Button variant="ghost" onClick={() => setOverrideDialog(null)}>取消</Button>
+              <Button variant="ghost" onClick={() => setOverrideDialog(null)}>关闭</Button>
               <Button onClick={saveOverride}>保存</Button>
             </div>
           </div>
@@ -753,7 +753,7 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
       {/* 设置可售量弹窗（该客户×该商品的独立可售量，不联动商品全局库存） */}
       {stockDialog && (
         <div className="category-dialog-overlay" onClick={() => setStockDialog(null)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 420, maxWidth: '94vw' }}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 500, maxWidth: '94vw' }}>
             <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 4 }}>设置可售量</h3>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
               {stockDialog.product.name} · {customer.name}<br />
@@ -781,7 +781,7 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
               <div style={{ padding: '8px 12px', background: '#FFEBEE', color: '#C62828', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>{stockDialog.err}</div>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
-              <Button variant="ghost" onClick={() => setStockDialog(null)}>取消</Button>
+              <Button variant="ghost" onClick={() => setStockDialog(null)}>关闭</Button>
               <Button onClick={() => {
                 const qty = Number(stockDialog.qty);
                 if (!Number.isInteger(qty) || qty <= 0) {

@@ -440,7 +440,7 @@ export default function PartnerReferrals() {
             )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-              <Button variant="ghost" onClick={() => setCreating(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setCreating(false)}>关闭</Button>
               <Button onClick={confirmSubmit}>提交推介</Button>
             </div>
           </div>

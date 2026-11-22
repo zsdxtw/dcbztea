@@ -173,7 +173,7 @@ export default function ProductBrand() {
                 </svg>
                 删除所选({selectedForDelete.size})
               </Button>
-              <Button variant="ghost" onClick={handleCancelDeleteMode} style={{ color: 'var(--color-neutral-500)' }}>取消</Button>
+              <Button variant="ghost" onClick={handleCancelDeleteMode} style={{ color: 'var(--color-neutral-500)' }}>关闭</Button>
             </>
           ) : (
             <Button style={{ background: '#eb5c20', borderColor: '#eb5c20' }} onClick={handleEnterDeleteMode}>
@@ -440,7 +440,7 @@ export default function ProductBrand() {
                     {showSeriesInput ? (
                       <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                         <input className="detail-input" value={newSeries} onChange={(e) => setNewSeries(e.target.value)} placeholder="输入系列名称" style={{ flex: 1 }} onKeyDown={(e) => { if (e.key === 'Enter') handleAddSeries(); }} />
-                        <Button variant="ghost" size="sm" onClick={() => { setShowSeriesInput(false); setNewSeries(''); }} style={{ color: 'var(--color-neutral-400)' }}>取消</Button>
+                        <Button variant="ghost" size="sm" onClick={() => { setShowSeriesInput(false); setNewSeries(''); }} style={{ color: 'var(--color-neutral-400)' }}>关闭</Button>
                         <Button size="sm" onClick={handleAddSeries}>确认</Button>
                       </div>
                     ) : (
@@ -459,7 +459,7 @@ export default function ProductBrand() {
               </div>
             </div>
             <div className="drawer-footer">
-              <Button variant="ghost" onClick={handleCloseDrawer}>取消</Button>
+              <Button variant="ghost" onClick={handleCloseDrawer}>关闭</Button>
               <Button onClick={handleSubmit}>确认新增</Button>
             </div>
           </div>
@@ -475,7 +475,7 @@ export default function ProductBrand() {
               确定要删除选中的 {selectedForDelete.size} 个品牌吗？此操作不可撤销。
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-              <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>关闭</Button>
               <Button onClick={() => { handleConfirmDelete(); setShowDeleteConfirm(false); }} style={{ background: '#eb5c20', borderColor: '#eb5c20' }}>确认删除</Button>
             </div>
           </div>

@@ -440,7 +440,7 @@ function PurchaseQuoteConfigurator({ partners, selectedId, onSelect }: {
               </label>
             ))}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
-              <Button variant="ghost" onClick={() => setOverrideDialog(null)}>取消</Button>
+              <Button variant="ghost" onClick={() => setOverrideDialog(null)}>关闭</Button>
               <Button onClick={saveOverride}>保存</Button>
             </div>
           </div>

@@ -121,7 +121,7 @@ export default function SalesStores() {
                 <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14 }}><path d="M2 4h12M5.33 4V2.67a1.33 1.33 0 011.34-1.34h2.66a1.33 1.33 0 011.34 1.34V4m2 0v9.33a1.33 1.33 0 01-1.34 1.34H4.67a1.33 1.33 0 01-1.34-1.34V4h9.34z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 删除所选({selectedForDelete.size})
               </Button>
-              <Button variant="ghost" onClick={exitDeleteMode}>取消</Button>
+              <Button variant="ghost" onClick={exitDeleteMode}>关闭</Button>
             </>
           ) : (
             <Button style={{ background: SECONDARY, borderColor: SECONDARY }} onClick={enterDeleteMode}>
@@ -158,11 +158,11 @@ export default function SalesStores() {
       {/* 删除确认 */}
       {showDeleteConfirm && (
         <div className="category-dialog-overlay" onClick={() => setShowDeleteConfirm(false)}>
-          <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+          <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 440 }}>
             <h3 style={{ marginBottom: 'var(--space-3)' }}>确认删除</h3>
             <p style={{ color: 'var(--color-neutral-600)', marginBottom: 'var(--space-4)' }}>确定要删除选中的 {selectedForDelete.size} 个门店吗？关联的门店仓库将同步移除。此操作不可撤销。</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
-              <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>关闭</Button>
               <Button style={{ background: 'var(--color-semantic-error)', borderColor: 'var(--color-semantic-error)' }} onClick={confirmDelete}>确认删除</Button>
             </div>
           </div>
@@ -309,7 +309,7 @@ export default function SalesStores() {
               </div>
             </div>
             <div className="drawer-footer">
-              <Button variant="ghost" onClick={() => setShowAddDrawer(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setShowAddDrawer(false)}>关闭</Button>
               <Button onClick={handleSave} disabled={!canSave}>保存</Button>
             </div>
           </div>

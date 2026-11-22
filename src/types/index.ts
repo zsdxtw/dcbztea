@@ -1740,14 +1740,16 @@ export type DistributeMode = 'assign' | 'compare';
 
 /**
  * 分发状态（状态机 · 只表达分发过程，不含物流/结算）
- * pending 待分发（手工录入/直连推送，流转弹窗选路径）
+ * unprocessed 未分发（销售单已录入/推送，尚未送分发，未生成履约单）
+ * pending 待分发（已送分发，手工录入/直连推送生成的履约单，流转弹窗选路径）
  *   ├ 报备命中（录入/直连推送自动匹配）→ report_match_pending 报备-匹配待确认（人工确认）→ distribute_pending
- *   ├ 自营：self_pending 自营待接单（履约状态一般为待接单；可退回 pending，来源标注自营退回）
+ *   ├ 自营：self_pending 自营待接单（可退回 pending，来源标注自营退回）
  *   ├ 比单：comparing 分发比单中 → 定标后 distribute_pending
- *   └ 分发：指定 / 报备匹配 → distribute_pending 转派待接单（履约状态一般为待接单）
+ *   └ 分发：指定 / 报备匹配 → distribute_pending 转派待接单
  * 履约状态进入已接单及后续 → 本状态自动置 processed 分发已完成；cancelled 已取消贯穿（分发/履约状态均变为已取消）。
  */
 export type ExternalProcessStatus =
+  | 'unprocessed'
   | 'pending'
   | 'report_match_pending'
   | 'self_pending'
@@ -1887,6 +1889,10 @@ export interface CompareSession {
   itemAwards?: Record<string, string>;
   /** 报名合作商地区范围（可选，限定省市县内合作商可见可报名） */
   region?: RegionScope;
+  /** 参与比单的合作商类型（仅服务商 / 供应商，不含品牌商；缺省=两者） */
+  partnerTypes?: SupplierType[];
+  /** 参与比单的合作模式（差价 / 扣点；缺省=不限） */
+  coopMode?: PartnerCoopMode;
 }
 
 /** 地区范围（省/市/县三级，均可选；用于比单限定合作商地区） */
@@ -1942,6 +1948,15 @@ export interface ExternalOrder {
   /** 来源渠道：manual=手工录入 / push=平台直连推送 */
   sourceChannel: ExternalChannel;
   processStatus: ExternalProcessStatus;
+  /**
+   * 处理阶段（销售单维度）：
+   * unprocessed = 尚未送分发，未生成履约单（销售单处理页）；
+   * dispatched = 已送去分发，已生成履约单（母销售单保留）；
+   * 旧数据无此字段，按「未拆分的母销售单即履约单」兼容。
+   */
+  dispatchState?: 'unprocessed' | 'dispatched';
+  /** 本单与合作商的合作模式（订单维度选择，非合作商档案属性；差价模式 / 扣点模式） */
+  coopMode?: PartnerCoopMode;
   /** 来源附加标签：比单未成（分拆后未成交商品形成的子订单）/ 自营退回 / 待接单取回（按原分发来源） */
   sourceTag?:
     | 'compare_failed'

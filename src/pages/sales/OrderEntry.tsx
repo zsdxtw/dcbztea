@@ -29,8 +29,9 @@ const nowLocal = () => {
  * 销售 · 新建销售单（手工录入类型的销售订单生成入口）
  * 首先选择销售路径：直接销售（路径1-4：直营/渠道/平台/个人客户）/ 经平台销售（路径5：淡茶→平台客户→直营客户）。
  * 客户匹配带出类型/联系人/默认价，保存即匹配报备。
+ * embedded=true 时用于销售单列表的弹窗内嵌展示（不渲染页头与页容器）。
  */
-export default function OrderEntry() {
+export default function OrderEntry({ embedded = false, onClose }: { embedded?: boolean; onClose?: () => void }) {
   const navigate = useNavigate();
   const store = useOrderFlowStore;
   const products = usePriceStore((s) => s.products);
@@ -270,7 +271,7 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
   );
 
   /* ── 创建成功弹窗：展示销售单编号与关键信息，可直接去分发 ── */
-  const createdHitReport = createdOrder?.processStatus === 'report_match_pending';
+  const createdHitReport = !!createdOrder?.reportMatches?.length;
   const createdSummary: { label: string; value: ReactNode; mono?: boolean; span?: boolean }[] = createdOrder ? [
     { label: '客户名称', value: createdOrder.customerName },
     { label: '客户类型', value: createdOrder.customerType },
@@ -285,15 +286,14 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
     { label: '收货地址', value: createdOrder.receiverAddress, span: true },
   ] : [];
 
-  return (
+  /** 表单主体：独立页面与销售单列表弹窗共用 */
+  const formContent = (
     <>
-      <ContentHeader title="新建销售单" breadcrumbs={['销售', '销售单管理', '新建销售单']} />
-      <div className="content-body">
-        <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-          新建销售单用于创建<strong>手工录入</strong>类型的销售订单（三个入口：<strong>本页手工录入</strong> / <strong>平台直连推送</strong> / <strong>报备商机转入</strong>）。
-          首先选择<strong>销售路径</strong>：直接销售（直营 / 渠道 / 平台 / 个人客户）或经平台销售（淡茶 → 平台客户 → 直营客户）；
-          保存时自动与审批通过的报备比对，命中则进入「报备-匹配待确认」，人工确认后转派报备合作商。
-        </div>
+      <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
+        新建销售单用于创建<strong>手工录入</strong>类型的销售订单（三个入口：<strong>本页手工录入</strong> / <strong>平台直连推送</strong> / <strong>报备商机转入</strong>）。
+        首先选择<strong>销售路径</strong>：直接销售（直营 / 渠道 / 平台 / 个人客户）或经平台销售（淡茶 → 平台客户 → 直营客户）；
+        保存后进入「销售单处理」；录入时自动与审批通过的报备比对，命中报备的可在送去分发后选择报备转派。
+      </div>
 
         <Card title="订单信息">
           {/* 销售路径选择 */}
@@ -587,6 +587,7 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
 
           {/* 操作按钮：合计下一行，居中，间距加宽（重置=辅色调实心，创建=主色调） */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-6)', marginTop: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
+            {embedded && onClose && <Button variant="ghost" onClick={onClose}>关闭</Button>}
             <Button onClick={saveOrder}>创建订单并匹配报备</Button>
             <Button style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)' }} onClick={resetForm}>重置</Button>
           </div>
@@ -595,12 +596,24 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
         {error && (
           <div style={{ padding: '8px 12px', background: '#FFEBEE', color: '#C62828', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginTop: 'var(--space-4)' }}>{error}</div>
         )}
-      </div>
+    </>
+  );
+
+  return (
+    <>
+      {embedded ? (
+        formContent
+      ) : (
+        <>
+          <ContentHeader title="新建销售单" breadcrumbs={['销售', '销售单管理', '新建销售单']} />
+          <div className="content-body">{formContent}</div>
+        </>
+      )}
 
       {/* ── 创建成功弹窗（不跳页，留在当前页） ── */}
       {createdOrder && (
         <div className="category-dialog-overlay" onClick={() => setCreatedOrder(null)}>
-          <div className="category-dialog" style={{ width: 560, padding: 0, overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
+          <div className="category-dialog" style={{ width: 560, padding: 0, overflowX: 'hidden', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'var(--space-7) var(--space-6) var(--space-5)' }}>
               <div style={{
                 width: 52, height: 52, borderRadius: '50%', background: 'var(--color-module-current-lightest)',
@@ -616,8 +629,8 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
               </div>
               <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginTop: 'var(--space-2)', textAlign: 'center', lineHeight: 1.7 }}>
                 {createdHitReport
-                  ? '命中审批通过的报备，已进入「报备-匹配待确认」，确认后自动转派报备合作商'
-                  : '已进入「分发-待处理」，请选择履约路径（自营 / 指定 / 比单）完成分发'}
+                  ? '已进入「销售单处理」；录入时命中审批通过的报备，送去分发后可选择报备转派'
+                  : '已进入「销售单处理」，送去分发后生成履约单并进入「履约单分发-待分发」'}
               </div>
             </div>
 
@@ -634,7 +647,10 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', padding: 'var(--space-4) var(--space-6) var(--space-5)' }}>
               <Button variant="ghost" onClick={() => setCreatedOrder(null)}>继续新建</Button>
-              <Button onClick={() => navigate('/sales/order-distribute')}>去分发</Button>
+              {embedded && onClose && (
+                <Button variant="ghost" onClick={() => { setCreatedOrder(null); onClose(); }}>完成</Button>
+              )}
+              <Button onClick={() => { setCreatedOrder(null); onClose?.(); navigate('/sales/sales-order-processing'); }}>去销售单处理</Button>
             </div>
           </div>
         </div>

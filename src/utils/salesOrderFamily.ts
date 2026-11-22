@@ -44,9 +44,8 @@ export function buildFamilies(orders: ExternalOrder[]): OrderFamily[] {
 /* ── 履约单单元（默认履约单01 + 拆单后真实子履约单） ── */
 
 /**
- * 履约单单元：订单进入管理后台即默认生成履约单01（编号 = 母销售单号 + LY01，虚拟挂在母单上，
- * 生成时间 = 订单录入时间）；拆单后履约单 = 真实子履约单（LY01/LY02…，生成时间 = 拆单时间）。
- * 分发、发货等操作仍作用于 underlying（底层订单），展示层统一以履约单为维度。
+ * 履约单单元：已送分发的订单按子履约单展示；未拆分的母销售单本身即默认履约单01（虚拟）。
+ * 尚未送分发（dispatchState=unprocessed）的销售单没有履约单，返回空数组。
  */
 export interface FulfillmentUnit {
   /** 底层订单（分发 / 发货等操作对象） */
@@ -75,6 +74,7 @@ export function fulfillmentUnitsOf(family: OrderFamily): FulfillmentUnit[] {
       amount: c.totalAmount,
     }));
   }
+  if (family.mother.dispatchState === 'unprocessed') return [];
   return [{
     underlying: family.mother,
     seq: 1,
@@ -103,17 +103,16 @@ export function distributeStateOf(o: ExternalOrder): string {
 
 /**
  * 单笔履约状态（履约单维度显示档位，考虑多发货单）：
- * 未履约 → 待接单 → 已接单 → 部分已发货 → 运输中 → 部分妥投 → 妥投 → 部分已确收 → 全部已确收（已取消贯穿）
+ * 未履约 → 已接单 → 部分已发货 → 运输中 → 部分妥投 → 妥投 → 部分已确收 → 全部已确收（已取消贯穿）
+ * 已分发但未接单（自营待接单 / 转派待接单）仍为未履约；履约主体接单后才进入已接单。
  * pos 为该子单关联采购单集合（缺省时仅按订单自身包裹判断）
  */
 export function fulfillStateOf(o: ExternalOrder, pos?: { packages: PkgLike[] }[]): string {
   if (o.processStatus === 'cancelled') return '已取消';
   const d = o.processStatus;
-  /* 未进入履约主体：待分发 / 报备确认 / 比单中 */
-  if (d === 'pending' || d === 'report_match_pending' || d === 'comparing') return '未履约';
-  /* 已分发待主体接单：自营待接单 / 转派待接单 → 履约状态一般为待接单 */
-  if (d === 'self_pending' || d === 'distribute_pending') return '待接单';
-  /* 分发已完成：按发货单包裹推导档位 */
+  /* 未进入履约主体：未分发 / 待分发 / 报备确认 / 比单中 / 已分发待接单 → 履约状态均为未履约 */
+  if (d === 'unprocessed' || d === 'pending' || d === 'report_match_pending' || d === 'comparing' || d === 'self_pending' || d === 'distribute_pending') return '未履约';
+  /* 分发已完成（父单已接单）：按发货单包裹推导档位 */
   const pkgs = packagesOf(o, pos);
   if (pkgs.length === 0) {
     const stage = stageOfOrder(o);
@@ -161,17 +160,17 @@ const aggregate = (flags: boolean[]): TriState =>
   flags.every(Boolean) ? '全部' : flags.some(Boolean) ? '部分' : '未';
 
 export interface FamilyStates {
-  /** 分发状态聚合：未分发 / 分发中 / 部分已完成 / 全部已完成（全部取消时为已取消） */
-  distribute: '未分发' | '分发中' | '部分已完成' | '全部已完成' | '已取消';
-  /** 履约状态聚合：未履约 / 履约中 / 部分已完成 / 全部已完成（全部取消时为已取消） */
-  fulfill: '未履约' | '履约中' | '部分已完成' | '全部已完成' | '已取消';
-  /** 结算状态聚合：未结算 / 结算中 / 部分已完成 / 全部已完成 */
-  settle: '未结算' | '结算中' | '部分已完成' | '全部已完成';
-  /** 开票状态聚合：未开票 / 开票中 / 部分已完成 / 全部已完成 */
-  invoice: '未开票' | '开票中' | '部分已完成' | '全部已完成';
+  /** 分发进度聚合：未分发 / 分发中 / 分发完成（全部取消时为已取消） */
+  distribute: '未分发' | '分发中' | '分发完成' | '已取消';
+  /** 履约进度聚合：未履约 / 履约中 / 履约完成（全部取消时为已取消） */
+  fulfill: '未履约' | '履约中' | '履约完成' | '已取消';
+  /** 结算进度聚合：未结算 / 结算中 / 结算完成 */
+  settle: '未结算' | '结算中' | '结算完成';
+  /** 开票进度聚合：未开票 / 开票中 / 开票完成 */
+  invoice: '未开票' | '开票中' | '开票完成';
   /** 履约单总数（含已取消） */
   total: number;
-  /** 参与聚合的履约单数（剔除已取消；x/y 数值分母口径，P8） */
+  /** 有效履约单数（剔除已取消） */
   active: number;
   /** 分发已完成履约单数 */
   distributed: number;
@@ -188,8 +187,9 @@ const isFulfilled = (o: ExternalOrder, pos?: { packages: PkgLike[] }[]): boolean
   o.processStatus !== 'cancelled' && fulfillStateOf(o, pos) === '全部已确收';
 
 /**
- * 母销售单四维状态聚合（按履约单维度：未拆分 = 默认履约单01；拆分后 = 全部子履约单，母单不参与聚合）
- * 列表行显示聚合药丸 + 数值（如 部分已完成 1/3）；全部履约单已取消时聚合显示已取消。
+ * 母销售单四维进度聚合（按履约单维度：未拆分 = 默认履约单01；拆分后 = 全部子履约单，母单不参与聚合）
+ * 进度值 x/y：x = 已完成履约单数，y = 有效履约单数（剔除已取消）。
+ * 未进入 → 未…；部分进入或部分完成 → …中；全部完成 → …完成；全部取消 → 已取消（分发 / 履约）。
  */
 export function familyStatesOf(family: OrderFamily): FamilyStates {
   const units = fulfillmentUnitsOf(family);
@@ -198,56 +198,61 @@ export function familyStatesOf(family: OrderFamily): FamilyStates {
   const active = list.filter((o) => o.processStatus !== 'cancelled');
   const cancelledAll = active.length === 0;
 
-  /* 分发：分发已完成单元数（履约状态进入已接单及后续即视为分发已完成） */
+  /* 尚未生成履约单：分发/履约显示未…，已取消销售单显示已取消 */
+  if (total === 0) {
+    const cancelled = family.mother.processStatus === 'cancelled';
+    return {
+      distribute: cancelled ? '已取消' : '未分发',
+      fulfill: cancelled ? '已取消' : '未履约',
+      settle: '未结算',
+      invoice: '未开票',
+      total: 0,
+      active: 0,
+      distributed: 0,
+      fulfilled: 0,
+      settled: 0,
+      invoiced: 0,
+    };
+  }
+
+  /* 分发：已完成（processed）履约单数 / 有效履约单数 */
   const distributed = active.filter((o) => o.processStatus === 'processed').length;
   const distribute: FamilyStates['distribute'] = cancelledAll
     ? '已取消'
     : distributed === active.length
-      ? '全部已完成'
-      : distributed > 0
-        ? '部分已完成'
-        : active.some((o) => ['report_match_pending', 'comparing', 'self_pending', 'distribute_pending'].includes(o.processStatus))
-          ? '分发中'
-          : '未分发';
+      ? '分发完成'
+      : distributed > 0 || active.some((o) => ['pending', 'report_match_pending', 'comparing', 'self_pending', 'distribute_pending'].includes(o.processStatus))
+        ? '分发中'
+        : '未分发';
 
-  /* 履约：全部已确收单元数 */
+  /* 履约：全部已确收履约单数 / 有效履约单数 */
   const fulfilled = active.filter((o) => isFulfilled(o)).length;
   const FULFILL_DOING = ['已接单', '部分已发货', '运输中', '部分妥投', '妥投', '部分已确收'];
   const fulfill: FamilyStates['fulfill'] = cancelledAll
     ? '已取消'
     : fulfilled === active.length
-      ? '全部已完成'
-      : fulfilled > 0
-        ? '部分已完成'
-        : active.some((o) => FULFILL_DOING.includes(fulfillStateOf(o)))
-          ? '履约中'
-          : '未履约';
+      ? '履约完成'
+      : fulfilled > 0 || active.some((o) => FULFILL_DOING.includes(fulfillStateOf(o)))
+        ? '履约中'
+        : '未履约';
 
-  /* 结算：按履约单结算状态聚合 */
+  /* 结算：已结算履约单数 / 有效履约单数 */
   const settledList = active.map((o) => settleStateOf(o));
   const settled = settledList.filter((s) => s === '已结算').length;
-  const settle: FamilyStates['settle'] = cancelledAll
-    ? '未结算'
-    : settled === active.length && active.length > 0
-      ? '全部已完成'
-      : settled > 0
-        ? '部分已完成'
-        : settledList.some((s) => s === '部分结算')
-          ? '结算中'
-          : '未结算';
+  const settle: FamilyStates['settle'] = settled === active.length
+    ? '结算完成'
+    : settled > 0 || settledList.some((s) => s === '部分结算')
+      ? '结算中'
+      : '未结算';
 
-  /* 开票：按履约单开票状态聚合 */
+  /* 开票：已开票履约单数 / 有效履约单数 */
   const invoiceList = active.map((o) => invoiceStateOf(o));
   const invoiced = invoiceList.filter((s) => s === '已开票').length;
-  const invoice: FamilyStates['invoice'] = cancelledAll
-    ? '未开票'
-    : invoiced === active.length && active.length > 0
-      ? '全部已完成'
-      : invoiced > 0
-        ? '部分已完成'
-        : invoiceList.some((s) => s === '部分开票')
-          ? '开票中'
-          : '未开票';
+  const invoice: FamilyStates['invoice'] = invoiced === active.length
+    ? '开票完成'
+    : invoiced > 0 || invoiceList.some((s) => s === '部分开票')
+      ? '开票中'
+      : '未开票';
 
   return { distribute, fulfill, settle, invoice, total, active: active.length, distributed, fulfilled, settled, invoiced };
 }
@@ -257,12 +262,12 @@ export const FAMILY_STATE_COLORS = {
   /* 分发聚合 */
   '未分发': { bg: '#F5F5F5', color: '#9E9E9E' },
   '分发中': { bg: '#FBF3E2', color: '#9A7A1C' },
-  '部分已完成': { bg: '#E3F2FD', color: '#0F64B5' },
-  '全部已完成': { bg: '#E8F5E9', color: '#01795D' },
+  '分发完成': { bg: '#E8F5E9', color: '#01795D' },
   '已取消': { bg: '#FFEBEE', color: '#C62828' },
   /* 履约（聚合 + 履约单档位） */
   '未履约': { bg: '#F5F5F5', color: '#9E9E9E' },
   '履约中': { bg: '#E3F2FD', color: '#0F64B5' },
+  '履约完成': { bg: '#E8F5E9', color: '#2E7D32' },
   '待接单': { bg: '#FFF4E5', color: '#B26A00' },
   '已接单': { bg: '#E8F1FB', color: '#0F64B5' },
   '部分已发货': { bg: '#FFF4E5', color: '#B26A00' },
@@ -274,11 +279,13 @@ export const FAMILY_STATE_COLORS = {
   /* 结算 */
   '未结算': { bg: '#F5F5F5', color: '#9E9E9E' },
   '结算中': { bg: '#FBF3E2', color: '#9A7A1C' },
+  '结算完成': { bg: '#E8F5E9', color: '#01795D' },
   '部分结算': { bg: '#E0F2F1', color: '#00695C' },
   '已结算': { bg: '#E8F5E9', color: '#01795D' },
   /* 开票 */
   '未开票': { bg: '#F5F5F5', color: '#9E9E9E' },
   '开票中': { bg: '#FBF3E2', color: '#9A7A1C' },
+  '开票完成': { bg: '#E8F5E9', color: '#01795D' },
   '部分开票': { bg: '#E0F7FA', color: '#00838F' },
   '已开票': { bg: '#E8F5E9', color: '#01795D' },
 } as const;

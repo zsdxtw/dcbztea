@@ -369,7 +369,7 @@ export default function ProductTeaDetail() {
         actions={
           editMode ? (
             <>
-              <Button variant="ghost" onClick={handleCancelEdit}>取消</Button>
+              <Button variant="ghost" onClick={handleCancelEdit}>关闭</Button>
               <Button onClick={handleSaveEdit}>保存修改</Button>
             </>
           ) : (
@@ -504,7 +504,7 @@ export default function ProductTeaDetail() {
                           border: '1px solid var(--color-neutral-200)', background: 'var(--color-neutral-0)',
                           color: 'var(--color-neutral-500)', cursor: 'pointer', whiteSpace: 'nowrap',
                         }}
-                      >取消</button>
+                      >关闭</button>
                     </div>
                   ) : (
                     <select
@@ -1142,7 +1142,7 @@ export default function ProductTeaDetail() {
               确定要删除商品「{product?.name}」吗？此操作不可撤销。
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-              <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>关闭</Button>
               <Button onClick={() => { setShowDeleteConfirm(false); navigate('/product/product-manage-tea'); }} style={{ background: '#eb5c20', borderColor: '#eb5c20' }}>确认删除</Button>
             </div>
           </div>

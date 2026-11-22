@@ -143,19 +143,19 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {pill(states.distribute)}
-            {states.active > 0 && states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.distributed}/{states.active}</span>}
+            {states.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.distributed}/{states.active}</span>}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {pill(states.fulfill)}
-            {states.active > 0 && states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.fulfilled}/{states.active}</span>}
+            {states.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.fulfilled}/{states.active}</span>}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {pill(states.settle)}
-            {states.active > 0 && states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.settled}/{states.active}</span>}
+            {states.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.settled}/{states.active}</span>}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {pill(states.invoice)}
-            {states.active > 0 && states.total > 1 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.invoiced}/{states.active}</span>}
+            {states.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.invoiced}/{states.active}</span>}
           </span>
         </div>
       )}

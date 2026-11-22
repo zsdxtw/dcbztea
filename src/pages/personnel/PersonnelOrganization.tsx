@@ -688,7 +688,7 @@ function EditNodeDrawer(props: EditNodeDrawerProps) {
           </div>
         </div>
         <div className="drawer-footer">
-          <Button variant="ghost" onClick={onClose}>取消</Button>
+          <Button variant="ghost" onClick={onClose}>关闭</Button>
           <Button onClick={onSave}>保存</Button>
         </div>
       </div>

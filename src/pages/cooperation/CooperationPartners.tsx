@@ -408,7 +408,7 @@ export default function PurchaseSuppliers() {
               <svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14 }}><path d="M2 4h12M5.33 4V2.67a1.33 1.33 0 011.34-1.34h2.66a1.33 1.33 0 011.34 1.34V4m2 0v9.33a1.33 1.33 0 01-1.34 1.34H4.67a1.33 1.33 0 01-1.34-1.34V4h9.34z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
               删除所选({selectedForDelete.size})
             </Button>
-            <Button variant="ghost" onClick={handleCancelDeleteMode}>取消</Button>
+            <Button variant="ghost" onClick={handleCancelDeleteMode}>关闭</Button>
           </>
         ) : (
           <Button style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)' }} onClick={handleEnterDeleteMode}>
@@ -463,7 +463,7 @@ export default function PurchaseSuppliers() {
             <h3 style={{ marginBottom: 'var(--space-3)' }}>确认删除</h3>
             <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)' }}>确定要删除选中的 {selectedForDelete.size} 家合作商吗？此操作不可撤销。</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
-              <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>关闭</Button>
               <Button style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)' }} onClick={handleCancelDeleteMode}>确认删除</Button>
             </div>
           </div>
@@ -1471,7 +1471,7 @@ export default function PurchaseSuppliers() {
             </div>
             </div>
             <div className="drawer-footer">
-              <Button variant="ghost" onClick={() => setShowAddDrawer(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setShowAddDrawer(false)}>关闭</Button>
               <Button onClick={handleAddSave}>保存</Button>
             </div>
           </div>
@@ -1487,7 +1487,7 @@ export default function PurchaseSuppliers() {
               删除管理员账号将同时关闭该合作商的终端，所有终端账号（含操作员）将无法登录合作商终端。确认删除？
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-              <Button variant="ghost" onClick={() => setShowAdminDeleteConfirm(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setShowAdminDeleteConfirm(false)}>关闭</Button>
               <Button variant="danger" onClick={confirmAdminDelete}>确认删除</Button>
             </div>
           </div>

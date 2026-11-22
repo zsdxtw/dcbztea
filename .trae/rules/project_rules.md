@@ -714,3 +714,18 @@ tmallPrice                 vipPrice
 - 表格组件（可调列宽）：`src/components/common/Table.tsx`
 - 按钮组件（含 danger 变体）：`src/components/common/Button.tsx`
 - 列表+详情参考页：`src/pages/inventory/InventoryCheck.tsx`、`src/pages/personnel/PersonnelEmployee.tsx`
+
+---
+
+## 按钮文案与取消规则
+
+### 关闭 / 取消
+
+- **关闭**：关闭弹窗、抽屉、编辑态、删除模式等「退出当前界面」语义的按钮，统一文案为「关闭」，不再使用「取消」。
+- **取消**：仅用于取消订单、单据、记录等业务对象；点击后必须弹窗让用户输入取消原因（必填），确认后写入处理轨迹。
+- **配色**：取消类按钮（取消订单 / 取消销售单等）使用当前模块辅助色 `--color-module-current-secondary`；关闭类按钮用 `ghost`。
+
+### 品牌数/总数量
+
+- 销售相关列表中的商品汇总列统一命名为「品牌数/总数量」，值显示为 `x种/y份`，例如 `2种/14份`。
+- 不再使用 `x / y`、`x 种 / y 件` 等旧写法。

@@ -18,8 +18,24 @@ const baseSeeds: ExternalOrder[] = [
     receiver: '清心茶坊收发部', receiverPhone: '139****2210', receiverAddress: '浙江宁波市鄞州区中山东路2001号',
     remark: '双十一预售尾款订单',
     entryTime: '2026-10-25', operator: '运营小周', sourceChannel: 'manual',
-    processStatus: 'pending',
-    history: [{ time: '2026-10-25', action: '手工录入订单', detail: '天猫平台' }],
+    processStatus: 'unprocessed', dispatchState: 'unprocessed',
+    history: [{ time: '2026-10-25', action: '手工录入订单', detail: '天猫平台 · 进入销售单处理' }],
+  },
+
+  /* ── 未分发（平台直连推送 · 等待销售单处理） ── */
+  {
+    id: 'eo_u2', code: 'SO-2611220001', platform: 'jd', externalOrderNo: 'JD-20261122-7781',
+    customerName: '杭州云栖茶空间', customerType: '直营客户', customerRegion: '浙江杭州',
+    items: [
+      { productId: 'p2', productName: '碧螺春·一级', spec: '100g/袋', quantity: 8, price: 328 },
+      { productId: 'p10', productName: '大红袍·特级', spec: '150g/盒', quantity: 6, price: 494 },
+    ],
+    totalAmount: 5588,
+    receiver: '云栖茶空间前台', receiverPhone: '0571-8899****', receiverAddress: '浙江杭州市西湖区龙井路18号',
+    remark: '京东慧采直连推送，待运营处理',
+    entryTime: '2026-11-22 09:20:00', operator: '系统直连', sourceChannel: 'push',
+    processStatus: 'unprocessed', dispatchState: 'unprocessed',
+    history: [{ time: '2026-11-22 09:20:00', action: '直连推送订单', detail: '京东慧采 API 自动同步 · 进入销售单处理' }],
   },
 
   /* ── 待处理（平台直连推送 · 已拆单：LY01 已指定转派 / LY02 待分发） ── */
@@ -1000,6 +1016,7 @@ export const EXTERNAL_CHANNEL_LABELS: Record<string, string> = {
 };
 
 export const EXTERNAL_STATUS_LABELS: Record<string, string> = {
+  unprocessed: '未分发',
   pending: '待分发',
   report_match_pending: '报备-匹配待确认',
   self_pending: '自营待接单',
@@ -1020,6 +1037,7 @@ export const SOURCE_TAG_LABELS: Record<string, { label: string; bg: string; colo
 };
 
 export const EXTERNAL_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
+  unprocessed: { bg: '#F5F5F5', color: '#9E9E9E' },
   pending: { bg: '#FFF3E0', color: '#E65100' },
   report_match_pending: { bg: '#E0F7FA', color: '#00838F' },
   self_pending: { bg: '#E3F2FD', color: '#0F64B5' },

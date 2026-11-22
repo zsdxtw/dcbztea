@@ -377,7 +377,7 @@ export default function PartnerScores() {
             )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <Button variant="ghost" onClick={() => setDialogOpen(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setDialogOpen(false)}>关闭</Button>
               <Button onClick={submitClaim}>提交申报</Button>
             </div>
           </div>

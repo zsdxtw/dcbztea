@@ -78,7 +78,7 @@ export default function ProductTeaCategory() {
                 ),
                 isEditing ? (
                   <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                    <Button variant="ghost" size="sm" onClick={handleCancel} style={{ color: 'var(--color-neutral-400)' }}>取消</Button>
+                    <Button variant="ghost" size="sm" onClick={handleCancel} style={{ color: 'var(--color-neutral-400)' }}>关闭</Button>
                     <Button size="sm" onClick={handleSave}>保存</Button>
                   </div>
                 ) : (

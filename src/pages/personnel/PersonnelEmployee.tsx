@@ -852,7 +852,7 @@ function EditEmployeeDrawer({
         </div>
 
         <div className="drawer-footer">
-          <Button variant="ghost" onClick={onCancel}>取消</Button>
+          <Button variant="ghost" onClick={onCancel}>关闭</Button>
           <Button onClick={handleSave} disabled={!canSave}>保存</Button>
         </div>
       </div>

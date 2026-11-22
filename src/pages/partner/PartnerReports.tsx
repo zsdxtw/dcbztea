@@ -650,7 +650,7 @@ export default function PartnerReports() {
               {formErr && <div style={{ fontSize: 'var(--text-sm)', color: '#C62828', marginBottom: 'var(--space-3)' }}>{formErr}</div>}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', flexShrink: 0, marginTop: 'var(--space-3)' }}>
-              <Button variant="ghost" onClick={() => setShowAdd(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setShowAdd(false)}>关闭</Button>
               <Button onClick={submitReport}>提交报备</Button>
             </div>
           </div>

@@ -295,7 +295,7 @@ export default function SelfOrderDetailDrawer({ orderId, onClose }: SelfOrderDet
                 确认退回 <strong className="mono">{current.code}</strong> 至履约分配？退回后重新进入<strong>分发-待处理</strong>，来源将标注「自营退回」。
               </div>
               <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                <Button variant="ghost" size="sm" onClick={() => setReturning(false)}>取消</Button>
+                <Button variant="ghost" size="sm" onClick={() => setReturning(false)}>关闭</Button>
                 <Button variant="danger" size="sm" onClick={() => { store.getState().returnToDistribute(current.id); setReturning(false); onClose(); }}>确认退回</Button>
               </div>
             </div>
@@ -329,7 +329,7 @@ export default function SelfOrderDetailDrawer({ orderId, onClose }: SelfOrderDet
                 </tbody>
               </table>
               <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-                <Button size="sm" variant="ghost" onClick={() => setSplitOpen(false)}>取消</Button>
+                <Button size="sm" variant="ghost" onClick={() => setSplitOpen(false)}>关闭</Button>
                 <Button size="sm" disabled={!current.items.some((it) => Number(splitQty[it.productName] ?? 0) > 0)}
                   onClick={() => {
                     const parts = current.items
@@ -455,7 +455,7 @@ export default function SelfOrderDetailDrawer({ orderId, onClose }: SelfOrderDet
 
               {shipError && <div style={{ padding: '8px 12px', background: '#FFEBEE', color: '#C62828', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)' }}>{shipError}</div>}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
-                <Button variant="ghost" size="sm" onClick={() => setShipOpen(false)}>取消</Button>
+                <Button variant="ghost" size="sm" onClick={() => setShipOpen(false)}>关闭</Button>
                 <Button size="sm" disabled={!shipCanSubmit} onClick={submitShip}>确认发货</Button>
               </div>
             </div>

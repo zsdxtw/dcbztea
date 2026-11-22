@@ -163,7 +163,7 @@ export default function InventoryAlertSettings() {
             </div>
 
             <div className="drawer-footer">
-              <Button variant="ghost" onClick={handleCloseDrawer}>取消</Button>
+              <Button variant="ghost" onClick={handleCloseDrawer}>关闭</Button>
               <Button>保存</Button>
             </div>
           </div>

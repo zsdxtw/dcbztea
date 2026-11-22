@@ -189,7 +189,7 @@ function SignUpDialog({ state, tick, myId, myName, onClose, onDone }: {
           {err && <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-sm)', color: '#C62828' }}>{err}</div>}
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-3)', flexShrink: 0 }}>
-          <Button variant="ghost" onClick={onClose}>取消</Button>
+          <Button variant="ghost" onClick={onClose}>关闭</Button>
           <Button onClick={submit}>提交报名</Button>
         </div>
       </div>
@@ -325,7 +325,7 @@ function ShipDialog({ state, onClose, onDone }: {
           {err && <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-sm)', color: '#C62828' }}>{err}</div>}
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-3)', flexShrink: 0 }}>
-          <Button variant="ghost" onClick={onClose}>取消</Button>
+          <Button variant="ghost" onClick={onClose}>关闭</Button>
           <Button onClick={submit}>{mode === 'self' ? '确认自行配送' : '确认发货'}</Button>
         </div>
       </div>
@@ -888,7 +888,7 @@ export default function PartnerOrders() {
               确认退回该订单吗？
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <Button variant="ghost" onClick={() => setReturnOf(null)}>取消</Button>
+              <Button variant="ghost" onClick={() => setReturnOf(null)}>关闭</Button>
               <Button onClick={() => {
                 const res = useOrderFlowStore.getState().partnerReturnOrder(returnOf.id.replace('ext_', ''));
                 setReturnOf(null);

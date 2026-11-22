@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import HScrollBox from '../../components/common/HScrollBox';
 import DetailDrawer, { DrawerSection } from '../../components/common/DetailDrawer';
 import ContentHeader from '../../components/layout/ContentHeader';
@@ -17,6 +16,7 @@ import {
 } from '../../utils/salesOrderFamily';
 import type { ExternalOrder } from '../../types';
 import { SalesOrderDetailTabs } from './SalesOrderDetail';
+import SalesOrderEntryModal from '../../components/business/SalesOrderEntryModal';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 /** 列表展示日期；详情页用 fmtDateTime 展示日期+时分秒（演示数据不足 10 位时补齐演示时分秒） */
@@ -59,7 +59,7 @@ function regionText(o: ExternalOrder): string {
  * 母销售单行含三状态（分发 / 发货 / 结算），「查看」进入销售单履约详情页。分发订单 Tab 保留自营接单与履约跟踪。
  */
 export default function SalesOrders() {
-  const navigate = useNavigate();
+  const [entryOpen, setEntryOpen] = useState(false);
 
   /* ── 全部销售单（母单聚合） ── */
   const flowOrders = useOrderFlowStore((s) => s.orders);
@@ -168,7 +168,7 @@ export default function SalesOrders() {
       customerOrderNo: orderEdit.customerOrderNo || undefined,
       customerOrderTime: orderEdit.customerOrderTime || undefined,
     };
-    const coreEditable = (fam.mother.processStatus === 'pending' || fam.mother.processStatus === 'report_match_pending') && fam.children.length === 0;
+    const coreEditable = (fam.mother.processStatus === 'pending' || fam.mother.processStatus === 'unprocessed' || fam.mother.processStatus === 'report_match_pending') && fam.children.length === 0;
     if (coreEditable) {
       patch.receiver = orderEdit.receiver;
       patch.receiverPhone = orderEdit.receiverPhone;
@@ -223,8 +223,8 @@ export default function SalesOrders() {
       <div className="content-body">
         {/* ── 母销售单一行 + 展开子履约单 ── */}
         <>          <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-            展示<strong>全部母销售单</strong>：以<strong>手工录入</strong>或<strong>直连推送</strong>的母销售单（SO）为一行（分发/履约/结算/开票四状态为该母销售单含全部子履约单的聚合），点击母销售单行展开其下全部子履约单（FO）；未拆分的母销售单即履约单；点击「查看」进入销售单履约详情页。
-            逐单分发操作请前往「<strong>销售单管理 → 销售单分发</strong>」；履约进度跟踪见「销售单履约」。
+            展示<strong>全部母销售单</strong>：以<strong>手工录入</strong>或<strong>直连推送</strong>的母销售单（SO）为一行（分发/履约/结算/开票四状态为该母销售单含全部子履约单的聚合），点击母销售单行展开其下全部子履约单（FO）；未拆分的母销售单即履约单；点击「查看」进入履约单详情页。
+            逐单分发操作请前往「<strong>销售单管理 → 履约单分发</strong>」；履约进度跟踪见「履约单履约」。
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
@@ -242,39 +242,35 @@ export default function SalesOrders() {
               <option value="direct">直接销售</option>
               <option value="via_platform">经平台销售</option>
             </select>
-            <span className="so-f-label">分发状态：</span>
+            <span className="so-f-label">分发进度：</span>
             <select className="filter-select" value={filterDistribute} onChange={(e) => setFilterDistribute(e.target.value)}>
-              <option value="">全部分发状态</option>
+              <option value="">全部分发进度</option>
               <option value="未分发">未分发</option>
               <option value="分发中">分发中</option>
-              <option value="部分已完成">部分已完成</option>
-              <option value="全部已完成">全部已完成</option>
+              <option value="分发完成">分发完成</option>
               <option value="已取消">已取消</option>
             </select>
-            <span className="so-f-label">履约状态：</span>
+            <span className="so-f-label">履约进度：</span>
             <select className="filter-select" value={filterFulfill} onChange={(e) => setFilterFulfill(e.target.value)}>
-              <option value="">全部履约状态</option>
+              <option value="">全部履约进度</option>
               <option value="未履约">未履约</option>
               <option value="履约中">履约中</option>
-              <option value="部分已完成">部分已完成</option>
-              <option value="全部已完成">全部已完成</option>
+              <option value="履约完成">履约完成</option>
               <option value="已取消">已取消</option>
             </select>
-            <span className="so-f-label">结算状态：</span>
+            <span className="so-f-label">结算进度：</span>
             <select className="filter-select" value={filterSettle} onChange={(e) => setFilterSettle(e.target.value)}>
-              <option value="">全部结算状态</option>
+              <option value="">全部结算进度</option>
               <option value="未结算">未结算</option>
               <option value="结算中">结算中</option>
-              <option value="部分已完成">部分已完成</option>
-              <option value="全部已完成">全部已完成</option>
+              <option value="结算完成">结算完成</option>
             </select>
-            <span className="so-f-label">开票状态：</span>
+            <span className="so-f-label">开票进度：</span>
             <select className="filter-select" value={filterInvoice} onChange={(e) => setFilterInvoice(e.target.value)}>
-              <option value="">全部开票状态</option>
+              <option value="">全部开票进度</option>
               <option value="未开票">未开票</option>
               <option value="开票中">开票中</option>
-              <option value="部分已完成">部分已完成</option>
-              <option value="全部已完成">全部已完成</option>
+              <option value="开票完成">开票完成</option>
             </select>
 
             {/* 客户:下拉选择 + 输入自动匹配 */}
@@ -325,7 +321,7 @@ export default function SalesOrders() {
             </Button>
             <Button size="sm" variant="ghost" onClick={resetFilters}>重置</Button>
             <span style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)' }}>
-              <Button onClick={() => navigate('/sales/order-entry')}>+ 新建销售单</Button>
+              <Button onClick={() => setEntryOpen(true)}>+ 新建销售单</Button>
             </span>
           </div>
 
@@ -343,10 +339,10 @@ export default function SalesOrders() {
                   <span>收货人 / 地区</span>
                   <span style={{ textAlign: 'right' }}>总金额</span>
                   <span style={{ textAlign: 'center' }}>履约单数</span>
-                  <span>分发状态</span>
-                  <span>履约状态</span>
-                  <span>结算状态</span>
-                  <span>开票状态</span>
+                  <span>分发进度</span>
+                  <span>履约进度</span>
+                  <span>结算进度</span>
+                  <span>开票进度</span>
                   <span>录入时间</span>
                   <span style={{ textAlign: 'center' }}>操作</span>
                 </div>
@@ -423,7 +419,7 @@ export default function SalesOrders() {
                             <span>分发方式</span>
                             <span style={{ gridColumn: 'span 2' }}>履约主体</span>
                             <span>物流进度</span>
-                            <span>品牌数 / 总数量</span>
+                            <span>品牌数/总数量</span>
                             <span style={{ textAlign: 'right' }}>金额</span>
                             <span>生成时间</span>
                             <span>分发状态</span>
@@ -432,6 +428,11 @@ export default function SalesOrders() {
                             <span>开票状态</span>
                             <span style={{ textAlign: 'center' }}>操作</span>
                           </div>
+                          {units.length === 0 && (
+                            <div style={{ padding: 'var(--space-4)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>
+                              尚未生成履约单，请前往「销售单处理」送去分发或拆分送分发。
+                            </div>
+                          )}
                           {units.map((u, ui) => {
                             const pos = poDocs.filter((d) => d.childOrderId === u.underlying.id);
                             const pkgs = pos.flatMap((d) => d.packages.filter((x) => x.status !== 'void'));
@@ -483,7 +484,7 @@ export default function SalesOrders() {
                               </span>
                               {/* 品牌数 / 总数量：x=本单商品去重品牌数，y=本单商品总数量 */}
                               <span className="mono" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>
-                                {new Set(u.underlying.items.map((it) => priceProducts.find((x) => x.id === it.productId)?.brand ?? priceProducts.find((x) => x.name === it.productName)?.brand ?? '—')).size}/{u.underlying.items.reduce((s, it) => s + it.quantity, 0)}
+                                {new Set(u.underlying.items.map((it) => priceProducts.find((x) => x.id === it.productId)?.brand ?? priceProducts.find((x) => x.name === it.productName)?.brand ?? '—')).size}种/{u.underlying.items.reduce((s, it) => s + it.quantity, 0)}份
                               </span>
                               {/* 履约单金额（与母单「总金额」列对齐） */}
                               <span className="mono" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', textAlign: 'right' }}>{money(u.amount)}</span>
@@ -558,7 +559,7 @@ export default function SalesOrders() {
           if (view?.edit && orderEdit) {
             return (
               <>
-                <Button variant="ghost" onClick={() => setOrderEdit(null)}>取消</Button>
+                <Button variant="ghost" onClick={() => setOrderEdit(null)}>关闭</Button>
                 <Button onClick={saveOrderEdit}>保存修改</Button>
               </>
             );
@@ -581,7 +582,7 @@ export default function SalesOrders() {
           const fam = families.find((f) => f.rootCode === view?.root);
           if (!fam) return null;
           const m = fam.mother;
-          const coreEditable = (m.processStatus === 'pending' || m.processStatus === 'report_match_pending') && fam.children.length === 0;
+          const coreEditable = (m.processStatus === 'pending' || m.processStatus === 'unprocessed' || m.processStatus === 'report_match_pending') && fam.children.length === 0;
           if (view?.edit && orderEdit) {
             return (
               <>
@@ -657,6 +658,9 @@ export default function SalesOrders() {
           );
         })()}
       </DetailDrawer>
+
+      {/* ── 新建销售单弹窗（复用新建销售单页面表单） ── */}
+      <SalesOrderEntryModal open={entryOpen} onClose={() => setEntryOpen(false)} />
     </>
   );
 }

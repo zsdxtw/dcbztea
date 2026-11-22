@@ -289,10 +289,10 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
     menus: [
       { key: 'sales-overview', label: '销售概览', icon: <OverviewIcon /> },
       { key: 'sales-order-manage', label: '销售单管理', icon: <OrdersIcon />, children: [
-        { key: 'order-entry', label: '新建销售单', icon: <QuotationIcon /> },
+        { key: 'sales-order-processing', label: '销售单处理', icon: <TodoIcon /> },
         { key: 'sales-orders', label: '销售单列表', icon: <OrdersIcon /> },
-        { key: 'order-distribute', label: '销售单分发', icon: <OrdersIcon /> },
-        { key: 'sales-fulfillment', label: '销售单履约', icon: <InboundIcon /> },
+        { key: 'order-distribute', label: '履约单分发', icon: <OrdersIcon /> },
+        { key: 'sales-fulfillment', label: '履约单履约', icon: <InboundIcon /> },
       ] },
       { key: 'customer-manage', label: '客户管理', icon: <CustomersIcon />, children: [
         { key: 'sales-customers', label: '客户列表', icon: <CustomersIcon /> },

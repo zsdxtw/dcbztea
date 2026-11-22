@@ -525,7 +525,7 @@ export default function PartnerRegister() {
 
         {/* 提交 */}
         <div className="pk-reg-footer">
-          <button className="pk-reg-cancel" onClick={() => navigate('/partner/login')}>取消</button>
+          <button className="pk-reg-cancel" onClick={() => navigate('/partner/login')}>关闭</button>
           <button className="pk-reg-submit" onClick={handleSubmit}>提交注册申请</button>
         </div>
       </div>

@@ -356,7 +356,7 @@ export default function PartnerReturns({ embedded = false }: { embedded?: boolea
               {draftErr && <div style={{ fontSize: 'var(--text-sm)', color: '#C62828' }}>{draftErr}</div>}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-4)', flexShrink: 0 }}>
-              <button className="pk-reg-cancel" style={{ height: 34, padding: '0 16px', fontSize: 13 }} onClick={() => setAddOpen(false)}>取消</button>
+              <button className="pk-reg-cancel" style={{ height: 34, padding: '0 16px', fontSize: 13 }} onClick={() => setAddOpen(false)}>关闭</button>
               <button className="pk-reg-submit" style={{ height: 34, padding: '0 18px', fontSize: 13, letterSpacing: 'normal', textIndent: 0 }} onClick={saveDraft}>保存登记</button>
             </div>
           </div>
@@ -377,7 +377,7 @@ export default function PartnerReturns({ embedded = false }: { embedded?: boolea
               <textarea className="filter-input" style={{ width: '100%', minHeight: 64, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.7 }} placeholder={finishOf.solution === 'refund' ? '如：质检通过，原路退回' : '如：已重新发出换货商品（顺丰 SF...）'} value={finishNote} onChange={(e) => setFinishNote(e.target.value)} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
-              <Button variant="ghost" onClick={() => setFinishOf(null)}>取消</Button>
+              <Button variant="ghost" onClick={() => setFinishOf(null)}>关闭</Button>
               <Button onClick={() => {
                 setStatus(finishOf.id, 'completed', finishNote.trim() || (finishOf.solution === 'refund' ? `已退款 ${money(finishOf.refundAmount)}` : '换货商品已发出'));
                 flash(`退货单 ${finishOf.code} 已完成处理（${finishOf.solution === 'refund' ? '退款' : '换货'}）`);

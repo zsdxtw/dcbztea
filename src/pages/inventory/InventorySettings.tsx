@@ -369,7 +369,7 @@ export default function InventorySettings() {
               </div>
             </div>
             <div className="drawer-footer">
-              <Button variant="ghost" onClick={() => setShowDrawer(false)}>取消</Button>
+              <Button variant="ghost" onClick={() => setShowDrawer(false)}>关闭</Button>
               <Button onClick={handleSave}>保存</Button>
             </div>
           </div>
@@ -385,7 +385,7 @@ export default function InventorySettings() {
               确定要删除仓库「<span style={{ fontWeight: 'var(--font-semibold)', color: 'var(--color-neutral-800)' }}>{deleteTarget.name}</span>」吗？此操作不可撤销。
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
-              <Button variant="ghost" onClick={() => setDeleteTarget(null)}>取消</Button>
+              <Button variant="ghost" onClick={() => setDeleteTarget(null)}>关闭</Button>
               <Button style={{ background: 'var(--color-semantic-error)', borderColor: 'var(--color-semantic-error)' }} onClick={handleDelete}>确认删除</Button>
             </div>
           </div>
