@@ -174,7 +174,7 @@ interface SupplierStoreState {
   suppliers: SupplierItem[];
   /** 注册/修改审批单 */
   approvals: SupplierApproval[];
-  /** 新品提醒（合作商提报 → 管理端「商品 > 新品提醒」处理） */
+  /** 新品提醒（合作商提报 → 管理端「合作商 > 新品提醒」处理） */
   arrivalReminders: NewArrivalReminder[];
   /** 合作商报价设置（键=合作商/供应商 ID） */
   quoteSettings: Record<string, PartnerQuoteSetting>;

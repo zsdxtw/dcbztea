@@ -21,6 +21,7 @@ import PurchaseStoreOverview from './pages/purchase/PurchaseStoreOverview';
 import CooperationStores from './pages/cooperation/CooperationStores';
 import CooperationScores from './pages/cooperation/CooperationScores';
 import CooperationNotices from './pages/cooperation/CooperationNotices';
+import CooperationNewArrivals from './pages/cooperation/CooperationNewArrivals';
 import ReferralManage from './pages/referral/ReferralManage';
 import PurchaseReconciliation from './pages/purchase/PurchaseReconciliation';
 import PurchaseReturn from './pages/purchase/PurchaseReturn';
@@ -62,7 +63,6 @@ import ProductCategory from './pages/product/ProductCategory';
 import ProductBrand from './pages/product/ProductBrand';
 import ProductBrandDetail from './pages/product/ProductBrandDetail';
 import ProductPrice from './pages/product/ProductPrice';
-import ProductNewArrivals from './pages/product/ProductNewArrivals';
 
 import FinanceOverview from './pages/finance/FinanceOverview';
 import FinancePurchasePayment from './pages/finance/FinancePurchasePayment';
@@ -166,6 +166,7 @@ export const router = createBrowserRouter([
       { path: 'cooperation/cooperation-stores', element: <CooperationStores /> },
       { path: 'cooperation/cooperation-scores', element: <CooperationScores /> },
       { path: 'cooperation/cooperation-reports', element: <SalesReports /> },
+      { path: 'cooperation/cooperation-new-arrivals', element: <CooperationNewArrivals /> },
       { path: 'cooperation/cooperation-notices', element: <CooperationNotices /> },
       { path: 'cooperation/referral-manage', element: <ReferralManage /> },
       { path: 'cooperation', element: <Navigate to="/cooperation/cooperation-overview" replace /> },
@@ -223,7 +224,7 @@ export const router = createBrowserRouter([
       { path: 'product/product-brand', element: <ProductBrand /> },
       { path: 'product/product-brand/:id', element: <ProductBrandDetail /> },
       { path: 'product/product-price', element: <ProductPrice /> },
-      { path: 'product/product-new-arrivals', element: <ProductNewArrivals /> },
+      { path: 'product/product-new-arrivals', element: <Navigate to="/cooperation/cooperation-new-arrivals" replace /> },
       /* ── 财务 ── */
       { path: 'finance', element: <FinanceOverview /> },
       { path: 'finance/finance-overview', element: <FinanceOverview /> },

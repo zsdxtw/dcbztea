@@ -24,7 +24,7 @@ interface HandleDialog {
   note: string;
 }
 
-export default function ProductNewArrivals() {
+export default function CooperationNewArrivals() {
   const arrivalReminders = useSupplierStore(s => s.arrivalReminders);
   const handleArrivalReminder = useSupplierStore(s => s.handleArrivalReminder);
 
@@ -76,7 +76,7 @@ export default function ProductNewArrivals() {
 
   return (
     <>
-      <ContentHeader title="新品提醒" breadcrumbs={['商品', '新品提醒']} />
+      <ContentHeader title="新品提醒" breadcrumbs={['合作商', '新品提醒']} />
       <div className="content-body">
         {/* 状态 Tab 卡片 */}
         <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>

@@ -278,6 +278,7 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
       { key: 'cooperation-stores', label: '合作商门店', icon: <StoreIcon /> },
       { key: 'cooperation-scores', label: '合作商积分', icon: <SupplierApprovalIcon /> },
       { key: 'cooperation-reports', label: '报备管理', icon: <ReportMgmtIcon /> },
+      { key: 'cooperation-new-arrivals', label: '新品提醒', icon: <NewArrivalIcon /> },
       { key: 'referral-manage', label: '推介管理', icon: <ReportMgmtIcon /> },
       { key: 'cooperation-notices', label: '通知公告', icon: <NotificationIcon /> },
     ],
@@ -315,7 +316,6 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
       { key: 'product-category', label: '分类管理', icon: <ProductCategoryIcon /> },
       { key: 'product-brand', label: '品牌管理', icon: <BrandIcon /> },
       { key: 'product-price', label: '价格管理', icon: <PriceIcon /> },
-      { key: 'product-new-arrivals', label: '新品提醒', icon: <NewArrivalIcon /> },
       { key: 'product-tea-category', label: '茶叶档案', icon: <CategoryIcon />, children: [
         { key: 'product-tea-seven', label: '六大茶类', icon: <CategoryIcon /> },
         { key: 'product-tea-list', label: '茶种大全', icon: <CategoryIcon /> },

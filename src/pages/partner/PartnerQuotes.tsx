@@ -441,7 +441,7 @@ export default function PartnerQuotes() {
           <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 860, maxWidth: '94vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 4 }}>提报管理</h3>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-3)' }}>
-              贵司此前的全部新品提报记录与处理进展（共 {myReminders.length} 条；待处理 {myReminders.filter(r => r.status === 'pending').length} · 已上架 {myReminders.filter(r => r.status === 'listed').length} · 已忽略 {myReminders.filter(r => r.status === 'dismissed').length}）；处理进度可在管理平台「商品 &gt; 新品提醒」中由平台跟进。
+              贵司此前的全部新品提报记录与处理进展（共 {myReminders.length} 条；待处理 {myReminders.filter(r => r.status === 'pending').length} · 已上架 {myReminders.filter(r => r.status === 'listed').length} · 已忽略 {myReminders.filter(r => r.status === 'dismissed').length}）；处理进度可在管理平台「合作商 &gt; 新品提醒」中由平台跟进。
             </div>
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
