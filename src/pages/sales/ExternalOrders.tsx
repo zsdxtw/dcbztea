@@ -7,6 +7,7 @@ import Button from '../../components/common/Button';
 import Toggle from '../../components/common/Toggle';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { useOrderFlowStore, getSelfPurchaseEstimate, reportMatchesOrder } from '../../stores/orderFlowStore';
+import { usePurchaseStore } from '../../stores/purchaseStore';
 import { useSupplierStore } from '../../stores/supplierStore';
 import { useScoreStore, getScoreSummary } from '../../stores/scoreStore';
 import { useReportStore } from '../../stores/reportStore';
@@ -14,8 +15,9 @@ import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABE
   TRANSFER_SOURCE_LABELS, SOURCE_TAG_LABELS, compareFloorAmount, platformLabelOf } from '../../data/externalOrders';
 import { PARTNER_ORDER_STATUS_LABELS, PARTNER_REPORT_TYPE_LABELS } from '../../data/partner';
 import { REGIONS, getCities, getDistricts, regionTextOf } from '../../data/regions';
-import SalesOrderInfoModal from '../../components/business/SalesOrderInfoModal';
+import { ProductItemsTable, FulfillmentProgressBlock, SettleInvoiceBlock } from './SalesOrderDetail';
 import { FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS, stageOfOrder } from '../../utils/fulfillment';
+import { buildFamilies, FAMILY_STATE_COLORS } from '../../utils/salesOrderFamily';
 import { usePriceStore } from '../../stores/priceStore';
 import { partnerInRegion } from '../../types';
 import type { ExternalOrder, RegionScope } from '../../types';
@@ -31,6 +33,8 @@ const statusPill = (status: string) => {
 
 /** 状态键（分发状态 7 态直接使用，无归并） */
 const mergedStatus = (s: string) => s;
+/** 详情展示日期+时分秒（数据无时分秒时补齐演示值） */
+const fmtDT = (v?: string) => (!v ? '—' : v.length > 10 ? v : `${v} 09:12:00`);
 
 /** 销售履约单号：子履约单取自身编号；未拆分的销售单本身即履约单，按规则展示为 LY01 */
 const fulfillmentCodeOf = (o: ExternalOrder): string => (o.parentCode ? o.code : `${o.code}LY01`);
@@ -109,6 +113,8 @@ export default function ExternalOrders() {
   const scoreEntries = useScoreStore((s) => s.entries);
 
   const [filterStatus, setFilterStatus] = useState('');
+  /** 母销售单家族（销售单号弹窗：订单信息/收货信息/商品明细三段） */
+  const families = useMemo(() => buildFamilies(orders), [orders]);
   const [linkOrderCode, setLinkOrderCode] = useState<string | null>(null);
   const [quickMsg, setQuickMsg] = useState('');
   const products = usePriceStore((s) => s.products);
@@ -285,7 +291,10 @@ export default function ExternalOrders() {
     setFlowingId(null);
   };
 
+  const purchaseDocs = usePurchaseStore((s) => s.docs);
   const current = selectedId ? orders.find((o) => o.id === selectedId) ?? null : null;
+  /** 当前查看单据关联的采购发货单（发货情况表 / 结算口径） */
+  const currentPos = useMemo(() => (current ? purchaseDocs.filter((d) => d.childOrderId === current.id) : []), [purchaseDocs, current]);
   const enrollOrder = enrollOf ? orders.find((o) => o.id === enrollOf) ?? null : null;
 
   const noDialogOpen = !selectedId && !splitting && !deleting && !reflowing && !matchConfirming && !enrollOrder && !awarding && !cancelling && !flowingId && !reportListOpen && !compareMgmtOpen;
@@ -613,6 +622,7 @@ export default function ExternalOrders() {
               <div key="act" className="row-actions" style={{ whiteSpace: 'nowrap' }}>
                 {o.processStatus === 'pending' && (
                   <>
+                    {actBtn(o, 'view', '查看', () => openDetail(o.id))}
                     {actBtn(o, 'flow', '分发', () => openFlow(o))}
                     {o.items.length >= 1 && actBtn(o, 'split', '拆单', () => { setSplitting(o); setSplitQty({}); setQuickMsg(''); })}
                     {o.sourceChannel === 'manual' && actBtn(o, 'edit', '修改', () => { setSelectedId(o.id); startEdit(o); })}
@@ -639,7 +649,7 @@ export default function ExternalOrders() {
                 )}
                 {o.processStatus === 'comparing' && (
                   <>
-                    {actBtn(o, 'query', '查单', () => openDetail(o.id))}
+                    {actBtn(o, 'view', '查看', () => openDetail(o.id))}
                     {actBtn(o, 'enroll', '报名情况', () => setEnrollOf(o.id))}
                   </>
                 )}
@@ -765,10 +775,17 @@ export default function ExternalOrders() {
                   {current.platformCustomerName && <InfoItem label="平台客户">{current.platformCustomerName}</InfoItem>}
                   <InfoItem label="分发方式">{pathLabel(current)}</InfoItem>
                   {current.parentCode && <InfoItem label="母销售单编号" mono>{current.parentCode}</InfoItem>}
-                  {current.parentCode && <InfoItem label="母销售单编号" mono>{current.parentCode}</InfoItem>}
                 </InfoGrid>
               </DrawerSection>
             )}
+
+            <DrawerSection title="收货信息">
+              <InfoGrid cols={4}>
+                <InfoItem label="收货人">{current.receiver}</InfoItem>
+                <InfoItem label="联系电话" mono>{current.receiverPhone}</InfoItem>
+                <InfoItem label="收货地址" span={3}>{current.receiverAddress}</InfoItem>
+              </InfoGrid>
+            </DrawerSection>
 
             {/* ── 母单总览：子单进度（拆单家族） ── */}
             {(() => {
@@ -812,21 +829,30 @@ export default function ExternalOrders() {
               </DrawerSection>
             )}
 
-            <DrawerSection title={`商品明细（${current.items.length} 种）`}>
-              <table className="detail-inline-table">
-                <thead><tr><th>商品名称</th><th>规格</th><th>数量</th><th>单价</th><th>小计</th></tr></thead>
-                <tbody>
-                  {current.items.map((it, i) => (
-                    <tr key={i}>
-                      <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
-                      <td>{it.spec}</td>
-                      <td className="mono">{it.quantity}</td>
-                      <td className="mono">{money(it.price)}</td>
-                      <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(it.price * it.quantity)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <DrawerSection title="履约单信息">
+              <InfoGrid cols={4}>
+                <InfoItem label="履约单编号" mono emph>{current.code}</InfoItem>
+                <InfoItem label={current.parentCode ? '关联销售单' : '单据性质'}>{current.parentCode ?? (orders.some((x) => x.parentCode === current.code) ? '母销售单（已拆分）' : '母销售单（未拆分，即履约单）')}</InfoItem>
+                <InfoItem label="生成时间" mono>{fmtDT(current.history?.[0]?.time ?? current.entryTime)}</InfoItem>
+                <InfoItem label="金额" mono valueStyle={{ fontWeight: 'var(--font-semibold)' }}>{money(current.totalAmount)}</InfoItem>
+              </InfoGrid>
+              <ProductItemsTable
+                items={current.items}
+                customerName={current.customerName}
+                salesPath={current.salesPath ?? 'direct'}
+                platformCustomerId={current.platformCustomerId}
+                platform={current.platform}
+                footerAmount={current.totalAmount}
+              />
+            </DrawerSection>
+
+            <DrawerSection title="分发情况">
+              <InfoGrid cols={4}>
+                <InfoItem label="分发状态">{(() => { const st = distributeStateOf(current); return pill(st.bg, st.color, st.label); })()}</InfoItem>
+                <InfoItem label="分发方式">{pathLabel(current)}</InfoItem>
+                <InfoItem label="履约主体">{current.partnerName ?? (current.path === 'self' ? '淡茶半盏（自营）' : '待分发')}</InfoItem>
+                <InfoItem label="分发时间">{current.fulfillment?.acceptTime ?? '—'}</InfoItem>
+              </InfoGrid>
             </DrawerSection>
 
             {/* ── 待处理：提示前往销售单分发弹窗处理 ── */}
@@ -907,7 +933,7 @@ export default function ExternalOrders() {
                 <InfoGrid cols={4}>
                   <InfoItem label="履约主体">{current.partnerName}</InfoItem>
                   <InfoItem label="分发方式">{TRANSFER_SOURCE_LABELS[current.transferSource ?? '']}</InfoItem>
-                  <InfoItem label="分发时间">{current.transferTime ?? '—'}</InfoItem>
+                  <InfoItem label="转派时间">{current.transferTime ?? '—'}</InfoItem>
                   {current.reportMatches?.[0] && <InfoItem label="命中报备" mono>{current.reportMatches[0].reportCode}</InfoItem>}
                 </InfoGrid>
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginTop: 'var(--space-2)', lineHeight: 1.7 }}>
@@ -916,31 +942,43 @@ export default function ExternalOrders() {
               </DrawerSection>
             )}
 
-            {/* ── 分发已完成：合作商履约（接单/发货/妥投由合作商终端推进；确收/结算在管理后台） ── */}
-            {current.processStatus === 'processed' && current.path === 'distribute' && current.partnerName && (
-              <DrawerSection title="合作商履约">
-                <InfoGrid cols={4}>
-                  <InfoItem label="履约主体">{current.partnerName}</InfoItem>
-                  <InfoItem label="分发方式">{TRANSFER_SOURCE_LABELS[current.transferSource ?? '']}</InfoItem>
-                  <InfoItem label="履约状态">{current.partnerStatus ? PARTNER_ORDER_STATUS_LABELS[current.partnerStatus] : '待接单'}</InfoItem>
-                  <InfoItem label="结算履约">{current.settleOnTime === true ? '按时（积分 +5）' : current.settleOnTime === false ? '超时（积分 -5）' : '未结算'}</InfoItem>
-                </InfoGrid>
-                <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
-                  {current.partnerStatus === 'accepted' && <Button onClick={() => store.getState().advancePartner(current.id, 'shipping')}>推进：发货</Button>}
-                  {current.partnerStatus === 'shipping' && <Button onClick={() => store.getState().advancePartner(current.id, 'transit')}>推进：物流妥投</Button>}
-                  {current.partnerStatus === 'transit' && <Button onClick={() => store.getState().confirmReceipt(current.id)}>确认收货（管理后台）</Button>}
-                  {current.partnerStatus === 'confirmed' && (
-                    <>
-                      <Button onClick={() => store.getState().settleOrder(current.id, { onTime: true })}>结算（按时 · 积分+5）</Button>
-                      <Button variant="danger" onClick={() => store.getState().settleOrder(current.id, { onTime: false })}>结算（超时 · 积分-5）</Button>
-                    </>
-                  )}
-                  {current.partnerStatus !== 'confirmed' && (
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', alignSelf: 'center' }}>
-                      接单/发货/妥投由合作商终端推进；全部包裹妥投后由管理后台「确认收货」，结算按发货单可部分结算
-                    </span>
-                  )}
-                </div>
+            {/* ── 履约情况：履约时间线 + 发货情况（包裹级，可点物流跟踪）+ 合作商履约推进 ── */}
+            {current.processStatus !== 'cancelled' && (
+              <DrawerSection title="履约情况">
+                <FulfillmentProgressBlock order={current} poDocs={currentPos} />
+                {current.processStatus === 'processed' && current.path === 'distribute' && current.partnerName && (
+                  <>
+                    <InfoGrid cols={4}>
+                      <InfoItem label="履约主体">{current.partnerName}</InfoItem>
+                      <InfoItem label="分发方式">{TRANSFER_SOURCE_LABELS[current.transferSource ?? '']}</InfoItem>
+                      <InfoItem label="履约状态">{current.partnerStatus ? PARTNER_ORDER_STATUS_LABELS[current.partnerStatus] : '待接单'}</InfoItem>
+                      <InfoItem label="结算履约">{current.settleOnTime === true ? '按时（积分 +5）' : current.settleOnTime === false ? '超时（积分 -5）' : '未结算'}</InfoItem>
+                    </InfoGrid>
+                    <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
+                      {current.partnerStatus === 'accepted' && <Button onClick={() => store.getState().advancePartner(current.id, 'shipping')}>推进：发货</Button>}
+                      {current.partnerStatus === 'shipping' && <Button onClick={() => store.getState().advancePartner(current.id, 'transit')}>推进：物流妥投</Button>}
+                      {current.partnerStatus === 'transit' && <Button onClick={() => store.getState().confirmReceipt(current.id)}>确认收货（管理后台）</Button>}
+                      {current.partnerStatus === 'confirmed' && (
+                        <>
+                          <Button onClick={() => store.getState().settleOrder(current.id, { onTime: true })}>结算（按时 · 积分+5）</Button>
+                          <Button variant="danger" onClick={() => store.getState().settleOrder(current.id, { onTime: false })}>结算（超时 · 积分-5）</Button>
+                        </>
+                      )}
+                      {current.partnerStatus !== 'confirmed' && (
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', alignSelf: 'center' }}>
+                          接单/发货/妥投由合作商终端推进；全部包裹妥投后由管理后台「确认收货」，结算按发货单可部分结算
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
+              </DrawerSection>
+            )}
+
+            {/* ── 结算 & 开票情况（分发完成后） ── */}
+            {current.processStatus === 'processed' && (
+              <DrawerSection title="结算 & 开票情况">
+                <SettleInvoiceBlock order={current} poDocs={currentPos} />
               </DrawerSection>
             )}
 
@@ -952,14 +990,6 @@ export default function ExternalOrders() {
                 </div>
               </DrawerSection>
             )}
-
-            <DrawerSection title="收货信息">
-              <InfoGrid cols={4}>
-                <InfoItem label="收货人">{current.receiver}</InfoItem>
-                <InfoItem label="联系电话" mono>{current.receiverPhone}</InfoItem>
-                <InfoItem label="收货地址" span={3}>{current.receiverAddress}</InfoItem>
-              </InfoGrid>
-            </DrawerSection>
 
             <DrawerSection title="处理轨迹">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
@@ -1440,7 +1470,74 @@ export default function ExternalOrders() {
       )}
 
       {/* ── 母销售单信息弹窗（关联销售单点击） ── */}
-      <SalesOrderInfoModal code={linkOrderCode} onClose={() => setLinkOrderCode(null)} />
+      {/* ── 销售单信息弹窗（订单信息 / 收货信息 / 商品明细，参照销售单列表详情「销售单信息」） ── */}
+      {linkOrderCode && (() => {
+        const fam = families.find((f) => f.rootCode === linkOrderCode);
+        if (!fam) return null;
+        const m = fam.mother;
+        const amount = (fam.children.length > 0 ? fam.children : fam.all).reduce((s2, o) => s2 + o.totalAmount, 0);
+        const rows = fam.children.length > 0 ? fam.children.flatMap((c) => c.items) : m.items;
+        const map = new Map<string, { productId: string; productName: string; spec: string; quantity: number; price: number }>();
+        for (const it of rows) {
+          const k = `${it.productName}|${it.spec}`;
+          const cu = map.get(k);
+          if (cu) cu.quantity += it.quantity;
+          else map.set(k, { productId: it.productId, productName: it.productName, spec: it.spec, quantity: it.quantity, price: it.price });
+        }
+        const infoCell = (label: string, node: React.ReactNode, opts?: { mono?: boolean; emph?: boolean; span?: 2 | 3 }) => (
+          <div className={`detail-info-item${opts?.span === 2 ? ' span-2' : opts?.span === 3 ? ' span-3' : ''}`}><label className="drawer-label">{label}</label><div className={`detail-info-value${opts?.emph ? ' emph' : ''}${opts?.mono ? ' mono' : ''}`}>{node}</div></div>
+        );
+        return (
+          <div className="category-dialog-overlay" onClick={() => setLinkOrderCode(null)}>
+            <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 980, maxWidth: '96vw' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+                <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)' }}>销售单信息 · {linkOrderCode}</div>
+                <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>母销售单（聚合其下 {fam.children.length > 0 ? `${fam.children.length} 张` : '1 张'}履约单）</span>
+              </div>
+              <DrawerSection title="订单信息">
+                <InfoGrid cols={4}>
+                  {infoCell('销售单号', fam.rootCode, { mono: true, emph: true })}
+                  {infoCell('订单来源', <>{m.salesPath === 'via_platform' ? (m.platformCustomerName ?? '经平台销售') : '淡茶半盏'}（{EXTERNAL_CHANNEL_LABELS[m.sourceChannel]}）</>)}
+                  {infoCell('下单平台', m.salesPath === 'via_platform' ? (m.platformCustomerName ?? '—') : '—')}
+                  {infoCell('平台订单号', m.externalOrderNo ?? '—', { mono: true })}
+                  {infoCell('客户', `${m.customerName}（${m.customerType}）`, { emph: true })}
+                  {infoCell('客户区域', regionText(m))}
+                  {infoCell('总金额', money(amount), { mono: true })}
+                  {infoCell('履约单数', fam.children.length > 0 ? `${fam.children.length} 单` : '1 单（未拆分，母销售单即履约单）')}
+                  {infoCell('销售路径', m.salesPath === 'via_platform' ? '经平台销售' : '直接销售')}
+                  {infoCell('客户下单时间', m.customerOrderTime ?? '—')}
+                  {infoCell('客户侧订单号', m.customerOrderNo ?? '—', { mono: true })}
+                  {infoCell('录入时间', m.entryTime.length > 10 ? m.entryTime : `${m.entryTime} 09:12:00`, { mono: true })}
+                  {infoCell('录入人', m.operator)}
+                  {m.platformCustomerName ? infoCell('平台客户', m.platformCustomerName) : null}
+                </InfoGrid>
+              </DrawerSection>
+              <DrawerSection title="收货信息">
+                <InfoGrid cols={4}>
+                  {infoCell('收货人', m.receiver, { emph: true })}
+                  {infoCell('联系电话', m.receiverPhone, { mono: true })}
+                  {infoCell('收货地区', regionText(m))}
+                  {infoCell('收货地址', m.receiverAddress, { span: 2 })}
+                  {infoCell('备注', m.remark || '—', { span: 2 })}
+                </InfoGrid>
+              </DrawerSection>
+              <DrawerSection title="商品明细">
+                <ProductItemsTable
+                  items={[...map.values()]}
+                  customerName={m.customerName}
+                  salesPath={m.salesPath}
+                  platformCustomerId={m.platformCustomerId}
+                  platform={m.platform}
+                  footerAmount={amount}
+                />
+              </DrawerSection>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-3)' }}>
+                <Button variant="ghost" onClick={() => setLinkOrderCode(null)}>关闭</Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {/* ── 报备管理弹窗（报备-匹配待确认节点） ── */}
       {reportListOpen && (
         <div className="category-dialog-overlay" onClick={() => setReportListOpen(false)}>
