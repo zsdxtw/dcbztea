@@ -30,7 +30,7 @@ const pill = (bg: string, color: string, text: string) => (
 const FLOW_BRIEF: { key: string; label: string }[] = [
   { key: 'pending', label: '待分发' },
   { key: 'self_pending', label: '自营待接单' },
-  { key: 'comparing', label: '分发比单中' },
+  { key: 'comparing', label: '转派比单中' },
   { key: 'distribute_pending', label: '转派待接单' },
   { key: 'processed', label: '分发已完成' },
   { key: 'cancelled', label: '已取消' },
@@ -168,7 +168,7 @@ export default function SalesOverview() {
       text: `${statusCount.pending} 单待分发（分发 / 拆单 / 修改）`, tag: '待分发', color: EXTERNAL_STATUS_COLORS.pending, to: '/sales/order-distribute',
     },
     (statusCount.comparing ?? 0) > 0 && {
-      text: `${statusCount.comparing} 单分发比单中 · 已报名 ${compareQuotes} 家`, tag: '比单', color: EXTERNAL_STATUS_COLORS.comparing, to: '/sales/order-distribute',
+      text: `${statusCount.comparing} 单转派比单中 · 已报名 ${compareQuotes} 家`, tag: '比单', color: EXTERNAL_STATUS_COLORS.comparing, to: '/sales/order-distribute',
     },
     (statusCount.self_pending ?? 0) > 0 && {
       text: `${statusCount.self_pending} 单自营待接单（接单 / 退回在自营工作台）`, tag: '自营', color: EXTERNAL_STATUS_COLORS.self_pending, to: '/selfop/orders',

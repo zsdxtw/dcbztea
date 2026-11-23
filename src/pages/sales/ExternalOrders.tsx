@@ -11,12 +11,12 @@ import { usePurchaseStore } from '../../stores/purchaseStore';
 import { useSupplierStore } from '../../stores/supplierStore';
 import { usePriceStore } from '../../stores/priceStore';
 import { useScoreStore, getScoreSummary } from '../../stores/scoreStore';
-import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS,
+import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS,
   TRANSFER_SOURCE_LABELS, SOURCE_TAG_LABELS, platformLabelOf } from '../../data/externalOrders';
-import { PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
 import { REGIONS, getCities, getDistricts, regionTextOf } from '../../data/regions';
-import { ProductItemsTable, FulfillmentProgressBlock, SettleInvoiceBlock } from './SalesOrderDetail';
-import { buildFamilies, orderProgressOf, FAMILY_STATE_COLORS } from '../../utils/salesOrderFamily';
+import { ProductItemsTable, SalesOrderDetailTabs } from './SalesOrderDetail';
+import TakebackDialog from '../../components/business/TakebackDialog';
+import { buildFamilies, familyStatesOf, orderProgressOf, FAMILY_STATE_COLORS } from '../../utils/salesOrderFamily';
 import SplitDraftBuilder, { type DraftFulfillment } from '../../components/business/SplitDraftBuilder';
 import DispatchDialog from '../../components/business/DispatchDialog';
 import type { ExternalOrder } from '../../types';
@@ -25,15 +25,8 @@ const pill = (bg: string, color: string, text: string) => (
   <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: bg, color, whiteSpace: 'nowrap' }}>{text}</span>
 );
 
-const statusPill = (status: string) => {
-  const c = EXTERNAL_STATUS_COLORS[status] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
-  return pill(c.bg, c.color, EXTERNAL_STATUS_LABELS[status] ?? status);
-};
-
-/** 状态键（分发状态 7 态直接使用，无归并） */
+/** 状态键（分发状态直接使用，无归并） */
 const mergedStatus = (s: string) => s;
-/** 详情展示日期+时分秒（数据无时分秒时补齐演示值） */
-const fmtDT = (v?: string) => (!v ? '—' : v.length > 10 ? v : `${v} 09:12:00`);
 
 /** 销售履约单号：子履约单取自身编号；未拆分的销售单本身即履约单，按规则展示为 LY01 */
 const fulfillmentCodeOf = (o: ExternalOrder): string => (o.parentCode ? o.code : `${o.code}LY01`);
@@ -43,7 +36,7 @@ const salesOrderCodeOf = (o: ExternalOrder): string => o.parentCode ?? o.code;
 /** 分发状态 5 态（已取消归入订单进度，不再在分发状态中展示） */
 const DISTRIBUTE_STATE: Record<string, { label: string; bg: string; color: string }> = {
   pending: { label: '待分发', bg: '#FFF3E0', color: '#B26A00' },
-  comparing: { label: '分发比单中', bg: '#EDE7F6', color: '#5E35B1' },
+  comparing: { label: '转派比单中', bg: '#EDE7F6', color: '#5E35B1' },
   self_pending: { label: '自营待接单', bg: '#E3F2FD', color: '#0F64B5' },
   distribute_pending: { label: '转派待接单', bg: '#E8F1FB', color: '#0F64B5' },
   processed: { label: '分发已完成', bg: '#E8F5E9', color: '#2E7D32' },
@@ -82,19 +75,6 @@ function pathKey(o: ExternalOrder): string {
 /** 地区列展示：省 / 市 / 区（共享助手，见 data/regions.regionTextOf） */
 function regionText(o: ExternalOrder): string {
   return regionTextOf(o.customerRegion, o.receiverAddress);
-}
-
-/** 已接单订单重新分发的风险措辞 */
-function processedWarnText(o: ExternalOrder): string {
-  if (o.path === 'self') {
-    if ((o.selfShipments?.length ?? 0) > 0) return '该订单已发货（有物流单号），重新分发将作废发货包裹与采购单据，请谨慎确认！';
-    if (o.selfPo) return '该订单已接单且已下采购单，重新分发将作废采购订单，请确认。';
-    return '该订单已被接单（自营），重新分发将收回订单，请确认。';
-  }
-  const ps = o.partnerStatus;
-  if (ps === 'shipping' || ps === 'transit') return `该订单合作商【已发货/妥投】，重新分发将中断合作商履约并可能产生违约责任，请谨慎确认！`;
-  if (ps === 'confirmed') return `该订单合作商【已确收】，重新分发将产生结算与积分回滚，请谨慎确认！`;
-  return '该订单已被合作商接单，重新分发将收回订单并通知合作商，请确认。';
 }
 
 export default function ExternalOrders() {
@@ -137,35 +117,20 @@ export default function ExternalOrders() {
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
 
-  /** 重新分发确认弹窗 */
-  const [reflowing, setReflowing] = useState<ExternalOrder | null>(null);
   /** 删除确认弹窗 */
   const [deleting, setDeleting] = useState<ExternalOrder | null>(null);
-  const [cancelling, setCancelling] = useState<ExternalOrder | null>(null);
-  const [cancelReason, setCancelReason] = useState('');
-  /** 操作列选中态：点击即选中（primary 样式），全部对话框关闭后取消选中 */
-  const [activeAction, setActiveAction] = useState<{ id: string; act: string } | null>(null);
-  /** 操作按钮：未选中=ghost（参照拆单），选中=primary（参照分发） */
-  const actBtn = (o: ExternalOrder, act: string, label: string, onClick: () => void) => {
-    const selected = activeAction?.id === o.id && activeAction?.act === act;
-    return (
-      <Button size="sm" variant={selected ? 'primary' : 'ghost'} className={selected ? undefined : 'act-selectable'} onClick={() => { setActiveAction({ id: o.id, act }); onClick(); }}>{label}</Button>
-    );
-  };
-  /** 报名情况弹窗 */
+  /** 取回弹窗（自营待接单 / 转派待接单 / 分发已完成） */
+  const [recallOf, setRecallOf] = useState<ExternalOrder | null>(null);
+  const [recallMsg, setRecallMsg] = useState('');
+  /** 报名处理弹窗（转派比单中） */
   const [enrollOf, setEnrollOf] = useState<string | null>(null);
+  const [enrollMsg, setEnrollMsg] = useState('');
   /** 直接选定弹窗 */
   const [awarding, setAwarding] = useState<{ orderId: string; supplierId: string; supplierName: string } | null>(null);
   const [awardReason, setAwardReason] = useState('');
   /** 履约单分发弹窗（与销售单处理共用：拆单 + 四方向） */
   const [flowingId, setFlowingId] = useState<string | null>(null);
   const [flowMsg, setFlowMsg] = useState('');
-  /** 管理弹窗：比单管理 */
-  const [compareMgmtOpen, setCompareMgmtOpen] = useState(false);
-  const [compareMsg, setCompareMsg] = useState('');
-
-  /** 修改抽屉编辑态 */
-  const [editForm, setEditForm] = useState<Record<string, string>>({});
 
   const [tick, setTick] = useState(Date.now());
   useEffect(() => {
@@ -183,21 +148,7 @@ export default function ExternalOrders() {
 
   const purchaseDocs = usePurchaseStore((s) => s.docs);
   const current = selectedId ? orders.find((o) => o.id === selectedId) ?? null : null;
-  /** 当前查看单据关联的采购发货单（发货情况表 / 结算口径） */
-  const currentPos = useMemo(() => (current ? purchaseDocs.filter((d) => d.childOrderId === current.id) : []), [purchaseDocs, current]);
   const enrollOrder = enrollOf ? orders.find((o) => o.id === enrollOf) ?? null : null;
-
-  const noDialogOpen = !selectedId && !splitting && !deleting && !reflowing && !enrollOrder && !awarding && !cancelling && !flowingId && !compareMgmtOpen;
-  useEffect(() => {
-    if (noDialogOpen) setActiveAction(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noDialogOpen]);
-
-  useEffect(() => {
-    if (current) {
-      setEditForm({});
-    }
-  }, [selectedId]);
 
   /** 关键字匹配：编号 / 客户 / 平台单号 / 母销售单编号（输入母单号时该母单下所有子单均展出） */
   const kwMatch = (o: ExternalOrder, kw: string) =>
@@ -205,7 +156,7 @@ export default function ExternalOrders() {
 
   // 已拆分的母销售单不在分发列表/计数展示（由其下各子履约单呈现）
   const motherCodes = useMemo(() => new Set(orders.map((x) => x.parentCode).filter(Boolean) as string[]), [orders]);
-  const listOrders = useMemo(() => orders.filter((o) => o.processStatus !== 'unprocessed' && (o.parentCode || !motherCodes.has(o.code))), [orders, motherCodes]);
+  const listOrders = useMemo(() => orders.filter((o) => o.processStatus !== 'unprocessed' && o.processStatus !== 'cancelled' && (o.parentCode || !motherCodes.has(o.code))), [orders, motherCodes]);
   const filtered = useMemo(() => listOrders.filter((o) => {
     if (keyword && !kwMatch(o, keyword.trim())) return false;
     if (filterStatus !== '') return mergedStatus(o.processStatus) === filterStatus;
@@ -248,63 +199,21 @@ export default function ExternalOrders() {
     </button>
   );
 
-  /* ── 重新分发 ── */
-  const startReflow = (o: ExternalOrder) => setReflowing(o);
-  const confirmReflow = () => {
-    if (!reflowing) return;
-    const o = reflowing;
-    store.getState().resetToPending(o.id, o.processStatus === 'processed' ? '管理后台重新分发（原执行信息作废）' : undefined);
-    setReflowing(null);
-    setSelectedId(null);
-  };
-
   /* ── 详情抽屉开启（查看/查单） ── */
   const openDetail = (id: string) => setSelectedId(id);
-
-  /* ── 编辑保存 ── */
-  const startEdit = (order?: ExternalOrder) => {
-    const target = order ?? current;
-    if (!target) return;
-    setEditForm({
-      externalOrderNo: target.externalOrderNo ?? '',
-      customerName: target.customerName,
-      customerRegion: target.customerRegion,
-      receiver: target.receiver,
-      receiverPhone: target.receiverPhone,
-      receiverAddress: target.receiverAddress,
-      remark: target.remark ?? '',
-    });
-  };
-  const saveEdit = () => {
-    if (!current) return;
-    store.getState().updateOrder(current.id, {
-      externalOrderNo: editForm.externalOrderNo?.trim() || current.externalOrderNo,
-      customerName: editForm.customerName?.trim() || current.customerName,
-      customerRegion: editForm.customerRegion?.trim() || current.customerRegion,
-      receiver: editForm.receiver?.trim() || current.receiver,
-      receiverPhone: editForm.receiverPhone?.trim() || current.receiverPhone,
-      receiverAddress: editForm.receiverAddress?.trim() || current.receiverAddress,
-      remark: editForm.remark?.trim() || undefined,
-    });
-    setEditForm({});
-  };
-
-  const editField = (label: string, key: string, width = '100%') => (
-    <div>
-      <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>{label}</label>
-      <input className="filter-input" style={{ width }} value={editForm[key] ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, [key]: e.target.value }))} />
-    </div>
-  );
 
   /* ── 渲染 ── */
   return (
     <>
       <ContentHeader title="履约单分发" breadcrumbs={['销售', '销售单管理', '履约单分发']} />
       <div className="content-body">
+        {recallMsg && (
+          <div style={{ marginBottom: 'var(--space-3)', padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', background: '#E8F5E9', color: '#01795D' }}>{recallMsg}</div>
+        )}
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           履约单分发决定<strong>销售订单由谁来供货发货</strong>（自营仓发货 / 合作商采购直发），均<strong>逐个展示子单</strong>（母单聚合总览请前往「销售单管理 → 销售订单」）。两个来源渠道：<strong>手工录入</strong>与<strong>直连推送</strong>，订单进入系统不做自动报备匹配，均由管理员人工处理。
           报备匹配由<strong>人工处理</strong>：点击「分发」后在弹窗中选择「转派-报备」，人工勾选命中的报备记录（订单 / 商品 / 地区），确认后整单直接转出报备合作商；其余分发方向为自营（淡茶半盏）/ 转派-指定 / 转派-比单，比单可限定合作商地区。
-          履约状态进入已接单及后续后分发状态自动变为<strong>分发已完成</strong>；全部包裹妥投后由管理后台「确认收货」→ 履约已确收；待接单订单可「重新分发」回待分发重新选择路径，已接单的重新分发需二次确认。
+          履约状态进入已接单及后续后分发状态自动变为<strong>分发已完成</strong>；全部包裹妥投后由管理后台「确认收货」→ 履约已确收；自营待接单 / 转派待接单的履约单可「取回」回到待分发重新选择路径。
           尚未送去分发的销售单在「销售单管理 → 销售单处理」中，送去分发生成履约单后才会出现在本页。
         </div>
 
@@ -386,7 +295,7 @@ export default function ExternalOrders() {
                   <button className="tab-card-simple eop-dim" disabled title="报备转派直接转出，无中间状态">报备</button>
                   <button className="tab-card-simple eop-dim" disabled title="指定转派即时转出，无中间状态">指定</button>
                   <button className={`tab-card-simple${filterStatus === 'comparing' ? ' active' : ''}`} onClick={() => setFilterStatus('comparing')}>
-                    分发比单中
+                    转派比单中
                     <span className="tab-card-simple-count">{countOf('comparing')}</span>
                   </button>
                 </div>
@@ -410,11 +319,7 @@ export default function ExternalOrders() {
               </button>
             </div>
 
-            {/* 已取消（贯穿：取消后分发与履约状态均为已取消） */}
-            <button className={`tab-card-simple${filterStatus === 'cancelled' ? ' active' : ''}`} onClick={() => setFilterStatus('cancelled')}>
-              已取消
-              <span className="tab-card-simple-count">{countOf('cancelled')}</span>
-            </button>
+            {/* 已取消不再在分发环节展示（已取消的履约单仅在销售单列表查看） */}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
@@ -445,7 +350,7 @@ export default function ExternalOrders() {
           )}
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)' }}>
             {/* 管理按钮仅在对应状态页面展示 */}
-            {filterStatus === 'comparing' && <Button onClick={() => setCompareMgmtOpen(true)}>比单管理</Button>}
+            {filterStatus === 'comparing' && <Button onClick={() => navigate('/sales/compare-manage')}>比单管理</Button>}
           </span>
         </div>
 
@@ -499,44 +404,36 @@ export default function ExternalOrders() {
                 {(() => { const d = distributeStateOf(o); return pill(d.bg, d.color, d.label); })()}
               </span>,
               <span key="pa" style={{ fontSize: 'var(--text-sm)' }}>{pathLabel(o)}</span>,
-              <span key="pt" style={{ fontSize: 'var(--text-sm)' }}>{o.partnerName ?? (o.path === 'self' ? '淡茶半盏（自营）' : '待分发')}</span>,
+              <span key="pt" style={{ fontSize: 'var(--text-sm)' }}>{o.processStatus === 'pending' ? '—' : (o.partnerName ?? (o.path === 'self' ? '淡茶半盏（自营）' : '—'))}</span>,
               <span key="t" className="cell-muted" style={{ whiteSpace: 'nowrap' }}>{o.entryTime.slice(0, 10)}</span>,
               <div key="act" className="row-actions" style={{ whiteSpace: 'nowrap' }}>
                 {o.processStatus === 'pending' && (
                   <>
-                    {actBtn(o, 'view', '查看', () => openDetail(o.id))}
-                    {actBtn(o, 'flow', '分发', () => openFlow(o))}
-                    {o.items.length >= 1 && actBtn(o, 'split', '拆单', () => { setSplitting(o); setSplitDrafts([]); setSplitSelected(null); setSplitNotice(''); })}
-                    {o.sourceChannel === 'manual' && actBtn(o, 'edit', '修改', () => { setSelectedId(o.id); startEdit(o); })}
-                    {o.sourceChannel === 'manual' && actBtn(o, 'delete', '删除', () => setDeleting(o))}
+                    <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
+                    <Button size="sm" onClick={() => openFlow(o)}>分发</Button>
+                    <Button size="sm" onClick={() => { setSplitting(o); setSplitDrafts([]); setSplitSelected(null); setSplitNotice(''); }}>拆单</Button>
                   </>
                 )}
                 {o.processStatus === 'self_pending' && (
                   <>
-                    {actBtn(o, 'view', '查看', () => openDetail(o.id))}
-                    {actBtn(o, 'selfop', '去自营工作台处理', () => navigate('/selfop/orders'))}
+                    <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
+                    <Button size="sm" style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)', color: '#fff' }} onClick={() => { setRecallOf(o); setRecallMsg(''); }}>取回</Button>
                   </>
                 )}
                 {o.processStatus === 'distribute_pending' && (
                   <>
-                    {actBtn(o, 'view', '查看', () => openDetail(o.id))}
-                    {actBtn(o, 'reflow', '重新分发', () => startReflow(o))}
+                    <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
+                    <Button size="sm" style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)', color: '#fff' }} onClick={() => { setRecallOf(o); setRecallMsg(''); }}>取回</Button>
                   </>
                 )}
                 {o.processStatus === 'comparing' && (
                   <>
-                    {actBtn(o, 'view', '查看', () => openDetail(o.id))}
-                    {actBtn(o, 'enroll', '报名情况', () => setEnrollOf(o.id))}
+                    <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
+                    <Button size="sm" onClick={() => { setEnrollOf(o.id); setEnrollMsg(''); }}>报名处理</Button>
                   </>
                 )}
                 {o.processStatus === 'processed' && (
-                  <>
-                    {actBtn(o, 'view', '查看', () => openDetail(o.id))}
-                    {actBtn(o, 'reflow', '重新分发', () => startReflow(o))}
-                  </>
-                )}
-                {o.processStatus === 'cancelled' && (
-                  actBtn(o, 'view', '查看', () => openDetail(o.id))
+                  <Button size="sm" variant="ghost" onClick={() => openDetail(o.id)}>查看</Button>
                 )}
               </div>,
             ])}
@@ -565,354 +462,55 @@ export default function ExternalOrders() {
         )}
       </div>
 
-      {/* ── 详情 / 处理抽屉 ── */}
+      {/* ── 详情抽屉（统一使用销售单列表详情：销售单信息 + 履约单 Tab） ── */}
       <DetailDrawer
         open={!!current}
         onClose={() => setSelectedId(null)}
-        badge="WB"
-        title={current?.code ?? ''}
-        statusTag={current ? statusPill(current.processStatus) : null}
-        subtitle={current ? `${platformLabelOf(current)} · ${current.externalOrderNo ?? '—'} · ${EXTERNAL_CHANNEL_LABELS[current.sourceChannel]} · ${current.customerName}` : ''}
+        badge="SO"
+        title={current ? (current.parentCode ?? current.code) : ''}
+        statusTag={(() => {
+          if (!current) return null;
+          const fam = buildFamilies(orders).find((f) => f.rootCode === (current.parentCode ?? current.code));
+          if (!fam) return null;
+          const st = familyStatesOf(fam);
+          const fp = (t: string) => {
+            const c = (FAMILY_STATE_COLORS as Record<string, { bg: string; color: string }>)[t] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
+            return pill(c.bg, c.color, t);
+          };
+          return <>{fp(st.orderStatus)}{fp(st.distribute)}{fp(st.fulfill)}{fp(st.settle)}</>;
+        })()}
+        subtitle={current ? `${platformLabelOf(current)} · ${current.customerName}（${current.customerType}） · ${current.receiver}` : ''}
         footer={
-          Object.keys(editForm).length > 0 ? (
-            <>
-              <Button variant="ghost" onClick={() => setEditForm({})}>关闭</Button>
-              <Button onClick={saveEdit}>保存修改</Button>
-            </>
-          ) : (
-            <>
-              <Button variant="ghost" onClick={() => setSelectedId(null)}>关闭</Button>
-              {current && !['pending', 'self_pending', 'cancelled'].includes(current.processStatus) && (
-                <Button variant="danger" onClick={() => startReflow(current)}>重新分发</Button>
-              )}
-              {current && current.sourceChannel === 'manual' && current.processStatus !== 'processed' && current.processStatus !== 'cancelled' && (
-                <Button onClick={() => startEdit()}>修改</Button>
-              )}
-              {current && current.processStatus !== 'cancelled' && current.fulfillment?.stage !== 'confirmed' && (
-                <Button style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)', color: '#fff' }} onClick={() => { setCancelling(current); setCancelReason(''); }}>取消订单</Button>
-              )}
-              {current && current.processStatus === 'processed' && current.fulfillment?.stage === 'confirmed' && (
-                <>
-                  {current.invoiceStatus !== 'invoiced' && <Button variant="ghost" onClick={() => store.getState().registerInvoice(current.id, 'partial')}>登记部分开票</Button>}
-                  {current.invoiceStatus !== 'invoiced' && <Button onClick={() => store.getState().registerInvoice(current.id, 'full')}>登记全额开票</Button>}
-                </>
-              )}
-            </>
-          )
+          <>
+            <Button variant="ghost" onClick={() => setSelectedId(null)}>关闭</Button>
+            {current && ['self_pending', 'distribute_pending'].includes(current.processStatus) && (
+              <Button style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)', color: '#fff' }} onClick={() => { setRecallOf(current); setRecallMsg(''); }}>取回</Button>
+            )}
+          </>
         }
       >
-        {current && (
-          <>
-            {/* ── 母子订单标签页（拆单家族：母销售单 + 子订单1..N） ── */}
-            {(() => {
-              const rootCode = current.parentCode ?? current.code;
-              const mother = orders.find((o) => o.code === rootCode && !o.parentCode);
-              const children = orders.filter((o) => o.parentCode === rootCode);
-              if (children.length === 0 && !current.parentCode) return null;
-              const tab = (code: string, label: string) => (
-                <button
-                  key={code}
-                  onClick={() => { const t = orders.find((o) => o.code === code); if (t) setSelectedId(t.id); }}
-                  style={{
-                    padding: '6px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
-                    border: `1px solid ${current.code === code ? 'var(--color-module-current-base)' : 'var(--color-neutral-200)'}`,
-                    background: current.code === code ? 'var(--color-module-current-lightest)' : 'var(--color-neutral-0)',
-                    color: current.code === code ? 'var(--color-module-current-base)' : 'var(--color-neutral-600)',
-                    fontSize: 'var(--text-sm)', fontWeight: 500,
-                  }}
-                >
-                  {label}
-                </button>
-              );
-              return (
-                <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
-                  {mother ? tab(mother.code, `母销售单 ${mother.code}`) : null}
-                  {children.map((c, i) => tab(c.code, `子订单${i + 1} ${c.code}`))}
-                </div>
-              );
-            })()}
-
-            {/* ── 查看态：订单信息 ── */}
-            {!editForm.externalOrderNo && Object.keys(editForm).length === 0 && (
-              <DrawerSection title="订单信息">
-                <InfoGrid cols={4}>
-                  <InfoItem label="销售单编号" mono emph>{current.code}</InfoItem>
-                  <InfoItem label="来源平台">{platformLabelOf(current)}</InfoItem>
-                  <InfoItem label="平台母销售单号" mono>{current.externalOrderNo ?? '—'}</InfoItem>
-                  <InfoItem label="来源渠道">{current.sourceChannel === 'manual' ? '手工录入' : '直连推送'}</InfoItem>
-                  <InfoItem label="客户">{current.customerName}（{current.customerType}）</InfoItem>
-                  <InfoItem label="客户区域">{regionText(current)}</InfoItem>
-                  <InfoItem label="订单金额" mono emph valueStyle={{ color: 'var(--color-module-current-base)' }}>{money(current.totalAmount)}</InfoItem>
-                  <InfoItem label="录入时间">{current.entryTime}</InfoItem>
-                  <InfoItem label="录入人">{current.operator}</InfoItem>
-                  <InfoItem label="销售路径">{current.salesPath === 'via_platform' ? '经平台销售' : '直接销售'}</InfoItem>
-                  <InfoItem label="客户下单时间">{current.customerOrderTime ?? '—'}</InfoItem>
-                  <InfoItem label="客户侧订单号" mono>{current.customerOrderNo ?? '—'}</InfoItem>
-                  {current.platformCustomerName && <InfoItem label="平台客户">{current.platformCustomerName}</InfoItem>}
-                  <InfoItem label="分发方式">{pathLabel(current)}</InfoItem>
-                  {current.parentCode && <InfoItem label="母销售单编号" mono>{current.parentCode}</InfoItem>}
-                </InfoGrid>
-              </DrawerSection>
-            )}
-
-            <DrawerSection title="收货信息">
-              <InfoGrid cols={4}>
-                <InfoItem label="收货人">{current.receiver}</InfoItem>
-                <InfoItem label="联系电话" mono>{current.receiverPhone}</InfoItem>
-                <InfoItem label="收货地址" span={3}>{current.receiverAddress}</InfoItem>
-              </InfoGrid>
-            </DrawerSection>
-
-            {/* ── 母单总览：子单进度（拆单家族） ── */}
-            {(() => {
-              const rootCode = current.parentCode ?? current.code;
-              const children = orders.filter((o) => o.parentCode === rootCode);
-              if (children.length === 0 || current.parentCode) return null;
-              return (
-                <DrawerSection title={`子单进度（${children.length} 张子单）`}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                    {children.map((c) => (
-                      <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)', border: '1px solid var(--color-neutral-100)', borderRadius: 'var(--radius-md)' }}>
-                        <span className="mono" style={{ fontWeight: 'var(--font-medium)', minWidth: 150 }}>{c.code}</span>
-                        {statusPill(c.processStatus)}
-                        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', minWidth: 90 }}>{pathLabel(c)}</span>
-                        <span style={{ fontSize: 'var(--text-sm)', flex: 1 }}>{c.partnerName ?? (c.path === 'self' ? '淡茶半盏（自营）' : '待分发')}</span>
-                        <span className="mono" style={{ fontSize: 'var(--text-sm)' }}>{money(c.totalAmount)}</span>
-                        <Button size="sm" variant="ghost" onClick={() => setSelectedId(c.id)}>查看</Button>
-                      </div>
-                    ))}
-                  </div>
-                </DrawerSection>
-              );
-            })()}
-
-            {/* ── 编辑态：订单信息修改 ── */}
-            {Object.keys(editForm).length > 0 && (
-              <DrawerSection title="修改订单信息">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
-                  {editField('平台母销售单号', 'externalOrderNo')}
-                  {editField('客户名称', 'customerName')}
-                  {editField('客户区域', 'customerRegion')}
-                  {editField('收货人', 'receiver')}
-                  {editField('联系电话', 'receiverPhone')}
-                  <div style={{ gridColumn: 'span 2' }}>{editField('收货地址', 'receiverAddress')}</div>
-                  <div style={{ gridColumn: 'span 2' }}>{editField('备注', 'remark')}</div>
-                </div>
-                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                  <Button variant="ghost" onClick={() => setEditForm({})}>关闭</Button>
-                  <Button onClick={saveEdit}>保存修改</Button>
-                </div>
-              </DrawerSection>
-            )}
-
-            <DrawerSection title="履约单信息">
-              <InfoGrid cols={4}>
-                <InfoItem label="履约单编号" mono emph>{current.code}</InfoItem>
-                <InfoItem label={current.parentCode ? '关联销售单' : '单据性质'}>{current.parentCode ?? (orders.some((x) => x.parentCode === current.code) ? '母销售单（已拆分）' : '母销售单（未拆分，即履约单）')}</InfoItem>
-                <InfoItem label="生成时间" mono>{fmtDT(current.history?.[0]?.time ?? current.entryTime)}</InfoItem>
-                <InfoItem label="金额" mono valueStyle={{ fontWeight: 'var(--font-semibold)' }}>{money(current.totalAmount)}</InfoItem>
-              </InfoGrid>
-              <ProductItemsTable
-                items={current.items}
-                customerName={current.customerName}
-                salesPath={current.salesPath ?? 'direct'}
-                platformCustomerId={current.platformCustomerId}
-                platform={current.platform}
-                footerAmount={current.totalAmount}
-              />
-            </DrawerSection>
-
-            <DrawerSection title="分发情况">
-              <InfoGrid cols={4}>
-                <InfoItem label="分发状态">{(() => { const st = distributeStateOf(current); return pill(st.bg, st.color, st.label); })()}</InfoItem>
-                <InfoItem label="分发方式">{pathLabel(current)}</InfoItem>
-                <InfoItem label="履约主体">{current.partnerName ?? (current.path === 'self' ? '淡茶半盏（自营）' : '待分发')}</InfoItem>
-                <InfoItem label="分发时间">{current.fulfillment?.acceptTime ?? '—'}</InfoItem>
-              </InfoGrid>
-            </DrawerSection>
-
-            {/* ── 待处理：提示前往销售单分发弹窗处理 ── */}
-            {current.processStatus === 'pending' && (
-              <DrawerSection title="分发处理">
-                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
-                  订单待分发：请点击列表行操作「<strong>分发</strong>」按钮，在<strong>履约单分发弹窗</strong>中选择自营或分发（指定 / 报备匹配 / 比单）路径完成分发。
-                  报备匹配由人工处理：在分发弹窗中选择「转派-报备」，人工勾选命中的报备记录后直接转出报备合作商。
-                  本抽屉用于查看订单信息与处理轨迹，不做分发操作。
-                </div>
-              </DrawerSection>
-            )}
-
-            {/* ── 自营待接单：接单/退回在「销售单自营」详情页 ── */}
-            {current.processStatus === 'self_pending' && (
-              <DrawerSection title="自营待接单">
-                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7, marginBottom: 'var(--space-2)' }}>
-                  订单已转入<strong>自营</strong>：接单、退回分发等操作请在<strong>销售单自营</strong>菜单的详情页进行；
-                  接单后可拆单，并通过「采购&amp;发货」按仓库分仓直发（各仓快递单号）+ 缺口以销定采。
-                </div>
-                <Button onClick={() => navigate('/selfop/orders')}>前往自营工作台处理</Button>
-              </DrawerSection>
-            )}
-
-            {/* ── 比单中（公开报名） ── */}
-            {current.processStatus === 'comparing' && current.compare && (
-              <DrawerSection title="比单报名中（公开报名制）">
-                <div style={{ fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)', lineHeight: 1.7 }}>
-                  已报名 <strong className="mono">{current.compare.quotes.length}</strong> 家 · 截止剩余：
-                  <strong className="mono" style={{ color: (current.compare.deadline - tick) > 0 ? '#7B1FA2' : '#C62828' }}>
-                    {' '}{Math.max(0, Math.floor((current.compare.deadline - tick) / 60000))} 分 {Math.max(0, Math.floor(((current.compare.deadline - tick) % 60000) / 1000))} 秒
-                  </strong>
-                  <Button size="sm" variant="ghost" style={{ marginLeft: 12 }} onClick={() => store.getState().extendCompare(current.id, 10)}>延长 10 分钟</Button>
-                </div>
-                <div style={{ fontSize: 'var(--text-sm)', color: '#B26A00', marginBottom: 'var(--space-2)' }}>底价：{current.compare.floorNote}</div>
-                <table className="detail-inline-table">
-                  <thead><tr><th>合作商</th><th>报名报价</th><th>报名时间</th><th>操作</th></tr></thead>
-                  <tbody>
-                    {current.compare.quotes.length === 0 && (
-                      <tr><td colSpan={4} style={{ color: 'var(--color-neutral-400)', textAlign: 'center', padding: 'var(--space-3)' }}>暂无合作商报名</td></tr>
-                    )}
-                    {current.compare.quotes.map((q) => (
-                      <tr key={q.supplierId}>
-                        <td style={{ fontWeight: 'var(--font-medium)' }}>{q.supplierName}</td>
-                        <td className="mono">{money(q.amount)}</td>
-                        <td className="mono">{q.quoteTime}</td>
-                        <td><Button size="sm" variant="ghost" onClick={() => { setAwarding({ orderId: current.id, supplierId: q.supplierId, supplierName: q.supplierName }); setAwardReason(''); }}>直接选定</Button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 'var(--space-2)' }}>
-                  截止后在「销售 → 比单管理」评分定标；也可在报名合作商中直接选定（转为指定转派）
-                </div>
-              </DrawerSection>
-            )}
-
-            {/* ── 转派待接单 ── */}
-            {current.processStatus === 'distribute_pending' && current.partnerName && (
-              <DrawerSection title="转派待接单">
-                <InfoGrid cols={4}>
-                  <InfoItem label="履约主体">{current.partnerName}</InfoItem>
-                  <InfoItem label="分发方式">{TRANSFER_SOURCE_LABELS[current.transferSource ?? '']}</InfoItem>
-                  <InfoItem label="转派时间">{current.transferTime ?? '—'}</InfoItem>
-                  {current.reportMatches?.[0] && <InfoItem label="命中报备" mono>{current.reportMatches[0].reportCode}</InfoItem>}
-                </InfoGrid>
-                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginTop: 'var(--space-2)', lineHeight: 1.7 }}>
-                  等待合作商在终端<strong>订单管理</strong>点击「接单」；接单后订单进入<strong>已处理</strong>。改路径可「重新分发」退回待处理。
-                </div>
-              </DrawerSection>
-            )}
-
-            {/* ── 履约情况：履约时间线 + 发货情况（包裹级，可点物流跟踪）+ 合作商履约推进 ── */}
-            {current.processStatus !== 'cancelled' && (
-              <DrawerSection title="履约情况">
-                <FulfillmentProgressBlock order={current} poDocs={currentPos} />
-                {current.processStatus === 'processed' && current.path === 'distribute' && current.partnerName && (
-                  <>
-                    <InfoGrid cols={4}>
-                      <InfoItem label="履约主体">{current.partnerName}</InfoItem>
-                      <InfoItem label="分发方式">{TRANSFER_SOURCE_LABELS[current.transferSource ?? '']}</InfoItem>
-                      <InfoItem label="履约状态">{current.partnerStatus ? PARTNER_ORDER_STATUS_LABELS[current.partnerStatus] : '待接单'}</InfoItem>
-                      <InfoItem label="结算履约">{current.settleOnTime === true ? '按时（积分 +5）' : current.settleOnTime === false ? '超时（积分 -5）' : '未结算'}</InfoItem>
-                    </InfoGrid>
-                    <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
-                      {current.partnerStatus === 'accepted' && <Button onClick={() => store.getState().advancePartner(current.id, 'shipping')}>推进：发货</Button>}
-                      {current.partnerStatus === 'shipping' && <Button onClick={() => store.getState().advancePartner(current.id, 'transit')}>推进：物流妥投</Button>}
-                      {current.partnerStatus === 'transit' && <Button onClick={() => store.getState().confirmReceipt(current.id)}>确认收货（管理后台）</Button>}
-                      {current.partnerStatus === 'confirmed' && (
-                        <>
-                          <Button onClick={() => store.getState().settleOrder(current.id, { onTime: true })}>结算（按时 · 积分+5）</Button>
-                          <Button variant="danger" onClick={() => store.getState().settleOrder(current.id, { onTime: false })}>结算（超时 · 积分-5）</Button>
-                        </>
-                      )}
-                      {current.partnerStatus !== 'confirmed' && (
-                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', alignSelf: 'center' }}>
-                          接单/发货/妥投由合作商终端推进；全部包裹妥投后由管理后台「确认收货」，结算按发货单可部分结算
-                        </span>
-                      )}
-                    </div>
-                  </>
-                )}
-              </DrawerSection>
-            )}
-
-            {/* ── 结算 & 开票情况（分发完成后） ── */}
-            {current.processStatus === 'processed' && (
-              <DrawerSection title="结算 & 开票情况">
-                <SettleInvoiceBlock order={current} poDocs={currentPos} />
-              </DrawerSection>
-            )}
-
-            {/* ── 已取消说明 ── */}
-            {current.processStatus === 'cancelled' && (
-              <DrawerSection title="订单已取消">
-                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
-                  该订单已取消：<strong>订单进度＝已取消</strong>，分发与履约状态不再展示已取消，不再参与分发与履约流转（见处理轨迹中的取消原因）。
-                </div>
-              </DrawerSection>
-            )}
-
-            <DrawerSection title="处理轨迹">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                {current.history.map((h, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 'var(--space-3)', fontSize: 'var(--text-sm)' }}>
-                    <span className="mono" style={{ color: 'var(--color-neutral-400)', flexShrink: 0 }}>{h.time}</span>
-                    <span style={{ fontWeight: 'var(--font-medium)', flexShrink: 0 }}>{h.action}</span>
-                    {h.detail && <span style={{ color: 'var(--color-neutral-500)' }}>{h.detail}</span>}
-                  </div>
-                ))}
-              </div>
-            </DrawerSection>
-          </>
-        )}
+        {current && (() => {
+          /* 查看态：与销售单列表同一套详情（销售单信息 / 履约单01… Tab）；已进入分发/履约/结算的履约单不在此处修改 */
+          const rootCode = current.parentCode ?? current.code;
+          const fam = buildFamilies(orders).find((f) => f.rootCode === rootCode);
+          if (!fam) return null;
+          return (
+            <SalesOrderDetailTabs
+              key={`${rootCode}-${current.code}`}
+              family={fam}
+              poDocs={purchaseDocs}
+              initialTab={current.code}
+            />
+          );
+        })()}
       </DetailDrawer>
 
-      {/* ── 重新分发确认弹窗 ── */}
-      {reflowing && (
-        <div className="category-dialog-overlay" onClick={() => setReflowing(null)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 520 }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>重新分发</div>
-            {reflowing.processStatus === 'processed' && (
-              <div style={{ padding: '10px 14px', background: '#FFF3E0', color: '#E65100', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)', lineHeight: 1.7, fontWeight: 'var(--font-medium)' }}>
-                {processedWarnText(reflowing)}
-              </div>
-            )}
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
-              确认后订单 <strong className="mono">{reflowing.code}</strong> 将<strong>进入待分发状态重新选择路径</strong>
-              {reflowing.processStatus === 'processed' ? `，原有执行信息（${reflowing.path === 'self' ? '采购/出入库单据' : '合作商关联、履约进度'}）全部作废。` : '，可重新选择自营或分发路径。'}
-              {reflowing.transferSource === 'report' && ' 该订单原为报备转派，重新分发后报备匹配信息已清除，不会再自动按报备转派。'}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-              <Button variant="ghost" onClick={() => setReflowing(null)}>关闭</Button>
-              <Button variant={reflowing.processStatus === 'processed' ? 'danger' : undefined} onClick={confirmReflow}>确认重新分发</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 取消订单弹窗 ── */}
-      {cancelling && (
-        <div className="category-dialog-overlay" onClick={() => setCancelling(null)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 440 }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>取消订单</div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
-              确认取消订单 <strong className="mono">{cancelling.code}</strong>（{cancelling.customerName} · {money(cancelling.totalAmount)}）？
-              取消后<strong>订单进度变为已取消</strong>，不再参与后续流转。
-            </div>
-            <div style={{ marginBottom: 'var(--space-3)' }}>
-              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>取消原因 *</label>
-              <input className="filter-input" placeholder="如：客户取消采购计划 / 地址错误无法送达" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} style={{ width: '100%' }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-              <Button variant="ghost" onClick={() => setCancelling(null)}>关闭</Button>
-              <Button style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)', color: '#fff' }} onClick={() => {
-                if (!cancelReason.trim()) { window.alert('请填写取消原因'); return; }
-                store.getState().cancelOrder(cancelling.id, cancelReason);
-                setCancelling(null);
-                setSelectedId(null);
-              }}>确认取消</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── 取回弹窗（整体 / 部分两段式） ── */}
+      <TakebackDialog
+        order={recallOf}
+        onClose={() => setRecallOf(null)}
+        onDone={(m) => { setRecallMsg(m); setTimeout(() => setRecallMsg(''), 3600); }}
+      />
 
       {/* ── 删除确认弹窗 ── */}
       {deleting && (
@@ -930,39 +528,69 @@ export default function ExternalOrders() {
         </div>
       )}
 
-      {/* ── 报名情况弹窗（比单中） ── */}
-      {enrollOrder?.compare && (
-        <div className="category-dialog-overlay" onClick={() => setEnrollOf(null)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 720, maxWidth: '94vw' }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>比单报名情况</div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
-              {enrollOrder.code} · {enrollOrder.customerName} · 订单金额 {money(enrollOrder.totalAmount)} · 已报名 <strong className="mono">{enrollOrder.compare.quotes.length}</strong> 家 ·
-              截止剩余 <strong className="mono" style={{ color: (enrollOrder.compare.deadline - tick) > 0 ? '#7B1FA2' : '#C62828' }}>{Math.max(0, Math.floor((enrollOrder.compare.deadline - tick) / 60000))} 分</strong>
-            </div>
-            <div style={{ fontSize: 'var(--text-sm)', color: '#B26A00', marginBottom: 'var(--space-3)' }}>底价：{enrollOrder.compare.floorNote}</div>
-            <table className="detail-inline-table" style={{ marginBottom: 'var(--space-3)' }}>
-              <thead><tr><th>合作商</th><th>报名报价</th><th>报名时间</th><th>操作</th></tr></thead>
-              <tbody>
-                {enrollOrder.compare.quotes.length === 0 && (
-                  <tr><td colSpan={4} style={{ color: 'var(--color-neutral-400)', textAlign: 'center', padding: 'var(--space-3)' }}>暂无合作商报名</td></tr>
-                )}
-                {enrollOrder.compare.quotes.map((q) => (
-                  <tr key={q.supplierId}>
-                    <td style={{ fontWeight: 'var(--font-medium)' }}>{q.supplierName}</td>
-                    <td className="mono">{money(q.amount)}</td>
-                    <td className="mono">{q.quoteTime}</td>
-                    <td><Button size="sm" variant="ghost" onClick={() => { setAwarding({ orderId: enrollOrder.id, supplierId: q.supplierId, supplierName: q.supplierName }); setAwardReason(''); }}>直接选定</Button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Button variant="ghost" onClick={() => store.getState().extendCompare(enrollOrder.id, 10)}>延长报名 10 分钟</Button>
-              <Button variant="ghost" onClick={() => setEnrollOf(null)}>关闭</Button>
+      {/* ── 报名处理弹窗（转派比单中·单笔订单，内容同「比单管理」中的单张比单） ── */}
+      {enrollOrder?.compare && (() => {
+        const cmp = enrollOrder.compare;
+        const minQuote = cmp.quotes.length > 0 ? Math.min(...cmp.quotes.map((q) => q.amount)) : 0;
+        return (
+          <div className="category-dialog-overlay" onClick={() => setEnrollOf(null)}>
+            <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 880, maxWidth: '94vw', maxHeight: '85vh', overflowY: 'auto' }}>
+              <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>报名处理 · {enrollOrder.code}</div>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
+                该笔<strong>转派比单中</strong>订单的公开报名情况（报价不得低于底价），支持<strong>延长报名</strong>、<strong>评分定标</strong>
+                （截止前可强制：评分=报价 {settings.compareWeights.quote}0% + 积分 {settings.compareWeights.score}0%，按商品积分排名定标）与<strong>直接选定</strong>（转为指定转派）。
+              </div>
+              <div style={{ border: '1px solid var(--color-neutral-100)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
+                  <span className="cell-mono-emph">{enrollOrder.code}</span>
+                  <span className="cell-emph">{enrollOrder.customerName}</span>
+                  <span className="mono" style={{ fontSize: 'var(--text-sm)' }}>{money(enrollOrder.totalAmount)}</span>
+                  {cmp.region && pill('#E0F7FA', '#00838F', `限 ${[cmp.region.province, cmp.region.city, cmp.region.district].filter(Boolean).join(' ')}`)}
+                  <span style={{ fontSize: 'var(--text-xs)', color: '#B26A00' }}>底价：{cmp.floorNote}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 'var(--text-sm)' }}>
+                    截止剩余 <strong className="mono" style={{ color: cmp.deadline - tick > 0 ? '#7B1FA2' : '#C62828' }}>
+                      {Math.max(0, Math.floor((cmp.deadline - tick) / 60000))} 分 {Math.max(0, Math.floor(((cmp.deadline - tick) % 60000) / 1000))} 秒
+                    </strong>
+                  </span>
+                </div>
+                <table className="detail-inline-table" style={{ marginBottom: 'var(--space-2)' }}>
+                  <thead><tr><th>报名合作商</th><th>报名报价</th><th>报价分预览</th><th>积分</th><th>报名商品</th><th>报名时间</th><th>操作</th></tr></thead>
+                  <tbody>
+                    {cmp.quotes.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--color-neutral-400)', textAlign: 'center', padding: 'var(--space-2)' }}>暂无合作商报名</td></tr>}
+                    {cmp.quotes.map((q) => {
+                      const sc = scoreOf(q.supplierId, q.supplierName);
+                      const quoteScore = q.amount > 0 && minQuote > 0 ? Math.round((minQuote / q.amount) * 100) : 0;
+                      return (
+                        <tr key={q.supplierId}>
+                          <td style={{ fontWeight: 'var(--font-medium)' }}>{q.supplierName}</td>
+                          <td className="mono">{money(q.amount)}</td>
+                          <td className="mono">{quoteScore}</td>
+                          <td className="mono">{sc.total}</td>
+                          <td style={{ fontSize: 'var(--text-sm)' }}>{(q.items ?? enrollOrder.items.map((i) => i.productName)).join('、')}</td>
+                          <td className="mono">{q.quoteTime}</td>
+                          <td><Button size="sm" variant="ghost" onClick={() => { setAwarding({ orderId: enrollOrder.id, supplierId: q.supplierId, supplierName: q.supplierName }); setAwardReason(''); }}>直接选定</Button></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                  <Button size="sm" variant="ghost" onClick={() => store.getState().extendCompare(enrollOrder.id, 10)}>延长报名 10 分钟</Button>
+                  <Button size="sm" disabled={cmp.quotes.length === 0} onClick={() => {
+                    const r = store.getState().finalizeCompare(enrollOrder.id, true);
+                    if (r.ok) { setEnrollOf(null); setFlowMsg(r.msg); } else setEnrollMsg(r.msg);
+                  }}>评分定标（按商品·积分优先）</Button>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>截止前定标为强制定标</span>
+                </div>
+              </div>
+              {enrollMsg && <div style={{ padding: '8px 12px', background: '#E8F5E9', color: '#01795D', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)' }}>{enrollMsg}</div>}
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Button variant="ghost" onClick={() => setEnrollOf(null)}>关闭</Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── 直接选定弹窗 ── */}
       {awarding && (
@@ -1113,71 +741,6 @@ export default function ExternalOrders() {
           </div>
         );
       })()}
-      {/* ── 比单管理弹窗（比单中节点） ── */}
-      {compareMgmtOpen && (
-        <div className="category-dialog-overlay" onClick={() => setCompareMgmtOpen(false)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 880, maxWidth: '94vw', maxHeight: '85vh', overflowY: 'auto' }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>比单管理</div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
-              全部<strong>比单中</strong>订单：查看各单公开报名情况（报价不得低于底价），支持<strong>延长报名</strong>、<strong>评分定标</strong>
-              （截止前可强制：评分=报价 {settings.compareWeights.quote}0% + 积分 {settings.compareWeights.score}0%，按商品积分排名定标）与<strong>直接选定</strong>（转为指定转派）。
-            </div>
-            {orders.filter((o) => o.processStatus === 'comparing').length === 0 && (
-              <div style={{ padding: 'var(--space-5)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>当前无比单中的订单（在订单「分配」中选择「转派-比单」发起）</div>
-            )}
-            {orders.filter((o) => o.processStatus === 'comparing').map((o) => {
-              const cmp = o.compare!;
-              const minQuote = cmp.quotes.length > 0 ? Math.min(...cmp.quotes.map((q) => q.amount)) : 0;
-              return (
-                <div key={o.id} style={{ border: '1px solid var(--color-neutral-100)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
-                    <span className="cell-mono-emph">{o.code}</span>
-                    <span className="cell-emph">{o.customerName}</span>
-                    <span className="mono" style={{ fontSize: 'var(--text-sm)' }}>{money(o.totalAmount)}</span>
-                    {cmp.region && pill('#E0F7FA', '#00838F', `限 ${[cmp.region.province, cmp.region.city, cmp.region.district].filter(Boolean).join(' ')}`)}
-                    <span style={{ fontSize: 'var(--text-xs)', color: '#B26A00' }}>底价：{cmp.floorNote}</span>
-                    <span style={{ marginLeft: 'auto', fontSize: 'var(--text-sm)' }}>
-                      截止剩余 <strong className="mono" style={{ color: cmp.deadline - tick > 0 ? '#7B1FA2' : '#C62828' }}>
-                        {Math.max(0, Math.floor((cmp.deadline - tick) / 60000))} 分 {Math.max(0, Math.floor(((cmp.deadline - tick) % 60000) / 1000))} 秒
-                      </strong>
-                    </span>
-                  </div>
-                  <table className="detail-inline-table" style={{ marginBottom: 'var(--space-2)' }}>
-                    <thead><tr><th>报名合作商</th><th>报名报价</th><th>报价分预览</th><th>积分</th><th>报名商品</th><th>报名时间</th><th>操作</th></tr></thead>
-                    <tbody>
-                      {cmp.quotes.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--color-neutral-400)', textAlign: 'center', padding: 'var(--space-2)' }}>暂无合作商报名</td></tr>}
-                      {cmp.quotes.map((q) => {
-                        const sc = scoreOf(q.supplierId, q.supplierName);
-                        const quoteScore = q.amount > 0 && minQuote > 0 ? Math.round((minQuote / q.amount) * 100) : 0;
-                        return (
-                          <tr key={q.supplierId}>
-                            <td style={{ fontWeight: 'var(--font-medium)' }}>{q.supplierName}</td>
-                            <td className="mono">{money(q.amount)}</td>
-                            <td className="mono">{quoteScore}</td>
-                            <td className="mono">{sc.total}</td>
-                            <td style={{ fontSize: 'var(--text-sm)' }}>{(q.items ?? o.items.map((i) => i.productName)).join('、')}</td>
-                            <td className="mono">{q.quoteTime}</td>
-                            <td><Button size="sm" variant="ghost" onClick={() => { setAwarding({ orderId: o.id, supplierId: q.supplierId, supplierName: q.supplierName }); setAwardReason(''); }}>直接选定</Button></td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-                    <Button size="sm" variant="ghost" onClick={() => store.getState().extendCompare(o.id, 10)}>延长报名 10 分钟</Button>
-                    <Button size="sm" disabled={cmp.quotes.length === 0} onClick={() => { const r = store.getState().finalizeCompare(o.id, true); setCompareMsg(r.msg); }}>评分定标（按商品·积分优先）</Button>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>截止前定标为强制定标</span>
-                  </div>
-                </div>
-              );
-            })}
-            {compareMsg && <div style={{ padding: '8px 12px', background: '#E8F5E9', color: '#01795D', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)' }}>{compareMsg}</div>}
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button variant="ghost" onClick={() => { setCompareMgmtOpen(false); setCompareMsg(''); }}>关闭</Button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

@@ -34,6 +34,7 @@ import OrderEntry from './pages/sales/OrderEntry';
 import SalesOrderProcessing from './pages/sales/SalesOrderProcessing';
 import SalesFulfillment from './pages/sales/SalesFulfillment';
 import SalesSettlement from './pages/sales/SalesSettlement';
+import CompareManage from './pages/sales/CompareManage';
 import SalesPricing from './pages/sales/SalesPricing';
 import SalesReconciliation from './pages/sales/SalesReconciliation';
 import SalesCustomers from './pages/sales/SalesCustomers';
@@ -183,6 +184,7 @@ export const router = createBrowserRouter([
       { path: 'sales/sales-order-processing', element: <SalesOrderProcessing /> },
       { path: 'sales/order-processing', element: <SalesOrderProcessing /> },
       { path: 'sales/order-distribute', element: <ExternalOrders /> },
+      { path: 'sales/compare-manage', element: <CompareManage /> },
       { path: 'sales/order-shipping', element: <Navigate to="/selfop/orders" replace /> },
       { path: 'sales/sales-fulfillment', element: <SalesFulfillment /> },
       { path: 'sales/sales-settlement', element: <SalesSettlement /> },

@@ -169,7 +169,7 @@ export default function SalesSettlement() {
         {(() => {
           const fam = families.find((f) => f.rootCode === view?.root);
           if (!fam) return null;
-          return <SalesOrderDetailTabs family={fam} poDocs={poDocs} initialTab={view?.child ?? 'info'} showStates={false} />;
+          return <SalesOrderDetailTabs family={fam} poDocs={poDocs} initialTab={view?.child ?? 'info'} />;
         })()}
       </DetailDrawer>
     </>

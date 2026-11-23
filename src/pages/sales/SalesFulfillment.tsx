@@ -8,6 +8,7 @@ import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import SalesOrderInfoModal from '../../components/business/SalesOrderInfoModal';
 import { SalesOrderDetailTabs } from './SalesOrderDetail';
+import TakebackDialog from '../../components/business/TakebackDialog';
 import { EXTERNAL_CHANNEL_LABELS, platformLabelOf } from '../../data/externalOrders';
 import { buildFamilies, familyStatesOf, fulfillStateOf, orderProgressOf, FAMILY_STATE_COLORS } from '../../utils/salesOrderFamily';
 import type { ExternalOrder } from '../../types';
@@ -38,33 +39,14 @@ export default function SalesFulfillment() {
   const [linkOrderCode, setLinkOrderCode] = useState<string | null>(null);
   /** 待接单取回弹窗 */
   const [recallOf, setRecallOf] = useState<ExternalOrder | null>(null);
-  const [recallQty, setRecallQty] = useState<Record<string, string>>({});
   const [recallMsg, setRecallMsg] = useState('');
-
-  const submitRecall = (all: boolean) => {
-    if (!recallOf) return;
-    const parts = all
-      ? undefined
-      : Object.entries(recallQty)
-        .map(([productName, q]) => ({ productName, quantity: Number(q) || 0 }))
-        .filter((p) => p.quantity > 0);
-    const res = useOrderFlowStore.getState().recallPendingOrder(recallOf.id, parts);
-    if (res.ok) {
-      setRecallOf(null);
-      setRecallQty({});
-      setRecallMsg(res.msg);
-      setTimeout(() => setRecallMsg(''), 3600);
-    } else {
-      setRecallMsg(res.msg);
-    }
-  };
 
   const units = useMemo(() => {
     const childCodes = new Set(orders.filter((o) => o.parentCode).map((o) => o.code));
     const rootHasChild = new Set(orders.filter((o) => childCodes.has(o.code) || o.parentCode).map((o) => o.parentCode ?? o.code));
     return orders
-      // 履约环节仅含已分发订单（未分发 / 待分发 / 比单中仍留在销售单处理 / 履约单分发）
-      .filter((o) => !['unprocessed', 'pending', 'comparing'].includes(o.processStatus))
+      // 履约环节仅含已分发且未取消的订单（未分发 / 待分发 / 比单中留在销售单处理 / 履约单分发；已取消仅在销售单列表查看）
+      .filter((o) => !['unprocessed', 'pending', 'comparing', 'cancelled'].includes(o.processStatus))
       .filter((o) => !o.parentCode && !rootHasChild.has(o.code) || o.parentCode)
       .map((o) => {
         const fulfill = fulfillStateOf(o);
@@ -158,7 +140,7 @@ export default function SalesFulfillment() {
                 <div key="act" className="row-actions">
                   <Button size="sm" variant="ghost" onClick={() => setView({ root: u.rootCode, child: o.code })}>查看详情</Button>
                   {(o.processStatus === 'self_pending' || o.processStatus === 'distribute_pending') && (
-                    <Button size="sm" variant="ghost" onClick={() => { setRecallOf(o); setRecallQty({}); setRecallMsg(''); }}>取回</Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setRecallOf(o); setRecallMsg(''); }}>取回</Button>
                   )}
                 </div>,
               ];
@@ -173,51 +155,12 @@ export default function SalesFulfillment() {
       </div>
       <SalesOrderInfoModal code={linkOrderCode} onClose={() => setLinkOrderCode(null)} />
 
-      {/* 待接单取回弹窗：整体取回（编号不变）/ 部分取回（取回部分生成新履约单） */}
-      {recallOf && (
-        <div className="category-dialog-overlay" onClick={() => setRecallOf(null)}>
-          <div className="category-dialog" style={{ width: 640 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 4 }}>取回订单 · {recallOf.code}</div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7, marginBottom: 'var(--space-4)' }}>
-              从 <strong>{recallOf.path === 'self' ? '自营' : (recallOf.partnerName ?? '合作商')}</strong> 取回，取回后进入履约单分发。
-              整体取回时履约单编号不变；部分取回时<strong>剩余部分沿用原编号 {recallOf.code}</strong>，取回部分按规则生成新履约单。
-              留空或 0 表示不取回该商品。
-            </div>
-            <table className="detail-inline-table">
-              <thead><tr><th>商品名称</th><th>规格</th><th>订单数量</th><th>取回数量</th></tr></thead>
-              <tbody>
-                {recallOf.items.map((it) => (
-                  <tr key={it.productName}>
-                    <td style={{ fontWeight: 'var(--font-medium)' }}>{it.productName}</td>
-                    <td>{it.spec}</td>
-                    <td className="mono">{it.quantity}</td>
-                    <td>
-                      <input
-                        className="filter-input mono"
-                        type="number"
-                        min={0}
-                        max={it.quantity}
-                        placeholder="0"
-                        value={recallQty[it.productName] ?? ''}
-                        onChange={(e) => setRecallQty((prev) => ({ ...prev, [it.productName]: e.target.value }))}
-                        style={{ width: 96, height: 30 }}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {recallMsg && (
-              <div style={{ marginTop: 'var(--space-3)', padding: '8px 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', background: '#FFF3E0', color: '#B26A00' }}>{recallMsg}</div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-5)' }}>
-              <Button variant="ghost" onClick={() => setRecallOf(null)}>关闭</Button>
-              <Button variant="ghost" onClick={() => submitRecall(true)}>整体取回</Button>
-              <Button onClick={() => submitRecall(false)}>确认部分取回</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 待接单取回弹窗（整体 / 部分两段式） */}
+      <TakebackDialog
+        order={recallOf}
+        onClose={() => setRecallOf(null)}
+        onDone={(m) => { setRecallMsg(m); setTimeout(() => setRecallMsg(''), 3600); }}
+      />
 
       {/* ── 履约单详情抽屉（右侧拉出，展示样式与销售单列表详情一致） ── */}
       <DetailDrawer

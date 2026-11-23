@@ -30,7 +30,7 @@ const pill = (text: string) => {
   );
 };
 
-/** 单笔分发状态药丸（5 态：待分发 / 自营待接单 / 分发比单中 / 转派待接单 / 分发已完成） */
+/** 单笔分发状态药丸（5 态：待分发 / 自营待接单 / 转派比单中 / 转派待接单 / 分发已完成） */
 const orderDistributePill = (o: ExternalOrder) => pill(distributeStateOf(o));
 
 /** 路径标签（与销售单分发页口径一致） */
@@ -86,6 +86,10 @@ export default function SalesOrders() {
   } | null>(null);
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
+  /** 取消订单弹窗：母单查看=取消整个销售单（其下全部履约单）；子单查看=取消该履约单自身 */
+  const [cancelTarget, setCancelTarget] = useState<{ ids: string[]; label: string } | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelErr, setCancelErr] = useState('');
 
   const families = useMemo(() => buildFamilies(flowOrders), [flowOrders]);
 
@@ -546,7 +550,10 @@ export default function SalesOrders() {
         mode="view"
         footer={(() => {
           const fam = families.find((f) => f.rootCode === view?.root);
-          const manual = fam?.mother.sourceChannel === 'manual';
+          const isChild = !!view?.child;
+          const childOrder = isChild && fam
+            ? (fam.children.find((c) => c.code === view!.child) ?? (fam.mother.code === view!.child ? fam.mother : null))
+            : null;
           if (view?.edit && orderEdit) {
             return (
               <>
@@ -555,15 +562,33 @@ export default function SalesOrders() {
               </>
             );
           }
+          const canCancel = !!fam && (isChild
+            ? !!childOrder && childOrder.processStatus !== 'cancelled'
+            : fam.mother.processStatus !== 'cancelled');
           return (
             <>
               <Button variant="ghost" onClick={() => setView(null)}>关闭</Button>
-              {manual && (
+              {!isChild && fam && fam.mother.processStatus !== 'cancelled' && (
                 <Button onClick={() => {
                   const fam2 = families.find((f) => f.rootCode === view?.root);
                   if (fam2) startOrderEdit(fam2.mother);
                   setView((v) => (v ? { ...v, edit: true } : v));
                 }}>修改</Button>
+              )}
+              {canCancel && fam && (
+                <Button
+                  style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)', color: '#fff' }}
+                  onClick={() => {
+                    const ids = isChild && childOrder
+                      ? [childOrder.id]
+                      : (fam.children.length > 0
+                        ? fam.children.filter((c) => c.processStatus !== 'cancelled').map((c) => c.id)
+                        : [fam.mother.id]);
+                    setCancelTarget({ ids, label: isChild && childOrder ? childOrder.code : fam.rootCode });
+                    setCancelReason('');
+                    setCancelErr('');
+                  }}
+                >取消订单</Button>
               )}
             </>
           );
@@ -632,7 +657,7 @@ export default function SalesOrders() {
                   </>
                 ) : (
                   <div style={{ padding: 'var(--space-3) var(--space-4)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
-                    订单已进入待接单 / 比单状态或已拆分，<strong>收货信息与商品明细不可修改</strong>；仅客户侧订单号 / 客户下单时间可修改。
+                    订单已进入分发 / 履约 / 结算阶段或已拆分，<strong>仅支持修改客户侧订单号 / 客户下单时间</strong>；收货信息与商品明细不可修改。
                   </div>
                 )}
               </>
@@ -644,11 +669,46 @@ export default function SalesOrders() {
               family={fam}
               poDocs={poDocs}
               initialTab={view?.child ?? 'info'}
-              showStates={false}
             />
           );
         })()}
       </DetailDrawer>
+
+      {/* ── 取消订单弹窗（取消原因必填） ── */}
+      {cancelTarget && (
+        <div className="category-dialog-overlay" onClick={() => setCancelTarget(null)}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 440 }}>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>取消订单</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
+              确认取消 <strong className="mono">{cancelTarget.label}</strong>
+              {cancelTarget.ids.length > 1 ? `（含 ${cancelTarget.ids.length} 张履约单）` : ''}？
+              取消后<strong>订单进度变为已取消</strong>，不再参与后续流转。
+            </div>
+            <div style={{ marginBottom: 'var(--space-3)' }}>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>取消原因 *</label>
+              <input className="filter-input" placeholder="如：客户取消采购计划 / 地址错误无法送达" value={cancelReason} onChange={(e) => { setCancelReason(e.target.value); setCancelErr(''); }} style={{ width: '100%' }} />
+              {cancelErr && <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger, #CB405D)', marginTop: 'var(--space-1)' }}>{cancelErr}</div>}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
+              <Button variant="ghost" onClick={() => setCancelTarget(null)}>关闭</Button>
+              <Button
+                style={{ background: 'var(--color-module-current-secondary)', borderColor: 'var(--color-module-current-secondary)', color: '#fff' }}
+                onClick={() => {
+                  if (!cancelReason.trim()) { setCancelErr('请填写取消原因'); return; }
+                  const fails: string[] = [];
+                  for (const id of cancelTarget.ids) {
+                    const r = useOrderFlowStore.getState().cancelOrder(id, cancelReason);
+                    if (!r.ok) fails.push(r.msg);
+                  }
+                  if (fails.length > 0) { setCancelErr(fails[0]); return; }
+                  setCancelTarget(null);
+                  setView(null);
+                }}
+              >确认取消</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── 新建销售单弹窗（复用新建销售单页面表单） ── */}
       <SalesOrderEntryModal open={entryOpen} onClose={() => setEntryOpen(false)} />

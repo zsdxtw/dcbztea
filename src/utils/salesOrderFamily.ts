@@ -3,7 +3,7 @@
  * 销售单管理（母单一行聚合）与销售单详情页共用口径。
  *
  * 履约单状态（四块）：
- * - 分发状态（5 态）：待分发 / 自营待接单 / 分发比单中 / 转派待接单 / 分发已完成
+ * - 分发状态（5 态）：待分发 / 自营待接单 / 转派比单中 / 转派待接单 / 分发已完成
  * - 履约状态（5 态）：待接单 / 已接单 / 运输中 / 已妥投 / 已确收
  * - 结算状态（收款·开票二维组合）：未收款/已收款 × 未开票/已开票，如「未收款·已开票」
  * - 订单进度（5 态）：分发中 / 履约中 / 结算中 / 已办结 / 已取消
@@ -97,12 +97,12 @@ export function packagesOf(o: ExternalOrder, pos?: { packages: PkgLike[] }[]): P
 /* ── 单笔履约单状态（分发 / 履约 / 结算 / 订单进度） ── */
 
 /** 分发状态 5 态（已取消归入订单进度，不再在分发状态中展示） */
-export type DistributeState = '待分发' | '自营待接单' | '分发比单中' | '转派待接单' | '分发已完成';
+export type DistributeState = '待分发' | '自营待接单' | '转派比单中' | '转派待接单' | '分发已完成';
 
 const DISTRIBUTE_MAP: Record<string, DistributeState> = {
   pending: '待分发',
   self_pending: '自营待接单',
-  comparing: '分发比单中',
+  comparing: '转派比单中',
   distribute_pending: '转派待接单',
   processed: '分发已完成',
 };
@@ -168,7 +168,7 @@ export type OrderProgress = '分发中' | '履约中' | '结算中' | '已办结
  * - 已取消：订单取消（分发/履约状态不再展示已取消）
  * - 已办结：收款 + 开票均完成；或已收款后手工办结
  * - 结算中：已确收并发起了对账结算
- * - 分发中：分发状态处于待分发 / 分发比单中 / 自营待接单 / 转派待接单
+ * - 分发中：分发状态处于待分发 / 转派比单中 / 自营待接单 / 转派待接单
  * - 履约中：其余已进入履约的订单
  */
 export function orderProgressOf(o: ExternalOrder, pos?: { packages: PkgLike[] }[]): OrderProgress {
@@ -293,7 +293,7 @@ export const FAMILY_STATE_COLORS = {
   /* 分发状态 5 态 */
   '待分发': { bg: '#FFF3E0', color: '#E65100' },
   '自营待接单': { bg: '#E3F2FD', color: '#0F64B5' },
-  '分发比单中': { bg: '#F3E5F5', color: '#7B1FA2' },
+  '转派比单中': { bg: '#F3E5F5', color: '#7B1FA2' },
   '转派待接单': { bg: '#E0F2F1', color: '#00695C' },
   '分发已完成': { bg: '#E8F5E9', color: '#01795D' },
   /* 履约（聚合 + 履约单 5 态） */

@@ -5,7 +5,7 @@
  * pending 待分发（手工录入 / 直连推送，订单分发弹窗选路径；支持按商品+数量拆单）
  *   ├ 自营：self_pending 自营待接单（履约状态一般为待接单）→ 接单后分发状态置 processed 分发已完成
  *   └ 分发：指定 / 报备匹配（纯人工选报备，可多选，确认后直接转出报备合作商）→ distribute_pending 转派待接单（履约状态一般为待接单）
- *       比单 comparing 分发比单中（按商品报名、底价限制、可限地区）：截止后按商品维度积分排名定标；
+ *       比单 comparing 转派比单中（按商品报名、底价限制、可限地区）：截止后按商品维度积分排名定标；
  *            同一合作商多商品合并生成一个子订单，未报名商品合并子订单退回待分发+「比单未成」标签
  * 订单进入不自动匹配报备：所有订单先进销售单处理待人工处理，报备匹配均由管理员手动发起，无中间待确认状态。
  * 履约状态：pending_accept 待接单 → accepted 已接单 → shipping 运输中 / transit 妥投 → confirmed 已确收
@@ -742,7 +742,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       return { ok: true, msg: '已退回履约单分发（分发-待处理），来源已标注「自营退回」' };
     },
 
-    /* ── 待接单取回 / 合作商退回 ── */
+    /* ── 取回（待接单）/ 合作商退回 ── */
     recallPendingOrder: (id, parts) => {
       const order = get().orders.find((o) => o.id === id);
       if (!order) return { ok: false, msg: '订单不存在' };
@@ -1291,6 +1291,20 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       const target = order.compare.quotes.find((q) => q.supplierId === supplierId);
       if (!target) return { ok: false, msg: '该合作商尚未报名' };
       transfer(id, supplierId, target.supplierName, 'assign', `比单直接选定（${reason.trim() || '管理后台综合判断'}）`);
+      // 记录定标结果：直接选定按整单中单，供「比单管理」历史列表展示中单合作商
+      set((s) => ({
+        orders: s.orders.map((o) => (o.id === id && o.compare
+          ? {
+              ...o,
+              compare: {
+                ...o.compare,
+                scored: true,
+                winnerId: supplierId,
+                itemAwards: Object.fromEntries(order.items.map((it) => [it.productName, target.supplierName])),
+              },
+            }
+          : o)),
+      }));
       return { ok: true, msg: `已选定 ${target.supplierName}，转为指定转派` };
     },
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
@@ -119,10 +119,9 @@ export function ProductItemsTable({ items, customerName, salesPath, platformCust
  * ────────────────────────────────────────────── */
 
 /** 母销售单信息内容（「销售单信息」Tab 内分 订单信息 / 收货信息 / 商品信息 三段，参照分发详情页 DrawerSection 样式） */
-function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFamily; showStates?: boolean }) {
+export function MotherOrderInfoSection({ family }: { family: OrderFamily }) {
   const mother = family.mother;
   const children = family.children;
-  const states = familyStatesOf(family);
   const amount = (children.length > 0 ? children : family.all).reduce((s, o) => s + o.totalAmount, 0);
   /* 商品信息：按商品规格聚合（拆单家族合并全部子履约单商品行） */
   const productRows = (() => {
@@ -138,25 +137,6 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
   })();
   return (
     <>
-      {showStates && (
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            {pill(states.orderStatus)}
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            {pill(states.distribute)}
-            {states.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.distributed}/{states.active}</span>}
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            {pill(states.fulfill)}
-            {states.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.fulfilled}/{states.active}</span>}
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            {pill(states.settle)}
-            {states.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.settled}/{states.active}</span>}
-          </span>
-        </div>
-      )}
       <DrawerSection title="订单信息">
         <InfoGrid cols={4}>
           <InfoItem label="销售单号" mono emph>{family.rootCode}</InfoItem>
@@ -227,6 +207,28 @@ export function FulfillmentProgressBlock({ order, poDocs }: { order: ExternalOrd
             </div>
           ))}
         </div>
+        {/* 管理后台推进（合作商链推进发货/妥投、妥投后确认收货） */}
+        {(() => {
+          const stage = order.fulfillment?.stage;
+          const partnerChain = order.processStatus === 'processed' && order.path === 'distribute' && !!order.partnerName;
+          const actions: ReactNode[] = [];
+          if (partnerChain && order.partnerStatus === 'accepted') {
+            actions.push(<Button key="ship" size="sm" onClick={() => useOrderFlowStore.getState().advancePartner(order.id, 'shipping')}>推进：发货</Button>);
+          }
+          if (partnerChain && order.partnerStatus === 'shipping') {
+            actions.push(<Button key="transit" size="sm" onClick={() => useOrderFlowStore.getState().advancePartner(order.id, 'transit')}>推进：物流妥投</Button>);
+          }
+          if (stage === 'transit') {
+            actions.push(<Button key="confirm" size="sm" onClick={() => useOrderFlowStore.getState().confirmReceipt(order.id)}>确认收货（管理后台）</Button>);
+          }
+          if (actions.length === 0) return null;
+          return (
+            <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'center' }}>
+              {actions}
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>接单 / 发货 / 妥投由履约主体推进；全部包裹妥投后确认收货 → 已确收，随后在「履约单结算」页发起对账</span>
+            </div>
+          );
+        })()}
       </div>
 
       {/* 发货情况（包裹1、包裹2…：该履约单下全部发货包裹，PO 包裹 + 自营分仓发货；不单独成标签组） */}
@@ -338,11 +340,10 @@ export function FulfillmentProgressBlock({ order, poDocs }: { order: ExternalOrd
   );
 }
 
-/** 结算 & 开票块：订单进度 / 收款 / 开票 / 结算状态（收款·开票二维组合） */
+/** 结算 & 开票块：收款 / 开票 / 结算状态（收款·开票二维组合；订单状态在履约单属性区展示） */
 export function SettleInvoiceBlock({ order, poDocs }: { order: ExternalOrder; poDocs: PurchaseDoc[] }) {
   return (
     <InfoGrid cols={4}>
-      <InfoItem label="订单进度">{pill(orderProgressOf(order, poDocs))}</InfoItem>
       <InfoItem label="收款状态">{pill(receiveStateOf(order, poDocs))}</InfoItem>
       <InfoItem label="开票状态">{pill(invoiceStateOf(order))}</InfoItem>
       <InfoItem label="结算状态">{pill(settleStateOf(order, poDocs))}</InfoItem>
@@ -350,22 +351,33 @@ export function SettleInvoiceBlock({ order, poDocs }: { order: ExternalOrder; po
   );
 }
 
+/** 履约单详情内部分区 Tab（样式参照客户列表详情页顶部标签） */
+type UnitTab = 'dispatch' | 'fulfill' | 'settle' | 'history';
+const UNIT_TABS: { key: UnitTab; label: string }[] = [
+  { key: 'dispatch', label: '分发情况' },
+  { key: 'fulfill', label: '履约情况' },
+  { key: 'settle', label: '结算情况' },
+  { key: 'history', label: '操作轨迹' },
+];
+
 /** 单个履约单详情内容（Tab 内容区：code = 该履约单对应底层订单编号） */
 function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; poDocs: PurchaseDoc[]; code: string }) {
   const children = family.children;
   const current = family.all.find((o) => o.code === code) ?? family.mother;
   const currentPos = poDocs.filter((d) => d.childOrderId === current.id);
+  const [tab, setTab] = useState<UnitTab>('dispatch');
 
   return (
     <>
-      {/* 履约单信息（含商品明细） */}
-      <DrawerSection title="履约单信息">
-        <InfoGrid cols={4}>
-          <InfoItem label="履约单编号" mono emph>{current.code}</InfoItem>
-          <InfoItem label={current.parentCode ? '关联销售单' : '单据性质'}>{current.parentCode ?? (children.length > 0 ? '母销售单（已拆分）' : '母销售单（未拆分，即履约单）')}</InfoItem>
-          <InfoItem label="生成时间" mono>{fmtDateTime(current.history?.[0]?.time ?? current.entryTime)}</InfoItem>
-          <InfoItem label="金额" mono valueStyle={{ fontWeight: 'var(--font-semibold)' }}>{money(current.totalAmount)}</InfoItem>
-        </InfoGrid>
+      {/* 履约单信息：字段直接展示（不设分区标题与横线） */}
+      <InfoGrid cols={4}>
+        <InfoItem label="履约单编号" mono emph>{current.code}</InfoItem>
+        <InfoItem label="订单进度">{pill(orderProgressOf(current, currentPos))}</InfoItem>
+        <InfoItem label={current.parentCode ? '关联销售单' : '单据性质'}>{current.parentCode ?? (children.length > 0 ? '母销售单（已拆分）' : '母销售单（未拆分，即履约单）')}</InfoItem>
+        <InfoItem label="生成时间" mono>{fmtDateTime(current.history?.[0]?.time ?? current.entryTime)}</InfoItem>
+        <InfoItem label="金额" mono valueStyle={{ fontWeight: 'var(--font-semibold)' }}>{money(current.totalAmount)}</InfoItem>
+      </InfoGrid>
+      <div style={{ marginTop: 'var(--space-3)' }}>
         <ProductItemsTable
           items={current.items}
           customerName={current.customerName}
@@ -374,37 +386,47 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
           platform={current.platform}
           footerAmount={current.totalAmount}
         />
-      </DrawerSection>
+      </div>
 
-      <DrawerSection title="分发情况">
-        <InfoGrid cols={4}>
-          <InfoItem label="分发状态">{pill(distributeStateOf(current))}</InfoItem>
-          <InfoItem label="分发方式">{pathLabel(current)}</InfoItem>
-          <InfoItem label="履约主体">{current.partnerName ?? (current.path === 'self' ? '淡茶半盏（自营）' : '待分发')}</InfoItem>
-          <InfoItem label="分发时间">{current.fulfillment?.acceptTime ?? '—'}</InfoItem>
-        </InfoGrid>
-      </DrawerSection>
+      {/* 分发 / 履约 / 结算 / 操作轨迹：标签页展示（样式同客户列表详情页顶部 Tab） */}
+      <div className="drawer-tab-bar" style={{ marginTop: 'var(--space-5)' }}>
+        {UNIT_TABS.map((t) => (
+          <button key={t.key} type="button" className={`drawer-tab${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>
+            {t.label}
+            {t.key === 'history' && <span className="drawer-tab-count">{current.history.length}</span>}
+          </button>
+        ))}
+      </div>
+      <div className="drawer-tab-contents">
+        {tab === 'dispatch' && (
+          <InfoGrid cols={4}>
+            <InfoItem label="分发状态">{pill(distributeStateOf(current))}</InfoItem>
+            <InfoItem label="分发方式">{pathLabel(current)}</InfoItem>
+            <InfoItem label="履约主体">{current.partnerName ?? (current.path === 'self' ? '淡茶半盏（自营）' : '待分发')}</InfoItem>
+            <InfoItem label="分发时间">{current.fulfillment?.acceptTime ?? '—'}</InfoItem>
+          </InfoGrid>
+        )}
 
-      <DrawerSection title="履约情况">
-        <FulfillmentProgressBlock order={current} poDocs={currentPos} />
-      </DrawerSection>
+        {tab === 'fulfill' && (
+          <FulfillmentProgressBlock order={current} poDocs={currentPos} />
+        )}
 
-      <DrawerSection title="结算 & 开票情况">
-        <SettleInvoiceBlock order={current} poDocs={currentPos} />
-      </DrawerSection>
+        {tab === 'settle' && (
+          <SettleInvoiceBlock order={current} poDocs={currentPos} />
+        )}
 
-      {/* 处理轨迹 */}
-      <DrawerSection title="处理轨迹">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: 320, overflowY: 'auto' }}>
-          {current.history.map((h, i) => (
-            <div key={i} style={{ display: 'flex', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', alignItems: 'baseline' }}>
-              <span className="mono" style={{ color: 'var(--color-neutral-400)', flexShrink: 0 }}>{h.time}</span>
-              <span style={{ fontWeight: 'var(--font-medium)', flexShrink: 0 }}>{h.action}</span>
-              {h.detail && <span style={{ color: 'var(--color-neutral-500)' }}>{h.detail}</span>}
-            </div>
-          ))}
-        </div>
-      </DrawerSection>
+        {tab === 'history' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: 320, overflowY: 'auto' }}>
+            {current.history.map((h, i) => (
+              <div key={i} style={{ display: 'flex', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', alignItems: 'baseline' }}>
+                <span className="mono" style={{ color: 'var(--color-neutral-400)', flexShrink: 0 }}>{h.time}</span>
+                <span style={{ fontWeight: 'var(--font-medium)', flexShrink: 0 }}>{h.action}</span>
+                {h.detail && <span style={{ color: 'var(--color-neutral-500)' }}>{h.detail}</span>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* 自营执行信息（采购&发货 / 物流跟踪） */}
       {current.path === 'self' && ((current.selfShipments?.length ?? 0) > 0 || currentPos.length > 0) && (
@@ -440,13 +462,11 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
 }
 
 /** 销售单详情 Tab 视图：销售单信息 / 履约单01 / 履约单02… 分开以 Tab 展示（列表「查看」抽屉与本详情页共用） */
-export function SalesOrderDetailTabs({ family, poDocs, initialTab = 'info', showStates = true }: {
+export function SalesOrderDetailTabs({ family, poDocs, initialTab = 'info' }: {
   family: OrderFamily;
   poDocs: PurchaseDoc[];
   /** 初始展示的 Tab：'info' = 销售单信息；其余为履约单对应底层订单编号（子单「查看」进入默认定位该履约单） */
   initialTab?: string;
-  /** 销售单信息 Tab 顶部是否展示三状态药丸（抽屉头部已展示时传 false） */
-  showStates?: boolean;
 }) {
   const units = useMemo(() => fulfillmentUnitsOf(family), [family]);
   const isUnitCode = (code: string) => units.some((u) => u.underlying.code === code);
@@ -477,7 +497,7 @@ export function SalesOrderDetailTabs({ family, poDocs, initialTab = 'info', show
         {units.map((u) => tabBtn(u.underlying.code, `履约单${String(u.seq).padStart(2, '0')} · ${u.code}`))}
       </div>
       {showInfo
-        ? <MotherOrderInfoSection family={family} showStates={showStates} />
+        ? <MotherOrderInfoSection family={family} />
         : <FulfillmentUnitDetail family={family} poDocs={poDocs} code={active} />}
     </>
   );

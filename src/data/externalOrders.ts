@@ -380,6 +380,44 @@ const DEMO_PLATFORM_CUSTOMERS = [
   { id: 'p3', name: '易积通' },
 ];
 
+/** 已定标比单会话（历史比单记录：报名报价、评分明细与按商品中单结果） */
+function scoredCompareOf(
+  items: ExternalOrderItem[],
+  winner: { id: string; name: string },
+  rivals: { id: string; name: string }[],
+  day: string,
+): NonNullable<ExternalOrder['compare']> {
+  const total = items.reduce((s, it) => s + it.price * it.quantity, 0);
+  const floor = Math.round(total * 0.88);
+  const quotes = [
+    { supplierId: winner.id, supplierName: winner.name, amount: Math.round(total * 0.9), quoteTime: `${day} 10:05`, items: items.map((it) => it.productName) },
+    ...rivals.slice(0, 2).map((r, idx) => ({
+      supplierId: r.id,
+      supplierName: r.name,
+      amount: Math.round(total * (0.93 + idx * 0.03)),
+      quoteTime: `${day} 10:${String(12 + idx * 8).padStart(2, '0')}`,
+      items: idx === 0 ? [items[0].productName] : items.map((it) => it.productName),
+    })),
+  ];
+  const minQuote = Math.min(...quotes.map((q) => q.amount));
+  const scores: Record<string, { quoteScore: number; scoreScore: number; total: number }> = {};
+  quotes.forEach((q, idx) => {
+    const quoteScore = Math.round((minQuote / q.amount) * 100);
+    const scoreScore = 60 + (quotes.length - idx) * 8;
+    scores[q.supplierId] = { quoteScore, scoreScore, total: Math.round((quoteScore * 0.5 + scoreScore * 0.5) * 10) / 10 };
+  });
+  return {
+    deadline: new Date(`${day}T12:00:00`).getTime(),
+    floorRule: { type: 'discount', value: 88 },
+    floorNote: `报名报价不得低于订单金额的 88 折（¥${floor.toLocaleString()}）`,
+    quotes,
+    scored: true,
+    scores,
+    winnerId: winner.id,
+    itemAwards: Object.fromEntries(items.map((it) => [it.productName, winner.name])),
+  };
+}
+
 /** 销售单编号：SO- + YYMMDD + 4 位序号；按日期登记已有最大序号，演示数据续号生成不重复 */
 const soDaySeq = new Map<string, number>();
 const registerSOCode = (code: string) => {
@@ -564,8 +602,9 @@ function buildDemoOrders(): ExternalOrder[] {
     const s = next();
     const p = DEMO_PARTNERS[i % DEMO_PARTNERS.length];
     const src = sources[i % sources.length];
+    const items = pickItems(s);
     orders.push(buildOne(s, {
-      items: pickItems(s),
+      items,
       processStatus: 'distribute_pending',
       history: [{ time: D(s), action: { report: '报备匹配确认转出', assign: '指定转派', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name} · 等待合作商接单` }],
       extra: {
@@ -573,6 +612,10 @@ function buildDemoOrders(): ExternalOrder[] {
         partnerId: p.id, partnerName: p.name,
         transferSource: src, transferTime: D(s),
         ...(src === 'report' ? { reportMatches: [{ reportCode: 'BB20260901006', reportType: 'product', partnerId: p.id, partnerName: p.name }] } : {}),
+        ...(src === 'compare' ? {
+          compare: scoredCompareOf(items, p, [DEMO_PARTNERS[(i + 1) % DEMO_PARTNERS.length], DEMO_PARTNERS[(i + 3) % DEMO_PARTNERS.length]], D(s)),
+          distributeMode: 'compare',
+        } : {}),
       },
     }));
   }
@@ -582,6 +625,8 @@ function buildDemoOrders(): ExternalOrder[] {
   const motherCodeC = famC.code.replace(/9\d$/, '80');
   famC.parentCode = motherCodeC; famC.code = `${motherCodeC}LY01`;
   famC.transferSource = 'compare';
+  famC.distributeMode = 'compare';
+  famC.compare = scoredCompareOf(famC.items, { id: famC.partnerId!, name: famC.partnerName! }, [DEMO_PARTNERS[0], DEMO_PARTNERS[4]], D(20));
   famC.history.push({ time: D(20), action: '比单定标（按商品·积分优先）', detail: `按商品积分排名第一中单 → ${famC.partnerName} · 等待合作商接单` });
   famC2.parentCode = motherCodeC; famC2.code = `${motherCodeC}LY02`;
   famC2.processStatus = 'pending';
@@ -903,8 +948,9 @@ function buildDemoOrders(): ExternalOrder[] {
     const p = DEMO_PARTNERS[(i + 5) % DEMO_PARTNERS.length];
     const src = sources[i % sources.length];
     const ps = psList[i];
+    const items = pickItems(s);
     orders.push(buildOne(s, {
-      items: pickItems(s),
+      items,
       processStatus: 'processed',
       history: [
         { time: D(s), action: { report: '报备匹配确认转出', assign: '指定转派', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name}` },
@@ -915,6 +961,10 @@ function buildDemoOrders(): ExternalOrder[] {
         partnerId: p.id, partnerName: p.name,
         transferSource: src, transferTime: D(s),
         partnerStatus: ps,
+        ...(src === 'compare' ? {
+          compare: scoredCompareOf(items, p, [DEMO_PARTNERS[(i + 1) % DEMO_PARTNERS.length], DEMO_PARTNERS[(i + 2) % DEMO_PARTNERS.length]], D(s)),
+          distributeMode: 'compare',
+        } : {}),
       },
     }));
   }
@@ -1023,7 +1073,7 @@ export const EXTERNAL_STATUS_LABELS: Record<string, string> = {
   unprocessed: '未分发',
   pending: '待分发',
   self_pending: '自营待接单',
-  comparing: '分发比单中',
+  comparing: '转派比单中',
   distribute_pending: '转派待接单',
   processed: '分发已完成',
   cancelled: '已取消',

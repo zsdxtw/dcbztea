@@ -12,7 +12,7 @@ import DispatchDialog from '../../components/business/DispatchDialog';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePriceStore } from '../../stores/priceStore';
 import { buildFamilies, FAMILY_STATE_COLORS } from '../../utils/salesOrderFamily';
-import { SalesOrderDetailTabs } from './SalesOrderDetail';
+import { MotherOrderInfoSection } from './SalesOrderDetail';
 import { EXTERNAL_CHANNEL_LABELS, EXTERNAL_PLATFORM_LABELS, platformLabelOf } from '../../data/externalOrders';
 import { regionTextOf } from '../../data/regions';
 import type { ExternalOrder, ExternalOrderItem } from '../../types';
@@ -431,7 +431,7 @@ export default function SalesOrderProcessing() {
             <div style={{ marginBottom: 'var(--space-4)', padding: '10px 14px', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-600)', lineHeight: 1.7 }}>
               该销售单尚未生成履约单。点击「分发」可先拆单再选择方向；点击「拆单」仅预生成履约单，确认后进入履约单分发。
             </div>
-            <SalesOrderDetailTabs family={detailFamily} poDocs={[]} initialTab="info" showStates={false} />
+            <MotherOrderInfoSection family={detailFamily} />
           </>
         )}
       </DetailDrawer>

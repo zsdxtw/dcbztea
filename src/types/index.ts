@@ -1743,7 +1743,7 @@ export type DistributeMode = 'assign' | 'compare';
  * unprocessed 未分发（销售单已录入/推送，尚未送分发，未生成履约单）
  * pending 待分发（已送分发，手工录入/直连推送生成的履约单，流转弹窗选路径）
  *   ├ 自营：self_pending 自营待接单（可退回 pending，来源标注自营退回）
- *   ├ 比单：comparing 分发比单中 → 定标后 distribute_pending
+ *   ├ 比单：comparing 转派比单中 → 定标后 distribute_pending
  *   └ 分发：指定 / 报备（人工匹配后直接转出）→ distribute_pending 转派待接单
  * 报备匹配为纯人工动作：管理员手动选择报备记录确认后直接转出报备合作商，无中间待确认状态。
  * 履约状态进入已接单及后续 → 本状态自动置 processed 分发已完成；cancelled 已取消贯穿（分发/履约状态均变为已取消）。
