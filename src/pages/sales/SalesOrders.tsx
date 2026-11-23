@@ -10,9 +10,9 @@ import { usePurchaseStore } from '../../stores/purchaseStore';
 import { usePriceStore } from '../../stores/priceStore';
 import { customerItems } from '../../data/customers';
 import { PROVINCE_NAMES, getCityNames, getDistricts, regionTextOf } from '../../data/regions';
-import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS, EXTERNAL_STATUS_COLORS, TRANSFER_SOURCE_LABELS, platformLabelOf } from '../../data/externalOrders';
+import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, TRANSFER_SOURCE_LABELS, platformLabelOf } from '../../data/externalOrders';
 import {
-  buildFamilies, familyStatesOf, fulfillStateOf, settleStateOf, invoiceStateOf, FAMILY_STATE_COLORS, fulfillmentUnitsOf,
+  buildFamilies, familyStatesOf, fulfillStateOf, settleStateOf, orderProgressOf, distributeStateOf, FAMILY_STATE_COLORS, fulfillmentUnitsOf,
 } from '../../utils/salesOrderFamily';
 import type { ExternalOrder } from '../../types';
 import { SalesOrderDetailTabs } from './SalesOrderDetail';
@@ -30,14 +30,8 @@ const pill = (text: string) => {
   );
 };
 
-/** 单笔分发状态药丸（分发状态 7 态文案 + 配色） */
-const orderDistributePill = (o: ExternalOrder) => {
-  const key = EXTERNAL_STATUS_LABELS[o.processStatus] ?? o.processStatus;
-  const c = { bg: EXTERNAL_STATUS_COLORS[o.processStatus]?.bg ?? '#F5F5F5', color: EXTERNAL_STATUS_COLORS[o.processStatus]?.color ?? '#9E9E9E' };
-  return (
-    <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: c.bg, color: c.color, whiteSpace: 'nowrap' }}>{key}</span>
-  );
-};
+/** 单笔分发状态药丸（5 态：待分发 / 自营待接单 / 分发比单中 / 转派待接单 / 分发已完成） */
+const orderDistributePill = (o: ExternalOrder) => pill(distributeStateOf(o));
 
 /** 路径标签（与销售单分发页口径一致） */
 function pathLabel(o: ExternalOrder): string {
@@ -68,7 +62,7 @@ export default function SalesOrders() {
   const [filterDistribute, setFilterDistribute] = useState('');
   const [filterFulfill, setFilterFulfill] = useState('');
   const [filterSettle, setFilterSettle] = useState('');
-  const [filterInvoice, setFilterInvoice] = useState('');
+  const [filterOrderStatus, setFilterOrderStatus] = useState('');
   /* 新增筛选项:草稿态(输入)→ 点「查询」应用 */
   const [draftCustomer, setDraftCustomer] = useState('');
   const [draftReceiver, setDraftReceiver] = useState('');
@@ -104,10 +98,10 @@ export default function SalesOrders() {
     if (filterChannel && f.mother.sourceChannel !== filterChannel) return false;
     if (filterPath && (f.mother.salesPath ?? 'direct') !== filterPath) return false;
     const st = familyStatesOf(f);
+    if (filterOrderStatus && st.orderStatus !== filterOrderStatus) return false;
     if (filterDistribute && st.distribute !== filterDistribute) return false;
     if (filterFulfill && st.fulfill !== filterFulfill) return false;
     if (filterSettle && st.settle !== filterSettle) return false;
-    if (filterInvoice && st.invoice !== filterInvoice) return false;
     // 新增筛选项(查询按钮应用)
     const a = applied;
     if (a.customer && f.mother.customerName !== a.customer) return false;
@@ -127,11 +121,11 @@ export default function SalesOrders() {
       if (a.orderTo && t > a.orderTo) return false;
     }
     return true;
-  }), [families, keyword, filterChannel, filterPath, filterDistribute, filterFulfill, filterSettle, filterInvoice, applied]);
+  }), [families, keyword, filterChannel, filterPath, filterOrderStatus, filterDistribute, filterFulfill, filterSettle, applied]);
 
   const totalPages = Math.max(1, Math.ceil(filteredFamilies.length / pageSize));
   const pagedFamilies = filteredFamilies.slice((page - 1) * pageSize, page * pageSize);
-  useEffect(() => { setPage(1); }, [keyword, filterChannel, filterPath, filterDistribute, filterFulfill, filterSettle, filterInvoice, applied, pageSize]);
+  useEffect(() => { setPage(1); }, [keyword, filterChannel, filterPath, filterOrderStatus, filterDistribute, filterFulfill, filterSettle, applied, pageSize]);
   useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
 
   const applyFilters = () => {
@@ -222,7 +216,7 @@ export default function SalesOrders() {
       <div className="content-body">
         {/* ── 母销售单一行 + 展开子履约单 ── */}
         <>          <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-            展示<strong>全部母销售单</strong>：以<strong>手工录入</strong>或<strong>直连推送</strong>的母销售单（SO）为一行（分发/履约/结算/开票四状态为该母销售单含全部子履约单的聚合），点击母销售单行展开其下全部子履约单（FO）；未拆分的母销售单即履约单；点击「查看」进入履约单详情页。
+            展示<strong>全部母销售单</strong>：以<strong>手工录入</strong>或<strong>直连推送</strong>的母销售单（SO）为一行，销售单含<strong>订单状态</strong>（未处理 / 处理中 / 已办结 / 已取消）与<strong>分发 / 履约 / 结算</strong>三个进度聚合；点击母销售单行展开其下全部子履约单（FO）；未拆分的母销售单即履约单；点击「查看」进入履约单详情页。
             逐单分发操作请前往「<strong>销售单管理 → 履约单分发</strong>」；履约进度跟踪见「履约单履约」。
           </div>
 
@@ -240,6 +234,14 @@ export default function SalesOrders() {
               <option value="">全部路径</option>
               <option value="direct">直接销售</option>
               <option value="via_platform">经平台销售</option>
+            </select>
+            <span className="so-f-label">订单状态：</span>
+            <select className="filter-select" value={filterOrderStatus} onChange={(e) => setFilterOrderStatus(e.target.value)}>
+              <option value="">全部订单状态</option>
+              <option value="未处理">未处理</option>
+              <option value="处理中">处理中</option>
+              <option value="已办结">已办结</option>
+              <option value="已取消">已取消</option>
             </select>
             <span className="so-f-label">分发进度：</span>
             <select className="filter-select" value={filterDistribute} onChange={(e) => setFilterDistribute(e.target.value)}>
@@ -263,13 +265,6 @@ export default function SalesOrders() {
               <option value="未结算">未结算</option>
               <option value="结算中">结算中</option>
               <option value="结算完成">结算完成</option>
-            </select>
-            <span className="so-f-label">开票进度：</span>
-            <select className="filter-select" value={filterInvoice} onChange={(e) => setFilterInvoice(e.target.value)}>
-              <option value="">全部开票进度</option>
-              <option value="未开票">未开票</option>
-              <option value="开票中">开票中</option>
-              <option value="开票完成">开票完成</option>
             </select>
 
             {/* 客户:下拉选择 + 输入自动匹配 */}
@@ -338,10 +333,10 @@ export default function SalesOrders() {
                   <span>收货人 / 地区</span>
                   <span style={{ textAlign: 'right' }}>总金额</span>
                   <span style={{ textAlign: 'center' }}>履约单数</span>
+                  <span>订单状态</span>
                   <span>分发进度</span>
                   <span>履约进度</span>
                   <span>结算进度</span>
-                  <span>开票进度</span>
                   <span>录入时间</span>
                   <span style={{ textAlign: 'center' }}>操作</span>
                 </div>
@@ -381,6 +376,7 @@ export default function SalesOrders() {
                         <span style={{ textAlign: 'center' }}>
                           <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: '#E3F2FD', color: '#0F64B5', whiteSpace: 'nowrap' }}>{st.total} 单</span>
                         </span>
+                        <span key="os">{pill(st.orderStatus)}</span>
                         <span key="dg" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           {pill(st.distribute)}
                           {st.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.distributed}/{st.active}</span>}
@@ -392,10 +388,6 @@ export default function SalesOrders() {
                         <span key="se" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           {pill(st.settle)}
                           {st.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.settled}/{st.active}</span>}
-                        </span>
-                        <span key="in" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          {pill(st.invoice)}
-                          {st.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{st.invoiced}/{st.active}</span>}
                         </span>
                         <span className="cell-muted" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{fmtDate(f.mother.entryTime)}</span>
                         <span style={{ textAlign: 'center' }}>
@@ -421,10 +413,10 @@ export default function SalesOrders() {
                             <span>品牌/数量</span>
                             <span style={{ textAlign: 'right' }}>金额</span>
                             <span>生成时间</span>
+                            <span>订单进度</span>
                             <span>分发状态</span>
                             <span>履约状态</span>
                             <span>结算状态</span>
-                            <span>开票状态</span>
                             <span style={{ textAlign: 'center' }}>操作</span>
                           </div>
                           {units.length === 0 && (
@@ -439,11 +431,11 @@ export default function SalesOrders() {
                             const pkgTotal = pkgs.length + selfPkgs.length;
                             const delivered = pkgs.filter((x) => x.status === 'delivered' || x.status === 'confirmed').length
                               + selfPkgs.filter((x) => x.status === 'delivered' || x.status === 'confirmed').length;
-                            const fulText = fulfillStateOf(u.underlying, pos);
+                            const fulText = fulfillStateOf(u.underlying);
                             const pendingDist = u.underlying.processStatus === 'pending';
-                            /* 状态色：已确收/妥投=绿 / 履约中=琥珀 / 待分发默认履约=灰 / 已取消=红 */
+                            /* 状态色：已确收/已妥投=绿 / 履约中=琥珀 / 待分发默认履约=灰 / 已取消=红 */
                             const accent = u.underlying.processStatus === 'cancelled' ? '#C62828'
-                              : ['全部已确收', '妥投'].includes(fulText) ? '#2E7D32'
+                              : ['已确收', '已妥投'].includes(fulText) ? '#2E7D32'
                                 : pendingDist && u.virtual ? '#B0B7B0' : '#E6A23C';
                             const badgeBg = accent === '#2E7D32' ? '#E8F5E9'
                               : accent === '#C62828' ? '#FFEBEE'
@@ -489,11 +481,11 @@ export default function SalesOrders() {
                               <span className="mono" style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', textAlign: 'right' }}>{money(u.amount)}</span>
                               {/* 生成时间（列表展示日期；详情页展示日期+时分秒） */}
                               <span className="cell-muted mono" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{fmtDate(u.createdAt)}</span>
-                              {/* 分发 / 发货 / 结算状态（与母表头同列对齐） */}
+                              {/* 订单进度 / 分发 / 履约 / 结算状态（收款·开票组合） */}
+                              {pill(orderProgressOf(u.underlying, pos))}
                               {orderDistributePill(u.underlying)}
                               {pill(fulText)}
                               {pill(settleStateOf(u.underlying, pos))}
-                              {pill(invoiceStateOf(u.underlying))}
                               {/* 操作 */}
                               <span style={{ textAlign: 'center' }}>
                                 <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setView({ root: f.rootCode, child: u.underlying.code }); }}>查看</Button>
@@ -543,7 +535,7 @@ export default function SalesOrders() {
           const fam = families.find((f) => f.rootCode === view?.root);
           if (!fam) return null;
           const st = familyStatesOf(fam);
-          return <>{pill(st.distribute)}{pill(st.fulfill)}{pill(st.settle)}{pill(st.invoice)}</>;
+          return <>{pill(st.orderStatus)}{pill(st.distribute)}{pill(st.fulfill)}{pill(st.settle)}</>;
         })()}
         subtitle={(() => {
           const fam = families.find((f) => f.rootCode === view?.root);

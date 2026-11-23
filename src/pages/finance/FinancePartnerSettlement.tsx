@@ -4,7 +4,7 @@ import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
-import { settleStateOf } from '../../utils/salesOrderFamily';
+import { receiveStateOf } from '../../utils/salesOrderFamily';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { TRANSFER_SOURCE_LABELS } from '../../data/externalOrders';
 import type {} from '../../types';
@@ -32,8 +32,8 @@ export default function FinancePartnerSettlement() {
     o.processStatus === 'processed' && o.partnerStatus === 'confirmed'
   )), [orders]);
 
-  const pendingList = settleOrders.filter((o) => settleStateOf(o) !== '已结算');
-  const settledList = settleOrders.filter((o) => settleStateOf(o) === '已结算');
+  const pendingList = settleOrders.filter((o) => receiveStateOf(o) !== '已收款');
+  const settledList = settleOrders.filter((o) => receiveStateOf(o) === '已收款');
 
   /** 按合作商汇总（转派 PO 口径） */
   const partnerRows = useMemo(() => {

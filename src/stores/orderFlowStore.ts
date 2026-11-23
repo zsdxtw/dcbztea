@@ -20,7 +20,7 @@ import type {
 } from '../types';
 import { partnerInRegion } from '../types';
 import { externalOrderSeeds } from '../data/externalOrders';
-import { settleStateOf } from '../utils/salesOrderFamily';
+import { receiveStateOf } from '../utils/salesOrderFamily';
 import { matchesReport, useReportStore } from './reportStore';
 import { useSupplierStore } from './supplierStore';
 import { usePriceStore } from './priceStore';
@@ -188,12 +188,16 @@ interface OrderFlowState {
   confirmReceipt: (id: string) => { ok: boolean; msg: string };
 
   /* ── 结算 / 开票 / 取消 ── */
-  /** 结算（按发货单粒度）：不传 packageNos 结算全部已妥投发货单 → 已结算；传入 → 部分结算 */
+  /** 发起对账结算（已确收履约单 → 订单进度＝结算中） */
+  startSettlement: (id: string) => { ok: boolean; msg: string };
+  /** 结算（按发货单粒度）：不传 packageNos 结算全部已妥投发货单 → 已收款；传入 → 部分结算 */
   settleOrder: (id: string, opts?: { packageNos?: string[]; onTime?: boolean }) => { ok: boolean; msg: string };
-  /** 取消订单（已确收前可取消）：分发状态与履约状态均变为已取消 */
+  /** 取消订单（已确收前可取消）：订单进度变为已取消（分发/履约状态不再展示已取消） */
   cancelOrder: (id: string, reason?: string) => { ok: boolean; msg: string };
   /** 登记开票：partial=部分开票 / full=全部开票 */
   registerInvoice: (id: string, mode: 'partial' | 'full') => { ok: boolean; msg: string };
+  /** 手工办结（已收款但未开票时，将订单进度置为已办结） */
+  closeOrder: (id: string) => { ok: boolean; msg: string };
 
   /* ── 比单（公开报名制） ── */
   startCompare: (id: string, floorRule: CompareFloorRule, region?: RegionScope, filters?: { partnerTypes?: ('service' | 'supplier')[]; coopMode?: 'supplier' | 'service' }) => { ok: boolean; msg: string };
@@ -1028,6 +1032,19 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
     },
 
     /* ── 结算 / 开票 / 取消 ── */
+    startSettlement: (id) => {
+      const order = get().orders.find((o) => o.id === id);
+      if (!order) return { ok: false, msg: '订单不存在' };
+      if (order.processStatus === 'cancelled') return { ok: false, msg: '已取消订单不可发起结算' };
+      if (order.fulfillment?.stage !== 'confirmed') return { ok: false, msg: '仅已确收履约单可发起对账结算' };
+      if (order.settled && order.invoiceStatus === 'invoiced') return { ok: false, msg: '该履约单已完成收款与开票（已办结）' };
+      patchOrder(id, { settlementStarted: true }, {
+        action: '发起对账结算',
+        detail: `已确收履约单发起对账结算 → 订单进度＝结算中（${order.settled ? '已收款' : '待收款'}·${order.invoiceStatus ? '已开票' : '未开票'}）`,
+      });
+      return { ok: true, msg: '已发起对账结算，订单进度进入结算中' };
+    },
+
     settleOrder: (id, opts) => {
       const order = get().orders.find((o) => o.id === id);
       if (!order) return { ok: false, msg: '订单不存在' };
@@ -1055,14 +1072,15 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       patchOrder(id, {
         selfShipments,
         settleOnTime: onTime,
+        settlementStarted: true,
         ...(orderSettled ? { settled: true as const } : {}),
       }, {
-        action: '结算完成',
-        detail: `${targetNos ? `按发货单结算 ${targetNos.length} 张` : eligible.length > 0 ? '全部发货单结算' : '订单级结算'}（${onTime ? '按时履约' : '超时履约'}）`,
+        action: '登记收款',
+        detail: `${targetNos ? `按发货单收款 ${targetNos.length} 张` : eligible.length > 0 ? '全部发货单收款' : '订单级收款'}（${onTime ? '按时履约' : '超时履约'}）`,
       });
-      if (eligible.length === 0) return { ok: true, msg: '已结算（订单级，无发货单）' };
+      if (eligible.length === 0) return { ok: true, msg: '已登记收款（订单级，无发货单）' };
       const settledCount = eligible.filter((x) => x.settled).length;
-      return { ok: true, msg: orderSettled ? '已结算（全部已妥投发货单）' : `部分结算（${settledCount}/${eligible.length} 张已妥投发货单）` };
+      return { ok: true, msg: orderSettled ? '已收款（全部已妥投发货单）' : `部分收款（${settledCount}/${eligible.length} 张已妥投发货单）` };
     },
 
     cancelOrder: (id, reason) => {
@@ -1083,8 +1101,8 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         processStatus: 'cancelled',
         fulfillment: fulfil(order, { stage: 'cancelled' }),
         ...(order.compare ? { compare: undefined } : {}),
-      }, { action: '取消订单', detail: `${reason?.trim() || '管理后台取消订单'} · 分发状态与履约状态均变为已取消${recallNote}` });
-      return { ok: true, msg: '订单已取消（分发状态与履约状态均为已取消）' };
+      }, { action: '取消订单', detail: `${reason?.trim() || '管理后台取消订单'} · 订单进度变为已取消（分发 / 履约状态不再展示已取消）${recallNote}` });
+      return { ok: true, msg: '订单已取消（订单进度＝已取消）' };
     },
 
     registerInvoice: (id, mode) => {
@@ -1092,11 +1110,25 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       if (!order) return { ok: false, msg: '订单不存在' };
       if (order.processStatus === 'cancelled') return { ok: false, msg: '已取消订单不可开票' };
       if (order.fulfillment?.stage !== 'confirmed') return { ok: false, msg: '仅已确收订单可登记开票（预开票场景待业务确认）' };
-      patchOrder(id, { invoiceStatus: mode === 'full' ? 'invoiced' : 'partial' }, {
+      patchOrder(id, { invoiceStatus: mode === 'full' ? 'invoiced' : 'partial', settlementStarted: true }, {
         action: mode === 'full' ? '登记开票（全部）' : '登记开票（部分）',
-        detail: mode === 'full' ? '全额开票完成 → 已开票' : '部分金额开票 → 部分开票',
+        detail: mode === 'full' ? '全额开票完成 → 已开票' : '部分金额开票 → 已开票',
       });
-      return { ok: true, msg: mode === 'full' ? '已登记全额开票（已开票）' : '已登记部分开票' };
+      return { ok: true, msg: mode === 'full' ? '已登记全额开票（已开票）' : '已登记部分开票（已开票）' };
+    },
+
+    closeOrder: (id) => {
+      const order = get().orders.find((o) => o.id === id);
+      if (!order) return { ok: false, msg: '订单不存在' };
+      if (order.processStatus === 'cancelled') return { ok: false, msg: '已取消订单不可办结' };
+      const received = order.settled || receiveStateOf(order, usePurchaseStore.getState().listByChildOrder(id)) === '已收款';
+      if (!received) return { ok: false, msg: '仅已完成收款的履约单可手工办结（未开票场景）' };
+      if (order.closed) return { ok: false, msg: '该履约单已办结' };
+      patchOrder(id, { closed: true }, {
+        action: '手工办结',
+        detail: order.invoiceStatus ? '已收款且已开票，手工办结' : '已收款未开票，手工办结 → 订单进度＝已办结',
+      });
+      return { ok: true, msg: '已手工办结，订单进度进入已办结' };
     },
 
     /* ── 比单（公开报名制） ── */
@@ -1307,10 +1339,10 @@ const TRANSFER_KIND_MAP: Record<string, 'order-self' | 'product' | 'region' | 'a
   compare: 'compare',
 };
 
-/** 履约单结算状态派生（复用 settleStateOf 统一口径：分母=已妥投/已确收包裹 + 订单级 settled） */
+/** 履约单收款状态派生（统一口径：分母=已妥投/已确收包裹 + 订单级 settled） */
 const settledOf = (o: ExternalOrder): boolean => {
   const docs = usePurchaseStore.getState().docs.filter((d) => d.childOrderId === o.id);
-  return settleStateOf(o, docs) === '已结算';
+  return receiveStateOf(o, docs) === '已收款';
 };
 
 /** 某合作商名下的订单分发订单（映射为合作商订单结构，合作商终端展示/接单/报名） */

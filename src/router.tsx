@@ -33,6 +33,7 @@ import ExternalOrders from './pages/sales/ExternalOrders';
 import OrderEntry from './pages/sales/OrderEntry';
 import SalesOrderProcessing from './pages/sales/SalesOrderProcessing';
 import SalesFulfillment from './pages/sales/SalesFulfillment';
+import SalesSettlement from './pages/sales/SalesSettlement';
 import SalesPricing from './pages/sales/SalesPricing';
 import SalesReconciliation from './pages/sales/SalesReconciliation';
 import SalesCustomers from './pages/sales/SalesCustomers';
@@ -184,6 +185,7 @@ export const router = createBrowserRouter([
       { path: 'sales/order-distribute', element: <ExternalOrders /> },
       { path: 'sales/order-shipping', element: <Navigate to="/selfop/orders" replace /> },
       { path: 'sales/sales-fulfillment', element: <SalesFulfillment /> },
+      { path: 'sales/sales-settlement', element: <SalesSettlement /> },
       { path: 'sales/fulfillment-orders', element: <Navigate to="/sales/sales-fulfillment" replace /> },
       { path: 'sales/order-settlement', element: <Navigate to="/finance/finance-partner-settlement" replace /> },
       { path: 'sales/sales-orders', element: <SalesOrders /> },

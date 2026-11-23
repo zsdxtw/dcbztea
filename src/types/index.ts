@@ -1978,8 +1978,12 @@ export interface ExternalOrder {
   partnerStatus?: PartnerOrderStatus;
   /** 结算是否按时（超时扣积分；纯质量标记，不承担"是否已结算"语义） */
   settleOnTime?: boolean;
-  /** 订单级结算标记（P6：全部已妥投发货单结算 / 无发货单订单级结算后置位） */
+  /** 订单级结算标记（P6：全部已妥投发货单结算 / 无发货单订单级结算后置位）——兼作「已收款」标记 */
   settled?: boolean;
+  /** 已发起对账结算（已确收履约单 → 结算中） */
+  settlementStarted?: boolean;
+  /** 手工办结（已收款但未开票时，可手工将订单进度置为已办结） */
+  closed?: boolean;
   /** 开票状态：未开票（缺省）/ 部分开票 / 已开票（前置条件：已确收） */
   invoiceStatus?: SalesInvoiceStatus;
   /** 自营以销定采信息（采购&发货时固化，缺口的采购去向） */

@@ -11,7 +11,7 @@ import ReportMatchDialog from '../../components/business/ReportMatchDialog';
 import DispatchDialog from '../../components/business/DispatchDialog';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePriceStore } from '../../stores/priceStore';
-import { buildFamilies } from '../../utils/salesOrderFamily';
+import { buildFamilies, FAMILY_STATE_COLORS } from '../../utils/salesOrderFamily';
 import { SalesOrderDetailTabs } from './SalesOrderDetail';
 import { EXTERNAL_CHANNEL_LABELS, EXTERNAL_PLATFORM_LABELS, platformLabelOf } from '../../data/externalOrders';
 import { regionTextOf } from '../../data/regions';
@@ -238,7 +238,7 @@ export default function SalesOrderProcessing() {
 
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['序号', '销售单号', '订单来源', '销售路径', '客户', '收货人 / 地区', '品牌/数量', '总金额', '录入时间', '操作']}
+            headers={['序号', '销售单号', '订单来源', '销售路径', '客户', '收货人 / 地区', '品牌/数量', '总金额', '订单状态', '录入时间', '操作']}
             rows={pagedRows.map((o, idx) => [
               <span key="no" className="mono cell-muted">{(page - 1) * pageSize + idx + 1}</span>,
               <span key="c" className="cell-mono-emph" style={{ whiteSpace: 'nowrap' }}>
@@ -268,6 +268,12 @@ export default function SalesOrderProcessing() {
               </span>,
               <span key="items" className="mono" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{brandCountOf(o.items)}种/{totalQty(o.items)}份</span>,
               <span key="a" className="mono" style={{ fontWeight: 'var(--font-semibold)' }}>{money(o.totalAmount)}</span>,
+              <span key="st">
+                {(() => {
+                  const c = (FAMILY_STATE_COLORS as Record<string, { bg: string; color: string }>)['未处理'] ?? { bg: '#FFF3E0', color: '#B26A00' };
+                  return pill(c.bg, c.color, '未处理');
+                })()}
+              </span>,
               <span key="t" className="cell-muted" style={{ whiteSpace: 'nowrap' }}>{o.entryTime.slice(0, 10)}</span>,
               <div key="act" className="row-actions" style={{ whiteSpace: 'nowrap' }}>
                 <Button size="sm" variant="ghost" onClick={() => setDetailId(o.id)}>查看</Button>

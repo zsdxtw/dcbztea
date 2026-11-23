@@ -293,6 +293,7 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
         { key: 'sales-orders', label: '销售单列表', icon: <OrdersIcon /> },
         { key: 'order-distribute', label: '履约单分发', icon: <OrdersIcon /> },
         { key: 'sales-fulfillment', label: '履约单履约', icon: <InboundIcon /> },
+        { key: 'sales-settlement', label: '履约单结算', icon: <ReconciliationIcon /> },
       ] },
       { key: 'customer-manage', label: '客户管理', icon: <CustomersIcon />, children: [
         { key: 'sales-customers', label: '客户列表', icon: <CustomersIcon /> },

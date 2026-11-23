@@ -919,40 +919,48 @@ function buildDemoOrders(): ExternalOrder[] {
     }));
   }
 
-  /* ── 已完成（已结算）×6 ── */
+  /* ── 已确收结算样例 ×6（覆盖 结算中 / 已办结 组合） ── */
   for (let i = 0; i < 6; i++) {
     const s = next();
     const p = DEMO_PARTNERS[(i + 2) % DEMO_PARTNERS.length];
     const src = sources[i % sources.length];
     const onTime = i % 3 !== 0;
+    const invoiced = i === 0 || i === 1 || i === 4 || i === 5;
+    const manuallyClosed = i === 3;
     orders.push(buildOne(s, {
       items: pickItems(s),
       processStatus: 'processed',
       history: [
         { time: D(s), action: { report: '报备匹配确认转出', assign: '指定转派', compare: '比单定标（按商品·积分优先）' }[src], detail: `→ ${p.name}` },
-        { time: D(s), action: '结算完成', detail: onTime ? '按时履约 · 积分 +5' : '超时发货 · 积分 -5' },
+        { time: D(s), action: '客户确认收货', detail: '履约已确收' },
+        { time: D(s), action: '发起对账结算', detail: '订单进度＝结算中' },
+        { time: D(s), action: '登记收款', detail: onTime ? '按时履约 · 积分 +5' : '超时发货 · 积分 -5' },
+        ...(invoiced ? [{ time: D(s), action: '登记开票（全部）', detail: '收款 + 开票完成 → 已办结' }] : []),
+        ...(manuallyClosed ? [{ time: D(s), action: '手工办结', detail: '已收款未开票，手工办结 → 已办结' }] : []),
       ],
       extra: {
         path: 'distribute', distributeMode: 'assign',
         partnerId: p.id, partnerName: p.name,
         transferSource: src, transferTime: D(s),
         partnerStatus: 'confirmed', settleOnTime: onTime,
-        ...(i === 0 ? { invoiceStatus: 'invoiced' as const } : i === 1 ? { invoiceStatus: 'partial' as const } : {}),
+        settled: true, settlementStarted: true,
+        ...(invoiced ? { invoiceStatus: (i === 1 ? 'partial' : 'invoiced') as 'partial' | 'invoiced' } : {}),
+        ...(manuallyClosed ? { closed: true } : {}),
       },
     }));
   }
 
-  /* ── 已取消 ×2（分发环节 / 履约环节各 1，分发与履约状态均显示已取消） ── */
+  /* ── 已取消 ×2（订单进度＝已取消；分发 / 履约状态不再展示已取消） ── */
   for (let i = 0; i < 2; i++) {
     const s = next();
     const hist = i === 0
       ? [{ time: D(s), action: '手工录入订单', detail: '演示数据' },
-         { time: D(s), action: '取消订单', detail: '客户取消采购计划 → 分发状态与履约状态均为已取消' }]
+         { time: D(s), action: '取消订单', detail: '客户取消采购计划 → 订单进度＝已取消' }]
       : [{ time: D(s), action: '手工录入订单', detail: '演示数据' },
          { time: D(s), action: '指定转派', detail: '→ 福建正山堂茶业有限责任公司' },
          { time: D(s), action: '合作商接单', detail: '合作商终端接单' },
          { time: D(s), action: '合作商发货', detail: '1 个包裹发出' },
-         { time: D(s), action: '取消订单', detail: '收货地址错误且无法送达 → 订单取消（履约状态同步已取消）' }];
+         { time: D(s), action: '取消订单', detail: '收货地址错误且无法送达 → 订单进度＝已取消' }];
     orders.push(buildOne(s, {
       items: pickItems(s),
       processStatus: 'cancelled',

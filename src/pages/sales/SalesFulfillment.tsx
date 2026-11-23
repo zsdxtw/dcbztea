@@ -9,12 +9,8 @@ import { usePurchaseStore } from '../../stores/purchaseStore';
 import SalesOrderInfoModal from '../../components/business/SalesOrderInfoModal';
 import { SalesOrderDetailTabs } from './SalesOrderDetail';
 import { EXTERNAL_CHANNEL_LABELS, platformLabelOf } from '../../data/externalOrders';
-import { buildFamilies, familyStatesOf, FAMILY_STATE_COLORS } from '../../utils/salesOrderFamily';
-import {
-  FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS,
-  stageOfOrder, stageIndexOf,
-} from '../../utils/fulfillment';
-import type { ExternalOrder, FulfillmentStage } from '../../types';
+import { buildFamilies, familyStatesOf, fulfillStateOf, orderProgressOf, FAMILY_STATE_COLORS } from '../../utils/salesOrderFamily';
+import type { ExternalOrder } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -22,14 +18,14 @@ const pill = (bg: string, color: string, text: string) => (
   <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: bg, color, whiteSpace: 'nowrap' }}>{text}</span>
 );
 
-/** 履约 TAB（对齐合作商工作台：「已发货」= 运输中 + 妥投 合并桶，行内仍显示细档） */
-const STAGE_CHAIN: { key: string; label: string }[] = [
-  { key: 'pending_accept', label: '待接单' },
-  { key: 'accepted', label: '已接单' },
-  { key: 'shipping', label: '已发货' },
-  { key: 'confirmed', label: '已确收' },
-  { key: 'cancelled', label: '已取消' },
-];
+const statePill = (text: string) => {
+  const c = (FAMILY_STATE_COLORS as Record<string, { bg: string; color: string }>)[text] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
+  return pill(c.bg, c.color, text);
+};
+
+/** 履约状态 5 态 TAB（已取消归入订单进度，不单列 TAB） */
+const FULFILL_CHAIN = ['待接单', '已接单', '运输中', '已妥投', '已确收'] as const;
+const FULFILL_ORDER: Record<string, number> = { '—': 0, '待接单': 1, '已接单': 2, '运输中': 3, '已妥投': 4, '已确收': 5 };
 
 /** 履约单元：子订单 + 未被拆分的母销售单（有子单的母单由其子单代表） */
 export default function SalesFulfillment() {
@@ -71,25 +67,26 @@ export default function SalesFulfillment() {
       .filter((o) => !['unprocessed', 'pending', 'comparing'].includes(o.processStatus))
       .filter((o) => !o.parentCode && !rootHasChild.has(o.code) || o.parentCode)
       .map((o) => {
-        const stage = stageOfOrder(o);
+        const fulfill = fulfillStateOf(o);
+        const progress = orderProgressOf(o);
         const doc = purchaseDocs.find((d) => d.childOrderCode === o.code);
         const pkgs = doc?.packages.filter((p) => p.status !== 'void') ?? [];
         const delivered = pkgs.filter((p) => p.status === 'delivered' || p.status === 'confirmed').length;
         return {
           order: o,
           rootCode: o.parentCode ?? o.code,
-          stage,
-          stageIdx: stageIndexOf(stage),
+          fulfill,
+          progress,
+          fulfillIdx: FULFILL_ORDER[fulfill] ?? 0,
           pkgCount: pkgs.length,
           pkgDelivered: delivered,
           lastTracking: pkgs[pkgs.length - 1],
         };
       })
-      .sort((a, b) => b.stageIdx - a.stageIdx || b.order.entryTime.localeCompare(a.order.entryTime));
+      .sort((a, b) => b.fulfillIdx - a.fulfillIdx || b.order.entryTime.localeCompare(a.order.entryTime));
   }, [orders, purchaseDocs]);
 
-  const inTab = (u: { stage: FulfillmentStage }, k: string) =>
-    k === 'shipping' ? u.stage === 'shipping' || u.stage === 'transit' : u.stage === k;
+  const inTab = (u: { fulfill: string }, k: string) => u.fulfill === k;
   const countOf = (k: string) => (k === '' ? units.length : units.filter((u) => inTab(u, k)).length);
   const filtered = useMemo(() => (tab === '' ? units : units.filter((u) => inTab(u, tab))), [units, tab]);
 
@@ -111,20 +108,19 @@ export default function SalesFulfillment() {
           <button className={`tab-card-simple${tab === '' ? ' active' : ''}`} style={{ transition: 'none' }} onClick={() => setTab('')}>
             全部<span className="tab-card-simple-count">{units.length} 单</span>
           </button>
-          {STAGE_CHAIN.map((s) => (
-            <button key={s.key} className={`tab-card-simple${tab === s.key ? ' active' : ''}`} style={{ transition: 'none' }} onClick={() => setTab(s.key)}>
-              {s.label}
-              <span className="tab-card-simple-count">{countOf(s.key)} 单</span>
+          {FULFILL_CHAIN.map((s) => (
+            <button key={s} className={`tab-card-simple${tab === s ? ' active' : ''}`} style={{ transition: 'none' }} onClick={() => setTab(s)}>
+              {s}
+              <span className="tab-card-simple-count">{countOf(s)} 单</span>
             </button>
           ))}
         </div>
 
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['销售单编号', '关联销售单', '销售路径', '客户', '履约主体', '金额', '履约状态', '包裹物流', '操作']}
+            headers={['销售单编号', '关联销售单', '销售路径', '客户', '履约主体', '金额', '订单进度', '履约状态', '包裹物流', '操作']}
             rows={filtered.map((u) => {
               const o = u.order;
-              const sc = FULFILLMENT_STAGE_COLORS[u.stage];
               const isVia = o.salesPath === 'via_platform';
               return [
                 <span key="c" className="cell-mono-emph">
@@ -151,7 +147,8 @@ export default function SalesFulfillment() {
                   {o.path === 'self' ? '自营' : (o.partnerName ?? '待分发')}
                 </span>,
                 <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(o.totalAmount)}</span>,
-                pill(sc.bg, sc.color, FULFILLMENT_STAGE_LABELS[u.stage]),
+                statePill(u.progress),
+                statePill(u.fulfill),
                 u.pkgCount > 0
                   ? <span key="pkg" style={{ fontSize: 'var(--text-sm)' }}>
                       {u.pkgCount} 包裹 · {u.pkgDelivered} 妥投
@@ -232,11 +229,7 @@ export default function SalesFulfillment() {
           const fam = families.find((f) => f.rootCode === view?.root);
           if (!fam) return null;
           const st = familyStatesOf(fam);
-          const fp = (t: string) => {
-            const c = (FAMILY_STATE_COLORS as Record<string, { bg: string; color: string }>)[t] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
-            return pill(c.bg, c.color, t);
-          };
-          return <>{fp(st.distribute)}{fp(st.fulfill)}{fp(st.settle)}{fp(st.invoice)}</>;
+          return <>{statePill(st.orderStatus)}{statePill(st.distribute)}{statePill(st.fulfill)}{statePill(st.settle)}</>;
         })()}
         subtitle={(() => {
           const m = families.find((f) => f.rootCode === view?.root)?.mother;

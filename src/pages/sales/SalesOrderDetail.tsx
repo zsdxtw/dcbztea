@@ -12,7 +12,7 @@ import { customerItems } from '../../data/customers';
 import { regionTextOf } from '../../data/regions';
 import { EXTERNAL_CHANNEL_LABELS, EXTERNAL_PLATFORM_LABELS, TRANSFER_SOURCE_LABELS } from '../../data/externalOrders';
 import {
-  buildFamilies, familyStatesOf, distributeStateOf, fulfillStateOf, settleStateOf, invoiceStateOf, FAMILY_STATE_COLORS, fulfillmentUnitsOf,
+  buildFamilies, familyStatesOf, distributeStateOf, fulfillStateOf, settleStateOf, receiveStateOf, invoiceStateOf, orderProgressOf, FAMILY_STATE_COLORS, fulfillmentUnitsOf,
   type OrderFamily,
 } from '../../utils/salesOrderFamily';
 import { fulfillmentTimes } from '../../utils/fulfillment';
@@ -141,6 +141,9 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
       {showStates && (
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            {pill(states.orderStatus)}
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {pill(states.distribute)}
             {states.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.distributed}/{states.active}</span>}
           </span>
@@ -151,10 +154,6 @@ function MotherOrderInfoSection({ family, showStates = true }: { family: OrderFa
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {pill(states.settle)}
             {states.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.settled}/{states.active}</span>}
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            {pill(states.invoice)}
-            {states.active > 0 && <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>{states.invoiced}/{states.active}</span>}
           </span>
         </div>
       )}
@@ -217,8 +216,8 @@ export function FulfillmentProgressBlock({ order, poDocs }: { order: ExternalOrd
       <div style={{ marginBottom: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)' }}>销售履约状态</span>
-          {pill(fulfillStateOf(order, poDocs))}
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>待接单 → 已接单 → 运输中 / 妥投 → 已确收</span>
+          {pill(fulfillStateOf(order))}
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>待接单 → 已接单 → 运输中 → 已妥投 → 已确收</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 'var(--space-3)' }}>
           {fulfillmentTimes(order).map((t) => (
@@ -339,13 +338,14 @@ export function FulfillmentProgressBlock({ order, poDocs }: { order: ExternalOrd
   );
 }
 
-/** 结算 & 开票块：结算状态 / 开票状态 / 结算履约（按发货单结算口径，与履约单详情一致） */
+/** 结算 & 开票块：订单进度 / 收款 / 开票 / 结算状态（收款·开票二维组合） */
 export function SettleInvoiceBlock({ order, poDocs }: { order: ExternalOrder; poDocs: PurchaseDoc[] }) {
   return (
     <InfoGrid cols={4}>
-      <InfoItem label="结算状态">{pill(settleStateOf(order, poDocs))}</InfoItem>
+      <InfoItem label="订单进度">{pill(orderProgressOf(order, poDocs))}</InfoItem>
+      <InfoItem label="收款状态">{pill(receiveStateOf(order, poDocs))}</InfoItem>
       <InfoItem label="开票状态">{pill(invoiceStateOf(order))}</InfoItem>
-      <InfoItem label="结算履约">{order.settleOnTime === true ? '按时（积分 +5）' : order.settleOnTime === false ? '超时（积分 -5）' : '未结算'}</InfoItem>
+      <InfoItem label="结算状态">{pill(settleStateOf(order, poDocs))}</InfoItem>
     </InfoGrid>
   );
 }

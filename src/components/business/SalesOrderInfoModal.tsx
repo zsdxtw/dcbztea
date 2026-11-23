@@ -4,7 +4,8 @@ import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { customerItems } from '../../data/customers';
 import { usePriceStore, effectiveCustomerQuote } from '../../stores/priceStore';
 import { calcPlatformNetPrice } from '../../data/prices';
-import { EXTERNAL_STATUS_LABELS, platformLabelOf } from '../../data/externalOrders';
+import { platformLabelOf } from '../../data/externalOrders';
+import { orderProgressOf } from '../../utils/salesOrderFamily';
 import type { ExternalOrder } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
@@ -120,7 +121,7 @@ export default function SalesOrderInfoModal({ code, onClose }: { code: string | 
               </>
             ) : (
               <table className="detail-inline-table">
-                <thead><tr><th>子履约单号</th><th>供应方式</th><th>履约主体</th><th>金额</th><th>状态</th></tr></thead>
+                <thead><tr><th>子履约单号</th><th>供应方式</th><th>履约主体</th><th>金额</th><th>订单进度</th></tr></thead>
                 <tbody>
                   {fulfillments.length === 0 && (
                     <tr><td colSpan={5} style={{ color: 'var(--color-neutral-400)', textAlign: 'center', padding: 'var(--space-3)' }}>尚未生成子履约单（未拆分时母销售单即履约单；整单在途或待分发）</td></tr>
@@ -131,7 +132,7 @@ export default function SalesOrderInfoModal({ code, onClose }: { code: string | 
                       <td>{f.path === 'self' ? '自营' : '转派'}</td>
                       <td>{f.partnerName ?? (f.path === 'self' ? '自营' : '—')}</td>
                       <td className="mono">{money(f.totalAmount)}</td>
-                      <td>{EXTERNAL_STATUS_LABELS[f.processStatus] ?? f.processStatus}</td>
+                      <td>{orderProgressOf(f)}</td>
                     </tr>
                   ))}
                 </tbody>

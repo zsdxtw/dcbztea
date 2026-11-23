@@ -16,8 +16,8 @@ import { customerItems } from '../../data/customers';
 import { EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS,
   EXTERNAL_STATUS_COLORS, platformLabelOf } from '../../data/externalOrders';
 import { FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS, stageOfOrder } from '../../utils/fulfillment';
-import { buildFamilies, fulfillmentUnitsOf, familyStatesOf, fulfillStateOf,
-  settleStateOf, invoiceStateOf, FAMILY_STATE_COLORS } from '../../utils/salesOrderFamily';
+import { buildFamilies, fulfillmentUnitsOf, familyStatesOf, receiveStateOf,
+  invoiceStateOf, FAMILY_STATE_COLORS } from '../../utils/salesOrderFamily';
 import type { StatCardData, ExternalOrder } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
@@ -97,7 +97,7 @@ export default function SalesOverview() {
 
   const unitPos = (o: ExternalOrder) => poDocs.filter((d) => d.childOrderId === o.id);
   const waitReceipt = units.filter((o) => stageOfOrder(o) === 'transit').length;
-  const waitSettle = units.filter((o) => stageOfOrder(o) === 'confirmed' && settleStateOf(o, unitPos(o)) !== '已结算').length;
+  const waitSettle = units.filter((o) => stageOfOrder(o) === 'confirmed' && receiveStateOf(o, unitPos(o)) !== '已收款').length;
   const waitInvoice = units.filter((o) => stageOfOrder(o) === 'confirmed' && invoiceStateOf(o) !== '已开票').length;
 
   const compareQuotes = flowOrders
@@ -180,13 +180,13 @@ export default function SalesOverview() {
       text: `${waitReceipt} 张履约单已妥投待确认收货（管理后台确认收货）`, tag: '确收', color: FULFILLMENT_STAGE_COLORS.transit, to: '/sales/sales-fulfillment',
     },
     waitSettle > 0 && {
-      text: `${waitSettle} 张履约单已确收待结算（按发货单可部分结算）`, tag: '结算', color: FAMILY_STATE_COLORS['结算中'], to: '/sales/order-distribute',
+      text: `${waitSettle} 张履约单已确收待对账结算（履约单结算页登记收款）`, tag: '结算', color: FAMILY_STATE_COLORS['结算中'], to: '/sales/sales-settlement',
     },
     waitInvoice > 0 && {
-      text: `${waitInvoice} 张履约单已确收未开票（详情抽屉登记开票）`, tag: '开票', color: FAMILY_STATE_COLORS['开票中'], to: '/sales/order-distribute',
+      text: `${waitInvoice} 张履约单已确收未开票（履约单结算页登记开票）`, tag: '开票', color: FAMILY_STATE_COLORS['未开票'], to: '/sales/sales-settlement',
     },
     (statusCount.cancelled ?? 0) > 0 && {
-      text: `${statusCount.cancelled} 单已取消（分发状态与履约状态均为已取消）`, tag: '取消', color: EXTERNAL_STATUS_COLORS.cancelled, to: '/sales/order-distribute',
+      text: `${statusCount.cancelled} 单已取消（订单进度＝已取消）`, tag: '取消', color: EXTERNAL_STATUS_COLORS.cancelled, to: '/sales/order-distribute',
     },
   ].filter(Boolean) as { text: string; tag: string; color: { bg: string; color: string }; to: string }[];
 
@@ -310,7 +310,7 @@ export default function SalesOverview() {
           headerRight={<Button size="sm" variant="ghost" onClick={() => navigate('/sales/sales-orders')}>前往销售单列表</Button>}
         >
           <Table
-            headers={['销售单号', '来源', '客户', '履约单数', '总金额', '分发进度', '履约进度', '结算进度', '开票进度', '录入时间', '操作']}
+            headers={['销售单号', '来源', '客户', '履约单数', '总金额', '订单状态', '分发进度', '履约进度', '结算进度', '录入时间', '操作']}
             rows={recentFamilies.map((f) => {
               const st = familyStatesOf(f);
               const amount = (f.children.length > 0 ? f.children : f.all).reduce((s, o) => s + o.totalAmount, 0);
@@ -325,10 +325,10 @@ export default function SalesOverview() {
                 <span key="cu" style={{ fontWeight: 'var(--font-medium)' }}>{f.mother.customerName}</span>,
                 <span key="n" style={{ textAlign: 'center' }}>{st.total} 单</span>,
                 <span key="a" className="mono" style={{ fontWeight: 'var(--font-semibold)' }}>{money(amount)}</span>,
+                <span key="st0">{fp(st.orderStatus)}</span>,
                 <span key="st1">{fp(st.distribute)}</span>,
                 <span key="st2">{fp(st.fulfill)}</span>,
                 <span key="st3">{fp(st.settle)}</span>,
-                <span key="st4">{fp(st.invoice)}</span>,
                 <span key="t" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>{f.mother.entryTime.slice(0, 10)}</span>,
                 <Button key="act" size="sm" variant="ghost" onClick={() => navigate('/sales/sales-orders')}>查看</Button>,
               ];

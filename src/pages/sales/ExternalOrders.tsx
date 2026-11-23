@@ -16,8 +16,7 @@ import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABE
 import { PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
 import { REGIONS, getCities, getDistricts, regionTextOf } from '../../data/regions';
 import { ProductItemsTable, FulfillmentProgressBlock, SettleInvoiceBlock } from './SalesOrderDetail';
-import { FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS, stageOfOrder } from '../../utils/fulfillment';
-import { buildFamilies, FAMILY_STATE_COLORS } from '../../utils/salesOrderFamily';
+import { buildFamilies, orderProgressOf, FAMILY_STATE_COLORS } from '../../utils/salesOrderFamily';
 import SplitDraftBuilder, { type DraftFulfillment } from '../../components/business/SplitDraftBuilder';
 import DispatchDialog from '../../components/business/DispatchDialog';
 import type { ExternalOrder } from '../../types';
@@ -41,25 +40,22 @@ const fulfillmentCodeOf = (o: ExternalOrder): string => (o.parentCode ? o.code :
 /** 销售单订单号（履约单上层订单编号）：子履约单指向母销售单；未拆分时为自身 */
 const salesOrderCodeOf = (o: ExternalOrder): string => o.parentCode ?? o.code;
 
-/** 分发状态：仅分发环节（待分发 / 分发比单中 / 待接单 / 分发已完成 / 已取消） */
+/** 分发状态 5 态（已取消归入订单进度，不再在分发状态中展示） */
 const DISTRIBUTE_STATE: Record<string, { label: string; bg: string; color: string }> = {
   pending: { label: '待分发', bg: '#FFF3E0', color: '#B26A00' },
   comparing: { label: '分发比单中', bg: '#EDE7F6', color: '#5E35B1' },
   self_pending: { label: '自营待接单', bg: '#E3F2FD', color: '#0F64B5' },
   distribute_pending: { label: '转派待接单', bg: '#E8F1FB', color: '#0F64B5' },
   processed: { label: '分发已完成', bg: '#E8F5E9', color: '#2E7D32' },
-  cancelled: { label: '已取消', bg: '#FFEBEE', color: '#C62828' },
 };
 const distributeStateOf = (o: ExternalOrder) =>
   DISTRIBUTE_STATE[mergedStatus(o.processStatus)] ?? { label: '—', bg: '#F5F5F5', color: '#9E9E9E' };
 
-/** 订单状态：履约当前状态（未履约 / 待接单 / 已接单 / 运输中 / 妥投 / 已确收 / 已取消） */
-const orderStateOf = (o: ExternalOrder) => {
-  if (o.processStatus === 'cancelled') return { label: '已取消', bg: '#FFEBEE', color: '#C62828' };
-  if (!o.fulfillment && !['self_pending', 'distribute_pending'].includes(o.processStatus)) return { label: '未履约', bg: '#F5F5F5', color: '#9E9E9E' };
-  const st = stageOfOrder(o);
-  const c = FULFILLMENT_STAGE_COLORS[st];
-  return { label: FULFILLMENT_STAGE_LABELS[st], bg: c.bg, color: c.color };
+/** 订单进度药丸（分发中 / 履约中 / 结算中 / 已办结 / 已取消） */
+const progressPill = (o: ExternalOrder) => {
+  const p = orderProgressOf(o);
+  const c = (FAMILY_STATE_COLORS as Record<string, { bg: string; color: string }>)[p] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
+  return pill(c.bg, c.color, p);
 };
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
@@ -456,7 +452,7 @@ export default function ExternalOrders() {
         {/* 子单平铺列表（逐单操作视图；母单聚合总览见「销售单管理 → 销售订单」） */}
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['序号', '销售履约单号', '销售单号', '订单来源', '销售路径', '客户', '收件人 / 地区', '品牌/数量', '金额', '分发状态', '分发方式', '履约主体', '录入时间', '操作']}
+            headers={['序号', '销售履约单号', '销售单号', '订单来源', '销售路径', '客户', '收件人 / 地区', '品牌/数量', '金额', '订单进度', '分发状态', '分发方式', '履约主体', '录入时间', '操作']}
             rows={pagedOrders.map((o, idx) => [
               <span key="no" className="mono cell-muted">{(page - 1) * pageSize + idx + 1}</span>,
               <span key="c" className="cell-mono-emph" style={{ whiteSpace: 'nowrap' }}>{fulfillmentCodeOf(o)}<span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{o.externalOrderNo ?? '—'}</span></span>,
@@ -498,6 +494,7 @@ export default function ExternalOrders() {
               </span>,
               <span key="bq" className="mono" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{brandQtyOf(o)}</span>,
               <span key="a" className="mono" style={{ fontWeight: 'var(--font-semibold)' }}>{money(o.totalAmount)}</span>,
+              <span key="pg" style={{ whiteSpace: 'nowrap' }}>{progressPill(o)}</span>,
               <span key="s" style={{ whiteSpace: 'nowrap' }}>
                 {(() => { const d = distributeStateOf(o); return pill(d.bg, d.color, d.label); })()}
               </span>,
@@ -848,7 +845,7 @@ export default function ExternalOrders() {
             {current.processStatus === 'cancelled' && (
               <DrawerSection title="订单已取消">
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', lineHeight: 1.7 }}>
-                  该订单已取消：分发状态与履约状态均显示<strong>已取消</strong>，不再参与分发与履约流转（见处理轨迹中的取消原因）。
+                  该订单已取消：<strong>订单进度＝已取消</strong>，分发与履约状态不再展示已取消，不再参与分发与履约流转（见处理轨迹中的取消原因）。
                 </div>
               </DrawerSection>
             )}
@@ -898,7 +895,7 @@ export default function ExternalOrders() {
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>取消订单</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-3)', lineHeight: 1.7 }}>
               确认取消订单 <strong className="mono">{cancelling.code}</strong>（{cancelling.customerName} · {money(cancelling.totalAmount)}）？
-              取消后<strong>分发状态与履约状态均变为已取消</strong>，不再参与后续流转。
+              取消后<strong>订单进度变为已取消</strong>，不再参与后续流转。
             </div>
             <div style={{ marginBottom: 'var(--space-3)' }}>
               <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>取消原因 *</label>
