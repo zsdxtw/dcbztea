@@ -4,6 +4,7 @@ import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
+import { customerPlatformRate } from '../../data/customers';
 import { usePriceStore, effectiveCustomerQuote } from '../../stores/priceStore';
 import { calcPlatformNetPrice } from '../../data/prices';
 import { customerItems, CUSTOMER_TYPE_LABELS } from '../../data/customers';
@@ -247,6 +248,8 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
       externalOrderNo: isVia ? externalOrderNo.trim() : undefined,
       platformCustomerId: isVia ? platformCustomerId : undefined,
       platformCustomerName: isVia ? (selectedPlatformCustomer?.name ?? '') : undefined,
+      // 订单价格快照规则：平台扣点下单即固化（销平台报价/实价随单不再随档案扣点调整变化）
+      platformRateSnapshot: isVia ? customerPlatformRate(customerSearch.trim(), platformCustomerId) : undefined,
       customerOrderTime: customerOrderTime || undefined,
       customerOrderNo: customerOrderNo.trim() || undefined,
       customerName: customerSearch.trim(),

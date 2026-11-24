@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Button from '../common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
-import { customerItems } from '../../data/customers';
+import { customerItems, orderPlatformRate } from '../../data/customers';
 import { usePriceStore, effectiveCustomerQuote } from '../../stores/priceStore';
 import { calcPlatformNetPrice } from '../../data/prices';
 import { platformLabelOf } from '../../data/externalOrders';
@@ -28,21 +28,17 @@ export default function SalesOrderInfoModal({ code, onClose }: { code: string | 
     if (!cust || cust.type === 'personal') return undefined;
     return effectiveCustomerQuote(quoteMap, cust.id, productId, products);
   };
-  /** 经平台订单：销平台报价 = 销售报价 ×(1−扣点) */
+  /** 经平台订单：销平台报价 = 销售报价 ×(1−平台扣点)；扣点取订单下单快照（订单价格快照规则，旧数据回退客户档案现值） */
   const platformQuoteOf = (o: ExternalOrder, productId: string): number | undefined => {
     if (o.salesPath !== 'via_platform' || !o.platformCustomerId) return undefined;
-    const cust = customerItems.find((c) => c.name === o.customerName);
-    const rate = cust?.platformCommissionRates?.[o.platformCustomerId] ?? '0%';
     const q = quoteOf(o, productId);
     if (q === undefined) return undefined;
-    return calcPlatformNetPrice(q, rate);
+    return calcPlatformNetPrice(q, `${orderPlatformRate(o)}%`);
   };
-  /** 经平台订单：销平台实价 = 销售实价 ×(1−扣点)；扣点取客户在该平台配置（订单级口径） */
+  /** 经平台订单：销平台实价 = 销售实价 ×(1−平台扣点)；扣点取订单下单快照（订单级口径，随单固化） */
   const platformNetOf = (o: ExternalOrder, salesPrice: number): number | undefined => {
     if (o.salesPath !== 'via_platform' || !o.platformCustomerId) return undefined;
-    const cust = customerItems.find((c) => c.name === o.customerName);
-    const rate = cust?.platformCommissionRates?.[o.platformCustomerId] ?? '0%';
-    return calcPlatformNetPrice(salesPrice, rate);
+    return calcPlatformNetPrice(salesPrice, `${orderPlatformRate(o)}%`);
   };
   const isViaOrder = (o: ExternalOrder) => o.salesPath === 'via_platform' && !!o.platformCustomerId;
   const marketOf = (productId: string): number | undefined =>

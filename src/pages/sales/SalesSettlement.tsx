@@ -6,6 +6,7 @@ import Button from '../../components/common/Button';
 import DetailDrawer from '../../components/common/DetailDrawer';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
+import { useSettlementStore, statementOfOrder, netOf, receivedOf } from '../../stores/settlementStore';
 import { SalesOrderDetailTabs } from './SalesOrderDetail';
 import { platformLabelOf } from '../../data/externalOrders';
 import {
@@ -29,6 +30,7 @@ type SettleTab = 'pending' | 'settling' | 'closed' | 'all';
 export default function SalesSettlement() {
   const orders = useOrderFlowStore((s) => s.orders);
   const poDocs = usePurchaseStore((s) => s.docs);
+  const statements = useSettlementStore((s) => s.statements);
   const [tab, setTab] = useState<SettleTab>('pending');
   const [msg, setMsg] = useState('');
   const [view, setView] = useState<{ root: string; child?: string } | null>(null);
@@ -96,9 +98,9 @@ export default function SalesSettlement() {
       <ContentHeader title="履约单结算" breadcrumbs={['销售', '销售单管理', '履约单结算']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-          对<strong>已确收</strong>的履约单发起<strong>对账结算</strong>（订单进度＝结算中），随后分别登记
-          <strong>收款</strong>（未收款 / 已收款）与<strong>开票</strong>（未开票 / 已开票）两个独立维度：
-          两者均完成 → 订单进度自动<strong>已办结</strong>；已完成收款但未开票的，可<strong>手工办结</strong>。
+          对<strong>已确收</strong>的履约单发起<strong>对账结算</strong>（订单进度＝结算中）。已纳入<strong>客户对账单</strong>的履约单由对账单统一
+          <strong>开票 / 收款核销</strong>（部分开票、部分收款支持，操作入口见「销售 → 客户对账」），本页展示其所属对账单与核销进度；
+          未纳入对账单的履约单可在本页零星登记收款 / 开票。收款与开票均完成 → 订单进度自动<strong>已办结</strong>。
         </div>
 
         {msg && (
@@ -114,9 +116,11 @@ export default function SalesSettlement() {
 
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['履约单号', '关联销售单', '客户', '履约主体', '金额', '履约状态', '收款状态', '开票状态', '结算状态', '订单进度', '操作']}
+            headers={['履约单号', '关联销售单', '客户', '履约主体', '金额', '履约状态', '所属对账单', '收款状态', '开票状态', '结算状态', '订单进度', '操作']}
             rows={shown.map((x) => {
               const o = x.order;
+              const stmt = statementOfOrder(statements, o.id);
+              const inStmt = !!stmt && stmt.status !== 'closed';
               return [
                 <span key="c" className="cell-mono-emph">{o.code}</span>,
                 o.parentCode
@@ -126,15 +130,24 @@ export default function SalesSettlement() {
                 <span key="sub" style={{ fontSize: 'var(--text-sm)' }}>{o.path === 'self' ? '淡茶半盏（自营）' : (o.partnerName ?? '—')}</span>,
                 <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(o.totalAmount)}</span>,
                 pill(x.fulfill),
+                stmt
+                  ? <span key="dz" className="mono" style={{ fontSize: 'var(--text-xs)' }}>
+                      {stmt.code}
+                      <span style={{ display: 'block', fontWeight: 400, color: 'var(--color-neutral-400)' }}>
+                        已收 {money(receivedOf(stmt))} / 净 {money(netOf(stmt))}
+                      </span>
+                    </span>
+                  : <span key="dz" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>未纳入</span>,
                 pill(x.received),
                 pill(x.invoice),
                 pill(x.settle),
                 pill(x.progress),
                 <div key="act" className="row-actions">
-                  {(x.progress === '履约中') && <Button size="sm" variant="ghost" onClick={() => startSettlement(o)}>发起对账结算</Button>}
-                  {x.progress !== '已办结' && x.received === '未收款' && <Button size="sm" variant="ghost" onClick={() => registerReceipt(o)}>登记收款</Button>}
-                  {x.progress !== '已办结' && x.invoice === '未开票' && <Button size="sm" variant="ghost" onClick={() => registerInvoice(o)}>登记开票</Button>}
-                  {x.progress !== '已办结' && x.received === '已收款' && x.invoice === '未开票' && <Button size="sm" variant="ghost" onClick={() => closeManually(o)}>手工办结</Button>}
+                  {x.progress === '履约中' && <Button size="sm" variant="ghost" onClick={() => startSettlement(o)}>发起对账结算</Button>}
+                  {!inStmt && x.progress !== '已办结' && x.received === '未收款' && <Button size="sm" variant="ghost" onClick={() => registerReceipt(o)}>登记收款</Button>}
+                  {!inStmt && x.progress !== '已办结' && x.invoice === '未开票' && <Button size="sm" variant="ghost" onClick={() => registerInvoice(o)}>登记开票</Button>}
+                  {!inStmt && x.progress !== '已办结' && x.received === '已收款' && x.invoice === '未开票' && <Button size="sm" variant="ghost" onClick={() => closeManually(o)}>手工办结</Button>}
+                  {inStmt && x.progress !== '已办结' && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>由对账单核销</span>}
                   <Button size="sm" variant="ghost" onClick={() => setView({ root: x.rootCode, child: o.code })}>查看</Button>
                 </div>,
               ];

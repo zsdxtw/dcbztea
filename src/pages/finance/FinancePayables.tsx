@@ -6,6 +6,7 @@ import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
+import { useSettlementStore, partnerPaidOfPo, partnerStatementOfPo } from '../../stores/settlementStore';
 import type {} from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
@@ -23,6 +24,7 @@ export default function FinancePayables() {
   const navigate = useNavigate();
   const docs = usePurchaseStore((s) => s.docs);
   const orders = useOrderFlowStore((s) => s.orders);
+  const statements = useSettlementStore((s) => s.partnerStatements);
   const [tab, setTab] = useState<'' | 'unsettled' | 'settled'>('');
 
   const orderById = useMemo(() => new Map(orders.map((o) => [o.id, o])), [orders]);
@@ -34,14 +36,16 @@ export default function FinancePayables() {
     const confirmed = d.deliveryMode === 'warehouse'
       ? ['received', 'partial_shipped', 'fully_shipped', 'delivered', 'settled'].includes(d.status)
       : ['delivered', 'settled'].includes(d.status);
-    const settled = d.status === 'settled';
+    const paid = partnerPaidOfPo(statements, d.id);
+    const settled = d.status === 'settled' || paid >= d.amount - 0.001;
     return {
       code: d.code, poCode: d.code, supplier: d.supplierName,
       type: d.source === 'distribute' ? '合作商直发' : d.deliveryMode === 'direct' ? '以销定采·直发' : '以销定采·入库',
       orderCode: d.childOrderCode, motherCode: o?.parentCode ?? d.motherCode,
-      amount: d.amount, confirmPoint, confirmed, settled,
+      amount: d.amount, paid: settled ? d.amount : paid, confirmPoint, confirmed, settled,
+      statement: partnerStatementOfPo(statements, d.id)?.code,
     };
-  }), [docs, orderById]);
+  }), [docs, orderById, statements]);
 
   const filtered = tab === '' ? rows : rows.filter((r) => (tab === 'settled' ? r.settled : !r.settled));
   const totalAP = rows.reduce((s, r) => s + r.amount, 0);
@@ -70,7 +74,7 @@ export default function FinancePayables() {
 
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['应付单号', '供应商', '采购类型', '采购订单', '关联销售订单', '采购金额', '确认节点', '应付状态']}
+            headers={['应付单号', '供应商', '采购类型', '采购订单', '关联销售订单', '采购金额', '已付金额', '未付金额', '确认节点', '应付状态']}
             rows={filtered.map((r) => [
               <span key="c" className="cell-mono-emph">AP-{r.poCode}</span>,
               <span key="s" className="cell-emph">{r.supplier}</span>,
@@ -78,6 +82,8 @@ export default function FinancePayables() {
               <span key="po" className="mono" style={{ fontSize: 'var(--text-sm)' }}>{r.poCode}</span>,
               <span key="so" className="mono" style={{ fontSize: 'var(--text-sm)' }}>{r.orderCode}<span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>母单 {r.motherCode}</span></span>,
               <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(r.amount)}</span>,
+              <span key="pd" className="mono" style={{ color: r.paid > 0 ? '#01795D' : 'var(--color-neutral-400)' }}>{money(r.paid)}{r.statement ? <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 400 }}>{r.statement}</span> : null}</span>,
+              <span key="un" className="mono" style={{ color: r.amount - r.paid > 0 ? '#B26A00' : 'var(--color-neutral-400)' }}>{money(r.amount - r.paid)}</span>,
               <span key="cp" style={{ fontSize: 'var(--text-sm)' }}>{r.confirmPoint}</span>,
               r.settled
                 ? pill('#ECEFF1', '#455A64', '已付清')

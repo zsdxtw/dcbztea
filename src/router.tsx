@@ -23,7 +23,6 @@ import CooperationScores from './pages/cooperation/CooperationScores';
 import CooperationNotices from './pages/cooperation/CooperationNotices';
 import CooperationNewArrivals from './pages/cooperation/CooperationNewArrivals';
 import ReferralManage from './pages/referral/ReferralManage';
-import PurchaseReconciliation from './pages/purchase/PurchaseReconciliation';
 import PurchaseReturn from './pages/purchase/PurchaseReturn';
 
 import SalesOverview from './pages/sales/SalesOverview';
@@ -173,7 +172,7 @@ export const router = createBrowserRouter([
       { path: 'cooperation/referral-manage', element: <ReferralManage /> },
       { path: 'cooperation', element: <Navigate to="/cooperation/cooperation-overview" replace /> },
       { path: 'purchase/purchase-store-overview', element: <PurchaseStoreOverview /> },
-      { path: 'purchase/purchase-reconciliation', element: <Navigate to="/finance/finance-supplier-reconciliation" replace /> },
+      { path: 'purchase/purchase-reconciliation', element: <Navigate to="/finance/finance-partner-settlement" replace /> },
       { path: 'purchase/direct-delivery-confirm', element: <DirectDeliveryConfirm /> },
       { path: 'purchase/purchase-return', element: <PurchaseReturn /> },
       /* ── 销售 ── */
@@ -238,7 +237,7 @@ export const router = createBrowserRouter([
       { path: 'finance/finance-sales-collection', element: <FinanceSalesCollection /> },
       { path: 'finance/finance-partner-settlement', element: <FinancePartnerSettlement /> },
       { path: 'finance/finance-customer-reconciliation', element: <SalesReconciliation /> },
-      { path: 'finance/finance-supplier-reconciliation', element: <PurchaseReconciliation /> },
+      { path: 'finance/finance-supplier-reconciliation', element: <Navigate to="/finance/finance-partner-settlement" replace /> },
       { path: 'finance/finance-profit', element: <FinanceProfit /> },
       { path: 'finance/finance-other-receivable', element: <FinanceOtherReceivable /> },
       { path: 'finance/finance-other-payable', element: <FinanceOtherPayable /> },

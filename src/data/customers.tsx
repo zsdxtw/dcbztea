@@ -3,7 +3,7 @@ import { generateCustomerCode } from '../utils/customerCode';
 
 /* ── 直营客户（无平台） ── */
 const directNoPlatform: CustomerItem[] = [
-  { id: 'c1', name: '华茗堂茶庄', shortName: '华茗堂', type: 'direct', viaPlatform: false, region: '北京', province: '北京', city: '北京市', district: '西城区', contactPerson: '张明华', contactPhone: '010-8234****', contactEmail: 'zmh@huamingtang.com', contactAddress: '马连道16号', level: 'A级', orders: 32, totalAmount: 386000, platformIds: [], developerId: 'emp-6', developerType: 'employee', developerName: '周丽华', maintainerId: 'emp-7', maintainerType: 'employee', maintainerName: '李娜', followerId: 'emp-8', followerType: 'employee', followerName: '王强', profitShare: { developerRatio: 50, maintainerRatio: 30, followerRatio: 20 }, cooperationDate: '2023-02-15', status: 'active', settlementMethod: '月结', taxNo: '91110102MA***1234', source: '展会拓客', remark: '长期合作，月均采购稳定',
+  { id: 'c1', name: '华茗堂茶庄', shortName: '华茗堂', type: 'direct', viaPlatform: false, region: '北京', province: '北京', city: '北京市', district: '西城区', contactPerson: '张明华', contactPhone: '010-8234****', contactEmail: 'zmh@huamingtang.com', contactAddress: '马连道16号', level: 'A级', orders: 32, totalAmount: 386000, platformIds: [], developerId: 'emp-6', developerType: 'employee', developerName: '周丽华', maintainerId: 'emp-7', maintainerType: 'employee', maintainerName: '李娜', followerId: 'emp-8', followerType: 'employee', followerName: '王强', profitShare: { developerRatio: 50, maintainerRatio: 30, followerRatio: 20 }, cooperationDate: '2023-02-15', status: 'active', settlementMethod: '月结', taxNo: '91110102MA***1234', dachaRate: 15, source: '展会拓客', remark: '长期合作，月均采购稳定',
     bankAccounts: [{ accountName: '北京华茗堂茶业有限公司', accountNo: '1100 **** **** 8821', bankName: '中国工商银行北京西城支行', bankNo: '102100000XXX' }],
     invoiceInfos: [{ invoiceEntity: '北京华茗堂茶业有限公司', taxNo: '91110102MA***1234', taxRate: '6%' }],
     orderContacts: [
@@ -23,7 +23,7 @@ const directNoPlatform: CustomerItem[] = [
       { id: 'oc-c2-1', name: '李雅芳', department: '采购部', phone: '0571-8612****', address: '杭州市西湖区龙井路88号', remark: '主联系人' },
     ],
   },
-  { id: 'c3', name: '品茗轩', shortName: '品茗轩', type: 'direct', viaPlatform: false, region: '广州', province: '广东', city: '广州市', district: '天河区', contactPerson: '陈志远', contactPhone: '020-8356****', level: 'B级', orders: 19, totalAmount: 168600, platformIds: [], developerId: 'emp-16', developerType: 'employee', developerName: '陈志远', maintainerId: 'emp-17', maintainerType: 'employee', maintainerName: '刘晓东', profitShare: { developerRatio: 50, maintainerRatio: 30, followerRatio: 20 }, cooperationDate: '2024-01-20', status: 'active', settlementMethod: '预付', source: '线上咨询',
+  { id: 'c3', name: '品茗轩', shortName: '品茗轩', type: 'direct', viaPlatform: false, region: '广州', province: '广东', city: '广州市', district: '天河区', contactPerson: '陈志远', contactPhone: '020-8356****', level: 'B级', orders: 19, totalAmount: 168600, platformIds: [], developerId: 'emp-16', developerType: 'employee', developerName: '陈志远', maintainerId: 'emp-17', maintainerType: 'employee', maintainerName: '刘晓东', profitShare: { developerRatio: 50, maintainerRatio: 30, followerRatio: 20 }, cooperationDate: '2024-01-20', status: 'active', settlementMethod: '预付', dachaRate: 12, source: '线上咨询',
     bankAccounts: [{ accountName: '广州品茗轩茶业有限公司', accountNo: '3602 **** **** 3398', bankName: '中国农业银行广州天河支行', bankNo: '10358400XXX' }],
     invoiceInfos: [{ invoiceEntity: '广州品茗轩茶业有限公司', taxNo: '91440106MA***9012', taxRate: '6%' }],
     orderContacts: [
@@ -48,7 +48,7 @@ const directNoPlatform: CustomerItem[] = [
 
 /* ── 直营客户（经平台） ── */
 const directViaPlatform: CustomerItem[] = [
-  { id: 'c6', name: '浦发银行', shortName: '浦发银行', type: 'direct', viaPlatform: true, region: '上海', province: '上海', city: '上海市', district: '浦东新区', contactPerson: '赵经理', contactPhone: '021-6123****', level: 'S级', orders: 18, totalAmount: 425000, platformIds: ['p1'], platformCommissionRates: { p1: '8%' }, developerId: 'emp-6', developerType: 'employee', developerName: '周丽华', maintainerId: 'emp-7', maintainerType: 'employee', maintainerName: '李娜', profitShare: { developerRatio: 50, maintainerRatio: 30, followerRatio: 20 }, cooperationDate: '2023-04-22', status: 'active', settlementMethod: '月结', source: '平台引流', remark: '企业福利采购，年节大宗订单',
+  { id: 'c6', name: '浦发银行', shortName: '浦发银行', type: 'direct', viaPlatform: true, region: '上海', province: '上海', city: '上海市', district: '浦东新区', contactPerson: '赵经理', contactPhone: '021-6123****', level: 'S级', orders: 18, totalAmount: 425000, platformIds: ['p1'], platformCommissionRates: { p1: '8%' }, developerId: 'emp-6', developerType: 'employee', developerName: '周丽华', maintainerId: 'emp-7', maintainerType: 'employee', maintainerName: '李娜', profitShare: { developerRatio: 50, maintainerRatio: 30, followerRatio: 20 }, cooperationDate: '2023-04-22', status: 'active', settlementMethod: '月结', dachaRate: 10, source: '平台引流', remark: '企业福利采购，年节大宗订单',
     bankAccounts: [{ accountName: '上海浦东发展银行股份有限公司', accountNo: '1002 **** **** 1234', bankName: '中国工商银行上海浦东支行', bankNo: '10229000XXX' }],
     invoiceInfos: [{ invoiceEntity: '上海浦东发展银行股份有限公司', taxNo: '91310115MA***0001', taxRate: '6%' }],
     orderContacts: [
@@ -211,6 +211,26 @@ const allCustomers: CustomerItem[] = [
 assignCodes(allCustomers);
 
 export const customerItems: CustomerItem[] = allCustomers;
+
+/** 平台扣点%（客户档案现值：按客户名 + 平台 ID 查 platformCommissionRates，如 "8%" → 8；未配置为 0） */
+export function customerPlatformRate(customerName: string, platformId?: string): number {
+  if (!platformId) return 0;
+  const raw = customerItems.find((c) => c.name === customerName)?.platformCommissionRates?.[platformId];
+  const n = raw ? parseFloat(raw) : NaN;
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** 订单平台扣点%（订单价格快照规则：platformRateSnapshot 下单快照优先；缺省回退客户档案现值——旧数据兜底；非经平台订单为 0） */
+export function orderPlatformRate(o: {
+  salesPath?: string;
+  platformCustomerId?: string;
+  customerName?: string;
+  platformRateSnapshot?: number;
+}): number {
+  if (o.salesPath !== 'via_platform') return 0;
+  if (o.platformRateSnapshot !== undefined) return o.platformRateSnapshot;
+  return customerPlatformRate(o.customerName ?? '', o.platformCustomerId);
+}
 
 export const CUSTOMER_TYPE_LABELS: Record<CustomerItem['type'], string> = {
   direct: '直营客户',

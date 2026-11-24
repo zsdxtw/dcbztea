@@ -7,6 +7,8 @@ import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../component
 import { useSupplierStore } from '../../stores/supplierStore';
 import { useScoreStore, computeScore, getScoreSummary, SCORE_DIMENSION_LABELS, buildScoreRules, MARKETING_CLAIM_TYPE_LABELS } from '../../stores/scoreStore';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
+import { usePurchaseStore } from '../../stores/purchaseStore';
+import { receiveStateOf } from '../../utils/salesOrderFamily';
 import { useReportStore } from '../../stores/reportStore';
 import { useReferralStore } from '../../stores/referralStore';
 import type { ScoreDimension } from '../../types';
@@ -28,6 +30,7 @@ const dimColor = (d: ScoreDimension) => {
 export default function CooperationScores() {
   const suppliers = useSupplierStore((s) => s.suppliers);
   const orders = useOrderFlowStore((s) => s.orders);
+  const poDocs = usePurchaseStore((s) => s.docs);
   const reports = useReportStore((s) => s.reports);
   const referrals = useReferralStore((s) => s.referrals);
   const entries = useScoreStore((s) => s.entries);
@@ -67,7 +70,15 @@ export default function CooperationScores() {
         .map((s) => computeScore({
           entries,
           supplier: s,
-          orders: orders.filter((o) => o.partnerId === s.id),
+          /* P7/F：经营积分取数 = 客户回款到位（settled）+ 合作商付款完成（paid，采购单已结算）双门槛 */
+          orders: orders.filter((o) => o.partnerId === s.id).map((o) => {
+            const pos = poDocs.filter((d) => d.childOrderId === o.id && d.source === 'distribute');
+            return {
+              ...o,
+              settled: receiveStateOf(o, poDocs.filter((d) => d.childOrderId === o.id)) === '已收款',
+              paid: pos.length > 0 && pos.every((d) => d.status === 'settled'),
+            };
+          }),
           reports: reports.filter((r) => r.partnerName === s.name),
           referrals: referrals.filter((r) => r.supplierId === s.id),
           referralScores: {
@@ -78,7 +89,7 @@ export default function CooperationScores() {
           quotedProductCount: quotedCountOf(s.id),
         }))
         .sort((a, b) => b.total - a.total),
-    [suppliers, orders, reports, referrals, entries, supplierStore],
+    [suppliers, orders, poDocs, reports, referrals, entries, supplierStore],
   );
 
   const filtered = useMemo(

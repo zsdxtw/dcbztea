@@ -4,16 +4,11 @@ import Card from '../../components/common/Card';
 import LineChart from '../../components/charts/LineChart';
 import PieChart from '../../components/charts/PieChart';
 import Button from '../../components/common/Button';
+import { useOrderFlowStore } from '../../stores/orderFlowStore';
+import { usePurchaseStore } from '../../stores/purchaseStore';
+import { useSettlementStore, netOf, receivedOf, partnerPaidOfPo } from '../../stores/settlementStore';
+import { receiveStateOf } from '../../utils/salesOrderFamily';
 import type { StatCardData } from '../../types';
-
-const stats: StatCardData[] = [
-  { label: '总收入', value: '2,156,800', unit: '¥', trend: { direction: 'up', value: '18.5%' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '总支出', value: '1,423,600', unit: '¥', trend: { direction: 'up', value: '8.2%' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 5h12l-1.2 8H4.2L3 5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg> },
-  { label: '应收余额', value: '586,200', unit: '¥', icon: <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 8h2M5 11h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
-  { label: '应付余额', value: '312,800', unit: '¥', icon: <svg viewBox="0 0 18 18" fill="none"><rect x="4" y="2" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h4M7 9h4M7 12h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
-  { label: '本月利润', value: '733,200', unit: '¥', trend: { direction: 'up', value: '25.3%' }, icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M7 10l2 2 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  { label: '利润率', value: '34.0', unit: '%', icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2l2.5 5 5.5.8-4 3.9.9 5.5L9 14.7 5.1 17.2l.9-5.5-4-3.9L7.5 7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg> },
-];
 
 const revenueTrendData = {
   labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月'],
@@ -47,7 +42,39 @@ function todoTypeColor(type: string) {
   }
 }
 
+/**
+ * 财务概览：应收 / 应付 / 收支按结算中心真实数据联动——
+ * 收入 = 客户对账单收款核销累计 + 未入对账单的已收款订单；支出 = 合作商付款核销 + 自营采购已结算；
+ * 应收余额 = 对账单净额 − 已收款；应付余额 = 未结算采购单金额 − 对账单已付分摊。
+ */
 export default function FinanceOverview() {
+  const orders = useOrderFlowStore((s) => s.orders);
+  const docs = usePurchaseStore((s) => s.docs);
+  const statements = useSettlementStore((s) => s.statements);
+  const partnerStatements = useSettlementStore((s) => s.partnerStatements);
+
+  const inStatement = new Set(statements.flatMap((s) => s.lines.map((l) => l.orderId)));
+  const receivedTotal = statements.reduce((acc, s) => acc + receivedOf(s), 0)
+    + orders.filter((o) => !inStatement.has(o.id) && o.processStatus !== 'cancelled' && receiveStateOf(o, docs.filter((d) => d.childOrderId === o.id)) === '已收款')
+      .reduce((acc, o) => acc + o.totalAmount, 0);
+  const paidTotal = partnerStatements.reduce((acc, s) => acc + s.payments.reduce((x, p) => x + p.amount, 0), 0)
+    + docs.filter((d) => d.source === 'self' && d.status === 'settled').reduce((acc, d) => acc + d.amount, 0);
+  const arBalance = statements.filter((s) => s.status !== 'pending').reduce((acc, s) => acc + Math.max(0, netOf(s) - receivedOf(s)), 0);
+  const apBalance = docs
+    .filter((d) => ['confirmed', 'received', 'partial_shipped', 'fully_shipped', 'delivered'].includes(d.status))
+    .reduce((acc, d) => acc + Math.max(0, d.amount - partnerPaidOfPo(partnerStatements, d.id)), 0);
+  const profit = receivedTotal - paidTotal;
+  const profitRate = receivedTotal > 0 ? ((profit / receivedTotal) * 100).toFixed(1) : '0.0';
+
+  const stats: StatCardData[] = [
+    { label: '总收入（已回款）', value: receivedTotal.toLocaleString(), unit: '¥', trend: { direction: 'up', value: '按对账单收款核销' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+    { label: '总支出（已付款）', value: paidTotal.toLocaleString(), unit: '¥', trend: { direction: 'up', value: '含自营采购结算' }, icon: <svg viewBox="0 0 18 18" fill="none"><path d="M3 5h12l-1.2 8H4.2L3 5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg> },
+    { label: '应收余额', value: arBalance.toLocaleString(), unit: '¥', icon: <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 8h2M5 11h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
+    { label: '应付余额', value: apBalance.toLocaleString(), unit: '¥', icon: <svg viewBox="0 0 18 18" fill="none"><rect x="4" y="2" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M7 6h4M7 9h4M7 12h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
+    { label: '利润（回款−付款）', value: profit.toLocaleString(), unit: '¥', trend: { direction: profit >= 0 ? 'up' : 'down', value: '毛口径' }, icon: <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M7 10l2 2 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+    { label: '利润率', value: profitRate, unit: '%', icon: <svg viewBox="0 0 18 18" fill="none"><path d="M9 2l2.5 5 5.5.8-4 3.9.9 5.5L9 14.7 5.1 17.2l.9-5.5-4-3.9L7.5 7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg> },
+  ];
+
   return (
     <>
       <ContentHeader title="财务概览" breadcrumbs={['财务', '财务概览']} actions={<Button><PlusIcon />新建收支</Button>} />

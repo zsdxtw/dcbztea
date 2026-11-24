@@ -1,141 +1,104 @@
-import { useState } from 'react';
+/**
+ * 财务 · 付款管理（合作商付款台账）
+ * 数据源 = 合作商对账单的付款记录（购销背对背的应付侧：付款核销完成 → 采购单已结算）。
+ * 对账生成 / 确认 / 付款核销在「财务 → 合作商结算」操作；本页为付款台账视角。
+ */
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
-import StatusTag from '../../components/common/StatusTag';
 import Button from '../../components/common/Button';
-import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
-import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
-import type {} from '../../types';
+import StatusTag from '../../components/common/StatusTag';
+import { useSettlementStore, partnerPaidOfPo } from '../../stores/settlementStore';
+import { usePurchaseStore } from '../../stores/purchaseStore';
 
-
-interface PaymentRecord {
-  code: string;
-  supplier: string;
-  reconciliationCode: string;
-  amount: string;
-  method: string;
-  date: string;
-  status: 'pending' | 'paying' | 'paid' | 'overdue';
-  bankName?: string;
-  bankAccount?: string;
-  invoiceCode?: string;
-  remark?: string;
-}
-
-const paymentItems: PaymentRecord[] = [
-  { code: 'PP-2025-0038', supplier: '杭州西湖茶叶有限公司', reconciliationCode: 'RC-2025-0128', amount: '¥ 86,000', method: '银行转账', date: '2025-07-15', status: 'paid', bankName: '工商银行杭州分行', bankAccount: '1202 0200 1234 5678', invoiceCode: 'INV-2025-0040', remark: '6月采购对账付款' },
-  { code: 'PP-2025-0037', supplier: '福建正山堂茶业有限责任公司', reconciliationCode: 'RC-2025-0127', amount: '¥ 56,000', method: '银行转账', date: '2025-07-12', status: 'paid', bankName: '建设银行武夷山支行', bankAccount: '3502 0100 9876 5432', invoiceCode: 'INV-2025-0038', remark: '红茶采购对账' },
-  { code: 'PP-2025-0036', supplier: '八马茶业股份有限公司', reconciliationCode: 'RC-2025-0126', amount: '¥ 42,500', method: '承兑汇票', date: '2025-07-20', status: 'paying', bankName: '农业银行安溪支行', bankAccount: '1302 0300 5678 1234', invoiceCode: 'INV-2025-0036', remark: '铁观音采购对账' },
-  { code: 'PP-2025-0035', supplier: '福鼎白茶厂', reconciliationCode: 'RC-2025-0125', amount: '¥ 32,800', method: '银行转账', date: '2025-07-18', status: 'pending', bankName: '中国银行福鼎支行', bankAccount: '6102 0400 4321 8765', invoiceCode: 'INV-2025-0034', remark: '白茶采购对账' },
-  { code: 'PP-2025-0034', supplier: '云南普洱茶业集团有限公司', reconciliationCode: 'RC-2025-0124', amount: '¥ 45,600', method: '银行转账', date: '2025-07-08', status: 'overdue', bankName: '工商银行昆明分行', bankAccount: '2502 0500 8765 4321', remark: '逾期未付，需催办' },
-  { code: 'PP-2025-0033', supplier: '安溪铁观音集团', reconciliationCode: 'RC-2025-0123', amount: '¥ 28,200', method: '银行转账', date: '2025-07-10', status: 'paid', bankName: '建设银行安溪支行', bankAccount: '3502 0600 1357 2468', invoiceCode: 'INV-2025-0032', remark: '铁观音补货对账' },
-  { code: 'PP-2025-0032', supplier: '武夷山茶业有限公司', reconciliationCode: 'RC-2025-0122', amount: '¥ 18,500', method: '银行转账', date: '2025-07-05', status: 'overdue', bankName: '农业银行武夷山支行', bankAccount: '1302 0700 2468 1357', remark: '逾期3天，需跟进' },
-  { code: 'PP-2025-0031', supplier: '黄山毛峰茶业有限公司', reconciliationCode: 'RC-2025-0121', amount: '¥ 22,600', method: '支付宝', date: '2025-07-22', status: 'pending', bankName: '支付宝账户', bankAccount: 'hsmaofeng@alipay.com', remark: '绿茶采购对账' },
-];
-
-function paymentStatusToVariant(status: string) {
-  switch (status) {
-    case 'paid': return 'success' as const;
-    case 'paying': return 'info' as const;
-    case 'pending': return 'warning' as const;
-    case 'overdue': return 'error' as const;
-    default: return 'info' as const;
-  }
-}
-
-function paymentStatusLabel(status: string) {
-  switch (status) {
-    case 'paid': return '已付款';
-    case 'paying': return '付款中';
-    case 'pending': return '待付款';
-    case 'overdue': return '已逾期';
-    default: return status;
-  }
-}
+const money = (n: number) => `¥${n.toLocaleString()}`;
 
 export default function FinancePurchasePayment() {
-  const [showDetail, setShowDetail] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(null);
+  const navigate = useNavigate();
+  const partnerStatements = useSettlementStore((s) => s.partnerStatements);
+  const poDocs = usePurchaseStore((s) => s.docs);
+  const [keyword, setKeyword] = useState('');
+  const [view, setView] = useState<'records' | 'pending'>('records');
 
-  const handleView = (item: PaymentRecord) => {
-    setSelectedPayment(item);
-    setShowDetail(true);
-  };
+  /** 付款记录：合作商对账单付款流水 */
+  const records = useMemo(() => partnerStatements.flatMap((s) => s.payments.map((p) => ({
+    id: p.id, code: s.code, supplier: s.supplierName, amount: p.amount, date: p.date,
+    account: p.account ?? '', remark: p.remark ?? '',
+  }))).sort((a, b) => b.date.localeCompare(a.date)), [partnerStatements]);
+
+  /** 待付款：已确认合作商对账单的未付余额（付款核销未完成） */
+  const pending = useMemo(() => partnerStatements
+    .filter((s) => s.status === 'confirmed' && s.payments.reduce((acc, p) => acc + p.amount, 0) < s.amount - 0.001)
+    .map((s) => {
+      const paid = s.payments.reduce((acc, p) => acc + p.amount, 0);
+      return { code: s.code, supplier: s.supplierName, amount: s.amount, paid, balance: s.amount - paid, poCount: s.lines.length };
+    }), [partnerStatements]);
+
+  const kw = keyword.trim();
+  const filteredRecords = kw ? records.filter((r) => r.code.includes(kw) || r.supplier.includes(kw)) : records;
+  const filteredPending = kw ? pending.filter((p) => p.code.includes(kw) || p.supplier.includes(kw)) : pending;
+  const totalPaid = records.reduce((s, r) => s + r.amount, 0);
+  /** 未入对账单但已签收未结算的采购单金额（待生成对账单） */
+  const unStatemented = poDocs
+    .filter((d) => d.status === 'delivered' && !partnerStatements.some((s) => s.lines.some((l) => l.poId === d.id)) && partnerPaidOfPo(partnerStatements, d.id) < d.amount - 0.001)
+    .reduce((s, d) => s + d.amount, 0);
 
   return (
     <>
-      <ContentHeader title="付款管理" breadcrumbs={['财务', '应收应付', '付款管理']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建付款</Button></>} />
+      <ContentHeader title="付款管理" breadcrumbs={['财务', '应收应付', '付款管理']} actions={<Button onClick={() => navigate('/finance/finance-partner-settlement')}>去合作商结算付款 →</Button>} />
       <div className="content-body">
-        <FilterBar>
-          <FilterInput placeholder="搜索付款单号、供应商..." />
-          <FilterSelect options={['全部状态', '待付款', '付款中', '已付款', '已逾期']} />
-          <FilterSelect options={['全部供应商', '杭州西湖茶叶有限公司', '福建正山堂茶业有限责任公司', '八马茶业股份有限公司', '福鼎白茶厂', '云南普洱茶业集团有限公司', '安溪铁观音集团', '武夷山茶业有限公司', '黄山毛峰茶业有限公司']} />
-          <FilterSelect options={['全部时间', '今日', '本周', '本月', '近3月']} />
-        </FilterBar>
-        <Card>
-          <Table
-            headers={['付款单号', '供应商', '对账单号', '付款金额', '付款方式', '付款日期', '状态', '操作']}
-            rows={paymentItems.map((p) => [
-              <span className="mono">{p.code}</span>,
-              <span className="cell-emph">{p.supplier}</span>,
-              <span className="mono">{p.reconciliationCode}</span>,
-              <span className="mono">{p.amount}</span>,
-              p.method,
-              <span className="mono">{p.date}</span>,
-              <StatusTag variant={paymentStatusToVariant(p.status)} label={paymentStatusLabel(p.status)} />,
-              <div className="row-actions">
-                <Button size="sm" variant="ghost" onClick={() => handleView(p)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => handleView(p)}>编辑</Button>
-              </div>,
-            ])}
-          />
-        </Card>
-      </div>
+        <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
+          合作商付款台账（<strong>购销背对背</strong>的应付侧）：数据来自<strong>合作商对账单</strong>的付款核销，
+          付款按合作商独立账期执行、不以客户回款为前提；付款核销完成 → 关联采购单置为已结算。
+          累计付款 <strong className="mono">{money(totalPaid)}</strong> · 已签收未入对账单 {money(unStatemented)}（待生成对账单）。
+        </div>
 
-      <DetailDrawer
-        open={showDetail && !!selectedPayment}
-        onClose={() => setShowDetail(false)}
-        badge="PP"
-        title={selectedPayment?.code}
-        statusTag={selectedPayment && <StatusTag variant={paymentStatusToVariant(selectedPayment.status)} label={paymentStatusLabel(selectedPayment.status)} />}
-        subtitle={selectedPayment && `${selectedPayment.supplier} · ${selectedPayment.amount}`}
-        mode="view"
-      >
-        {selectedPayment && (
-          <>
-            <DrawerSection title="基本信息">
-              <InfoGrid cols={3}>
-                <InfoItem label="付款单号" emph mono>{selectedPayment.code}</InfoItem>
-                <InfoItem label="供应商" emph>{selectedPayment.supplier}</InfoItem>
-                <InfoItem label="对账单号" mono>{selectedPayment.reconciliationCode}</InfoItem>
-                <InfoItem label="付款金额" mono valueStyle={{ color: 'var(--color-module-current-base)', fontWeight: 'var(--font-semibold)' }}>{selectedPayment.amount}</InfoItem>
-                <InfoItem label="付款方式">{selectedPayment.method}</InfoItem>
-                <InfoItem label="付款日期" mono>{selectedPayment.date}</InfoItem>
-                <InfoItem label="备注" span={3}>{selectedPayment.remark || '—'}</InfoItem>
-              </InfoGrid>
-            </DrawerSection>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap', alignItems: 'center' }}>
+          {([['records', `付款记录 ${records.length}`], ['pending', `待付款 ${pending.length}`]] as const).map(([k, label]) => (
+            <button key={k} className={`tab-card-simple${view === k ? ' active' : ''}`} onClick={() => setView(k as typeof view)}>{label}</button>
+          ))}
+          <input className="filter-input" placeholder="搜索对账单号、合作商..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 240 }} />
+        </div>
 
-            <DrawerSection title="发票信息">
-              <InfoGrid cols={3}>
-                <InfoItem label="发票编号" mono>{selectedPayment.invoiceCode || '—'}</InfoItem>
-                <InfoItem label="发票类型">增值税专用发票</InfoItem>
-              </InfoGrid>
-            </DrawerSection>
-
-            <DrawerSection title="银行信息">
-              <InfoGrid cols={3}>
-                <InfoItem label="开户行" span={2} valueStyle={{ color: 'var(--color-module-finance-secondary)' }}>{selectedPayment.bankName || '—'}</InfoItem>
-                <InfoItem label="银行账号" mono valueStyle={{ color: 'var(--color-module-finance-secondary)' }}>{selectedPayment.bankAccount || '—'}</InfoItem>
-              </InfoGrid>
-            </DrawerSection>
-          </>
+        {view === 'records' ? (
+          <Card style={{ padding: 0 }}>
+            <Table
+              headers={['付款日期', '对账单号', '合作商', '付款金额', '付款账户', '备注']}
+              rows={filteredRecords.map((r) => [
+                <span key="d" className="mono">{r.date}</span>,
+                <span key="c" className="cell-mono-emph">{r.code}</span>,
+                <span key="s" className="cell-emph">{r.supplier}</span>,
+                <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)', color: '#CB405D' }}>{money(r.amount)}</span>,
+                <span key="ac" style={{ fontSize: 'var(--text-sm)' }}>{r.account || '—'}</span>,
+                <span key="rm" className="cell-muted" style={{ fontSize: 'var(--text-sm)' }}>{r.remark || '—'}</span>,
+              ])}
+            />
+            {filteredRecords.length === 0 && (
+              <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>暂无付款记录（在合作商结算付款核销后展示）</div>
+            )}
+          </Card>
+        ) : (
+          <Card style={{ padding: 0 }}>
+            <Table
+              headers={['对账单号', '合作商', '采购单数', '应付金额', '已付', '未付余额', '状态']}
+              rows={filteredPending.map((p) => [
+                <span key="c" className="cell-mono-emph">{p.code}</span>,
+                <span key="s" className="cell-emph">{p.supplier}</span>,
+                <span key="n" className="mono">{p.poCount} 张</span>,
+                <span key="a" className="mono">{money(p.amount)}</span>,
+                <span key="pd" className="mono" style={{ color: '#01795D' }}>{money(p.paid)}</span>,
+                <span key="b" className="mono" style={{ color: '#B26A00', fontWeight: 'var(--font-semibold)' }}>{money(p.balance)}</span>,
+                <StatusTag variant="warning" label="已确认 · 待付款" />,
+              ])}
+            />
+            {filteredPending.length === 0 && (
+              <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>暂无待付款对账单</div>
+            )}
+          </Card>
         )}
-      </DetailDrawer>
+      </div>
     </>
   );
-}
-
-function PlusIcon() {
-  return <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
 }

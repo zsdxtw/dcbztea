@@ -13,6 +13,8 @@ import type {
 } from '../types';
 import { externalOrderSeeds } from '../data/externalOrders';
 import { usePriceStore } from './priceStore';
+import { useSupplierStore } from './supplierStore';
+import { customerItems, orderPlatformRate } from '../data/customers';
 import type { SupplyPlanLine } from '../types';
 import { getStock } from '../data/stock';
 import { nextShipmentCode, soRootOf } from '../utils/orderCodes';
@@ -30,6 +32,29 @@ const nowMin = () => new Date().toISOString().slice(0, 16).replace('T', ' ');
 const purchasePriceOf = (it: { productId: string; price: number }, supplierId: string): number => {
   const rule = usePriceStore.getState().purchaseRules.find((r) => r.productId === it.productId && r.supplierId === supplierId && r.status === 'active');
   return rule?.purchasePrice ?? Math.round(it.price * 0.55);
+};
+
+/** 客户维度淡茶扣点（客户档案标准字段；扣点模式采购价 = 销售实价 ×（1 − 淡茶扣点），不随供货合作商变化） */
+const dachaRateOf = (customerName: string): number | undefined =>
+  customerItems.find((c) => c.name === customerName)?.dachaRate;
+
+/**
+ * 合作模式感知的采购口径单价（P4）：
+ * - 扣点模式（合作商 types 含 service）：扣点比例 = 淡茶扣点 + 平台扣点（经平台销售才加平台扣点，
+ *   平台扣点取订单下单快照——订单价格快照规则，缺省回退客户档案现值），
+ *   采购价 = 销售实价 ×（1 − 扣点比例/100）；淡茶扣点为客户维度属性，不随供货合作商变化；
+ * - 差价模式：按供应商采购价规则（缺省销售实价 55%）。
+ */
+const coopAwarePriceOf = (child: ExternalOrder, it: { productId: string; price: number }, supplierId: string): number => {
+  const supplier = useSupplierStore.getState().suppliers.find((s) => s.id === supplierId);
+  const coopMode = child.coopMode ?? (supplier?.types.includes('service') ? 'service' : 'supplier');
+  if (coopMode === 'service') {
+    const dacha = dachaRateOf(child.customerName) ?? 0;
+    const platform = orderPlatformRate(child);
+    const rate = Math.min(100, dacha + platform);
+    if (rate > 0) return Math.round(it.price * (1 - rate / 100));
+  }
+  return purchasePriceOf(it, supplierId);
 };
 
 interface CreateInput {
@@ -65,8 +90,10 @@ interface PurchaseState {
   deliverAllByChild: (childCode: string) => void;
   /** 全部已妥投包裹确认收货（管理后台确收联动） */
   confirmAllByChild: (childCode: string) => void;
-  /** 结算（按发货单粒度：不传 packageNos 全部结算；传入则部分结算） */
+  /** 结算（按发货单粒度：不传 packageNos 全部结算；传入则部分结算；无包裹采购单按单结算） */
   settleByChild: (childCode: string, packageNos?: string[]) => void;
+  /** 移除子单的采购单（合作商退回 / 取回时清理未发货 PO；已发货保留走线下召回） */
+  removeByChild: (childCode: string) => void;
   /** 入库制 PO 到货入库 */
   receiveByChild: (childCode: string) => void;
   /** 按子单查询其全部 PO（自营多源进度派生） */
@@ -194,7 +221,7 @@ function buildDoc(child: ExternalOrder, source: PurchaseDocSource, priceOf: ((it
   const items: PurchaseDocItem[] = child.items.map((it) => ({
     productId: it.productId, productName: it.productName, spec: it.spec,
     quantity: it.quantity, shippedQty: 0,
-    price: priceOf ? priceOf(it) : purchasePriceOf(it, child.partnerId ?? ''),
+    price: priceOf ? priceOf(it) : coopAwarePriceOf(child, it, child.partnerId ?? child.selfPo?.supplierId ?? ''),
   }));
   return {
     id: `po_${child.id}`,
@@ -320,14 +347,23 @@ export const usePurchaseStore = create<PurchaseState>((set, get) => {
 
     settleByChild: (childCode, packageNos) => {
       patchDoc(childCode, (d) => {
+        const active = d.packages.filter((x) => x.status !== 'void');
+        /* P8：无有效包裹的采购单（运行时生成的入库制 / 补结算）按单直接置为已结算 */
+        if (active.length === 0) return { ...d, status: 'settled' as const };
         const packages = d.packages.map((p) => (
           (!packageNos || packageNos.includes(p.packageNo)) && (p.status === 'delivered' || p.status === 'confirmed')
             ? { ...p, settled: true } : p
         ));
-        const active = packages.filter((x) => x.status !== 'void');
-        const allSettled = active.length > 0 && active.every((x) => x.settled);
+        const activePkgs = packages.filter((x) => x.status !== 'void');
+        const allSettled = activePkgs.length > 0 && activePkgs.every((x) => x.settled);
         return { ...d, packages, status: allSettled ? ('settled' as const) : d.status };
       });
+    },
+
+    removeByChild: (childCode) => {
+      set((s) => ({
+        docs: s.docs.filter((d) => !(d.childOrderCode === childCode && ['pending', 'confirmed'].includes(d.status))),
+      }));
     },
 
     /** 入库制 PO 到货入库（已确认/部分到货 → 已入库） */

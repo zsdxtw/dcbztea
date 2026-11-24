@@ -1,133 +1,104 @@
-import { useState } from 'react';
+/**
+ * 财务 · 收款管理（客户回款台账）
+ * 数据源 = 客户对账单的收款记录（含钱包余额支付）；未收余额按对账单展示。
+ * 收款登记操作在「销售 → 客户对账」；本页为回款台账视角。
+ */
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
-import StatusTag from '../../components/common/StatusTag';
 import Button from '../../components/common/Button';
-import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
-import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
-import type {} from '../../types';
+import StatusTag from '../../components/common/StatusTag';
+import { useSettlementStore, netOf, receivedOf } from '../../stores/settlementStore';
+import { RECEIPT_METHOD_LABELS } from '../../types';
+import type { StatementStatus } from '../../types';
 
+const money = (n: number) => `¥${n.toLocaleString()}`;
 
-interface CollectionRecord {
-  code: string;
-  customer: string;
-  reconciliationCode: string;
-  amount: string;
-  method: string;
-  date: string;
-  status: 'pending' | 'collecting' | 'received' | 'overdue';
-  bankName?: string;
-  bankAccount?: string;
-  remark?: string;
-}
-
-const collectionItems: CollectionRecord[] = [
-  { code: 'SC-2025-0042', customer: '华茗堂茶庄', reconciliationCode: 'RC-2025-0138', amount: '¥ 68,000', method: '银行转账', date: '2025-07-15', status: 'received', bankName: '工商银行杭州分行', bankAccount: '1202 0200 5678 1234', remark: '6月销售对账回款' },
-  { code: 'SC-2025-0041', customer: '雅韵茶社', reconciliationCode: 'RC-2025-0137', amount: '¥ 45,600', method: '微信支付', date: '2025-07-14', status: 'received', bankName: '微信支付', bankAccount: 'yayun_tea@wechat', remark: '7月订单回款' },
-  { code: 'SC-2025-0040', customer: '清心茶坊', reconciliationCode: 'RC-2025-0136', amount: '¥ 82,400', method: '银行转账', date: '2025-07-18', status: 'pending', bankName: '建设银行杭州分行', bankAccount: '3302 0100 4321 8765', remark: '待客户确认对账' },
-  { code: 'SC-2025-0039', customer: '品茗轩', reconciliationCode: 'RC-2025-0135', amount: '¥ 128,000', method: '承兑汇票', date: '2025-07-20', status: 'collecting', bankName: '农业银行杭州分行', bankAccount: '1202 0300 8765 4321', remark: '承兑汇票到期日8月20日' },
-  { code: 'SC-2025-0038', customer: '翠竹茶行', reconciliationCode: 'RC-2025-0134', amount: '¥ 52,500', method: '银行转账', date: '2025-07-10', status: 'overdue', bankName: '中国银行杭州分行', bankAccount: '5402 0400 1357 2468', remark: '逾期5天，需催收' },
-  { code: 'SC-2025-0037', customer: '茗香斋', reconciliationCode: 'RC-2025-0133', amount: '¥ 38,600', method: '微信支付', date: '2025-07-12', status: 'received', bankName: '微信支付', bankAccount: 'mingxiangzhai@wechat', remark: '7月销售回款' },
-  { code: 'SC-2025-0036', customer: '和风茶屋', reconciliationCode: 'RC-2025-0132', amount: '¥ 96,800', method: '支付宝', date: '2025-07-22', status: 'pending', bankName: '支付宝', bankAccount: 'hefeng_tea@alipay.com', remark: '待回款确认' },
-  { code: 'SC-2025-0035', customer: '云隐茶庄', reconciliationCode: 'RC-2025-0131', amount: '¥ 74,300', method: '银行转账', date: '2025-07-05', status: 'overdue', bankName: '工商银行杭州分行', bankAccount: '1202 0500 2468 1357', remark: '逾期8天，已发催收函' },
-];
-
-function collectionStatusToVariant(status: string) {
-  switch (status) {
-    case 'received': return 'success' as const;
-    case 'collecting': return 'info' as const;
-    case 'pending': return 'warning' as const;
-    case 'overdue': return 'error' as const;
-    default: return 'info' as const;
-  }
-}
-
-function collectionStatusLabel(status: string) {
-  switch (status) {
-    case 'received': return '已回款';
-    case 'collecting': return '回款中';
-    case 'pending': return '待回款';
-    case 'overdue': return '已逾期';
-    default: return status;
-  }
-}
+const METHOD_TONE: Record<string, 'success' | 'info' | 'warning' | 'error' | 'default'> = {
+  bank: 'success', wallet: 'info', cash: 'default', acceptance: 'warning', alipay: 'info', wechat: 'info',
+};
 
 export default function FinanceSalesCollection() {
-  const [showDetail, setShowDetail] = useState(false);
-  const [selectedCollection, setSelectedCollection] = useState<CollectionRecord | null>(null);
+  const navigate = useNavigate();
+  const statements = useSettlementStore((s) => s.statements);
+  const [keyword, setKeyword] = useState('');
+  const [view, setView] = useState<'records' | 'pending'>('records');
 
-  const handleView = (item: CollectionRecord) => {
-    setSelectedCollection(item);
-    setShowDetail(true);
-  };
+  /** 回款记录：对账单收款流水（每笔一行） */
+  const records = useMemo(() => statements.flatMap((s) => s.receipts.map((r) => ({
+    id: r.id, code: s.code, target: s.settleTarget, amount: r.amount, date: r.date,
+    method: r.method as string, remark: r.remark ?? '', wallet: r.method === 'wallet',
+  }))).sort((a, b) => b.date.localeCompare(a.date)), [statements]);
+
+  /** 待回款：已确认对账单的未收余额 */
+  const pending = useMemo(() => statements
+    .filter((s) => (s.status === 'confirmed' || s.status === 'disputed') && receivedOf(s) < netOf(s) - 0.001)
+    .map((s) => ({
+      code: s.code, target: s.settleTarget, net: netOf(s), rec: receivedOf(s),
+      balance: netOf(s) - receivedOf(s), status: s.status as StatementStatus,
+    })), [statements]);
+
+  const kw = keyword.trim();
+  const filteredRecords = kw ? records.filter((r) => r.code.includes(kw) || r.target.includes(kw)) : records;
+  const filteredPending = kw ? pending.filter((p) => p.code.includes(kw) || p.target.includes(kw)) : pending;
+  const totalReceived = records.reduce((s, r) => s + r.amount, 0);
+  const walletReceived = records.filter((r) => r.wallet).reduce((s, r) => s + r.amount, 0);
 
   return (
     <>
-      <ContentHeader title="收款管理" breadcrumbs={['财务', '应收应付', '收款管理']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建回款</Button></>} />
+      <ContentHeader title="收款管理" breadcrumbs={['财务', '应收应付', '收款管理']} actions={<Button onClick={() => navigate('/sales/sales-reconciliation')}>去登记收款 →</Button>} />
       <div className="content-body">
-        <FilterBar>
-          <FilterInput placeholder="搜索回款单号、客户..." />
-          <FilterSelect options={['全部状态', '待回款', '回款中', '已回款', '已逾期']} />
-          <FilterSelect options={['全部客户', '华茗堂茶庄', '雅韵茶社', '清心茶坊', '品茗轩', '翠竹茶行', '茗香斋', '和风茶屋', '云隐茶庄']} />
-          <FilterSelect options={['全部时间', '今日', '本周', '本月', '近3月']} />
-        </FilterBar>
-        <Card>
-          <Table
-            headers={['回款单号', '客户', '对账单号', '回款金额', '回款方式', '回款日期', '状态', '操作']}
-            rows={collectionItems.map((c) => [
-              <span className="mono">{c.code}</span>,
-              <span className="cell-emph">{c.customer}</span>,
-              <span className="mono">{c.reconciliationCode}</span>,
-              <span className="mono">{c.amount}</span>,
-              c.method,
-              <span className="mono">{c.date}</span>,
-              <StatusTag variant={collectionStatusToVariant(c.status)} label={collectionStatusLabel(c.status)} />,
-              <div className="row-actions">
-                <Button size="sm" variant="ghost" onClick={() => handleView(c)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => handleView(c)}>编辑</Button>
-              </div>,
-            ])}
-          />
-        </Card>
-      </div>
+        <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
+          客户回款台账：数据来自<strong>客户对账单</strong>的收款登记（支持部分收款，多笔到账逐步核销）；
+          预付客户可选<strong>钱包余额支付</strong>（核销扣减客户钱包）。累计回款 <strong className="mono">{money(totalReceived)}</strong>
+          （其中钱包支付 {money(walletReceived)}）。
+        </div>
 
-      <DetailDrawer
-        open={showDetail && !!selectedCollection}
-        onClose={() => setShowDetail(false)}
-        badge="SC"
-        title={selectedCollection?.code}
-        statusTag={selectedCollection && <StatusTag variant={collectionStatusToVariant(selectedCollection.status)} label={collectionStatusLabel(selectedCollection.status)} />}
-        subtitle={selectedCollection && `${selectedCollection.customer} · ${selectedCollection.amount}`}
-        mode="view"
-      >
-        {selectedCollection && (
-          <>
-            <DrawerSection title="基本信息">
-              <InfoGrid cols={3}>
-                <InfoItem label="回款单号" emph mono>{selectedCollection.code}</InfoItem>
-                <InfoItem label="客户" emph>{selectedCollection.customer}</InfoItem>
-                <InfoItem label="对账单号" mono>{selectedCollection.reconciliationCode}</InfoItem>
-                <InfoItem label="回款金额" mono valueStyle={{ color: 'var(--color-module-current-base)', fontWeight: 'var(--font-semibold)' }}>{selectedCollection.amount}</InfoItem>
-                <InfoItem label="回款方式">{selectedCollection.method}</InfoItem>
-                <InfoItem label="回款日期" mono>{selectedCollection.date}</InfoItem>
-                <InfoItem label="备注" span={3}>{selectedCollection.remark || '—'}</InfoItem>
-              </InfoGrid>
-            </DrawerSection>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap', alignItems: 'center' }}>
+          {([['records', `回款记录 ${records.length}`], ['pending', `待回款 ${pending.length}`]] as const).map(([k, label]) => (
+            <button key={k} className={`tab-card-simple${view === k ? ' active' : ''}`} onClick={() => setView(k as typeof view)}>{label}</button>
+          ))}
+          <input className="filter-input" placeholder="搜索对账单号、结算对象..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 240 }} />
+        </div>
 
-            <DrawerSection title="收款账户">
-              <InfoGrid cols={3}>
-                <InfoItem label="收款银行/平台" span={2} valueStyle={{ color: 'var(--color-module-finance-secondary)' }}>{selectedCollection.bankName || '—'}</InfoItem>
-                <InfoItem label="收款账号" mono valueStyle={{ color: 'var(--color-module-finance-secondary)' }}>{selectedCollection.bankAccount || '—'}</InfoItem>
-              </InfoGrid>
-            </DrawerSection>
-          </>
+        {view === 'records' ? (
+          <Card style={{ padding: 0 }}>
+            <Table
+              headers={['回款日期', '对账单号', '结算对象', '回款金额', '收款方式', '备注']}
+              rows={filteredRecords.map((r) => [
+                <span key="d" className="mono">{r.date}</span>,
+                <span key="c" className="cell-mono-emph">{r.code}</span>,
+                <span key="t" className="cell-emph">{r.target}</span>,
+                <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)', color: '#01795D' }}>{money(r.amount)}</span>,
+                <StatusTag key="m" variant={METHOD_TONE[r.method] ?? 'info'} label={RECEIPT_METHOD_LABELS[r.method as keyof typeof RECEIPT_METHOD_LABELS] ?? r.method} />,
+                <span key="rm" className="cell-muted" style={{ fontSize: 'var(--text-sm)' }}>{r.remark || '—'}</span>,
+              ])}
+            />
+            {filteredRecords.length === 0 && (
+              <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>暂无回款记录（在客户对账登记收款后展示）</div>
+            )}
+          </Card>
+        ) : (
+          <Card style={{ padding: 0 }}>
+            <Table
+              headers={['对账单号', '结算对象', '对账净额', '已收', '未收余额', '对账状态']}
+              rows={filteredPending.map((p) => [
+                <span key="c" className="cell-mono-emph">{p.code}</span>,
+                <span key="t" className="cell-emph">{p.target}</span>,
+                <span key="n" className="mono">{money(p.net)}</span>,
+                <span key="r" className="mono" style={{ color: '#01795D' }}>{money(p.rec)}</span>,
+                <span key="b" className="mono" style={{ color: '#B26A00', fontWeight: 'var(--font-semibold)' }}>{money(p.balance)}</span>,
+                <StatusTag key="s" variant={p.status === 'disputed' ? 'error' : 'warning'} label={p.status === 'disputed' ? '有异议' : '已确认 · 待收'} />,
+              ])}
+            />
+            {filteredPending.length === 0 && (
+              <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>暂无待回款对账单</div>
+            )}
+          </Card>
         )}
-      </DetailDrawer>
+      </div>
     </>
   );
-}
-
-function PlusIcon() {
-  return <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
 }

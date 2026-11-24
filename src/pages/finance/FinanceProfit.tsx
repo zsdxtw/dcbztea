@@ -5,25 +5,33 @@ import Table from '../../components/common/Table';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { usePriceStore } from '../../stores/priceStore';
+import { useSettlementStore, statementOfOrder, receivedOf } from '../../stores/settlementStore';
+import { receiveStateOf } from '../../utils/salesOrderFamily';
 import type {} from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
 /**
  * 财务 · 经营利润（订单 / 客户 / 商品 / 合作商 多维）
- * 口径：已完结（确认收货/已结算）订单；收入=订单金额；成本=关联采购单金额（直发）+ 平台仓出库成本（采购价估算）；
- * 预计毛利实时估算，最终经营利润以实际成本、退货与费用核算为准（退货/费用未接入前为演示口径）。
+ * 口径：收入按<strong>实际回款</strong>计——对账单内按收款核销比例分摊（部分收款按已收金额计），未入对账单按订单级收款标记全额计；
+ * 成本 = 关联采购单金额（直发）+ 平台仓出库成本（采购价估算）。
  */
 export default function FinanceProfit() {
   const orders = useOrderFlowStore((s) => s.orders);
   const purchaseDocs = usePurchaseStore((s) => s.docs);
   const products = usePriceStore((s) => s.products);
+  const statements = useSettlementStore((s) => s.statements);
   const [dim, setDim] = useState<'order' | 'customer' | 'product' | 'partner'>('order');
 
   /** 已完结订单利润行 */
   const orderRows = useMemo(() => {
     return orders
-      .filter((o) => o.settleOnTime !== undefined && o.processStatus !== 'cancelled')
+      .filter((o) => o.processStatus !== 'cancelled' && (
+        o.settleOnTime !== undefined || (() => {
+          const st = statementOfOrder(statements, o.id);
+          return !!st && receivedOf(st) > 0;
+        })()
+      ))
       .map((o) => {
         const pos = purchaseDocs.filter((d) => d.childOrderId === o.id);
         const purchaseCost = pos.reduce((s, d) => s + d.amount, 0);
@@ -32,7 +40,22 @@ export default function FinanceProfit() {
           const m = products.find((pp) => pp.id === i.productId)?.marketPrice ?? 0;
           return x + Math.round(m * 0.55) * i.qty;
         }, 0), 0);
-        const revenue = o.totalAmount;
+        /* 营收按实际回款计（业务确认 E）：对账单内按收款核销 FIFO 分摊；未入对账单按订单级收款标记全额计 */
+        const stmt = statementOfOrder(statements, o.id);
+        let revenue = 0;
+        if (stmt) {
+          const idx = stmt.lines.findIndex((l) => l.orderId === o.id);
+          if (idx >= 0 && stmt.lines[idx].amount > 0) {
+            let pool = receivedOf(stmt);
+            for (let i = 0; i <= idx; i += 1) {
+              const take = Math.min(stmt.lines[i].amount, Math.max(0, pool));
+              pool -= take;
+              if (i === idx) revenue = Math.round((take / stmt.lines[idx].amount) * o.totalAmount);
+            }
+          }
+        } else if (receiveStateOf(o, pos) === '已收款') {
+          revenue = o.totalAmount;
+        }
         const gross = revenue - purchaseCost - stockCost;
         return {
           code: o.code, customer: o.customerName, partner: o.partnerName ?? (o.path === 'self' ? '平台自营' : '—'),
@@ -41,7 +64,7 @@ export default function FinanceProfit() {
           revenue, purchaseCost, stockCost, gross, net: gross,
         };
       });
-  }, [orders, purchaseDocs, products]);
+  }, [orders, purchaseDocs, products, statements]);
 
   const totals = orderRows.reduce((acc, r) => ({
     revenue: acc.revenue + r.revenue, cost: acc.cost + r.purchaseCost + r.stockCost, gross: acc.gross + r.gross,
@@ -74,8 +97,8 @@ export default function FinanceProfit() {
       <ContentHeader title="经营利润" breadcrumbs={['财务', '经营利润']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-          从经营角度查看<strong>每张订单 / 客户 / 商品 / 合作商</strong>的利润：收入=订单金额；成本=合作商采购（直发 PO）+ 平台仓出库成本（采购价估算）。
-          预计毛利实时估算；最终经营利润以实际成本、退货与费用核算为准（退货 / 物流费未接入前为演示口径）。
+          从经营角度查看<strong>每张订单 / 客户 / 商品 / 合作商</strong>的利润：收入按<strong>实际回款</strong>计（对账单收款核销分摊，部分收款按已收金额计）；
+          成本 = 合作商采购（直发 PO）+ 平台仓出库成本（采购价估算）。
         </div>
 
 

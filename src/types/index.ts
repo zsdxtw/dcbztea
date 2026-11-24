@@ -943,6 +943,8 @@ export interface CustomerItem {
   status: 'active' | 'inactive';
   settlementMethod?: string;
   taxNo?: string;
+  /** 淡茶扣点（百分比，客户维度属性：扣点模式合作商的采购价 = 销售实价 ×（1 − 淡茶扣点），不随供货合作商变化；入池配置仅作带出与展示） */
+  dachaRate?: number;
   /** 客户来源 */
   source?: string;
   /** 结算账户列表 */
@@ -1931,6 +1933,9 @@ export interface ExternalOrder {
   /** 平台客户(经平台销售时的采购买方,即路径5的中间平台) */
   platformCustomerId?: string;
   platformCustomerName?: string;
+  /** 平台扣点快照%（下单时点客户在该平台的扣点；销平台报价/销平台实价 = 对应价 ×（1−快照/100）。
+   *  下单即固化，后续客户档案扣点调整不回写已创建订单（订单价格快照规则）；缺省回退客户档案现值——旧数据兜底 */
+  platformRateSnapshot?: number;
   /** 平台母销售单号 */
   externalOrderNo?: string;
   customerName: string;
@@ -1995,6 +2000,147 @@ export interface ExternalOrder {
   compare?: CompareSession;
   /** 处理轨迹 */
   history: { time: string; action: string; detail?: string }[];
+}
+
+/* ════════════════════════════════════════
+ * 结算中心（客户对账单 / 客户钱包 / 合作商对账单）
+ * 设计见 docs/销售单结算流程设计建议.md：
+ * - 客户对账单＝应收一级单据（结算对象 + 账期，手工生成），支持部分开票、部分收款；
+ *   履约单的收款 / 开票状态由对账单按明细行核销回写。
+ * - 合作商对账单＝应付一级单据（合作商 + 账期），确认 → 收票 → 付款核销；
+ *   付款核销完成才置采购单已结算，与客户回款互不依赖（购销背对背）。
+ * ════════════════════════════════════════ */
+
+/** 收款方式（钱包余额＝预付客户钱包核销） */
+export type ReceiptMethod = 'bank' | 'wallet' | 'cash' | 'acceptance' | 'alipay' | 'wechat';
+
+export const RECEIPT_METHOD_LABELS: Record<ReceiptMethod, string> = {
+  bank: '银行转账', wallet: '钱包余额', cash: '现金', acceptance: '承兑汇票', alipay: '支付宝', wechat: '微信支付',
+};
+
+/** 客户对账单明细行：勾选的已确收履约单（经平台销售按销平台实价计入） */
+export interface StatementLine {
+  orderId: string;
+  orderCode: string;
+  amount: number;
+}
+
+/** 对账单发票记录（部分开票：多张发票累计覆盖对账金额） */
+export interface StatementInvoice {
+  id: string;
+  invoiceNo: string;
+  amount: number;
+  date: string;
+  remark?: string;
+}
+
+/** 对账单收款记录（部分收款：多笔到账逐步核销） */
+export interface StatementReceipt {
+  id: string;
+  amount: number;
+  date: string;
+  method: ReceiptMethod;
+  remark?: string;
+}
+
+/** 对账单退货冲减记录（未开票直接冲减；已开票开红字发票后在此登记） */
+export interface StatementAdjustment {
+  id: string;
+  amount: number;
+  date: string;
+  reason: string;
+  refCode?: string;
+}
+
+/** 客户对账单状态：待对账 → 对账中 → 已确认 →（部分开票 / 部分收款）→ 已办结；有异议为分支状态 */
+export type StatementStatus = 'pending' | 'reconciling' | 'confirmed' | 'disputed' | 'closed';
+
+/** 客户对账单（应收结算一级单据） */
+export interface CustomerStatement {
+  id: string;
+  /** 对账单号 DZ-S-YYYYMMDD-XX */
+  code: string;
+  /** 结算对象（直接销售＝客户本人；经平台销售＝平台客户） */
+  settleTarget: string;
+  customerType: string;
+  /** 账期说明（默认账期仅作参考，手工生成时填写） */
+  period: string;
+  lines: StatementLine[];
+  /** 对账金额（净额 = Σ 明细行金额 − 退货冲减） */
+  amount: number;
+  adjustments: StatementAdjustment[];
+  invoices: StatementInvoice[];
+  receipts: StatementReceipt[];
+  status: StatementStatus;
+  disputeReason?: string;
+  createdAt: string;
+  closedAt?: string;
+}
+
+/** 客户钱包流水 */
+export interface WalletTxn {
+  id: string;
+  time: string;
+  type: 'recharge' | 'consume' | 'refund';
+  amount: number;
+  balanceAfter: number;
+  refCode?: string;
+  note?: string;
+}
+
+/** 客户钱包余额（客户维度预付账户：预付收款登记为余额，对账收款可选钱包余额支付） */
+export interface CustomerWallet {
+  customerId: string;
+  customerName: string;
+  balance: number;
+  txns: WalletTxn[];
+}
+
+/** 合作商对账单明细行：纳入的采购单 */
+export interface PartnerStatementLine {
+  poId: string;
+  poCode: string;
+  orderCode: string;
+  amount: number;
+}
+
+/** 合作商进项发票记录（收票登记） */
+export interface PartnerIncomingInvoice {
+  id: string;
+  invoiceNo: string;
+  amount: number;
+  date: string;
+}
+
+/** 合作商付款记录（付款核销） */
+export interface PartnerPayment {
+  id: string;
+  amount: number;
+  date: string;
+  account?: string;
+  remark?: string;
+}
+
+/** 合作商对账单状态：待对账 → 已确认 / 有异议 → 付款核销完成已办结 */
+export type PartnerStatementStatus = 'pending' | 'confirmed' | 'disputed' | 'closed';
+
+/** 合作商对账单（应付结算一级单据：按合作商 + 账期汇总已确收采购单） */
+export interface PartnerStatement {
+  id: string;
+  /** 对账单号 DZ-P-YYYYMMDD-XX */
+  code: string;
+  supplierId: string;
+  supplierName: string;
+  period: string;
+  lines: PartnerStatementLine[];
+  /** 应付金额（= Σ 明细行采购金额） */
+  amount: number;
+  invoices: PartnerIncomingInvoice[];
+  payments: PartnerPayment[];
+  status: PartnerStatementStatus;
+  disputeReason?: string;
+  createdAt: string;
+  closedAt?: string;
 }
 
 /** 订单流转设置 */

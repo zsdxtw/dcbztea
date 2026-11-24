@@ -1,142 +1,188 @@
-import { useState, useMemo } from 'react';
+/**
+ * 合作商终端 · 结算
+ * 数据源 = 合作商对账单（管理后台「财务 → 合作商结算」生成）：
+ * 待确认 → 确认对账 → 平台收票 / 付款核销 → 已办结（付款完成 = 采购单已结算）。
+ * 实时面板按采购单金额口径（购销背对背的应付侧），不再使用客户售价。
+ */
+import { useMemo, useState } from 'react';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
-import { PageHead, Pill, SETTLE_STATUS_TONE } from './PartnerUI';
+import { PageHead, Pill } from './PartnerUI';
 import { getPartnerAuth } from './PartnerLayout';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
+import { usePurchaseStore } from '../../stores/purchaseStore';
+import { useSettlementStore } from '../../stores/settlementStore';
 import { useSupplierStore } from '../../stores/supplierStore';
 import { TRANSFER_SOURCE_LABELS } from '../../data/externalOrders';
-import type { PartnerSettlement } from '../../types';
-import { partnerSettlements, PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
+import { PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
+import type { PartnerStatement } from '../../types';
 
-const STATUS_LABELS: Record<string, string> = { unsettled: '待结算', pending: '结算中', settled: '已结算' };
+const PS_STATUS_LABELS: Record<string, string> = { pending: '待确认', confirmed: '对账中', disputed: '有异议', closed: '已办结' };
+const PS_STATUS_TONE: Record<string, 'amber' | 'purple' | 'red' | 'green' | 'gray'> = {
+  pending: 'amber', confirmed: 'purple', disputed: 'red', closed: 'green',
+};
 
-/** 合作商结算页：发货订单的结算单管理 + 订单分发分发订单结算进度 */
+/** 合作商结算页：对账单管理（确认）+ 我名下分发订单的结算进度（采购单口径） */
 export default function PartnerSettlement() {
-  const [settlements] = useState<PartnerSettlement[]>(partnerSettlements);
-  const [filterStatus, setFilterStatus] = useState('');
-  const [selected, setSelected] = useState<PartnerSettlement | null>(null);
-
-  /** 订单分发流转中心转入我名下的订单（报备 / 指定 / 比单） */
   const auth = getPartnerAuth();
   const suppliers = useSupplierStore((s) => s.suppliers);
-  const flowVersion = useOrderFlowStore((s) => s.orders);
-  const flowOrders = useMemo(() => {
-    const myId = auth?.supplierId ?? suppliers.find((s) => s.terminal.enabled && s.terminal.username === auth?.username)?.id;
-    return myId
-      ? flowVersion.filter((o) => o.partnerId === myId && o.processStatus === 'processed')
-      : [];
-  }, [flowVersion, suppliers, auth?.supplierId, auth?.username]);
-  const flowUnsettled = flowOrders.filter((o) => o.partnerStatus === 'confirmed' && o.settleOnTime === undefined);
-  const flowDoing = flowOrders.filter((o) => o.partnerStatus === 'pending' || o.partnerStatus === 'accepted' || o.partnerStatus === 'shipping' || o.partnerStatus === 'transit');
-  const flowSettled = flowOrders.filter((o) => o.settleOnTime !== undefined);
+  const orders = useOrderFlowStore((s) => s.orders);
+  const poDocs = usePurchaseStore((s) => s.docs);
+  const statements = useSettlementStore((s) => s.partnerStatements);
+  const store = useSettlementStore;
+  const [filterStatus, setFilterStatus] = useState('');
+  const [selected, setSelected] = useState<PartnerStatement | null>(null);
+  const [msg, setMsg] = useState('');
 
-  const filtered = useMemo(() => settlements.filter(s => {
-    if (filterStatus && s.status !== filterStatus) return false;
-    return true;
-  }), [settlements, filterStatus]);
+  const myId = auth?.supplierId ?? suppliers.find((s) => s.terminal.enabled && s.terminal.username === auth?.username)?.id ?? '';
+  const myName = suppliers.find((s) => s.id === myId)?.name ?? '';
 
-  // 汇总（结算单 + 分发订单实时数据）
-  const totalSettle = settlements.filter(s => s.status !== 'settled').reduce((sum, s) => sum + s.settleAmount, 0)
-    + flowUnsettled.reduce((sum, o) => sum + o.totalAmount, 0);
-  const settledAmount = settlements.filter(s => s.status === 'settled').reduce((sum, s) => sum + s.settleAmount, 0)
-    + flowSettled.reduce((sum, o) => sum + o.totalAmount, 0);
+  const flash = (t: string) => { setMsg(t); setTimeout(() => setMsg(''), 3600); };
 
-  const statusPill = (status: string) => (
-    <Pill tone={SETTLE_STATUS_TONE[status]}>{STATUS_LABELS[status]}</Pill>
-  );
+  /** 我名下的对账单 */
+  const myStatements = useMemo(() => statements.filter((s) => s.supplierId === myId), [statements, myId]);
+  const filtered = filterStatus ? myStatements.filter((s) => s.status === filterStatus) : myStatements;
+
+  /** 我名下分发订单（实时进度；金额按采购单口径） */
+  const flowOrders = useMemo(() => (
+    myId ? orders.filter((o) => o.partnerId === myId && o.processStatus === 'processed') : []
+  ), [orders, myId]);
+  const posOf = (orderId: string) => poDocs.filter((d) => d.childOrderId === orderId && d.source === 'distribute');
+  const payableOf = (orderId: string, fallback: number) => {
+    const pos = posOf(orderId);
+    return pos.length > 0 ? pos.reduce((s, d) => s + d.amount, 0) : fallback;
+  };
+
+  /** 待对账（已签收未入对账单）采购单 */
+  const eligiblePos = poDocs.filter((d) => (
+    d.supplierId === myId && d.source === 'distribute' && d.status === 'delivered'
+    && !statements.some((st) => st.lines.some((l) => l.poId === d.id))
+  ));
+
+  const flowDoing = flowOrders.filter((o) => ['pending', 'accepted', 'shipping', 'transit'].includes(o.partnerStatus ?? ''));
+  const flowPaid = flowOrders.filter((o) => posOf(o.id).length > 0 && posOf(o.id).every((d) => d.status === 'settled'));
+
+  /** 汇总（对账单口径：待付 = 在途对账单未付余额 + 未入对账单的已签收采购单） */
+  const openUnpaid = myStatements
+    .filter((s) => s.status !== 'closed')
+    .reduce((sum, s) => sum + Math.max(0, s.amount - s.payments.reduce((acc, p) => acc + p.amount, 0)), 0);
+  const eligibleAmount = eligiblePos.reduce((sum, d) => sum + d.amount, 0);
+  const totalSettle = openUnpaid + eligibleAmount;
+  const settledAmount = myStatements.filter((s) => s.status === 'closed').reduce((sum, s) => sum + s.amount, 0);
+
+  const confirmStatement = (id: string) => {
+    const res = store.getState().confirmPartnerStatement(id);
+    flash(res.msg);
+  };
 
   return (
     <div className="pk-page">
       <PageHead
         eyebrow="合作商终端 · 结算"
         title="结算"
-        desc="发货订单按月汇总结算，应结金额 = 订单金额 − 扣除费用（平台服务费按 5% 计提），款项汇入合作商结算银行账户。"
+        desc="按对账单结算：平台按对账周期汇总你名下已签收的采购单（应付 = 采购单金额），你在线确认后平台收票并按账期付款核销；付款完成即结算完成。"
       />
+
+      {msg && (
+        <div style={{ margin: '0 0 14px', padding: '10px 14px', borderRadius: 10, fontSize: 13, background: '#E8F5E9', color: '#01795D' }}>{msg}</div>
+      )}
 
       {/* 汇总统计带 */}
       <div className="pk-stats cols-3">
         <div className="pk-stat accent">
           <div className="pk-stat-label">待结算金额</div>
           <div className="pk-stat-value">{totalSettle.toLocaleString()}<small>元</small></div>
-          <div className="pk-stat-sub">含结算单与分发订单（已确收 {flowUnsettled.length} 单）</div>
+          <div className="pk-stat-sub">在途对账单未付 {(openUnpaid).toLocaleString()} 元 · 待对账 {eligiblePos.length} 张采购单</div>
         </div>
         <div className="pk-stat">
           <div className="pk-stat-label">已结算金额</div>
           <div className="pk-stat-value">{settledAmount.toLocaleString()}<small>元</small></div>
-          <div className="pk-stat-sub">历史累计到账 · 含分发订单 {flowSettled.length} 单</div>
+          <div className="pk-stat-sub">已办结对账单累计（付款完成 · 采购单已结算）</div>
         </div>
         <div className="pk-stat">
-          <div className="pk-stat-label">结算单数</div>
-          <div className="pk-stat-value">{settlements.length}<small>张</small></div>
-          <div className="pk-stat-sub">待处理 {settlements.filter(s => s.status !== 'settled').length} 张</div>
+          <div className="pk-stat-label">对账单数</div>
+          <div className="pk-stat-value">{myStatements.length}<small>张</small></div>
+          <div className="pk-stat-sub">待确认 {myStatements.filter((s) => s.status === 'pending').length} 张</div>
         </div>
       </div>
 
       {/* 筛选 */}
       <div className="pk-toolbar">
-        <select className="filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+        <select className="filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
           <option value="">全部状态</option>
-          <option value="unsettled">待结算</option>
-          <option value="pending">结算中</option>
-          <option value="settled">已结算</option>
+          <option value="pending">待确认</option>
+          <option value="confirmed">对账中</option>
+          <option value="disputed">有异议</option>
+          <option value="closed">已办结</option>
         </select>
-        <span className="pk-count">共 {filtered.length} 张结算单</span>
+        <span className="pk-count">共 {filtered.length} 张对账单</span>
       </div>
 
       <div className="pk-table-panel">
         <Table
-          headers={['结算单号', '结算周期', '订单数', '订单金额', '扣除费用', '应结金额', '结算方式', '状态', '操作']}
-          rows={filtered.map(s => [
-            <span key="code" className="cell-mono-emph">{s.code}</span>,
-            <span key="period" className="cell-emph">{s.period}</span>,
-            <span key="cnt" className="mono">{s.orderCount} 单</span>,
-            <span key="oa" className="mono">¥{s.orderAmount.toLocaleString()}</span>,
-            <span key="ded" className="mono" style={{ color: '#C13A54' }}>-¥{s.deduction.toLocaleString()}</span>,
-            <span key="sa" className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--pk-accent)' }}>¥{s.settleAmount.toLocaleString()}</span>,
-            <span key="m">{s.method}</span>,
-            statusPill(s.status),
-            <div key="act" className="row-actions">
-              <Button size="sm" variant="ghost" onClick={() => setSelected(s)}>查看</Button>
-            </div>,
-          ])}
+          headers={['对账单号', '账期', '采购单数', '应付金额', '已付款', '未付余额', '状态', '操作']}
+          rows={filtered.map((s) => {
+            const paid = s.payments.reduce((acc, p) => acc + p.amount, 0);
+            return [
+              <span key="code" className="cell-mono-emph">{s.code}</span>,
+              <span key="period" className="cell-emph">{s.period}</span>,
+              <span key="cnt" className="mono">{s.lines.length} 张</span>,
+              <span key="oa" className="mono">¥{s.amount.toLocaleString()}</span>,
+              <span key="pd" className="mono" style={{ color: '#01795D' }}>¥{paid.toLocaleString()}</span>,
+              <span key="ub" className="mono" style={{ fontWeight: 'var(--font-semibold)', color: s.amount - paid > 0 ? '#B26A00' : 'var(--pk-accent)' }}>¥{Math.max(0, s.amount - paid).toLocaleString()}</span>,
+              <Pill key="st" tone={PS_STATUS_TONE[s.status]}>{PS_STATUS_LABELS[s.status]}</Pill>,
+              <div key="act" className="row-actions">
+                {s.status === 'pending' && <Button size="sm" onClick={() => confirmStatement(s.id)}>确认对账</Button>}
+                <Button size="sm" variant="ghost" onClick={() => setSelected(s)}>查看</Button>
+              </div>,
+            ];
+          })}
         />
+        {filtered.length === 0 && (
+          <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: 'var(--pk-ink3)' }}>
+            暂无对账单。平台按对账周期汇总你名下已签收采购单后，对账单会显示在这里，请及时确认。
+          </div>
+        )}
       </div>
 
-      {/* 订单分发 · 分发订单结算进度（实时数据） */}
+      {/* 订单分发 · 我名下订单结算进度（采购单口径） */}
       <div className="pk-panel">
         <div className="pk-panel-head">
           <span className="pk-panel-title">订单分发 · 分发订单结算</span>
-          <span style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>报备 / 指定 / 比单中单的订单，履约签收后进入结算</span>
+          <span style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>报备 / 指定 / 比单中单的订单，客户签收后进入平台待对账，付款核销完成即结算</span>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', padding: '0 22px 14px' }}>
           <span style={{ padding: '4px 12px', borderRadius: 999, fontSize: 12.5, fontWeight: 600, background: '#FFF3E0', color: '#E65100' }}>
-            待结算 {flowUnsettled.length} 单 · ¥{flowUnsettled.reduce((s, o) => s + o.totalAmount, 0).toLocaleString()}
+            待对账 {eligiblePos.length} 张 · ¥{eligibleAmount.toLocaleString()}
           </span>
           <span style={{ padding: '4px 12px', borderRadius: 999, fontSize: 12.5, fontWeight: 600, background: 'var(--color-neutral-100, #F1F3F5)', color: 'var(--pk-ink2)' }}>
             履约中 {flowDoing.length} 单
           </span>
           <span style={{ padding: '4px 12px', borderRadius: 999, fontSize: 12.5, fontWeight: 600, background: '#E8F5E9', color: '#01795D' }}>
-            已结算 {flowSettled.length} 单 · ¥{flowSettled.reduce((s, o) => s + o.totalAmount, 0).toLocaleString()}
+            已结算 {flowPaid.length} 单 · ¥{flowPaid.reduce((s, o) => s + payableOf(o.id, o.totalAmount), 0).toLocaleString()}
           </span>
         </div>
         {flowOrders.length > 0 ? (
           <div style={{ padding: '0 22px 18px' }}>
             <Table
-              headers={['销售单编号', '客户', '订单金额', '转入来源', '履约状态', '结算状态']}
-              rows={flowOrders.map(o => [
-                <span key="c" className="cell-mono-emph">{o.code}</span>,
-                <span key="cu" className="cell-emph">{o.customerName}</span>,
-                <span key="a" className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--pk-accent)' }}>¥{o.totalAmount.toLocaleString()}</span>,
-                <span key="src">{o.transferSource ? TRANSFER_SOURCE_LABELS[o.transferSource] : '—'}</span>,
-                <span key="st">{PARTNER_ORDER_STATUS_LABELS[o.partnerStatus ?? 'pending']}</span>,
-                o.settleOnTime !== undefined
-                  ? <Pill key="set" tone="green">已结算 · {o.settleOnTime === false ? '超时 -5 分' : '按时 +5 分'}</Pill>
-                  : o.partnerStatus === 'confirmed'
-                    ? <Pill key="set" tone="amber">待结算</Pill>
-                    : <Pill key="set" tone="gray">履约中</Pill>,
-              ])}
+              headers={['销售单编号', '客户', '应付金额（采购口径）', '转入来源', '履约状态', '结算状态']}
+              rows={flowOrders.map((o) => {
+                const pos = posOf(o.id);
+                const paid = pos.length > 0 && pos.every((d) => d.status === 'settled');
+                return [
+                  <span key="c" className="cell-mono-emph">{o.code}</span>,
+                  <span key="cu" className="cell-emph">{o.customerName}</span>,
+                  <span key="a" className="mono" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--pk-accent)' }}>¥{payableOf(o.id, o.totalAmount).toLocaleString()}</span>,
+                  <span key="src">{o.transferSource ? TRANSFER_SOURCE_LABELS[o.transferSource] : '—'}</span>,
+                  <span key="st">{PARTNER_ORDER_STATUS_LABELS[o.partnerStatus ?? 'pending']}</span>,
+                  paid
+                    ? <Pill key="set" tone="green">已结算（付款核销完成）</Pill>
+                    : pos.some((d) => d.status === 'delivered' || d.status === 'settled') || o.partnerStatus === 'confirmed'
+                      ? <Pill key="set" tone="amber">待对账 / 对账中</Pill>
+                      : <Pill key="set" tone="gray">履约中</Pill>,
+                ];
+              })}
             />
           </div>
         ) : (
@@ -146,49 +192,72 @@ export default function PartnerSettlement() {
         )}
       </div>
 
-      {/* 结算单详情抽屉 */}
+      {/* 对账单详情抽屉 */}
       <DetailDrawer
         open={!!selected}
         onClose={() => setSelected(null)}
-        badge="JS"
+        badge="DZ"
         title={selected?.code ?? ''}
-        statusTag={selected ? statusPill(selected.status) : null}
-        subtitle={selected ? `结算周期 ${selected.period} · ${selected.orderCount} 笔订单` : ''}
+        statusTag={selected ? <Pill tone={PS_STATUS_TONE[selected.status]}>{PS_STATUS_LABELS[selected.status]}</Pill> : null}
+        subtitle={selected ? `${selected.period} · ${selected.lines.length} 张采购单` : ''}
+        footer={selected && selected.status === 'pending' ? (
+          <>
+            <Button variant="ghost" onClick={() => setSelected(null)}>关闭</Button>
+            <Button onClick={() => confirmStatement(selected.id)}>确认对账</Button>
+          </>
+        ) : <Button variant="ghost" onClick={() => setSelected(null)}>关闭</Button>}
       >
         {selected && (
           <>
-            <DrawerSection title="结算信息">
+            <DrawerSection title="对账信息">
               <InfoGrid>
-                <InfoItem label="结算单号" mono emph>{selected.code}</InfoItem>
-                <InfoItem label="结算周期">{selected.period}</InfoItem>
-                <InfoItem label="结算方式">{selected.method}</InfoItem>
-                <InfoItem label="订单数" mono>{selected.orderCount} 单</InfoItem>
-                <InfoItem label="订单金额" mono>¥{selected.orderAmount.toLocaleString()}</InfoItem>
-                <InfoItem label="扣除费用" mono valueStyle={{ color: '#C13A54' }}>-¥{selected.deduction.toLocaleString()}</InfoItem>
-                <InfoItem label="应结金额" mono emph valueStyle={{ color: 'var(--color-module-current-base)' }}>¥{selected.settleAmount.toLocaleString()}</InfoItem>
-                <InfoItem label="创建时间">{selected.createTime}</InfoItem>
-                <InfoItem label="结算时间">{selected.settleTime || '—'}</InfoItem>
+                <InfoItem label="对账单号" mono emph>{selected.code}</InfoItem>
+                <InfoItem label="账期">{selected.period}</InfoItem>
+                <InfoItem label="应付金额" mono emph>¥{selected.amount.toLocaleString()}</InfoItem>
+                <InfoItem label="已付款" mono>¥{selected.payments.reduce((acc, p) => acc + p.amount, 0).toLocaleString()}</InfoItem>
+                <InfoItem label="状态">{PS_STATUS_LABELS[selected.status]}</InfoItem>
+                <InfoItem label="创建时间">{selected.createdAt}</InfoItem>
+                {selected.disputeReason && <InfoItem label="异议原因" span={2}>{selected.disputeReason}</InfoItem>}
               </InfoGrid>
               <div style={{ marginTop: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>
-                应结金额 = 订单金额 − 扣除费用（平台服务费按 5% 计提），款项汇入合作商结算银行账户
+                应付金额 = 采购单金额合计（购销背对背的应付侧）；平台付款核销完成后，关联采购单置为已结算（结算完成）。
               </div>
             </DrawerSection>
 
-            <DrawerSection title={`关联订单（${selected.orders.length} 笔）`}>
+            <DrawerSection title={`采购单明细（${selected.lines.length} 张）`}>
               <table className="detail-inline-table">
                 <thead>
-                  <tr><th>序号</th><th>销售单编号</th></tr>
+                  <tr><th>采购单号</th><th>关联履约单</th><th>金额</th></tr>
                 </thead>
                 <tbody>
-                  {selected.orders.map((code, i) => (
-                    <tr key={code}>
-                      <td className="mono">{i + 1}</td>
-                      <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{code}</td>
+                  {selected.lines.map((l) => (
+                    <tr key={l.poId}>
+                      <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{l.poCode}</td>
+                      <td className="mono">{l.orderCode}</td>
+                      <td className="mono">¥{l.amount.toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </DrawerSection>
+
+            {selected.payments.length > 0 && (
+              <DrawerSection title={`付款记录（${selected.payments.length}）`}>
+                <table className="detail-inline-table">
+                  <thead><tr><th>日期</th><th>金额</th><th>账户</th><th>备注</th></tr></thead>
+                  <tbody>
+                    {selected.payments.map((p) => (
+                      <tr key={p.id}>
+                        <td className="mono">{p.date}</td>
+                        <td className="mono">¥{p.amount.toLocaleString()}</td>
+                        <td>{p.account || '—'}</td>
+                        <td className="cell-muted">{p.remark || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </DrawerSection>
+            )}
           </>
         )}
       </DetailDrawer>

@@ -6,6 +6,8 @@ import Button from '../../components/common/Button';
 import { useScoreStore, computeScore, buildScoreRules, MARKETING_CLAIM_TYPE_LABELS } from '../../stores/scoreStore';
 import { useSupplierStore } from '../../stores/supplierStore';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
+import { usePurchaseStore } from '../../stores/purchaseStore';
+import { receiveStateOf } from '../../utils/salesOrderFamily';
 import { useReportStore } from '../../stores/reportStore';
 import { useReferralStore } from '../../stores/referralStore';
 import { SCORE_DIMENSION_LABELS } from '../../stores/scoreStore';
@@ -68,6 +70,7 @@ export default function PartnerScores() {
   const auth = getPartnerAuth();
   const suppliers = useSupplierStore((s) => s.suppliers);
   const orders = useOrderFlowStore((s) => s.orders);
+  const poDocs = usePurchaseStore((s) => s.docs);
   const reports = useReportStore((s) => s.reports);
   const referrals = useReferralStore((s) => s.referrals);
   const entries = useScoreStore((s) => s.entries);
@@ -110,7 +113,15 @@ export default function PartnerScores() {
   const summary = computeScore({
     entries,
     supplier: partner,
-    orders: orders.filter((o) => o.partnerId === myId),
+    /* P7/F：经营积分取数 = 客户回款到位 + 合作商付款完成（采购单已结算）双门槛 */
+    orders: orders.filter((o) => o.partnerId === myId).map((o) => {
+      const pos = poDocs.filter((d) => d.childOrderId === o.id && d.source === 'distribute');
+      return {
+        ...o,
+        settled: receiveStateOf(o, poDocs.filter((d) => d.childOrderId === o.id)) === '已收款',
+        paid: pos.length > 0 && pos.every((d) => d.status === 'settled'),
+      };
+    }),
     reports: reports.filter((r) => r.partnerName === myName),
     referrals: referrals.filter((r) => r.supplierId === myId),
     referralScores: {

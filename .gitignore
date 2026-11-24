@@ -10,3 +10,4 @@ _batch_*.json
 _mbatch_*.json
 _github_push.cjs
 _push_all.json
+.DS_Store

@@ -8,7 +8,7 @@ import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { usePriceStore, effectiveCustomerQuote } from '../../stores/priceStore';
 import { calcPlatformNetPrice } from '../../data/prices';
-import { customerItems } from '../../data/customers';
+import { customerItems, orderPlatformRate } from '../../data/customers';
 import { regionTextOf } from '../../data/regions';
 import { EXTERNAL_CHANNEL_LABELS, EXTERNAL_PLATFORM_LABELS, TRANSFER_SOURCE_LABELS } from '../../data/externalOrders';
 import {
@@ -38,22 +38,22 @@ function pathLabel(o: ExternalOrder): string {
 }
 
 /** 信息项 */
-/** 商品明细表（字段参照新建销售单：序号/图片/名称/品牌/规格/市场价+京东天猫价/销售报价/数量/销售实价/小计；经平台订单多一列销平台实价） */
-export function ProductItemsTable({ items, customerName, salesPath, platformCustomerId, platform, footerAmount }: {
+/** 商品明细表（字段参照新建销售单：序号/图片/名称/品牌/规格/市场价+京东天猫价/销售报价/数量/销售实价/小计；经平台订单多一列销平台实价——扣点取订单下单快照） */
+export function ProductItemsTable({ items, customerName, salesPath, platformCustomerId, platform, platformRateSnapshot, footerAmount }: {
   items: ExternalOrder['items'];
   customerName: string;
   salesPath?: ExternalOrder['salesPath'];
   platformCustomerId?: string;
   platform?: ExternalOrder['platform'];
+  /** 订单平台扣点快照%（下单时点固化；缺省回退客户档案现值——旧数据兜底） */
+  platformRateSnapshot?: number;
   footerAmount?: number;
 }) {
   const products = usePriceStore((s) => s.products);
   const customerQuotes = usePriceStore((s) => s.customerQuotes);
   const isVia = salesPath === 'via_platform';
   const customer = customerItems.find((c) => c.name === customerName);
-  const rate = isVia && platformCustomerId
-    ? customerItems.find((c) => c.id === platformCustomerId)?.platformCommissionRates?.[platformCustomerId]
-    : undefined;
+  const rate = isVia ? orderPlatformRate({ salesPath, platformCustomerId, customerName, platformRateSnapshot }) : undefined;
   return (
     <table className="detail-inline-table">
       <thead><tr>
@@ -77,7 +77,7 @@ export function ProductItemsTable({ items, customerName, salesPath, platformCust
           const quote = customer && customer.type !== 'personal'
             ? effectiveCustomerQuote(customerQuotes, customer.id, p ? p.id : it.productId, products)
             : undefined;
-          const net = rate !== undefined ? calcPlatformNetPrice(it.price, rate) : undefined;
+          const net = rate !== undefined ? calcPlatformNetPrice(it.price, `${rate}%`) : undefined;
           return (
             <tr key={i}>
               <td className="mono" style={{ color: 'var(--color-neutral-400)' }}>{i + 1}</td>
@@ -175,6 +175,7 @@ export function MotherOrderInfoSection({ family }: { family: OrderFamily }) {
           salesPath={mother.salesPath}
           platformCustomerId={mother.platformCustomerId}
           platform={mother.platform}
+          platformRateSnapshot={mother.platformRateSnapshot}
           footerAmount={amount}
         />
       </DrawerSection>
@@ -384,6 +385,7 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
           salesPath={current.salesPath ?? 'direct'}
           platformCustomerId={current.platformCustomerId}
           platform={current.platform}
+          platformRateSnapshot={current.platformRateSnapshot}
           footerAmount={current.totalAmount}
         />
       </div>

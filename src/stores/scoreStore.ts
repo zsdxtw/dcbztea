@@ -117,12 +117,17 @@ function getNextClaimSeq(claims: MarketingClaim[]): number {
 export interface ScoreContext {
   /** 合作商档案（基础积分派生：门店/主营品牌） */
   supplier?: SupplierItem;
-  /** 该合作商名下的订单流转单（经营积分：结算单量与金额；报备积分：按有效报备类型区分加分；处罚：发货延迟扣分） */
+  /** 该合作商名下的订单流转单（经营积分：结算单量与金额；报备积分：按有效报备类型区分加分；处罚：发货延迟扣分）
+   *  settled=客户回款到位（订单级收款完成）；paid=合作商付款完成（采购单已结算）——业务确认 F：两者齐备才计经营/报备结算积分 */
   orders?: {
     partnerId?: string;
     transferSource?: string;
-    /** 转出后履约状态（settled=结算完成；接单及之后计入转单加分） */
+    /** 转出后履约状态（接单及之后计入转单加分） */
     partnerStatus?: string;
+    /** 客户回款到位（应收侧：订单收款核销完成） */
+    settled?: boolean;
+    /** 合作商付款完成（应付侧：采购单已结算） */
+    paid?: boolean;
     /** 报备命中列表（首个 = 转出依据，reportType 区分订单报备与商品/地区报备） */
     reportMatches?: { reportType?: string; partnerId?: string }[];
     /** 处理轨迹（发货延迟扣分：取「合作商接单 / 合作商发货」时间） */
@@ -162,9 +167,10 @@ export function computeScore(ctx: ScoreContext): PartnerScoreSummary & { entries
     + clamp(quoted * 0.1, 5),
   );
 
-  /* 经营积分（派生）：结算单 ×0.2 + 结算金额每 1 万 ×0.2（不封顶） */
+  /* 经营积分（派生）：「结算完成」= 合作商付款完成（采购单已结算）且客户回款到位（订单收款核销完成）；
+     部分收款 / 仅付款未回款的订单不计入，不按金额比例预计算（业务确认 F） */
   const mineOrders = (ctx.orders ?? []).filter((o) => o.partnerId === sid);
-  const settled = mineOrders.filter((o) => o.partnerStatus === 'settled');
+  const settled = mineOrders.filter((o) => o.settled === true && o.paid === true);
   const operation = round1(settled.length * 0.2 + Math.floor(settled.reduce((s, o) => s + o.totalAmount, 0) / 10000) * 0.2);
 
   /* 报备积分（派生）：
@@ -179,7 +185,7 @@ export function computeScore(ctx: ScoreContext): PartnerScoreSummary & { entries
     !!o.partnerStatus && !['pending', 'rejected'].includes(o.partnerStatus);
   const reportOrders = mineOrders.filter((o) => o.transferSource === 'report');
   const orderReportTransfers = reportOrders.filter((o) => effReportType(o) === 'order' && isAccepted(o));
-  const prReportSettled = reportOrders.filter((o) => effReportType(o) !== 'order' && o.partnerStatus === 'settled');
+  const prReportSettled = reportOrders.filter((o) => effReportType(o) !== 'order' && o.settled === true && o.paid === true);
   const report = round1(
     approvedOrderReports * 0.1
     + orderReportTransfers.length * 0.1
@@ -248,6 +254,8 @@ export function getScoreSummary(input: {
     partnerId?: string;
     transferSource?: string;
     partnerStatus?: string;
+    settled?: boolean;
+    paid?: boolean;
     reportMatches?: { reportType?: string; partnerId?: string }[];
     history?: { time: string; action: string; detail?: string }[];
     totalAmount: number;
@@ -296,7 +304,7 @@ export const buildScoreRules = (referralScores?: { training?: number; activity?:
   };
   return [
     { dimension: '基础积分', rule: '注册审批成功 +1；每维护 1 个门店 +0.5（封顶 5 分）；每 1 个主营品牌 +0.5（封顶 3 分）；每报价 1 个商品 +0.1（封顶 5 分）', source: '自动计算（合作商档案 / 供货报价）' },
-    { dimension: '经营积分', rule: '每结算完成 1 单 +0.2（不封顶）；经营结算总金额每 1 万 +0.2（不封顶）', source: '自动计算（订单履约结算）' },
+    { dimension: '经营积分', rule: '每「结算完成」1 单 +0.2（不封顶）；结算总金额每 1 万 +0.2（不封顶）。结算完成 = 合作商付款完成（采购单已结算）且客户回款到位（订单收款核销完成）；部分收款不计比例积分', source: '自动计算（合作商付款 + 客户回款双门槛）' },
     { dimension: '报备积分', rule: '订单报备审批通过 +0.1；订单报备转入并接单再 +0.1；商品报备、地区报备报备成功不加分，但基于报备转入的订单按结算金额每 1 万额外 +0.1（在经营积分正常加分之外）', source: '自动计算（报备审批 / 报备转单）' },
     { dimension: '推介积分', rule: `每成功推介 1 个茶培训或茶活动 +${s.training} 分；每成功推介 1 个入驻淡茶（推荐新合作商通过专属链接 / 二维码注册入驻）+${s.join} 分`, source: '自动计算（业务推介 / 推荐注册成功）' },
     { dimension: '申报积分', rule: '主动发起积分申报（客户拜访 / 活动组织 / 其他），描述事项并可上传凭证图片，提交后由淡茶半盏评估给分；入驻推介的积分不在申报中，由「业务推介」入驻淡茶推介成功自动计入', source: '积分管理页 · 积分申报' },

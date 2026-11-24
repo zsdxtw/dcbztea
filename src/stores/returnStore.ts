@@ -1,9 +1,12 @@
 /**
  * 合作商退货管理 Store（合作商终端处理客户退货；管理后台后续可接入同一数据源）
+ * P6 退货冲减：退款完成时同步冲减客户对账单应收（未办结对账单）；预付客户退款回钱包余额。
  */
 import { create } from 'zustand';
 import type { PartnerReturn, PartnerReturnStatus } from '../types';
-import { genReturnCode } from '../utils/orderCodes';
+import { genReturnCode, soRootOf } from '../utils/orderCodes';
+import { useSettlementStore } from './settlementStore';
+import { customerItems } from '../data/customers';
 
 const now = () => new Date().toISOString().slice(0, 10);
 
@@ -104,22 +107,43 @@ export const useReturnStore = create<ReturnState>((set, get) => ({
     return item;
   },
 
-  setStatus: (id, status, note) => set({
-    returns: get().returns.map((r) => {
-      if (r.id !== id) return r;
-      const actionLabels: Record<PartnerReturnStatus, string> = {
-        pending: '待受理', accepted: '已受理', rejected: '已拒绝',
-        shipped: '客户已寄回', received: '已收货', completed: '完成处理',
-      };
-      return {
-        ...r,
-        status,
-        acceptTime: status === 'accepted' ? now() : r.acceptTime,
-        finishTime: status === 'completed' || status === 'rejected' ? now() : r.finishTime,
-        history: [...r.history, { time: now(), action: actionLabels[status], detail: note }],
-      };
-    }),
-  }),
+  setStatus: (id, status, note) => {
+    const target = get().returns.find((r) => r.id === id);
+    set({
+      returns: get().returns.map((r) => {
+        if (r.id !== id) return r;
+        const actionLabels: Record<PartnerReturnStatus, string> = {
+          pending: '待受理', accepted: '已受理', rejected: '已拒绝',
+          shipped: '客户已寄回', received: '已收货', completed: '完成处理',
+        };
+        return {
+          ...r,
+          status,
+          acceptTime: status === 'accepted' ? now() : r.acceptTime,
+          finishTime: status === 'completed' || status === 'rejected' ? now() : r.finishTime,
+          history: [...r.history, { time: now(), action: actionLabels[status], detail: note }],
+        };
+      }),
+    });
+    /* P6 退货冲减（仅退款类退货）：客户对账单应收冲减；预付客户退款回钱包余额 */
+    if (target && status === 'completed' && target.solution === 'refund') {
+      const settle = useSettlementStore.getState();
+      const root = soRootOf(target.sourceOrderCode);
+      const stmt = settle.statements.find((s) => s.lines.some(
+        (l) => l.orderCode === target.sourceOrderCode || l.orderCode === root,
+      ));
+      if (stmt && stmt.status !== 'closed') {
+        settle.adjustStatement(stmt.id, {
+          amount: Math.min(target.refundAmount, stmt.amount),
+          reason: `退货退款（${target.code} · ${target.customerName}）`,
+          refCode: target.code,
+        });
+      }
+      // 预付客户（档案结算方式=预付）退款回钱包余额
+      const isPrepaid = customerItems.find((c) => c.name === target.customerName)?.settlementMethod === '预付';
+      if (isPrepaid) settle.walletRefund(target.customerName, target.refundAmount, target.code, `退货退款回钱包（${target.code}）`);
+    }
+  },
 
   removeReturn: (id) => set({ returns: get().returns.filter((r) => r.id !== id) }),
 }));

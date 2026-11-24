@@ -731,6 +731,7 @@ export default function ExternalOrders() {
                   salesPath={m.salesPath}
                   platformCustomerId={m.platformCustomerId}
                   platform={m.platform}
+                  platformRateSnapshot={m.platformRateSnapshot}
                   footerAmount={amount}
                 />
               </DrawerSection>

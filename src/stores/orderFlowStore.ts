@@ -117,6 +117,8 @@ export interface AddExternalInput {
   /** 平台客户(经平台销售的采购买方) */
   platformCustomerId?: string;
   platformCustomerName?: string;
+  /** 平台扣点快照%（订单价格快照规则：下单即固化，销平台报价/实价随单；缺省回退客户档案现值） */
+  platformRateSnapshot?: number;
   /** 客户下单时间(客户在平台/渠道侧下单的时间) */
   customerOrderTime?: string;
   /** 客户侧订单号(客户在自己下单渠道的订单号,非必输) */
@@ -323,7 +325,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
           action: input.sourceChannel === 'push' ? '直连推送订单' : '手工录入订单',
           detail: (input.sourceChannel === 'push' ? '平台 API 自动同步' : '手工录入')
             + (input.salesPath === 'via_platform'
-              ? ` · 经平台销售（${input.platformCustomerName ?? '—'}）`
+              ? ` · 经平台销售（${input.platformCustomerName ?? '—'} · 平台扣点快照 ${input.platformRateSnapshot ?? 0}%，销平台实价随单固化）`
               : ' · 直接销售')
             + (input.customerOrderNo ? ` · 客户侧单号 ${input.customerOrderNo}` : '')
             + ' · 进入销售单处理',
@@ -753,7 +755,7 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       const from = order.path === 'self' ? '自营' : (order.partnerName ?? '合作商');
       const validParts = (parts ?? []).filter((p) => p.quantity > 0);
 
-      // 整体取回：履约单编号不变，直接回到分发-待处理
+      // 整体取回：履约单编号不变，直接回到分发-待处理；同步清理未发货采购单（取回联动）
       if (validParts.length === 0) {
         patchOrder(id, {
           processStatus: 'pending',
@@ -766,7 +768,8 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
           distributeMode: undefined,
           fulfillment: undefined,
           sourceTag: src.tag,
-        }, { action: src.label, detail: `从${from}整体取回 → 回到履约单分发（履约单编号 ${order.code} 不变）` });
+        }, { action: src.label, detail: `从${from}整体取回 → 回到履约单分发（履约单编号 ${order.code} 不变）；未发货采购单已同步作废` });
+        usePurchaseStore.getState().removeByChild(order.code);
         return { ok: true, msg: `已整体取回，订单进入分发-待处理（来源：${src.label}）` };
       }
 
@@ -842,7 +845,9 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         transferTime: undefined,
         partnerStatus: undefined,
         fulfillment: undefined,
-      }, { action: '合作商退回', detail: `${order.partnerName ?? '合作商'}主动退回整单 → 进入分发-待处理` });
+      }, { action: '合作商退回', detail: `${order.partnerName ?? '合作商'}主动退回整单 → 进入分发-待处理；未发货采购单已同步作废` });
+      /* P11：合作商退回时清理该子单未发货采购单，避免原合作商名下残留待确认 PO */
+      usePurchaseStore.getState().removeByChild(order.code);
       return { ok: true, msg: '已退回整单，订单进入分发-待处理' };
     },
 
@@ -1064,7 +1069,8 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
       const eligible = pkgs.filter((x) => x.status === 'delivered' || x.status === 'confirmed');
       /* 无发货单的订单走订单级结算；指定发货单但无可结算对象时报错 */
       if (eligible.length === 0 && targetNos) return { ok: false, msg: '暂无已妥投/已确收的发货单可结算' };
-      pos.forEach((d) => usePurchaseStore.getState().settleByChild(d.childOrderCode, targetNos));
+      /* P1 拆分：本动作只登记「客户回款」（应收侧），不再联动置采购单已结算——
+         采购单（应付侧）由合作商对账单付款核销完成时结算（购销背对背，见 docs/销售单结算流程设计建议.md 5.2） */
       /* 结算标记落库后重读最新包裹状态判定订单级 settled（避免使用结算前快照） */
       const freshPkgs = [...(selfShipments ?? []), ...usePurchaseStore.getState().listByChildOrder(id).flatMap((d) => d.packages.filter((x) => x.status !== 'void'))];
       const freshEligible = freshPkgs.filter((x) => x.status === 'delivered' || x.status === 'confirmed');
@@ -1076,11 +1082,11 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
         ...(orderSettled ? { settled: true as const } : {}),
       }, {
         action: '登记收款',
-        detail: `${targetNos ? `按发货单收款 ${targetNos.length} 张` : eligible.length > 0 ? '全部发货单收款' : '订单级收款'}（${onTime ? '按时履约' : '超时履约'}）`,
+        detail: `客户回款${targetNos ? `按发货单核销 ${targetNos.length} 张` : eligible.length > 0 ? '（全部已妥投发货单）' : '（订单级，无发货单）'} · 采购单结算由合作商对账单付款核销驱动`,
       });
       if (eligible.length === 0) return { ok: true, msg: '已登记收款（订单级，无发货单）' };
       const settledCount = eligible.filter((x) => x.settled).length;
-      return { ok: true, msg: orderSettled ? '已收款（全部已妥投发货单）' : `部分收款（${settledCount}/${eligible.length} 张已妥投发货单）` };
+      return { ok: true, msg: orderSettled ? '已登记收款（全部已妥投发货单）' : `部分收款（${settledCount}/${eligible.length} 张已妥投发货单）` };
     },
 
     cancelOrder: (id, reason) => {
@@ -1280,6 +1286,21 @@ export const useOrderFlowStore = create<OrderFlowState>((set, get) => {
               : o)),
           ],
         }));
+      }
+      /* P5：比单评分定标生成的履约单补建应付采购单（直送，按中单价行摊），
+         与「直接选定」走 transfer() 自动建单保持一致，确保每张中单履约单都有应付依据 */
+      for (const child of children) {
+        if (!child.partnerId || !child.partnerName) continue;
+        const winQuote = cmp.quotes.find((q) => q.supplierId === child.partnerId);
+        const totalAmt = Math.max(1, child.items.reduce((s, i) => s + i.price * i.quantity, 0));
+        usePurchaseStore.getState().createFromChild({
+          child,
+          source: 'distribute',
+          deliveryMode: 'direct',
+          ...(winQuote
+            ? { priceOf: (it: { productId: string; price: number; quantity: number }) => Math.round((winQuote.amount * (it.price * it.quantity)) / totalAmt / Math.max(1, it.quantity)) }
+            : {}),
+        });
       }
       const winnerNames = [...new Set(Object.values(itemAwards))];
       return { ok: true, msg: winnerNames.length ? `定标完成：${winnerNames.join('、')} 中单（按商品积分排名）` : '定标完成：无商品有报名' };

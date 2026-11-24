@@ -337,7 +337,6 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
       { key: 'finance-reconciliation', label: '对账结算', icon: <ReconciliationIcon />, children: [
         { key: 'finance-partner-settlement', label: '合作商结算', icon: <ReconciliationIcon /> },
         { key: 'finance-customer-reconciliation', label: '客户对账', icon: <CollectionIcon /> },
-        { key: 'finance-supplier-reconciliation', label: '供应商对账', icon: <PaymentIcon /> },
       ] },
       { key: 'finance-profit', label: '经营利润', icon: <FinanceReportIcon /> },
       { key: 'finance-other', label: '核算与其他', icon: <InvoiceIcon />, children: [

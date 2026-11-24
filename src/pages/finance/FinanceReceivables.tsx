@@ -1,12 +1,17 @@
+/**
+ * 财务 · 应收管理（客户应收账款）
+ * 应收 = 客户对账单（已确认 / 有异议 / 已办结）：应收余额 = 对账净额 − 已收款核销。
+ * 对账单生成与开票 / 收款操作在「销售 → 客户对账」；本页为应收台账视角。
+ * 设计见 docs/销售单结算流程设计建议.md 4.2-7。
+ */
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
-import { useOrderFlowStore } from '../../stores/orderFlowStore';
-import { EXTERNAL_PLATFORM_LABELS, platformLabelOf } from '../../data/externalOrders';
-import type {} from '../../types';
+import { useSettlementStore, netOf, receivedOf, invoicedOf } from '../../stores/settlementStore';
+import type { StatementStatus } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -14,58 +19,37 @@ const pill = (bg: string, color: string, text: string) => (
   <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: bg, color, whiteSpace: 'nowrap' }}>{text}</span>
 );
 
-const addDays = (date: string, days: number) => {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-};
-
-/**
- * 财务 · 应收管理（客户应收账款）
- * 由销售订单按合同约定确认节点派生（演示：妥投/完成后确认应收）；收款核销见「收款管理」。
- */
 export default function FinanceReceivables() {
   const navigate = useNavigate();
-  const orders = useOrderFlowStore((s) => s.orders);
+  const statements = useSettlementStore((s) => s.statements);
   const [tab, setTab] = useState<'' | 'unsettled' | 'settled'>('');
 
-  /** 应收范围：已进入履约的订单（转派待接单起 / 自营已接单起）；确认节点=妥投以后 */
-  const arOrders = useMemo(() => orders.filter((o) => {
-    if (o.processStatus === 'cancelled') return false;
-    if (o.path === 'self') return o.processStatus === 'processed';
-    return ['distribute_pending', 'processed'].includes(o.processStatus);
-  }), [orders]);
-
-  const rows = arOrders.map((o) => {
-    const confirmed = o.fulfillment?.stage === 'transit' || o.fulfillment?.stage === 'confirmed'
-      || o.partnerStatus === 'transit' || o.partnerStatus === 'confirmed';
-    // 演示收款口径：已确收/已结算 → 全额已收；妥投 → 收 60%；确认前 → 未收
-    const settled = o.settleOnTime !== undefined;
-    const received = settled ? o.totalAmount : confirmed ? Math.round(o.totalAmount * 0.6) : 0;
-    const dueDate = addDays(o.entryTime, 30);
-    const overdue = !settled && new Date(dueDate) < new Date('2026-11-30');
+  /** 应收台账：进入对账环节的对账单（待对账为预对账、确认后为正式应收） */
+  const rows = useMemo(() => statements.map((s) => {
+    const net = netOf(s);
+    const rec = receivedOf(s);
+    const inv = invoicedOf(s);
     return {
-      code: o.code, customer: o.customerName, platform: platformLabelOf(o),
-      amount: o.totalAmount, received, unreceived: o.totalAmount - received,
-      dueDate, confirmed, settled, overdue,
+      code: s.code, target: s.settleTarget, type: s.customerType, period: s.period,
+      lines: s.lines.length, net, inv, rec, balance: net - rec,
+      status: s.status as StatementStatus,
+      settled: rec >= net - 0.001,
+      confirmed: s.status === 'confirmed' || s.status === 'closed',
     };
-  });
+  }), [statements]);
 
   const filtered = tab === '' ? rows : rows.filter((r) => (tab === 'settled' ? r.settled : !r.settled));
-  const totalAR = rows.reduce((s, r) => s + r.amount, 0);
-  const totalReceived = rows.reduce((s, r) => s + r.received, 0);
-  const totalUnreceived = totalAR - totalReceived;
-
+  const totalAR = rows.reduce((s, r) => s + r.net, 0);
+  const totalReceived = rows.reduce((s, r) => s + r.rec, 0);
 
   return (
     <>
       <ContentHeader title="应收管理" breadcrumbs={['财务', '应收应付', '应收管理']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-          管理平台向客户销售形成的<strong>应收账款</strong>：应收按<strong>合同约定的确认节点</strong>生成（演示：妥投后确认，账期 30 天）；
-          收款核销在「收款管理」（支持一笔收款核销多单、部分收款与预收款）。
+          管理平台向客户销售形成的<strong>应收账款</strong>：应收以<strong>客户对账单</strong>为载体（按结算对象 + 账期手工生成），
+          应收余额 = <strong>对账净额 − 已收款核销</strong>（部分收款按已收金额计）。开票 / 收款核销在「销售 → 客户对账」操作。
         </div>
-
 
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', marginTop: 'var(--space-4)', flexWrap: 'wrap' }}>
           {([['', '全部应收'], ['unsettled', '未结清'], ['settled', '已结清']] as const).map(([k, label]) => (
@@ -78,29 +62,34 @@ export default function FinanceReceivables() {
 
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['应收单号', '客户', '来源销售订单', '应收金额', '已收金额', '未收金额', '到期日期', '应收状态']}
+            headers={['对账单号', '结算对象', '客户类型', '账期', '对账明细', '应收金额', '已开票', '已收金额', '应收余额', '应收状态']}
             rows={filtered.map((r) => [
-              <span key="c" className="cell-mono-emph">AR-{r.code}</span>,
-              <span key="cu" className="cell-emph">{r.customer}</span>,
-              <span key="so" className="mono" style={{ fontSize: 'var(--text-sm)' }}>{r.code}</span>,
-              <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(r.amount)}</span>,
-              <span key="rec" className="mono" style={{ color: r.received > 0 ? '#01795D' : 'var(--color-neutral-400)' }}>{money(r.received)}</span>,
-              <span key="un" className="mono" style={{ color: r.unreceived > 0 ? '#B26A00' : 'var(--color-neutral-400)' }}>{money(r.unreceived)}</span>,
-              <span key="d" className="cell-muted" style={{ fontSize: 'var(--text-sm)' }}>{r.dueDate}</span>,
+              <span key="c" className="cell-mono-emph">{r.code}</span>,
+              <span key="cu" className="cell-emph">{r.target}</span>,
+              <span key="t" style={{ fontSize: 'var(--text-sm)' }}>{r.type}</span>,
+              <span key="p" className="cell-muted" style={{ fontSize: 'var(--text-xs)' }}>{r.period}</span>,
+              <span key="l" className="mono">{r.lines} 行</span>,
+              <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(r.net)}</span>,
+              <span key="i" className="mono" style={{ color: r.inv > 0 ? '#01795D' : 'var(--color-neutral-400)' }}>{money(r.inv)}</span>,
+              <span key="r" className="mono" style={{ color: r.rec > 0 ? '#01795D' : 'var(--color-neutral-400)' }}>{money(r.rec)}</span>,
+              <span key="u" className="mono" style={{ color: r.balance > 0 ? '#B26A00' : 'var(--color-neutral-400)', fontWeight: r.balance > 0 ? 'var(--font-semibold)' : undefined }}>{money(r.balance)}</span>,
               r.settled
-                ? pill('#ECEFF1', '#455A64', '已结清')
-                : r.received > 0
-                  ? pill('#E0F2F1', '#00695C', r.confirmed ? '部分已收' : '预收')
-                  : pill(r.confirmed ? '#FBF3E2' : '#F5F5F5', r.confirmed ? '#9A7A1C' : '#9E9E9E', r.confirmed ? (r.overdue ? '已逾期 · 待收' : '已确认 · 待收') : '未到确认节点'),
+                ? pill('#ECEFF1', '#455A64', r.status === 'closed' ? '已办结 · 已结清' : '已结清')
+                : r.rec > 0
+                  ? pill('#E0F2F1', '#00695C', '部分已收')
+                  : pill(r.confirmed ? '#FBF3E2' : '#F5F5F5', r.confirmed ? '#9A7A1C' : '#9E9E9E', r.confirmed ? '已确认 · 待收' : '待对账'),
             ])}
           />
           {filtered.length === 0 && (
-            <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>暂无应收记录</div>
+            <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>暂无应收记录（对账单确认后进入应收）</div>
           )}
         </Card>
 
-        <div style={{ marginTop: 'var(--space-3)', display: 'flex', justifyContent: 'flex-end' }}>
-          <Button onClick={() => navigate('/finance/finance-sales-collection')}>去收款管理核销 →</Button>
+        <div style={{ marginTop: 'var(--space-3)', display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>
+            应收总额 {money(totalAR)} · 已核销 {money(totalReceived)} · 余额 <strong className="mono">{money(totalAR - totalReceived)}</strong>
+          </span>
+          <Button onClick={() => navigate('/sales/sales-reconciliation')}>去客户对账操作 →</Button>
         </div>
       </div>
     </>
