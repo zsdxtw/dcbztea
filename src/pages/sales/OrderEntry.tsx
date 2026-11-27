@@ -1,15 +1,14 @@
 import { useMemo, useState, useEffect, type ReactNode } from 'react';
+import { useCustomerStore, customerPlatformRate } from '../../stores/customerStore';
+import { CUSTOMER_TYPE_LABELS } from '../../data/customers';
 import { useNavigate } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
-import { customerPlatformRate } from '../../data/customers';
 import { usePriceStore, effectiveCustomerQuote } from '../../stores/priceStore';
 import { calcPlatformNetPrice } from '../../data/prices';
-import { customerItems, CUSTOMER_TYPE_LABELS } from '../../data/customers';
 import { productCategoryLabels } from '../../data/productCategories';
-import { platformItems } from '../../data/platforms';
 import { getSalesDefaultPrice, getPersonalMinPrice } from '../../data/prices';
 import { PROVINCE_NAMES, getCityNames, getDistricts } from '../../data/regions';
 import type { ExternalOrder, ExternalOrderItem } from '../../types';
@@ -29,10 +28,12 @@ const nowLocal = () => {
 /**
  * 销售 · 新建销售单（手工录入类型的销售订单生成入口）
  * 首先选择销售路径：直接销售（路径1-4：直营/渠道/平台/个人客户）/ 经平台销售（路径5：淡茶→平台客户→直营客户）。
- * 客户匹配带出类型/联系人/默认价，保存即匹配报备。
+ * 客户匹配带出类型/联系人/默认价；保存后进入「销售单处理」，不自动匹配报备（报备转派由分发时人工勾选）。
  * embedded=true 时用于销售单列表的弹窗内嵌展示（不渲染页头与页容器）。
  */
 export default function OrderEntry({ embedded = false, onClose }: { embedded?: boolean; onClose?: () => void }) {
+  const customerItems = useCustomerStore((st) => st.customers);
+  const platformItems = useCustomerStore((st) => st.platforms);
   const navigate = useNavigate();
   const store = useOrderFlowStore;
   const products = usePriceStore((s) => s.products);
@@ -252,6 +253,9 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
       platformRateSnapshot: isVia ? customerPlatformRate(customerSearch.trim(), platformCustomerId) : undefined,
       customerOrderTime: customerOrderTime || undefined,
       customerOrderNo: customerOrderNo.trim() || undefined,
+      // 客户档案关联：按名称精确匹配档案时回填编号（销售单按客户编号关联客户）
+      customerId: customerItems.find((c) => c.name === customerSearch.trim())?.id,
+      customerCode: customerItems.find((c) => c.name === customerSearch.trim())?.customerCode,
       customerName: customerSearch.trim(),
       customerType,
       customerRegion: [regionProv, regionCity, regionDist].filter(Boolean).join(''),
@@ -274,7 +278,6 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
   );
 
   /* ── 创建成功弹窗：展示销售单编号与关键信息，可直接去分发 ── */
-  const createdHitReport = !!createdOrder?.reportMatches?.length;
   const createdSummary: { label: string; value: ReactNode; mono?: boolean; span?: boolean }[] = createdOrder ? [
     { label: '客户名称', value: createdOrder.customerName },
     { label: '客户类型', value: createdOrder.customerType },
@@ -612,7 +615,7 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
       <span style={{ display: 'flex', gap: 'var(--space-3)', flexShrink: 0 }}>
         {embedded && onClose && <Button variant="ghost" onClick={onClose}>关闭</Button>}
         <Button variant="ghost" className="btn-secondary-fill" onClick={resetForm}>重置</Button>
-        <Button onClick={saveOrder}>创建订单并匹配报备</Button>
+        <Button onClick={saveOrder}>创建订单</Button>
       </span>
     </div>
   );
@@ -654,9 +657,7 @@ const l1OfProduct = (p: { category: string; categories?: string[] }): string =>
                 {createdOrder.code}
               </div>
               <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginTop: 'var(--space-2)', textAlign: 'center', lineHeight: 1.7 }}>
-                {createdHitReport
-                  ? '已进入「销售单处理」；如需报备转派，请在分发弹窗中选择「转派-报备」人工匹配'
-                  : '已进入「销售单处理」，送去分发后生成履约单并进入「履约单分发-待分发」'}
+                已进入「销售单处理」，送去分发后生成履约单并进入「履约单分发-待分发」
               </div>
             </div>
 

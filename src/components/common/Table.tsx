@@ -4,10 +4,12 @@ import HScrollBox from './HScrollBox';
 interface TableProps {
   headers: ReactNode[];
   rows: ReactNode[][];
+  /** 指定列的内容区最小宽度（按表头文本匹配，不含单元格内边距）：自动测量不足该值时按该值，其余列仍按内容自适应 */
+  colMinWidths?: Record<string, number>;
 }
 
 /** 可调整列宽的表格组件 */
-export default function Table({ headers, rows }: TableProps) {
+export default function Table({ headers, rows, colMinWidths }: TableProps) {
   const [colWidths, setColWidths] = useState<number[]>([]);
   const tableRef = useRef<HTMLTableElement>(null);
   const dragging = useRef<{ colIndex: number; startX: number; startWidth: number } | null>(null);
@@ -16,10 +18,15 @@ export default function Table({ headers, rows }: TableProps) {
   useEffect(() => {
     if (colWidths.length === 0 && tableRef.current) {
       const ths = tableRef.current.querySelectorAll('th');
-      const widths = Array.from(ths).map((th) => th.offsetWidth);
+      const widths = Array.from(ths).map((th, i) => {
+        const min = typeof headers[i] === 'string' ? colMinWidths?.[headers[i] as string] : undefined;
+        if (!min) return th.offsetWidth;
+        const cs = getComputedStyle(th);
+        return Math.max(th.offsetWidth, min + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight));
+      });
       setColWidths(widths);
     }
-  }, [headers]);
+  }, [headers, colMinWidths]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent, colIndex: number) => {
     e.preventDefault();

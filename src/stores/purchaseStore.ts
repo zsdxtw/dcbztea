@@ -13,8 +13,8 @@ import type {
 } from '../types';
 import { externalOrderSeeds } from '../data/externalOrders';
 import { usePriceStore } from './priceStore';
+import { useCustomerStore, orderPlatformRate, customerRateOf } from './customerStore';
 import { useSupplierStore } from './supplierStore';
-import { customerItems, orderPlatformRate } from '../data/customers';
 import type { SupplyPlanLine } from '../types';
 import { getStock } from '../data/stock';
 import { nextShipmentCode, soRootOf } from '../utils/orderCodes';
@@ -34,22 +34,19 @@ const purchasePriceOf = (it: { productId: string; price: number }, supplierId: s
   return rule?.purchasePrice ?? Math.round(it.price * 0.55);
 };
 
-/** 客户维度淡茶扣点（客户档案标准字段；扣点模式采购价 = 销售实价 ×（1 − 淡茶扣点），不随供货合作商变化） */
-const dachaRateOf = (customerName: string): number | undefined =>
-  customerItems.find((c) => c.name === customerName)?.dachaRate;
 
 /**
  * 合作模式感知的采购口径单价（P4）：
- * - 扣点模式（合作商 types 含 service）：扣点比例 = 淡茶扣点 + 平台扣点（经平台销售才加平台扣点，
+ * - 扣点模式（合作商 types 含 service）：扣点比例 = 客户扣点 + 平台扣点（仅经平台销售加平台扣点，
  *   平台扣点取订单下单快照——订单价格快照规则，缺省回退客户档案现值），
- *   采购价 = 销售实价 ×（1 − 扣点比例/100）；淡茶扣点为客户维度属性，不随供货合作商变化；
+ *   采购价 = 销售实价 ×（1 − 扣点比例/100）；客户扣点为客户维度属性（客户列表-结算开票维护），不随供货合作商变化；
  * - 差价模式：按供应商采购价规则（缺省销售实价 55%）。
  */
 const coopAwarePriceOf = (child: ExternalOrder, it: { productId: string; price: number }, supplierId: string): number => {
   const supplier = useSupplierStore.getState().suppliers.find((s) => s.id === supplierId);
   const coopMode = child.coopMode ?? (supplier?.types.includes('service') ? 'service' : 'supplier');
   if (coopMode === 'service') {
-    const dacha = dachaRateOf(child.customerName) ?? 0;
+    const dacha = customerRateOf(child.customerCode, child.customerName);
     const platform = orderPlatformRate(child);
     const rate = Math.min(100, dacha + platform);
     if (rate > 0) return Math.round(it.price * (1 - rate / 100));

@@ -13,13 +13,11 @@ import { useDrawerWidth } from '../../hooks/useDrawerWidth';
 import {
   orgNodes,
   employees as initialEmployees,
-  calculateEmployeePerformance,
   getOrgNodeName,
   EMP_STATUS_LABELS,
 } from '../../data/organization';
 import type {
   Employee,
-  EmployeePerformance,
   EmployeeStatus,
   EducationRecord,
   StatusVariant,
@@ -123,17 +121,13 @@ export default function PersonnelEmployee() {
 
 
       {/* 内容区 */}
-      {activeTab === 'list' ? (
-        <EmployeeListTab
-          employeeList={employeeList}
-          onAdd={handleAdd}
-          onEdit={handleEdit}
-          onDetail={handleDetail}
-          onDelete={handleDelete}
-        />
-      ) : (
-        <PerformanceTab />
-      )}
+      <EmployeeListTab
+        employeeList={employeeList}
+        onAdd={handleAdd}
+        onEdit={handleEdit}
+        onDetail={handleDetail}
+        onDelete={handleDelete}
+      />
 
       {/* 新增/编辑抽屉 */}
       {showDrawer && (
@@ -265,94 +259,6 @@ function EmployeeListTab({
   );
 }
 
-/* ── 子组件：员工绩效 Tab ── */
-
-function PerformanceTab() {
-  const performanceData: EmployeePerformance[] = useMemo(() => calculateEmployeePerformance(), []);
-
-  /** 排名样式：1-3 名用奖牌色，其余灰色 */
-  const rankStyle = (rank: number): CSSProperties => {
-    if (rank === 1) return { background: '#FFD700', color: '#5A4500' };
-    if (rank === 2) return { background: '#C0C0C0', color: '#3A3A3A' };
-    if (rank === 3) return { background: '#CD7F32', color: '#fff' };
-    return { background: 'var(--color-bg-tertiary)', color: 'var(--color-text-tertiary)' };
-  };
-
-  return (
-    <div>
-      {/* 说明卡片 */}
-      <div style={{ background: 'var(--color-module-current-lightest)', border: '1px solid var(--color-module-current-light)', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-          <svg viewBox="0 0 16 16" fill="none" style={{ width: 16, height: 16, color: 'var(--color-module-current-base)' }}>
-            <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.2" />
-            <path d="M8 5v3.5M8 11v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-          </svg>
-          <span style={{ fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-darkest)' }}>绩效计算规则</span>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-          <div>
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)', marginBottom: 'var(--space-1)' }}>绩效金额（基于订单金额）</div>
-            <ul style={{ margin: 0, paddingLeft: 'var(--space-5)', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.7 }}>
-              <li>情况2（经平台→直营）：主办人(无跟单人) = 金额×(1-平台扣点)×90%</li>
-              <li>情况2（经平台→直营）：主办人(有跟单人) = 金额×(1-平台扣点)×50%，跟单人 = 金额×(1-平台扣点)×40%</li>
-              <li>其他5种情况：主办人(无跟单人) = 金额×90%</li>
-              <li>其他5种情况：主办人(有跟单人) = 金额×50%，跟单人 = 金额×40%</li>
-            </ul>
-          </div>
-          <div>
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)', color: 'var(--color-module-personnel-secondary)', marginBottom: 'var(--space-1)' }}>绩效利润（基于订单利润）</div>
-            <ul style={{ margin: 0, paddingLeft: 'var(--space-5)', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.7 }}>
-              <li>情况2：利润 = (销售实价×(1-平台扣点) - 采购实价) × 87%</li>
-              <li>情况2：主办人(无跟单人) = 利润×90%，主办人(有跟单人) = 利润×50%，跟单人 = 利润×40%</li>
-              <li>其他5种情况：利润 = (销售实价 - 采购实价) × 87%</li>
-              <li>其他5种情况：主办人(无跟单人) = 利润×90%，主办人(有跟单人) = 利润×50%，跟单人 = 利润×40%</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <Card style={{ padding: 0 }}>
-        {performanceData.length === 0 ? (
-          <EmptyState text="暂无绩效数据。" />
-        ) : (
-          <Table
-            headers={['排名', '员工', '部门', '跟单金额(¥)', '主办金额(¥)', '金额合计(¥)', '跟单利润(¥)', '主办利润(¥)', '利润合计(¥)', '订单数']}
-            rows={performanceData.map((perf, idx) => {
-              const rank = idx + 1;
-              return [
-                <div
-                  key="rank"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    fontWeight: 'var(--font-bold)',
-                    fontSize: 'var(--text-sm)',
-                    ...rankStyle(rank),
-                  }}
-                >
-                  {rank}
-                </div>,
-                <span key="name" className="cell-emph">{perf.employeeName}</span>,
-                perf.departmentName,
-                <span key="follAmt" style={{ color: 'var(--color-text-secondary)' }}>{formatYuan(perf.followerAmount)}</span>,
-                <span key="liaAmt" style={{ color: 'var(--color-text-secondary)' }}>{formatYuan(perf.hostAmount)}</span>,
-                <span key="totAmt" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--color-module-current-base)' }}>{formatYuan(perf.totalAmount)}</span>,
-                <span key="follPft" style={{ color: 'var(--color-text-secondary)' }}>{formatYuan(perf.followerProfit)}</span>,
-                <span key="liaPft" style={{ color: 'var(--color-text-secondary)' }}>{formatYuan(perf.hostProfit)}</span>,
-                <span key="totPft" style={{ fontWeight: 'var(--font-semibold)', color: 'var(--color-module-personnel-secondary)' }}>{formatYuan(perf.totalProfit)}</span>,
-                <span key="count" style={{ color: 'var(--color-text-secondary)' }}>{perf.orderCount}</span>,
-              ];
-            })}
-          />
-        )}
-      </Card>
-    </div>
-  );
-}
 
 /* ── 子组件：新增/编辑抽屉 ── */
 

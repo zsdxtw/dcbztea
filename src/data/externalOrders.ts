@@ -4,6 +4,7 @@
  * 基础种子覆盖全部状态 + 程序化生成的 53 条随机状态演示订单（buildDemoOrders）
  */
 import type { ExternalOrder, ExternalOrderItem, ExternalPlatform, FulfillmentStage } from '../types';
+import { customerItems } from './customers';
 
 const minutesLater = (m: number) => Date.now() + m * 60 * 1000;
 
@@ -1055,6 +1056,16 @@ const withSeedFulfillment = (o: ExternalOrder): ExternalOrder => {
 };
 
 export const externalOrderSeeds: ExternalOrder[] = [...baseSeeds, ...buildDemoOrders()].map(withSeedFulfillment);
+
+/* ── 客户档案关联（2026-11-28 起：销售单按客户编号关联客户） ──
+ * 按客户名回填 customerId / customerCode；客户名不在档案中的演示客户保持未关联（名称兜底匹配仍可用）。 */
+for (const o of externalOrderSeeds) {
+  const c = customerItems.find((x) => x.name === o.customerName);
+  if (c) {
+    o.customerId = c.id;
+    o.customerCode = c.customerCode;
+  }
+}
 
 export const EXTERNAL_PLATFORM_LABELS: Record<ExternalPlatform, string> = {
   tmall: '天猫',

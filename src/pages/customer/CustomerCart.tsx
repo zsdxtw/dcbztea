@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { PageHead, Pill } from './CustomerUI';
 import { getCustomerAuth } from './CustomerUI';
 import { useCustomerStore } from '../../stores/customerStore';
-import { customerItems } from '../../data/customers';
 import '../partner/partner.css';
 import './customer.css';
 
 /** 购物车：核对商品数量 → 填写收货信息 → 提交订单 */
 export default function CustomerCart() {
+  const customerItems = useCustomerStore((st) => st.customers);
   const navigate = useNavigate();
   const auth = getCustomerAuth();
   const cart = useCustomerStore((s) => s.cart);

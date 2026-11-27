@@ -1,8 +1,8 @@
 import { create } from 'zustand';
+import { useCustomerStore } from './customerStore';
 import type { TeaProduct, PurchasePriceRule } from '../types';
 import { teaProducts, nonTeaDemoProducts } from '../data/teaProducts';
 import { purchasePriceRules, salesQuotationRules, calcPlatformNetPrice, type SalesQuotationRule } from '../data/prices';
-import { customerItems } from '../data/customers';
 
 /**
  * 客户销售报价（销售报（调）价维护，按「商品 + 客户」维度）
@@ -150,7 +150,7 @@ interface PriceStore {
 
 /** 初始客户报价种子（不经平台 / 经平台 / 品牌折扣三类示例） */
 function seedCustomerQuotes(): CustomerQuoteMap {
-  const byId = new Map(customerItems.map((c) => [c.id, c]));
+  const byId = new Map(useCustomerStore.getState().customers.map((c) => [c.id, c]));
   const platformSkeleton = (customerId: string): CustomerPlatformQuote[] => {
     const c = byId.get(customerId);
     return (c?.platformIds ?? []).map((pid) => ({ platformId: pid, sku: '' }));
@@ -256,7 +256,7 @@ export const usePriceStore = create<PriceStore>((set, get) => ({
   addCustomerQuoteProduct: (customerId, productId) => set((s) => {
     const cfg = getQuoteConfig(s.customerQuotes, customerId);
     if (cfg.products[productId]) return s;
-    const c = customerItems.find((x) => x.id === customerId);
+    const c = useCustomerStore.getState().customers.find((x) => x.id === customerId);
     const platforms = c?.platformIds ?? [];
     return {
       customerQuotes: {

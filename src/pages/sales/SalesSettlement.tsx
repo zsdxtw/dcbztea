@@ -8,6 +8,7 @@ import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { useSettlementStore, statementOfOrder, netOf, receivedOf } from '../../stores/settlementStore';
 import { SalesOrderDetailTabs } from './SalesOrderDetail';
+import { CUSTOMER_COL_WIDTH } from './SalesOrders';
 import { platformLabelOf } from '../../data/externalOrders';
 import {
   buildFamilies, familyStatesOf, fulfillmentUnitsOf, fulfillStateOf, orderProgressOf,
@@ -16,6 +17,9 @@ import {
 import type { ExternalOrder } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
+
+/** 列内容最小宽度：客户列同销售单列表的客户列宽 */
+const COL_MIN_WIDTHS = { 客户: CUSTOMER_COL_WIDTH };
 
 const pill = (text: string) => {
   const c = (FAMILY_STATE_COLORS as Record<string, { bg: string; color: string }>)[text] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
@@ -116,6 +120,7 @@ export default function SalesSettlement() {
 
         <Card style={{ padding: 0 }}>
           <Table
+            colMinWidths={COL_MIN_WIDTHS}
             headers={['履约单号', '关联销售单', '客户', '履约主体', '金额', '履约状态', '所属对账单', '收款状态', '开票状态', '结算状态', '订单进度', '操作']}
             rows={shown.map((x) => {
               const o = x.order;

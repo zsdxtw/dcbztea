@@ -14,7 +14,9 @@ import { useScoreStore, getScoreSummary } from '../../stores/scoreStore';
 import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS,
   TRANSFER_SOURCE_LABELS, SOURCE_TAG_LABELS, platformLabelOf } from '../../data/externalOrders';
 import { REGIONS, getCities, getDistricts, regionTextOf } from '../../data/regions';
-import { ProductItemsTable, SalesOrderDetailTabs } from './SalesOrderDetail';
+import { SalesOrderDetailTabs } from './SalesOrderDetail';
+import { CUSTOMER_COL_WIDTH, PARTNER_COL_WIDTH } from './SalesOrders';
+import SalesOrderInfoModal from '../../components/business/SalesOrderInfoModal';
 import TakebackDialog from '../../components/business/TakebackDialog';
 import { buildFamilies, familyStatesOf, orderProgressOf, FAMILY_STATE_COLORS } from '../../utils/salesOrderFamily';
 import SplitDraftBuilder, { type DraftFulfillment } from '../../components/business/SplitDraftBuilder';
@@ -52,6 +54,9 @@ const progressPill = (o: ExternalOrder) => {
 };
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
+
+/** 列内容最小宽度：客户列、履约主体列同销售单列表 */
+const COL_MIN_WIDTHS = { 客户: CUSTOMER_COL_WIDTH, 履约主体: PARTNER_COL_WIDTH };
 
 /** 省份选项（地区筛选/范围共用） */
 const PROVINCE_OPTS = REGIONS.map((r) => r.name);
@@ -357,6 +362,7 @@ export default function ExternalOrders() {
         {/* 子单平铺列表（逐单操作视图；母单聚合总览见「销售单管理 → 销售订单」） */}
         <Card style={{ padding: 0 }}>
           <Table
+            colMinWidths={COL_MIN_WIDTHS}
             headers={['序号', '销售履约单号', '销售单号', '订单来源', '销售路径', '客户', '收件人 / 地区', '品牌/数量', '金额', '订单进度', '分发状态', '分发方式', '履约主体', '录入时间', '操作']}
             rows={pagedOrders.map((o, idx) => [
               <span key="no" className="mono cell-muted">{(page - 1) * pageSize + idx + 1}</span>,
@@ -672,76 +678,8 @@ export default function ExternalOrders() {
         </div>
       )}
 
-      {/* ── 母销售单信息弹窗（关联销售单点击） ── */}
-      {/* ── 销售单信息弹窗（订单信息 / 收货信息 / 商品明细，参照销售单列表详情「销售单信息」） ── */}
-      {linkOrderCode && (() => {
-        const fam = families.find((f) => f.rootCode === linkOrderCode);
-        if (!fam) return null;
-        const m = fam.mother;
-        const amount = (fam.children.length > 0 ? fam.children : fam.all).reduce((s2, o) => s2 + o.totalAmount, 0);
-        const rows = fam.children.length > 0 ? fam.children.flatMap((c) => c.items) : m.items;
-        const map = new Map<string, { productId: string; productName: string; spec: string; quantity: number; price: number }>();
-        for (const it of rows) {
-          const k = `${it.productName}|${it.spec}`;
-          const cu = map.get(k);
-          if (cu) cu.quantity += it.quantity;
-          else map.set(k, { productId: it.productId, productName: it.productName, spec: it.spec, quantity: it.quantity, price: it.price });
-        }
-        const infoCell = (label: string, node: React.ReactNode, opts?: { mono?: boolean; emph?: boolean; span?: 2 | 3 }) => (
-          <div className={`detail-info-item${opts?.span === 2 ? ' span-2' : opts?.span === 3 ? ' span-3' : ''}`}><label className="drawer-label">{label}</label><div className={`detail-info-value${opts?.emph ? ' emph' : ''}${opts?.mono ? ' mono' : ''}`}>{node}</div></div>
-        );
-        return (
-          <div className="category-dialog-overlay" onClick={() => setLinkOrderCode(null)}>
-            <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 980, maxWidth: '94vw' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
-                <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)' }}>销售单信息 · {linkOrderCode}</div>
-                <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>母销售单（聚合其下 {fam.children.length > 0 ? `${fam.children.length} 张` : '1 张'}履约单）</span>
-              </div>
-              <DrawerSection title="订单信息">
-                <InfoGrid cols={4}>
-                  {infoCell('销售单号', fam.rootCode, { mono: true, emph: true })}
-                  {infoCell('订单来源', <>{m.salesPath === 'via_platform' ? (m.platformCustomerName ?? '经平台销售') : '淡茶半盏'}（{EXTERNAL_CHANNEL_LABELS[m.sourceChannel]}）</>)}
-                  {infoCell('下单平台', m.salesPath === 'via_platform' ? (m.platformCustomerName ?? '—') : '—')}
-                  {infoCell('平台订单号', m.externalOrderNo ?? '—', { mono: true })}
-                  {infoCell('客户', `${m.customerName}（${m.customerType}）`, { emph: true })}
-                  {infoCell('客户区域', regionText(m))}
-                  {infoCell('总金额', money(amount), { mono: true })}
-                  {infoCell('履约单数', fam.children.length > 0 ? `${fam.children.length} 单` : '1 单（未拆分，母销售单即履约单）')}
-                  {infoCell('销售路径', m.salesPath === 'via_platform' ? '经平台销售' : '直接销售')}
-                  {infoCell('客户下单时间', m.customerOrderTime ?? '—')}
-                  {infoCell('客户侧订单号', m.customerOrderNo ?? '—', { mono: true })}
-                  {infoCell('录入时间', m.entryTime.length > 10 ? m.entryTime : `${m.entryTime} 09:12:00`, { mono: true })}
-                  {infoCell('录入人', m.operator)}
-                  {m.platformCustomerName ? infoCell('平台客户', m.platformCustomerName) : null}
-                </InfoGrid>
-              </DrawerSection>
-              <DrawerSection title="收货信息">
-                <InfoGrid cols={4}>
-                  {infoCell('收货人', m.receiver, { emph: true })}
-                  {infoCell('联系电话', m.receiverPhone, { mono: true })}
-                  {infoCell('收货地区', regionText(m))}
-                  {infoCell('收货地址', m.receiverAddress, { span: 2 })}
-                  {infoCell('备注', m.remark || '—', { span: 2 })}
-                </InfoGrid>
-              </DrawerSection>
-              <DrawerSection title="商品明细">
-                <ProductItemsTable
-                  items={[...map.values()]}
-                  customerName={m.customerName}
-                  salesPath={m.salesPath}
-                  platformCustomerId={m.platformCustomerId}
-                  platform={m.platform}
-                  platformRateSnapshot={m.platformRateSnapshot}
-                  footerAmount={amount}
-                />
-              </DrawerSection>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-3)' }}>
-                <Button variant="ghost" onClick={() => setLinkOrderCode(null)}>关闭</Button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* ── 销售单信息弹窗（订单信息 / 收货信息 / 商品明细；与履约单履约列表共用同一组件） ── */}
+      <SalesOrderInfoModal code={linkOrderCode} onClose={() => setLinkOrderCode(null)} />
     </>
   );
 }

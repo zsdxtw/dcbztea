@@ -1,14 +1,14 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
+import { useCustomerStore, orderPlatformRate, customerByRef } from '../../stores/customerStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { usePriceStore, effectiveCustomerQuote } from '../../stores/priceStore';
 import { calcPlatformNetPrice } from '../../data/prices';
-import { customerItems, orderPlatformRate } from '../../data/customers';
 import { regionTextOf } from '../../data/regions';
 import { EXTERNAL_CHANNEL_LABELS, EXTERNAL_PLATFORM_LABELS, TRANSFER_SOURCE_LABELS } from '../../data/externalOrders';
 import {
@@ -39,8 +39,10 @@ function pathLabel(o: ExternalOrder): string {
 
 /** 信息项 */
 /** 商品明细表（字段参照新建销售单：序号/图片/名称/品牌/规格/市场价+京东天猫价/销售报价/数量/销售实价/小计；经平台订单多一列销平台实价——扣点取订单下单快照） */
-export function ProductItemsTable({ items, customerName, salesPath, platformCustomerId, platform, platformRateSnapshot, footerAmount }: {
+export function ProductItemsTable({ items, customerCode, customerName, salesPath, platformCustomerId, platform, platformRateSnapshot, footerAmount }: {
   items: ExternalOrder['items'];
+  /** 关联客户编号（匹配客户档案按编号优先、名称兜底） */
+  customerCode?: string;
   customerName: string;
   salesPath?: ExternalOrder['salesPath'];
   platformCustomerId?: string;
@@ -51,9 +53,10 @@ export function ProductItemsTable({ items, customerName, salesPath, platformCust
 }) {
   const products = usePriceStore((s) => s.products);
   const customerQuotes = usePriceStore((s) => s.customerQuotes);
+  const customerItems = useCustomerStore((st) => st.customers);
   const isVia = salesPath === 'via_platform';
-  const customer = customerItems.find((c) => c.name === customerName);
-  const rate = isVia ? orderPlatformRate({ salesPath, platformCustomerId, customerName, platformRateSnapshot }) : undefined;
+  const customer = customerByRef(customerCode, customerName);
+  const rate = isVia ? orderPlatformRate({ salesPath, platformCustomerId, customerCode, customerName, platformRateSnapshot }) : undefined;
   return (
     <table className="detail-inline-table">
       <thead><tr>
@@ -146,6 +149,7 @@ export function MotherOrderInfoSection({ family }: { family: OrderFamily }) {
           <InfoItem label="下单平台">{mother.salesPath === 'via_platform' ? (mother.platformCustomerName ?? '—') : '—'}</InfoItem>
           <InfoItem label="平台订单号" mono>{mother.externalOrderNo}</InfoItem>
           <InfoItem label="客户" emph>{`${mother.customerName}（${mother.customerType}）`}</InfoItem>
+          <InfoItem label="客户编号" mono>{mother.customerCode ?? '—'}</InfoItem>
           <InfoItem label="客户区域">{regionTextOf(mother.customerRegion, mother.receiverAddress)}</InfoItem>
           <InfoItem label="总金额" mono valueStyle={{ color: 'var(--color-module-current-base)', fontWeight: 'var(--font-semibold)' }}>{money(amount)}</InfoItem>
           <InfoItem label="履约单数">{children.length > 0 ? `${children.length} 单` : '1 单（未拆分，母销售单即履约单）'}</InfoItem>
@@ -208,25 +212,23 @@ export function FulfillmentProgressBlock({ order, poDocs }: { order: ExternalOrd
             </div>
           ))}
         </div>
-        {/* 管理后台推进（合作商链推进发货/妥投、妥投后确认收货） */}
+        {/* 说明与演示推进：物流状态以联机查询物流公司的结果为准（查询到妥投即进入已妥投，不手动推进）；妥投后的「确认收货」在履约单履约列表操作列进行 */}
         {(() => {
           const stage = order.fulfillment?.stage;
           const partnerChain = order.processStatus === 'processed' && order.path === 'distribute' && !!order.partnerName;
-          const actions: ReactNode[] = [];
-          if (partnerChain && order.partnerStatus === 'accepted') {
-            actions.push(<Button key="ship" size="sm" onClick={() => useOrderFlowStore.getState().advancePartner(order.id, 'shipping')}>推进：发货</Button>);
-          }
-          if (partnerChain && order.partnerStatus === 'shipping') {
-            actions.push(<Button key="transit" size="sm" onClick={() => useOrderFlowStore.getState().advancePartner(order.id, 'transit')}>推进：物流妥投</Button>);
-          }
-          if (stage === 'transit') {
-            actions.push(<Button key="confirm" size="sm" onClick={() => useOrderFlowStore.getState().confirmReceipt(order.id)}>确认收货（管理后台）</Button>);
-          }
-          if (actions.length === 0) return null;
+          const canDemoShip = partnerChain && order.partnerStatus === 'accepted';
+          const hint = stage === 'transit'
+            ? '物流已妥投：请在「履约单履约」列表操作列点击「确认收货」→ 已确收，随后在「履约单结算」页发起对账'
+            : stage === 'shipping'
+              ? '物流状态以联机查询物流公司的结果为准，查询到妥投后进入已妥投'
+              : canDemoShip
+                ? '接单 / 发货由履约主体推进；物流状态以联机查询物流公司的结果为准，妥投后在「履约单履约」列表确认收货'
+                : null;
+          if (!hint) return null;
           return (
             <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'center' }}>
-              {actions}
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>接单 / 发货 / 妥投由履约主体推进；全部包裹妥投后确认收货 → 已确收，随后在「履约单结算」页发起对账</span>
+              {canDemoShip && <Button size="sm" onClick={() => useOrderFlowStore.getState().advancePartner(order.id, 'shipping')}>推进：发货</Button>}
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>{hint}</span>
             </div>
           );
         })()}
@@ -381,6 +383,7 @@ function FulfillmentUnitDetail({ family, poDocs, code }: { family: OrderFamily; 
       <div style={{ marginTop: 'var(--space-3)' }}>
         <ProductItemsTable
           items={current.items}
+          customerCode={current.customerCode}
           customerName={current.customerName}
           salesPath={current.salesPath ?? 'direct'}
           platformCustomerId={current.platformCustomerId}

@@ -3,12 +3,12 @@ import Button from '../../components/common/Button';
 import { InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { PageHead, Pill, getCustomerAuth } from './CustomerUI';
 import { useCustomerStore } from '../../stores/customerStore';
-import { customerItems } from '../../data/customers';
 import '../partner/partner.css';
 import './customer.css';
 
 /** 账号信息：登录账号、关联客户档案与修改密码 */
 export default function CustomerAccountPage() {
+  const customerItems = useCustomerStore((st) => st.customers);
   const auth = getCustomerAuth();
   const account = useCustomerStore((s) => s.accounts.find(a => a.id === auth?.accountId));
   const changePassword = useCustomerStore((s) => s.changePassword);

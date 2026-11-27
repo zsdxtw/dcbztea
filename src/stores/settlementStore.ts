@@ -11,12 +11,12 @@
  * - 退货冲减：对账单退货调整减少应收净额；预付客户退款回钱包余额。
  */
 import { create } from 'zustand';
+import { useCustomerStore, orderPlatformRate } from './customerStore';
 import type {
   CustomerStatement, CustomerWallet, PartnerStatement, ReceiptMethod,
   StatementLine, ExternalOrder,
 } from '../types';
 import { externalOrderSeeds } from '../data/externalOrders';
-import { customerItems, orderPlatformRate } from '../data/customers';
 import { useOrderFlowStore } from './orderFlowStore';
 import { usePurchaseStore } from './purchaseStore';
 
@@ -357,7 +357,7 @@ export const useSettlementStore = create<SettlementState>((set, get) => {
     /* ═══ 客户钱包 ═══ */
     walletRecharge: (customerName, amount, note) => {
       if (!(amount > 0)) return { ok: false, msg: '充值金额须大于 0' };
-      const cust = customerItems.find((c) => c.name === customerName);
+      const cust = useCustomerStore.getState().customers.find((c) => c.name === customerName);
       set((s) => {
         const exist = s.wallets.find((w) => w.customerName === customerName);
         if (exist) {

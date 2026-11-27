@@ -98,20 +98,7 @@ export default function PartnerCustomers() {
   const customerQuotes = usePriceStore((s) => s.customerQuotes);
   const storeProducts = usePriceStore((s) => s.products);
 
-  /** 扣点模式文案：淡茶扣点 ~ 淡茶扣点+各经平台扣点（区间取最小~最大） */
-  const dachaRangeText = (c: CustomerItem, dachaRate?: number): string => {
-    if (dachaRate === undefined) return '未设置';
-    const rates = (c.platformIds ?? []).map((id) => {
-      const raw = c.platformCommissionRates?.[id] ?? '0';
-      const n = parseFloat(String(raw).replace('%', ''));
-      return Number.isNaN(n) ? 0 : dachaRate + n;
-    });
-    const all = [dachaRate, ...rates];
-    const min = Math.min(...all);
-    const max = Math.max(...all);
-    return min === max ? `${min}%` : `${min}%~${max}%`;
-  };
-
+  
   const auth = getPartnerAuth();
   const partner = useMemo(() => {
     return auth?.supplierId
@@ -251,8 +238,8 @@ export default function PartnerCustomers() {
                   地区：{poolScopeText(cfg)}
                 </div>
                 <div style={{ borderTop: '1px dashed var(--pk-line)', paddingTop: 5, display: 'flex', flexDirection: 'column', gap: 2, fontSize: 11, lineHeight: 1.5 }}>
-                  <span style={{ color: 'var(--pk-ink2)' }} title="淡茶扣点 + 该客户经平台的各平台扣点">
-                    扣点模式：<strong style={{ color: '#01795D' }}>{dachaRangeText(c, cfg?.dachaRate)}</strong>
+                  <span style={{ color: 'var(--pk-ink2)' }} title="客户扣点：扣点模式采购价 = 销售实价 ×（1 − 客户扣点 − 平台扣点〔仅经平台销售〕）">
+                    客户扣点：<strong style={{ color: '#01795D' }}>{c.customerRate !== undefined ? `${c.customerRate}%` : '未设置'}</strong>
                   </span>
                   <span style={{ color: 'var(--pk-ink3)' }}>差价模式：视具体订单情况</span>
                 </div>
@@ -269,16 +256,7 @@ export default function PartnerCustomers() {
 
       {/* 选中客户：合作规则（来自管理后台「客户列表 · 入池管理」的设置） */}
       {selected && (() => {
-        const rule = poolConfigs[selected.id]?.coopRule;
-        const hasRule = !!(rule && (rule.requirements || rule.orderProcess || rule.settlement));
-        const columns: { label: string; text?: string }[] = [
-          { label: '基础要求', text: rule?.requirements },
-          { label: '订单流程', text: rule?.orderProcess },
-          { label: '发货要求', text: rule?.shipping },
-          { label: '结算规则', text: rule?.settlement },
-          { label: '推品规则', text: rule?.promotion },
-          { label: '注意事项', text: rule?.precautions },
-        ];
+        const ruleText = (poolConfigs[selected.id]?.coopRuleText ?? '').trim();
         return (
           <div className="pk-panel" style={{ marginTop: 18 }}>
             <div className="pk-panel-head">
@@ -291,13 +269,9 @@ export default function PartnerCustomers() {
               <span style={{ fontSize: 12, color: 'var(--pk-ink3)' }}>{selected.shortName || selected.name}</span>
             </div>
             <div className="pk-panel-body">
-              {hasRule ? (
-                <div style={{ padding: '12px 16px', background: 'var(--pk-accent-soft)', borderRadius: 10, fontSize: 12.5, color: '#01795D', lineHeight: 1.7 }}>
-                  {columns.map((col) => (
-                    <div key={col.label} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                      <strong style={{ fontWeight: 600 }}>{col.label}</strong>：{col.text || '—'}
-                    </div>
-                  ))}
+              {ruleText ? (
+                <div style={{ padding: '12px 16px', background: 'var(--pk-accent-soft)', borderRadius: 10, fontSize: 12.5, color: '#01795D', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                  {ruleText}
                 </div>
               ) : (
                 <div style={{ fontSize: 13, color: 'var(--pk-ink3)', lineHeight: 1.8 }}>

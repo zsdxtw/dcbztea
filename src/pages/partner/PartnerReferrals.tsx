@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useCustomerStore } from '../../stores/customerStore';
 import QRCode from 'qrcode';
 import { PageHead, Pill } from './PartnerUI';
 import { getPartnerAuth } from './PartnerLayout';
@@ -6,7 +7,6 @@ import Pagination from '../../components/common/Pagination';
 import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { useReferralStore, REFERRAL_STATUS_LABELS, REFERRAL_BIZ_LABELS, TRAINING_KIND_OPTIONS } from '../../stores/referralStore';
-import { customerItems } from '../../data/customers';
 import type { CustomerReferral, ReferralBizType, ReferralRewardRule } from '../../types';
 import './partner.css';
 
@@ -35,6 +35,7 @@ const statusPill = (status: string) => {
 
 /** 合作商终端 · 业务推介：向平台推介客户参加茶培训 / 茶活动，或推荐新合作商入驻淡茶 */
 export default function PartnerReferrals() {
+  const customerItems = useCustomerStore((st) => st.customers);
   const auth = getPartnerAuth();
   const referrals = useReferralStore((s) => s.referrals);
   const rewardRules = useReferralStore((s) => s.rewardRules);

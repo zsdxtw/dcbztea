@@ -633,7 +633,7 @@ export interface BankAccount {
 }
 
 /** 客户类型 */
-export type CustomerType = 'direct' | 'channel' | 'personal' | 'platform' | 'guest';
+export type CustomerType = 'direct' | 'channel' | 'personal' | 'platform';
 
 /** 客户采购端（客户采买平台）终端：开通后客户可登录采购端按报品报（调）价选品下单 */
 export interface CustomerTerminal {
@@ -698,16 +698,6 @@ export type CustomerInvoiceInfo = PlatformInvoiceInfo;
 /** 人员角色类型：员工 / 茶人 */
 export type PersonRoleType = 'employee' | 'tea_professional';
 
-/** 分润比例设置 */
-export interface ProfitShareConfig {
-  /** 拓客人分润比例（0-100） */
-  developerRatio: number;
-  /** 维护人分润比例（0-100） */
-  maintainerRatio: number;
-  /** 跟单人分润比例（0-100） */
-  followerRatio: number;
-}
-
 /** 直营客户分子机构 */
 export interface CustomerSubOrganization {
   id: string;
@@ -725,18 +715,6 @@ export interface CustomerSubOrganization {
   district?: string;
   /** 详细地址 */
   address: string;
-  /** 拓客人 ID */
-  developerId?: string;
-  /** 拓客人类型 */
-  developerType?: PersonRoleType;
-  /** 拓客人姓名（冗余，便于展示） */
-  developerName?: string;
-  /** 维护人 ID */
-  maintainerId?: string;
-  /** 维护人类型 */
-  maintainerType?: PersonRoleType;
-  /** 维护人姓名（冗余，便于展示） */
-  maintainerName?: string;
   /** 备注 */
   remark?: string;
 }
@@ -763,12 +741,6 @@ export interface PlatformItem {
   deposit?: number;
   /** 保证金应收日期 */
   depositDueDate?: string;
-  /** 拓客人 ID（原主办人，负责该平台客户的拓展与维护，可为员工/茶人） */
-  developerId?: string;
-  /** 拓客人类型 */
-  developerType?: PersonRoleType;
-  /** 拓客人姓名（冗余，便于展示） */
-  developerName?: string;
   bankAccounts: PlatformBankAccount[];
   invoiceInfos: PlatformInvoiceInfo[];
   status: 'active' | 'inactive';
@@ -790,23 +762,8 @@ export interface CustomerPoolConfig {
   cities: string[];
   /** 区县范围（'省/市/县' 路径） */
   districts: string[];
-  /** 合作规则（合作商与该客户合作的规则说明，展示于合作商终端客户池） */
-  coopRule?: {
-    /** 基础要求（品质、包装、售后等要求） */
-    requirements?: string;
-    /** 订单流程（订货方式、确认流程等） */
-    orderProcess?: string;
-    /** 发货要求（发货时限、物流方式等） */
-    shipping?: string;
-    /** 结算规则（账期、开票、对账等） */
-    settlement?: string;
-    /** 推品规则（推品清单、推介支持等） */
-    promotion?: string;
-    /** 注意事项（禁止事项、风险提示等补充说明） */
-    precautions?: string;
-  };
-  /** 淡茶扣点（百分比，平台对该客户的扣点比例；展示于合作商终端客户池卡片） */
-  dachaRate?: number;
+  /** 合作规则（整段文本，可含「1.基础要求：2.订单流程…」分段；管理后台入合作池管理维护，展示于合作商终端客户池） */
+  coopRuleText?: string;
 }
 
 /* ════════════════════════════════════════
@@ -919,32 +876,12 @@ export interface CustomerItem {
   platformIds: string[];
   /** 平台扣点映射（仅"带平台方"的直营客户设置，键为平台ID，值为扣点如"8%"；扣点跟随平台，同一客户不同平台可有不同扣点） */
   platformCommissionRates?: Record<string, string>;
-  /** 拓客人 ID（原主办人，负责客户拓展，可为员工/茶人） */
-  developerId?: string;
-  /** 拓客人类型 */
-  developerType?: PersonRoleType;
-  /** 拓客人姓名（冗余，便于展示） */
-  developerName?: string;
-  /** 维护人 ID（负责客户维护，可为员工/茶人） */
-  maintainerId?: string;
-  /** 维护人类型 */
-  maintainerType?: PersonRoleType;
-  /** 维护人姓名（冗余，便于展示） */
-  maintainerName?: string;
-  /** 跟单人 ID（负责订单跟进，可为员工/茶人） */
-  followerId?: string;
-  /** 跟单人类型 */
-  followerType?: PersonRoleType;
-  /** 跟单人姓名（冗余，便于展示） */
-  followerName?: string;
-  /** 分润比例配置 */
-  profitShare?: ProfitShareConfig;
   cooperationDate: string;
   status: 'active' | 'inactive';
   settlementMethod?: string;
   taxNo?: string;
-  /** 淡茶扣点（百分比，客户维度属性：扣点模式合作商的采购价 = 销售实价 ×（1 − 淡茶扣点），不随供货合作商变化；入池配置仅作带出与展示） */
-  dachaRate?: number;
+  /** 客户扣点（百分比，针对该客户的扣点，与是否入合作池无关；客户列表-结算开票 TAB 维护；扣点模式采购价 = 销售实价 ×（1 − 客户扣点 − 平台扣点〔仅经平台销售〕）） */
+  customerRate?: number;
   /** 客户来源 */
   source?: string;
   /** 结算账户列表 */
@@ -1448,29 +1385,8 @@ export interface Employee {
 }
 
 /** 订单销售场景（6种情况） */
-export type SalesScenario = 1 | 2 | 3 | 4 | 5 | 6;
 
 /** 员工绩效统计（绩效金额 + 绩效利润） */
-export interface EmployeePerformance {
-  employeeId: string;
-  employeeName: string;
-  departmentName: string;
-  position: string;
-  /** 绩效金额 - 作为跟单人的销售金额 */
-  followerAmount: number;
-  /** 绩效金额 - 作为主办人的销售金额 */
-  hostAmount: number;
-  /** 绩效金额总额 */
-  totalAmount: number;
-  /** 绩效利润 - 作为跟单人的利润金额 */
-  followerProfit: number;
-  /** 绩效利润 - 作为主办人的利润金额 */
-  hostProfit: number;
-  /** 绩效利润总额 */
-  totalProfit: number;
-  /** 关联订单数 */
-  orderCount: number;
-}
 
 /* ─────────────────────────── 合作商终端（合作商后台） ─────────────────────────── */
 
@@ -1938,6 +1854,10 @@ export interface ExternalOrder {
   platformRateSnapshot?: number;
   /** 平台母销售单号 */
   externalOrderNo?: string;
+  /** 关联客户档案 ID（下单/推送时按客户名匹配档案回填；手工输入未匹配档案客户时为空） */
+  customerId?: string;
+  /** 关联客户编号（同上；客户相关匹配一律按编号优先、名称兜底） */
+  customerCode?: string;
   customerName: string;
   customerType: string;
   customerRegion: string;

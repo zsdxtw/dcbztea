@@ -5,7 +5,6 @@
  * - 直营客户：KHZY-0001
  * - 渠道客户：KHQD-0001
  * - 平台客户：KHPT-0001
- * - 游客客户：KHYK-0001（未知客户具体情况的自来客户）
  */
 
 import type { CustomerType } from '../types';
@@ -16,7 +15,6 @@ const TYPE_PREFIX: Record<CustomerType, string> = {
   channel: 'KHQD',
   personal: 'KHGR',
   platform: 'KHPT',
-  guest: 'KHYK',
 };
 
 /**

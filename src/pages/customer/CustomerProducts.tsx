@@ -3,7 +3,6 @@ import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { PageHead, Pill, getCustomerAuth } from './CustomerUI';
 import { useCustomerStore } from '../../stores/customerStore';
-import { customerItems } from '../../data/customers';
 import { usePriceStore, effectiveCustomerQuote } from '../../stores/priceStore';
 import {
   customerCatalog,
@@ -44,6 +43,7 @@ function ProdVisual() {
 
 /** 商品浏览：在售茶品目录，支持搜索/筛选/排序，加入购物车 */
 export default function CustomerProducts() {
+  const customerItems = useCustomerStore((st) => st.customers);
   const addToCart = useCustomerStore((s) => s.addToCart);
   const cart = useCustomerStore((s) => s.cart);
   /** 客户维度价格体系：本客户销售报价（单品价>品牌折扣）> 销售价回退（个人客户不提前报价） */

@@ -12,7 +12,6 @@ import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
-import { customerItems } from '../../data/customers';
 import { EXTERNAL_CHANNEL_LABELS, EXTERNAL_STATUS_LABELS,
   EXTERNAL_STATUS_COLORS, platformLabelOf } from '../../data/externalOrders';
 import { FULFILLMENT_STAGE_LABELS, FULFILLMENT_STAGE_COLORS, stageOfOrder } from '../../utils/fulfillment';

@@ -4,25 +4,16 @@ import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import type { CustomerItem, CustomerPoolConfig, CustomerType, PlatformItem, PlatformBankAccount, PlatformInvoiceInfo, CustomerBankAccount, CustomerInvoiceInfo, OrderContact, CustomerSubOrganization } from '../../types';
-import { customerItems as initialCustomers, CUSTOMER_TYPE_LABELS, CUSTOMER_TYPE_DESC, LEVEL_COLORS, CUSTOMER_GROUP_MAP, generateOrderContactId, convertPersonalToDirect } from '../../data/customers';
-import { platformItems as globalPlatforms } from '../../data/platforms';
+import { CUSTOMER_TYPE_LABELS, CUSTOMER_TYPE_DESC, LEVEL_COLORS, CUSTOMER_GROUP_MAP, generateOrderContactId } from '../../data/customers';
 import { PROVINCE_NAMES, getCityNames, getCities, getDistricts } from '../../data/regions';
 import { generateCustomerCode } from '../../utils/customerCode';
-import { useDrawerWidth } from '../../hooks/useDrawerWidth';
-import DeptEmployeeSelect from '../../components/business/DeptEmployeeSelect';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { useCustomerStore } from '../../stores/customerStore';
+import type { CustomerOpRecord } from '../../stores/customerStore';
 import Pagination from '../../components/common/Pagination';
 
-/** 合作规则六段配置（标签 / 字段键 / 占位提示；管理后台与合作商终端共用口径） */
-const COOP_RULE_FIELDS: { label: string; key: 'requirements' | 'orderProcess' | 'shipping' | 'settlement' | 'promotion' | 'precautions'; placeholder: string }[] = [
-  { label: '基础要求', key: 'requirements', placeholder: '如：要求供货商品提供当季检测报告；礼盒类需带品牌礼袋...' },
-  { label: '订单流程', key: 'orderProcess', placeholder: '如：每周三前汇总需求向平台下单，订单经客户采购部确认后生效...' },
-  { label: '发货要求', key: 'shipping', placeholder: '如：现货商品 48 小时内发货，发货前同步物流单号...' },
-  { label: '结算规则', key: 'settlement', placeholder: '如：月结 30 天，次月 10 日前对账开票（增值税专用发票）...' },
-  { label: '推品规则', key: 'promotion', placeholder: '如：按平台每月推品清单优先推介，新品首单可申请支持价...' },
-  { label: '注意事项', key: 'precautions', placeholder: '如：发货前需预约收货时段；节假日期间订单顺延处理...' },
-];
+/** 合作规则示范文字（未设置时预填入输入框，客户可自行删除修改） */
+const DEMO_RULE_TEXT = ['1.基础要求：', '2.订单流程', '3.发货要求', '4.结算规则', '5.推品规则', '6.注意事项'].join('\n');
 
 /** 入合作池范围编辑器：全国/省 chips + 手风琴市/区县（详情抽屉与入合作池弹窗共用） */
 function PoolScopeEditor({ cfg, update }: { cfg: CustomerPoolConfig; update: (patch: Partial<CustomerPoolConfig>) => void }) {
@@ -158,28 +149,6 @@ function PoolScopeEditor({ cfg, update }: { cfg: CustomerPoolConfig; update: (pa
   );
 }
 
-/** 客户档案操作记录（页面会话级） */
-interface CustomerOpRecord {
-  id: string;
-  customerCode: string;
-  time: string;
-  action: string;
-  detail?: string;
-  operator: string;
-}
-
-/** 操作记录种子（近两条演示流水） */
-const seedOpRecords: CustomerOpRecord[] = [
-  { id: 'op1', customerCode: 'KHZY-0001', time: '2026-10-20 14:30', action: '开通客户采购端', detail: '管理员账号 hmt001 开通，商品与报价由报品报（调）价统一控制', operator: '管理员' },
-  { id: 'op2', customerCode: 'KHZY-0006', time: '2026-10-18 10:15', action: '新增经平台销售', detail: '关联平台：京东慧采（扣点 8%）', operator: '管理员' },
-];
-
-const nowStamp = () => {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-};
-
 const PRIMARY = '#0F64B5';
 const PRIMARY_LIGHT = '#EBF3FC';
 const SECONDARY = '#CB405D';
@@ -203,42 +172,49 @@ const PERSONAL_COLOR_LIGHT = '#F3E5F5';
 export default function SalesCustomers() {
   const [activeTab, setActiveTab] = useState<CustomerType>('direct');
   const [keyword, setKeyword] = useState('');
-  const [data, setData] = useState<CustomerItem[]>(initialCustomers);
-  const [platforms, setPlatforms] = useState<PlatformItem[]>(globalPlatforms);
+  /** 客户档案 / 平台档案：唯一数据源在 customerStore（跨页共享，编辑实时生效） */
+  const data = useCustomerStore((s) => s.customers);
+  const setData = useCustomerStore((s) => s.setCustomers);
+  const platforms = useCustomerStore((s) => s.platforms);
+  const setPlatforms = useCustomerStore((s) => s.setPlatforms);
+  const storeAddCustomer = useCustomerStore((s) => s.addCustomer);
+  const storeRemoveCustomers = useCustomerStore((s) => s.removeCustomers);
+  const storeConvertPersonalToDirect = useCustomerStore((s) => s.convertPersonalToDirect);
+  const storeAddPlatform = useCustomerStore((s) => s.addPlatform);
+  const storeRemovePlatforms = useCustomerStore((s) => s.removePlatforms);
+  const storeAddOpRecord = useCustomerStore((s) => s.addOpRecord);
   const [deleteMode, setDeleteMode] = useState(false);
   const [selectedForDelete, setSelectedForDelete] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [detailCustomer, setDetailCustomer] = useState<CustomerItem | null>(null);
   /** 详情抽屉当前 Tab（参照合作商档案的分页设计） */
   const [detailTab, setDetailTab] = useState<'basic' | 'finance' | 'viaPlatform' | 'procurement' | 'contacts' | 'suborg' | 'ops' | 'pool'>('basic');
-  /** 列表筛选：等级 / 是否入池（直营）/ 合作状态（平台 Tab 仅状态） */
+  /** 列表筛选：等级 / 是否入合作池（直营）/ 合作状态（平台 Tab 仅状态） */
   const [filterLevel, setFilterLevel] = useState('');
   const [filterPool, setFilterPool] = useState<'all' | 'yes' | 'no'>('all');
   const [filterStatus, setFilterStatus] = useState('');
   /** 分页（客户表 / 平台表） */
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  /** 入池范围复选树：展开的省 / 市（各只展开一个，手风琴式） */
+  /** 入合作池范围复选树：展开的省 / 市（各只展开一个，手风琴式） */
   const [expandedProv, setExpandedProv] = useState('');
   const [expandedCity, setExpandedCity] = useState('');
-  /** 合作规则编辑表单（六段，键见 COOP_RULE_FIELDS） */
-  const [ruleForm, setRuleForm] = useState<Record<string, string> | null>(null);
-  /** 客户档案操作记录 */
-  const [opRecords, setOpRecords] = useState<CustomerOpRecord[]>(seedOpRecords);
+  /** 合作规则输入草稿（null=跟随入合作池配置值；换客户/关闭抽屉时重置） */
+  const [ruleText, setRuleText] = useState<string | null>(null);
+  /** 客户域操作记录（customerStore 共享） */
+  const opRecords = useCustomerStore((s) => s.opRecords);
   /** 基本信息 / 结算开票 编辑态 */
   const [editBasic, setEditBasic] = useState<Record<string, string> | null>(null);
-  const [editFinance, setEditFinance] = useState<Record<string, string> | null>(null);
+  const [editFinance, setEditFinance] = useState<Record<string, string | undefined> | null>(null);
   /** 经平台销售：新增/修改平台关联表单 */
   const [platformForm, setPlatformForm] = useState<{ editingId: string | null; platformId: string; rate: string } | null>(null);
   /** 采购端管理：开通表单 */
   const [procOpenForm, setProcOpenForm] = useState<{ username: string; password: string; name: string; phone: string } | null>(null);
-  /** 入合作池设置弹窗：滑动开关选「是」时打开（淡茶扣点 + 入合作池范围 + 合作规则） */
-  const [poolDialog, setPoolDialog] = useState<{ customerId: string; name: string; cfg: CustomerPoolConfig; dachaDraft: string; err: string } | null>(null);
+  /** 入合作池设置弹窗：滑动开关选「是」时打开（入合作池范围 + 合作规则） */
+  const [poolDialog, setPoolDialog] = useState<{ customerId: string; name: string; cfg: CustomerPoolConfig } | null>(null);
 
   /** 写入操作记录 */
-  const addOpRecord = (customerCode: string, action: string, detail?: string) => {
-    setOpRecords(prev => [{ id: `op_${Date.now()}`, customerCode, time: nowStamp(), action, detail, operator: '管理员' }, ...prev]);
-  };
+  const addOpRecord = (customerCode: string, action: string, detail?: string) => storeAddOpRecord(customerCode, action, detail);
 
   /** 客户采购端账号（关联当前详情客户） */
   const customerAccounts = useCustomerStore(s => s.accounts);
@@ -255,7 +231,6 @@ export default function SalesCustomers() {
   const [currentCustomerForContacts, setCurrentCustomerForContacts] = useState<CustomerItem | null>(null);
   const [showConvertConfirm, setShowConvertConfirm] = useState(false);
   const [customerToConvert, setCustomerToConvert] = useState<CustomerItem | null>(null);
-  const drawerWidth = useDrawerWidth();
 
   const [detailPlatform, setDetailPlatform] = useState<PlatformItem | null>(null);
   const [showPlatformDetail, setShowPlatformDetail] = useState(false);
@@ -301,9 +276,10 @@ export default function SalesCustomers() {
 
   const confirmDelete = () => {
     if (activeTab === 'platform') {
-      setPlatforms(prev => prev.filter(p => !selectedForDelete.has(p.id)));
+      storeRemovePlatforms([...selectedForDelete]);
     } else {
-      setData(prev => prev.filter(c => !selectedForDelete.has(c.id)));
+      storeRemoveCustomers([...selectedForDelete]);
+      if (detailCustomer && selectedForDelete.has(detailCustomer.id)) { resetDetailDrafts(); setDetailCustomer(null); }
     }
     setShowDeleteConfirm(false);
     exitDeleteMode();
@@ -319,20 +295,6 @@ export default function SalesCustomers() {
       {status === 'active' ? (type === 'platform' ? '在册' : '合作中') : (type === 'platform' ? '停用' : '已暂停')}
     </span>
   );
-
-  const platformTags = (platformIds: string[], commissionRates?: Record<string, string>) => {
-    if (platformIds.length === 0) return <span style={{ color: 'var(--color-neutral-300)' }}>-</span>;
-    return (
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-        {platformIds.slice(0, 2).map(id => (
-          <span key={id} style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: `${SECONDARY}15`, color: SECONDARY, border: `1px solid ${SECONDARY}30` }}>
-            {getPlatformName(id)}{commissionRates?.[id] ? <span style={{ marginLeft: 4, color: 'var(--color-neutral-500)', fontWeight: 'normal' }}>扣{commissionRates[id]}</span> : null}
-          </span>
-        ))}
-        {platformIds.length > 2 && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>+{platformIds.length - 2}</span>}
-      </div>
-    );
-  };
 
   const viaPlatformTag = (viaPlatform: boolean) => (
     <span style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: viaPlatform ? `${SECONDARY}15` : `${PRIMARY}15`, color: viaPlatform ? SECONDARY : PRIMARY, border: `1px solid ${viaPlatform ? `${SECONDARY}30` : `${PRIMARY}30`}` }}>
@@ -367,7 +329,7 @@ export default function SalesCustomers() {
   const pagedPlatforms = filteredPlatforms.slice((page - 1) * pageSize, page * pageSize);
   useEffect(() => { setPage(1); }, [keyword, filterLevel, filterPool, filterStatus, activeTab, pageSize]);
 
-  const handleViewPlatform = (p: PlatformItem) => { setDetailPlatform(p); setEditingPlatform(false); setEditPlatformForm(null); setPlatTermForm(null); setShowPlatformDetail(true); };
+  const handleViewPlatform = (p: PlatformItem) => { resetDetailDrafts(); setDetailPlatform(p); setEditingPlatform(false); setShowPlatformDetail(true); };
   const handleStartEditPlatform = () => { if (detailPlatform) { setEditPlatformForm({ ...detailPlatform, bankAccounts: detailPlatform.bankAccounts.map(b => ({ ...b })), invoiceInfos: detailPlatform.invoiceInfos.map(i => ({ ...i })) }); setEditingPlatform(true); } };
   const handleCancelEditPlatform = () => { setEditingPlatform(false); setEditPlatformForm(null); };
   const handleSaveEditPlatform = () => { if (editPlatformForm) { setPlatforms(prev => prev.map(p => p.id === editPlatformForm.id ? editPlatformForm : p)); setDetailPlatform(editPlatformForm); setEditingPlatform(false); setEditPlatformForm(null); } };
@@ -419,7 +381,16 @@ export default function SalesCustomers() {
     setDetailCustomer(updatedCustomer);
   };
 
+  /** 重置详情抽屉的全部编辑态（防止上一客户的草稿写入下一客户） */
+  const resetDetailDrafts = () => {
+    setEditBasic(null); setEditFinance(null); setPlatformForm(null);
+    setProcOpenForm(null); setRuleText(null);
+    setEditingPlatform(false); setEditPlatformForm(null); setPlatTermForm(null);
+    setExpandedProv(''); setExpandedCity('');
+  };
+
   const handleViewCustomer = (c: CustomerItem) => {
+    resetDetailDrafts();
     setDetailCustomer(c);
     setDetailTab('basic');
   };
@@ -440,8 +411,8 @@ export default function SalesCustomers() {
 
   const confirmConvert = () => {
     if (!customerToConvert) return;
-    const converted = convertPersonalToDirect(customerToConvert);
-    setData(prev => prev.filter(c => c.id !== customerToConvert.id).concat(converted));
+    const res = storeConvertPersonalToDirect(customerToConvert.id);
+    if (!res.ok) { window.alert(res.msg); return; }
     setShowConvertConfirm(false);
     setCustomerToConvert(null);
     setActiveTab('direct');
@@ -470,6 +441,14 @@ export default function SalesCustomers() {
         }
       });
     }
+    if (detailCustomer?.id === customerId) {
+      const contacts = detailCustomer.orderContacts || [];
+      const existingIdx = contacts.findIndex(co => co.id === contact.id);
+      const orderContacts = existingIdx >= 0
+        ? contacts.map((co, i) => (i === existingIdx ? contact : co))
+        : [...contacts, contact];
+      setDetailCustomer({ ...detailCustomer, orderContacts });
+    }
   };
 
   const handleDeleteOrderContact = (customerId: string, contactId: string) => {
@@ -482,6 +461,9 @@ export default function SalesCustomers() {
         if (!prev) return prev;
         return { ...prev, orderContacts: (prev.orderContacts || []).filter(co => co.id !== contactId) };
       });
+    }
+    if (detailCustomer?.id === customerId) {
+      setDetailCustomer({ ...detailCustomer, orderContacts: (detailCustomer.orderContacts || []).filter(co => co.id !== contactId) });
     }
   };
 
@@ -501,7 +483,7 @@ export default function SalesCustomers() {
             // 前 3 个企业卡片之间间距更小，与个人客户卡片之间有稍大间距
             const isLastEnterprise = idx === 2;
             return (
-              <div key={t.key} onClick={() => { setActiveTab(t.key); setKeyword(''); }} style={{ cursor: 'pointer', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', position: 'relative', border: isActive ? `2px solid ${groupColor}` : `1px solid var(--color-neutral-200)`, background: isActive ? `${groupColor}08` : 'var(--color-neutral-0)', boxShadow: isActive ? 'var(--shadow-md)' : 'var(--shadow-sm)', transition: 'var(--transition-fast)', marginRight: isLastEnterprise ? 'var(--space-3)' : 0 }}>
+              <div key={t.key} onClick={() => { setActiveTab(t.key); setKeyword(''); exitDeleteMode(); setFilterLevel(''); setFilterPool('all'); setFilterStatus(''); }} style={{ cursor: 'pointer', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', position: 'relative', border: isActive ? `2px solid ${groupColor}` : `1px solid var(--color-neutral-200)`, background: isActive ? `${groupColor}08` : 'var(--color-neutral-0)', boxShadow: isActive ? 'var(--shadow-md)' : 'var(--shadow-sm)', transition: 'var(--transition-fast)', marginRight: isLastEnterprise ? 'var(--space-3)' : 0 }}>
                 {/* 右上角分组徽章：企业/个人 */}
                 <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, fontWeight: 'var(--font-medium)', padding: '1px 6px', borderRadius: 'var(--radius-sm)', background: isEnterprise ? `${ENTERPRISE_COLOR}12` : `${PERSONAL_COLOR}12`, color: isEnterprise ? ENTERPRISE_COLOR : PERSONAL_COLOR, border: `1px solid ${isEnterprise ? `${ENTERPRISE_COLOR}30` : `${PERSONAL_COLOR}30`}` }}>
                   {isEnterprise ? '企业' : '个人'}
@@ -574,7 +556,11 @@ export default function SalesCustomers() {
                   <span key="st">{statusTag(p.status, 'platform')}</span>,
                   <div className="row-actions" key="act">
                     <Button size="sm" variant="ghost" onClick={() => handleViewPlatform(p)}>查看</Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleViewPlatform(p)}>编辑</Button>
+                    <Button size="sm" variant="ghost" onClick={() => {
+                    handleViewPlatform(p);
+                    setEditPlatformForm({ ...p, bankAccounts: (p.bankAccounts ?? []).map(b => ({ ...b })), invoiceInfos: (p.invoiceInfos ?? []).map(i => ({ ...i })) });
+                    setEditingPlatform(true);
+                  }}>编辑</Button>
                   </div>,
                 ])}
               />
@@ -613,10 +599,10 @@ export default function SalesCustomers() {
                 <option value="C级">C级</option>
               </select>
               {activeTab === 'direct' && (
-                <select className="filter-select" value={filterPool} onChange={(e) => setFilterPool(e.target.value as 'all' | 'yes' | 'no')} title="按是否入客户池筛选">
-                  <option value="all">是否入池：全部</option>
-                  <option value="yes">是否入池：是</option>
-                  <option value="no">是否入池：否</option>
+                <select className="filter-select" value={filterPool} onChange={(e) => setFilterPool(e.target.value as 'all' | 'yes' | 'no')} title="按是否入合作池筛选">
+                  <option value="all">是否入合作池：全部</option>
+                  <option value="yes">是否入合作池：是</option>
+                  <option value="no">是否入合作池：否</option>
                 </select>
               )}
               <select className="filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} title="按合作状态筛选">
@@ -629,7 +615,7 @@ export default function SalesCustomers() {
 
             <Card style={{ padding: 0 }}>
               <Table
-                headers={[...(deleteMode ? ['选择'] : ['序号']), '客户简称', '客户编号', '客户名称', ...(activeTab === 'direct' ? ['是否经平台'] : []), ...(activeTab === 'personal' ? ['下单人'] : []), '所在地区', '联系人', '联系电话', '客户来源', '等级', '采买平台', ...(activeTab === 'direct' ? ['入客户池'] : []), '状态', '操作']}
+                headers={[...(deleteMode ? ['选择'] : ['序号']), '客户简称', '客户编号', '客户名称', ...(activeTab === 'direct' ? ['是否经平台'] : []), ...(activeTab === 'personal' ? ['下单人'] : []), '所在地区', '联系人', '联系电话', '客户来源', '等级', '采买平台', ...(activeTab === 'direct' ? ['入合作池'] : []), '状态', '操作']}
                 rows={pagedRows.map((c, idx) => {
                   const cells: React.ReactNode[] = [
                     deleteMode ? <input key="chk" type="checkbox" checked={selectedForDelete.has(c.id)} onChange={() => toggleSelect(c.id)} /> : <span key="idx" className="mono">{(page - 1) * pageSize + idx + 1}</span>,
@@ -657,20 +643,18 @@ export default function SalesCustomers() {
                     ...(activeTab === 'direct' ? [<span key="pool" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                       <button
                         type="button" role="switch" aria-checked={poolConfigs[c.id]?.enabled === true}
-                        title={poolConfigs[c.id]?.enabled ? '入合作池：是（点击改为否，合作商客户池不再展示）' : '入合作池：否（点击改为是，弹窗设置淡茶扣点/入合作池范围/合作规则）'}
+                        title={poolConfigs[c.id]?.enabled ? '入合作池：是（点击改为否，合作商客户池不再展示）' : '入合作池：否（点击改为是，弹窗设置入合作池范围/合作规则）'}
                         onClick={() => {
                           const cfg = poolConfigs[c.id];
                           if (cfg?.enabled) {
                             // 是 → 否：直接关闭（合作商客户池不再展示）
                             setPoolConfig(c.id, { ...cfg, enabled: false });
                           } else {
-                            // 否 → 是：弹窗设置淡茶扣点 / 入合作池范围 / 合作规则
+                            // 否 → 是：弹窗设置入合作池范围 / 合作规则
                             setPoolDialog({
                               customerId: c.id,
                               name: c.shortName || c.name,
                               cfg: { ...(cfg ?? { enabled: false, nationwide: false, provinces: [], cities: [], districts: [] }), enabled: true },
-                              dachaDraft: cfg?.dachaRate !== undefined ? String(cfg.dachaRate) : '',
-                              err: '',
                             });
                           }
                         }}
@@ -712,7 +696,12 @@ export default function SalesCustomers() {
           <div className="category-dialog-overlay" onClick={() => setShowDeleteConfirm(false)}>
             <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 440 }}>
               <h3 style={{ marginBottom: 'var(--space-3)' }}>确认删除</h3>
-              <p style={{ color: 'var(--color-neutral-600)', marginBottom: 'var(--space-4)' }}>确定要删除选中的 {selectedForDelete.size} 个{activeTab === 'platform' ? '平台' : '客户'}吗？</p>
+              <p style={{ color: 'var(--color-neutral-600)', marginBottom: 'var(--space-2)' }}>确定要删除选中的 {selectedForDelete.size} 个{activeTab === 'platform' ? '平台' : '客户'}吗？</p>
+              {activeTab !== 'platform' && (
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
+                  删除将同时清除其入合作池配置并停用其客户采购端账号；已有销售单按客户编号关联，删除后其客户编号字段保留（价格/扣点匹配按名称兜底）；对账单与钱包仍按客户名关联。
+                </p>
+              )}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
                 <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>关闭</Button>
                 <Button style={{ background: SECONDARY, borderColor: SECONDARY }} onClick={confirmDelete}>确认删除</Button>
@@ -721,58 +710,38 @@ export default function SalesCustomers() {
           </div>
         )}
 
-        {/* 入合作池设置弹窗：列表滑动开关选「是」时打开（淡茶扣点 + 入合作池范围 + 合作规则） */}
+        {/* 入合作池设置弹窗：列表滑动开关选「是」时打开（入合作池范围 + 合作规则） */}
         {poolDialog && (() => {
           const update = (patch: Partial<CustomerPoolConfig>) => setPoolDialog(prev => prev ? { ...prev, cfg: { ...prev.cfg, ...patch } } : prev);
-          const rule = poolDialog.cfg.coopRule;
+          const rule = poolDialog.cfg.coopRuleText;
           return (
             <div className="category-dialog-overlay" onClick={() => setPoolDialog(null)}>
               <div className="category-dialog" onClick={e => e.stopPropagation()} style={{ width: 720, maxWidth: '94vw' }}>
                 <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 4 }}>入合作池设置</h3>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-4)', lineHeight: 1.7 }}>
-                  为 <strong>{poolDialog.name}</strong> 开启入合作池：设置淡茶扣点、入合作池范围与合作规则，保存后合作商终端「客户池」按设置展示该客户。
+                  为 <strong>{poolDialog.name}</strong> 开启入合作池：设置入合作池范围与合作规则，保存后合作商终端「客户池」按设置展示该客户。
                 </div>
-
-                <DrawerSection title="淡茶扣点">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                    <input
-                      className="filter-input mono" type="number" min={0} max={100} style={{ width: 120 }}
-                      placeholder="如 8 表示 8%"
-                      value={poolDialog.dachaDraft}
-                      onChange={(e) => setPoolDialog(f => f ? { ...f, dachaDraft: e.target.value, err: '' } : f)}
-                    />
-                    <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>%（平台对该客户的扣点比例，展示于合作商终端客户池卡片）</span>
-                  </div>
-                </DrawerSection>
 
                 <DrawerSection title="入合作池范围">
                   <PoolScopeEditor cfg={poolDialog.cfg} update={update} />
                 </DrawerSection>
 
                 <DrawerSection title="合作规则">
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    {COOP_RULE_FIELDS.map(({ label, key, placeholder }) => (
-                      <div key={key}>
-                        <label className="drawer-label" style={{ display: 'block', marginBottom: 6 }}>{label}</label>
-                        <textarea className="filter-input" style={{ width: '100%', minHeight: 64, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.7 }} placeholder={placeholder} value={rule?.[key] ?? ''} onChange={(e) => update({ coopRule: { ...(rule ?? {}), [key]: e.target.value } })} />
-                      </div>
-                    ))}
+                  <textarea
+                    className="filter-input"
+                    style={{ width: '100%', minHeight: 160, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.8 }}
+                    value={rule ?? DEMO_RULE_TEXT}
+                    onChange={(e) => update({ coopRuleText: e.target.value })}
+                  />
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 6, lineHeight: 1.7 }}>
+                    示范文字可自行删除修改；展示于合作商终端「客户池」。
                   </div>
                 </DrawerSection>
-
-                {poolDialog.err && (
-                  <div style={{ padding: '8px 12px', background: '#FFEBEE', color: '#C62828', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>{poolDialog.err}</div>
-                )}
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
                   <Button variant="ghost" onClick={() => setPoolDialog(null)}>关闭</Button>
                   <Button onClick={() => {
-                    const rate = Number(poolDialog.dachaDraft);
-                    if (poolDialog.dachaDraft.trim() === '' || Number.isNaN(rate) || rate < 0 || rate > 100) {
-                      setPoolDialog(f => f ? { ...f, err: '请输入 0-100 之间的淡茶扣点比例' } : f);
-                      return;
-                    }
-                    setPoolConfig(poolDialog.customerId, { ...poolDialog.cfg, dachaRate: rate });
+                    setPoolConfig(poolDialog.customerId, { ...poolDialog.cfg });
                     setPoolDialog(null);
                   }}>保存并开启</Button>
                 </div>
@@ -803,7 +772,7 @@ export default function SalesCustomers() {
 
         <DetailDrawer
           open={!!detailCustomer}
-          onClose={() => setDetailCustomer(null)}
+          onClose={() => { resetDetailDrafts(); setDetailCustomer(null); }}
           badge="CU"
           title={detailCustomer?.name}
           statusTag={detailCustomer && <>{levelTag(detailCustomer.level)}{statusTag(detailCustomer.status)}</>}
@@ -854,21 +823,32 @@ export default function SalesCustomers() {
                 <Button onClick={() => setEditFinance({
                   settlementMethod: detailCustomer.settlementMethod ?? '',
                   taxNo: detailCustomer.taxNo ?? '',
+                  customerRate: detailCustomer.customerRate !== undefined ? String(detailCustomer.customerRate) : '',
                 })}>编辑</Button>
               ) : (
                 <>
                   <Button variant="ghost" onClick={() => setEditFinance(null)}>关闭</Button>
                   <Button onClick={() => {
                     if (!editFinance) return;
+                    const rateRaw = (editFinance.customerRate ?? '').trim();
+                    let customerRate = detailCustomer.customerRate;
+                    if (rateRaw !== '') {
+                      const n = Number(rateRaw);
+                      if (!Number.isFinite(n) || n < 0 || n > 100) { window.alert('客户扣点请输入 0-100 之间的数字'); return; }
+                      customerRate = Math.round(n);
+                    } else {
+                      customerRate = undefined;
+                    }
                     const updated: CustomerItem = {
                       ...detailCustomer,
                       settlementMethod: editFinance.settlementMethod?.trim() || detailCustomer.settlementMethod,
                       taxNo: editFinance.taxNo?.trim() || detailCustomer.taxNo,
+                      customerRate,
                     };
                     setData(prev => prev.map(c => c.id === updated.id ? updated : c));
                     setDetailCustomer(updated);
                     setEditFinance(null);
-                    addOpRecord(updated.customerCode || '—', '修改结算开票', `结算方式：${updated.settlementMethod || '—'} · 税号：${updated.taxNo || '—'}`);
+                    addOpRecord(updated.customerCode || '—', '修改结算开票', `结算方式：${updated.settlementMethod || '—'} · 税号：${updated.taxNo || '—'} · 客户扣点：${updated.customerRate !== undefined ? `${updated.customerRate}%` : '未设置'}`);
                   }}>保存</Button>
                 </>
               ))}
@@ -884,6 +864,11 @@ export default function SalesCustomers() {
                     onClick={() => {
                       const p = platforms.find(x => x.id === platformForm.platformId);
                       if (!p) return;
+                      const rateRaw = platformForm.rate.trim();
+                      if (rateRaw) {
+                        const n = parseFloat(rateRaw.replace('%', ''));
+                        if (!Number.isFinite(n) || n < 0 || n > 100) { window.alert('平台扣点请输入 0-100 的数字（可带 %）'); return; }
+                      }
                       if (platformForm.editingId) {
                         const ids = detailCustomer.platformIds.map(id => id === platformForm.editingId ? p.id : id);
                         const rates = { ...(detailCustomer.platformCommissionRates ?? {}) };
@@ -991,7 +976,7 @@ export default function SalesCustomers() {
                 ['suborg', '分子机构', detailCustomer.type === 'direct'],
                 ['pool', '入合作池管理', detailCustomer.type === 'direct'],
                 ['ops', '操作记录', true],
-              ] as ['basic' | 'finance' | 'viaPlatform' | 'procurement' | 'contacts' | 'suborg' | 'ops', string, boolean][]).map(([key, label, show]) => show ? (
+              ] as ['basic' | 'finance' | 'viaPlatform' | 'procurement' | 'contacts' | 'suborg' | 'ops' | 'pool', string, boolean][]).map(([key, label, show]) => show ? (
                 <button key={key} type="button" className={`drawer-tab${detailTab === key ? ' active' : ''}`} onClick={() => setDetailTab(key)}>
                   {label}
                   {key === 'viaPlatform' && detailCustomer.platformIds.length > 0 && <span className="drawer-tab-count">{detailCustomer.platformIds.length}</span>}
@@ -1052,6 +1037,7 @@ export default function SalesCustomers() {
                     <InfoGrid cols={4}>
                       <InfoItem label="结算方式">{detailCustomer.settlementMethod || '—'}</InfoItem>
                       <InfoItem label="税号" mono>{detailCustomer.taxNo || '—'}</InfoItem>
+                      <InfoItem label="客户扣点" mono>{detailCustomer.customerRate !== undefined ? `${detailCustomer.customerRate}%` : '未设置'}</InfoItem>
                     </InfoGrid>
                   ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
@@ -1062,6 +1048,10 @@ export default function SalesCustomers() {
                       <div>
                         <label className="drawer-label">税号</label>
                         <input className="filter-input mono" style={{ width: '100%' }} value={editFinance.taxNo ?? ''} onChange={e => setEditFinance(f => f ? { ...f, taxNo: e.target.value } : f)} />
+                      </div>
+                      <div>
+                        <label className="drawer-label">客户扣点（%，0-100，与是否入合作池无关）</label>
+                        <input className="filter-input mono" type="number" min={0} max={100} style={{ width: '100%' }} value={editFinance.customerRate ?? ''} onChange={e => setEditFinance(f => f ? { ...f, customerRate: e.target.value } : f)} placeholder="如 8 表示 8%；留空=未设置" />
                       </div>
                     </div>
                   )}
@@ -1351,7 +1341,7 @@ export default function SalesCustomers() {
                 </DrawerSection>
               )}
 
-              {/* ── 入池管理：合作规则 + 入池状态 + 入池范围（复选树，即时保存，合作商终端客户池联动） ── */}
+              {/* ── 入合作池管理：合作规则 + 入合作池状态 + 入合作池范围（复选树，即时保存，合作商终端客户池联动） ── */}
               {detailTab === 'pool' && (() => {
                 const cfg = poolConfigs[detailCustomer.id] ?? { enabled: false, nationwide: false, provinces: [], cities: [], districts: [] };
                 const update = (patch: Partial<typeof cfg>) => setPoolConfig(detailCustomer.id, { ...cfg, ...patch });
@@ -1388,62 +1378,26 @@ export default function SalesCustomers() {
                       </div>
                     </DrawerSection>
 
-                    <DrawerSection title="淡茶扣点">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                        <input
-                          className="filter-input mono" type="number" min={0} max={100} style={{ width: 120 }}
-                          placeholder="如 8 表示 8%"
-                          value={cfg.dachaRate ?? ''}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            update({ dachaRate: v === '' ? undefined : Math.max(0, Math.min(100, Number(v))) });
-                          }}
-                        />
-                        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>%（平台对该客户的扣点比例，展示于合作商终端客户池卡片；留空=未设置）</span>
+                    {/* 合作规则：单个大多行输入框（示范文字可删除修改；展示于合作商终端-客户池） */}
+                    <DrawerSection
+                      title="合作规则"
+                      extra={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>输入即时保存 · 示范文字可自行删除修改</span>}
+                    >
+                      <textarea
+                        className="filter-input"
+                        style={{ width: '100%', minHeight: 200, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.9 }}
+                        value={ruleText ?? cfg.coopRuleText ?? DEMO_RULE_TEXT}
+                        onChange={(e) => {
+                          setRuleText(e.target.value);
+                          update({ coopRuleText: e.target.value });
+                        }}
+                      />
+                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 6, lineHeight: 1.7 }}>
+                        合作商与该客户合作的规则说明（展示于合作商终端「客户池」），输入即时保存。
                       </div>
                     </DrawerSection>
 
-                    {/* 合作规则：合作商与该客户合作的规则（展示于合作商终端-客户池） */}
-                    <DrawerSection
-                      title="合作规则"
-                      extra={ruleForm === null && (
-                        <Button size="sm" variant="ghost" onClick={() => setRuleForm(Object.fromEntries(COOP_RULE_FIELDS.map(({ key }) => [key, cfg.coopRule?.[key] ?? ''])))}>编辑</Button>
-                      )}
-                    >
-                      {ruleForm === null ? (
-                        cfg.coopRule && COOP_RULE_FIELDS.some(({ key }) => cfg.coopRule?.[key]) ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                            {COOP_RULE_FIELDS.map(({ label, key }) => (
-                              <div key={key} style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
-                                <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', paddingTop: 2, minWidth: 56 }}>{label}</span>
-                                <span style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--color-neutral-700)', lineHeight: 1.8 }}>{cfg.coopRule?.[key] || '—'}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <EmptyText>暂未设置合作规则，点击「编辑」填写基础要求、订单流程、发货要求、结算规则、推品规则与注意事项（合作商在客户池查看该客户时展示）。</EmptyText>
-                        )
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                          {COOP_RULE_FIELDS.map(({ label, key, placeholder }) => (
-                            <div key={key}>
-                              <label className="drawer-label" style={{ display: 'block', marginBottom: 6 }}>{label}</label>
-                              <textarea className="filter-input" style={{ width: '100%', minHeight: 64, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.7 }} placeholder={placeholder} value={ruleForm[key] ?? ''} onChange={(e) => setRuleForm((f) => f ? { ...f, [key]: e.target.value } : f)} />
-                            </div>
-                          ))}
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-                            <Button variant="ghost" onClick={() => setRuleForm(null)}>关闭</Button>
-                            <Button onClick={() => {
-                              update({ coopRule: Object.fromEntries(COOP_RULE_FIELDS.map(({ key }) => [key, (ruleForm[key] ?? '').trim() || undefined])) });
-                              addOpRecord(detailCustomer.customerCode || '—', '修改合作规则', '设置合作商与该客户的合作规则（' + COOP_RULE_FIELDS.map(({ label }) => label).join(' / ') + '）');
-                              setRuleForm(null);
-                            }}>保存</Button>
-                          </div>
-                        </div>
-                      )}
-                    </DrawerSection>
-
-                    <DrawerSection title="入池范围">
+                    <DrawerSection title="入合作池范围">
                       {/* 已选范围摘要（可删标签） */}
                       {!cfg.nationwide && (cfg.provinces.length + cfg.cities.length + cfg.districts.length) > 0 && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8, paddingBottom: 8, borderBottom: '1px dashed var(--color-neutral-200)' }}>
@@ -1561,7 +1515,7 @@ export default function SalesCustomers() {
                         </div>
                       )}
                       <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', lineHeight: 1.7 }}>
-                        匹配规则：合作商在客户池页选择地区后，所选地区落在任一入池范围内（或已选全国）且入池状态为「是」的客户才会展示。勾选即时保存生效。
+                        匹配规则：合作商在客户池页选择地区后，所选地区落在任一入合作池范围内（或已选全国）且入合作池状态为「是」的客户才会展示。勾选即时保存生效。
                       </div>
                     </DrawerSection>
                   </>
@@ -1773,13 +1727,21 @@ export default function SalesCustomers() {
         </DetailDrawer>
 
         {showAddDrawer && (
-          <CreateDrawer customerType={activeTab} platforms={platforms} sequence={data.filter(c => c.type === activeTab).length + 1} onCancel={() => setShowAddDrawer(false)}
-            onSave={item => { setData(prev => [item, ...prev]); setShowAddDrawer(false); }}
+          <CreateDrawer customerType={activeTab} platforms={platforms} onCancel={() => setShowAddDrawer(false)}
+            onSave={item => {
+              const res = storeAddCustomer(item);
+              if (!res.ok) { window.alert(res.msg); return; }
+              setShowAddDrawer(false);
+            }}
             onQuickAddPlatform={quickAddPlatform}
           />
         )}
 
-        {showAddPlatformDrawer && <AddPlatformDrawer onCancel={() => setShowAddPlatformDrawer(false)} onSave={item => { setPlatforms(prev => [item, ...prev]); setShowAddPlatformDrawer(false); }} sequence={platforms.length + 1} />}
+        {showAddPlatformDrawer && <AddPlatformDrawer onCancel={() => setShowAddPlatformDrawer(false)} onSave={item => {
+          if (platforms.some(p => p.name === item.name)) { window.alert(`平台名称「${item.name}」已存在`); return; }
+          storeAddPlatform(item);
+          setShowAddPlatformDrawer(false);
+        }} />}
 
         {showOrderContactDrawer && currentCustomerForContacts && (
           <OrderContactDrawer customer={currentCustomerForContacts} onClose={() => setShowOrderContactDrawer(false)} onSave={handleSaveOrderContact} onDelete={handleDeleteOrderContact} />
@@ -1886,7 +1848,7 @@ function OrderContactDrawer({ customer, onClose, onSave, onDelete }: {
         </div>
 
         <div className="drawer-footer">
-          <Button variant="ghost" onClick={cancelEdit}>{editingId ? '取消' : '关闭'}</Button>
+          <Button variant="ghost" onClick={editingId ? cancelEdit : onClose}>{editingId ? '取消' : '关闭'}</Button>
           <Button onClick={saveContact} disabled={!newContact.name.trim()}>{editingId ? '保存修改' : '添加下单人'}</Button>
         </div>
       </div>
@@ -1894,10 +1856,9 @@ function OrderContactDrawer({ customer, onClose, onSave, onDelete }: {
   );
 }
 
-function CreateDrawer({ customerType, platforms, sequence, onCancel, onSave, onQuickAddPlatform }: {
+function CreateDrawer({ customerType, platforms, onCancel, onSave, onQuickAddPlatform }: {
   customerType: CustomerType;
   platforms: { id: string; shortName: string; code: string; name: string; contactPerson: string; contactPhone: string }[];
-  sequence: number;
   onCancel: () => void;
   onSave: (item: CustomerItem) => void;
   onQuickAddPlatform: (shortName: string) => string;
@@ -1928,8 +1889,6 @@ function CreateDrawer({ customerType, platforms, sequence, onCancel, onSave, onQ
   const setPlatformRate = (id: string, rate: string) => setForm(prev => ({ ...prev, platformCommissionRates: { ...(prev.platformCommissionRates ?? {}), [id]: rate } }));
   const canSave = form.name.trim().length > 0 && (form.shortName ?? '').trim().length > 0 && form.contactPerson.trim().length > 0;
 
-  const previewCode = (form.shortName ?? '').trim() ? generateCustomerCode(customerType, form.shortName!.trim(), sequence) : '—';
-
   const handleProvinceChange = (p: string) => setForm(prev => ({ ...prev, province: p, city: '', district: '' }));
   const handleCityChange = (c: string) => setForm(prev => ({ ...prev, city: c, district: '' }));
   const handleDistrictChange = (d: string) => setForm(prev => ({ ...prev, district: d }));
@@ -1955,9 +1914,8 @@ function CreateDrawer({ customerType, platforms, sequence, onCancel, onSave, onQ
   const handleSave = () => {
     if (!canSave) return;
     const shortName = form.shortName!.trim();
-    const customerCode = generateCustomerCode(customerType, shortName, sequence);
     const region = form.city ? form.city.replace(/市$/, '') : (form.province || '');
-    onSave({ ...form, shortName, customerCode, region, bankAccounts, invoiceInfos });
+    onSave({ ...form, shortName, region, bankAccounts, invoiceInfos });
   };
 
   return (
@@ -1975,7 +1933,7 @@ function CreateDrawer({ customerType, platforms, sequence, onCancel, onSave, onQ
             <div className="drawer-form-field"><label className="drawer-label">客户等级</label><select className="filter-select" style={{ width: '100%' }} value={form.level} onChange={e => update('level', e.target.value)}><option>S级</option><option>A级</option><option>B级</option><option>C级</option></select></div>
           </div>
           <div className="drawer-form-row">
-            <div className="drawer-form-field" style={{ flex: 1 }}><label className="drawer-label">客户编号（自动生成）</label><input className="filter-input" style={{ width: '100%' }} value={previewCode} readOnly placeholder="输入客户简称后自动生成" /></div>
+            <div className="drawer-form-field" style={{ flex: 1 }}><label className="drawer-label">客户编号（保存后按 KHZY 系列规则自动生成）</label><input className="filter-input" style={{ width: '100%' }} value="—" readOnly /></div>
             {customerType === 'direct' && (
               <div className="drawer-form-field"><label className="drawer-label">是否经平台</label><select className="filter-select" style={{ width: '100%' }} value={form.viaPlatform ? 'true' : 'false'} onChange={(e) => { update('viaPlatform', e.target.value === 'true'); if (e.target.value !== 'true') { update('platformIds', []); update('platformCommissionRates', {}); } }}><option value="false">否（无平台）</option><option value="true">是（经平台）</option></select></div>
             )}
@@ -2100,7 +2058,7 @@ function CreateDrawer({ customerType, platforms, sequence, onCancel, onSave, onQ
   );
 }
 
-function AddPlatformDrawer({ onCancel, onSave, sequence }: { onCancel: () => void; onSave: (item: PlatformItem) => void; sequence: number }) {
+function AddPlatformDrawer({ onCancel, onSave }: { onCancel: () => void; onSave: (item: PlatformItem) => void }) {
   const [form, setForm] = useState<Partial<PlatformItem>>({
     name: '', shortName: '', contactPerson: '', contactPosition: '', contactPhone: '', contactAddress: '',
     province: '', city: '', district: '',
@@ -2114,8 +2072,6 @@ function AddPlatformDrawer({ onCancel, onSave, sequence }: { onCancel: () => voi
 
   const update = <K extends keyof PlatformItem>(k: K, v: PlatformItem[K]) => setForm(prev => ({ ...prev, [k]: v }));
   const canSave = (form.name?.trim().length ?? 0) > 0 && (form.shortName?.trim().length ?? 0) > 0;
-
-  const previewCode = (form.shortName ?? '').trim() ? generateCustomerCode('platform', form.shortName!.trim(), sequence) : '—';
 
   const handleProvinceChange = (p: string) => setForm(prev => ({ ...prev, province: p, city: '', district: '' }));
   const handleCityChange = (c: string) => setForm(prev => ({ ...prev, city: c, district: '' }));
@@ -2135,7 +2091,7 @@ function AddPlatformDrawer({ onCancel, onSave, sequence }: { onCancel: () => voi
   const handleSave = () => {
     if (!canSave) return;
     const shortName = form.shortName!.trim();
-    const code = generateCustomerCode('platform', shortName, sequence);
+    const code = '';  // 平台编号由「平台客户」档案口径生成（KHPT 系），此处留空展示
     onSave({
       id: `p_${Date.now()}`, name: form.name!, shortName, code,
       contactPerson: form.contactPerson ?? '', contactPosition: form.contactPosition ?? '', contactPhone: form.contactPhone ?? '', contactAddress: form.contactAddress ?? '',
@@ -2158,7 +2114,7 @@ function AddPlatformDrawer({ onCancel, onSave, sequence }: { onCancel: () => voi
           <div style={grid2}>
             <Field label="平台名称 *"><input className="filter-input" style={{ width: '100%' }} value={form.name ?? ''} onChange={e => update('name', e.target.value)} placeholder="请输入平台全称" /></Field>
             <Field label="平台简称 *"><input className="filter-input" style={{ width: '100%' }} value={form.shortName ?? ''} onChange={e => update('shortName', e.target.value)} placeholder="如：京东慧采" /></Field>
-            <Field label="平台编号（自动生成）" full><input className="filter-input" style={{ width: '100%' }} value={previewCode} readOnly placeholder="输入平台简称后自动生成" /></Field>
+            <Field label="平台编号（保存后按 KHPT 系列规则生成）" full><input className="filter-input" style={{ width: '100%' }} value="—" readOnly /></Field>
             <Field label="联系人"><input className="filter-input" style={{ width: '100%' }} value={form.contactPerson ?? ''} onChange={e => update('contactPerson', e.target.value)} /></Field>
             <Field label="联系人职务"><input className="filter-input" style={{ width: '100%' }} value={form.contactPosition ?? ''} onChange={e => update('contactPosition', e.target.value)} placeholder="如：采购总监" /></Field>
             
@@ -2229,8 +2185,3 @@ function Field({ label, children, full }: { label: string; children: React.React
 function Text({ children, className, style }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) { return <div className={className} style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-800)', fontWeight: 'var(--font-medium)', ...style }}>{children}</div>; }
 function EmptyText({ children }: { children: React.ReactNode }) { return <div style={{ padding: 'var(--space-3)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>{children}</div>; }
 
-function IconUsers() { return <svg viewBox="0 0 18 18" fill="none"><circle cx="7" cy="6.5" r="2.8" stroke="currentColor" strokeWidth="1.3" /><path d="M1 15c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /><circle cx="13" cy="7" r="2.2" stroke="currentColor" strokeWidth="1.2" /><path d="M13 11c2 0 4 1.5 4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>; }
-function IconHome() { return <svg viewBox="0 0 18 18" fill="none"><path d="M3 8.5L9 3.5l6 5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round" /><path d="M4.5 8v7h9v-7" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /></svg>; }
-function IconChannel() { return <svg viewBox="0 0 18 18" fill="none"><path d="M2 10l3 2 3-4 3 5 3-3 2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /><circle cx="4" cy="5" r="1.5" stroke="currentColor" strokeWidth="1.3" /></svg>; }
-function IconPersonal() { return <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="6" r="3" stroke="currentColor" strokeWidth="1.3" /><path d="M3 15c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>; }
-function IconPlatform() { return <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="5" width="12" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3" /><path d="M6 5V3.5A1.5 1.5 0 017.5 2h3A1.5 1.5 0 0112 3.5V5" stroke="currentColor" strokeWidth="1.3" /><path d="M9 8v2M8 9h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>; }

@@ -3,10 +3,10 @@
  * P6 退货冲减：退款完成时同步冲减客户对账单应收（未办结对账单）；预付客户退款回钱包余额。
  */
 import { create } from 'zustand';
+import { useCustomerStore } from './customerStore';
 import type { PartnerReturn, PartnerReturnStatus } from '../types';
 import { genReturnCode, soRootOf } from '../utils/orderCodes';
 import { useSettlementStore } from './settlementStore';
-import { customerItems } from '../data/customers';
 
 const now = () => new Date().toISOString().slice(0, 10);
 
@@ -140,7 +140,7 @@ export const useReturnStore = create<ReturnState>((set, get) => ({
         });
       }
       // 预付客户（档案结算方式=预付）退款回钱包余额
-      const isPrepaid = customerItems.find((c) => c.name === target.customerName)?.settlementMethod === '预付';
+      const isPrepaid = useCustomerStore.getState().customers.find((c) => c.name === target.customerName)?.settlementMethod === '预付';
       if (isPrepaid) settle.walletRefund(target.customerName, target.refundAmount, target.code, `退货退款回钱包（${target.code}）`);
     }
   },

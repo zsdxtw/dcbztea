@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCustomerStore } from '../../stores/customerStore';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { getInitials } from '../../utils/pinyinInitials';
-import { platformItems } from '../../data/platforms';
-import { customerItems } from '../../data/customers';
 import { calcPlatformNetPrice, purchasePriceRules, PRICE_SUPPLIERS } from '../../data/prices';
 import { usePriceStore, getQuoteConfig, effectiveCustomerQuote, effectivePlatformQuote, getCustomerStock } from '../../stores/priceStore';
 import type { TeaProduct, PurchasePriceRule } from '../../types';
@@ -808,6 +807,8 @@ function QuoteConfigurator({ customers, allowPlatformQuotes, selectedId, onSelec
 
 /** 页面：报品报（调）价（客户销售报价配置） */
 export default function SalesPricing() {
+  const customerItems = useCustomerStore((st) => st.customers);
+  const platformItems = useCustomerStore((st) => st.platforms);
   const [activeTab, setActiveTab] = useState<QuotationTab>('direct');
   const [selDirect, setSelDirect] = useState('c1');
   const [selChannel, setSelChannel] = useState('');

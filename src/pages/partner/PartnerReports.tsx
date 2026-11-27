@@ -8,7 +8,6 @@ import { useReportStore, reportActive } from '../../stores/reportStore';
 import { useSupplierStore } from '../../stores/supplierStore';
 import { useCustomerStore } from '../../stores/customerStore';
 import { usePriceStore } from '../../stores/priceStore';
-import { customerItems } from '../../data/customers';
 import { teaProducts } from '../../data/teaProducts';
 import { PROVINCE_NAMES, getCities, getDistricts } from '../../data/regions';
 import type { PartnerOrderReportKind, PartnerReport, PartnerReportType } from '../../types';
@@ -171,8 +170,9 @@ const EMPTY_FORM: ReportForm = {
   regions: [], validUntil: '', summary: '', amount: '',
 };
 
-/** 报备管理：先选客户（仅入客户池客户）→ 订单/商品/地区三类报备（含有效日期） */
+/** 报备管理：先选客户（仅入合作池客户）→ 订单/商品/地区三类报备（含有效日期） */
 export default function PartnerReports() {
+  const customerItems = useCustomerStore((st) => st.customers);
   const reports = useReportStore((s) => s.reports);
   const submitReportAction = useReportStore((s) => s.submitReport);
   const suppliers = useSupplierStore((s) => s.suppliers);
@@ -186,7 +186,7 @@ export default function PartnerReports() {
       ? suppliers.find((s) => s.id === auth.supplierId)
       : suppliers.find((s) => s.terminal.enabled && s.terminal.username === auth?.username);
   }, [suppliers]);
-  /** 入客户池的客户（新增报备只展示这些客户） */
+  /** 入合作池的客户（新增报备只展示这些客户） */
   const poolCustomers = useMemo(() => customerItems.filter((c) => poolConfigs[c.id]?.enabled), [poolConfigs]);
 
 
@@ -234,7 +234,7 @@ export default function PartnerReports() {
 
   /* ── 校验 ── */
   const validate = (): string | null => {
-    if (!form.customerName) return '请先选择要报备的客户（仅展示入客户池的客户）';
+    if (!form.customerName) return '请先选择要报备的客户（仅展示入合作池的客户）';
     if (!form.validUntil) return '请选择报备有效日期（结束日期）';
     if (!form.summary.trim()) return '请输入报备说明';
     if (form.type === 'order') {
@@ -336,7 +336,7 @@ export default function PartnerReports() {
       <PageHead
         eyebrow="合作商终端 · 报备"
         title="报备管理"
-        desc="先选择要报备的客户（仅入客户池客户），再按三类报备：订单报备（有货源=我方供货 / 无货源=平台自营或转派供货商）、商品报备（限您经营的品牌）、地区报备（该客户某地区全部订单，含未经营品牌）。匹配优先级：订单报备 > 商品报备 > 地区报备；报备均在有效日期（含当日）内生效。"
+        desc="先选择要报备的客户（仅入合作池客户），再按三类报备：订单报备（有货源=我方供货 / 无货源=平台自营或转派供货商）、商品报备（限您经营的品牌）、地区报备（该客户某地区全部订单，含未经营品牌）。匹配优先级：订单报备 > 商品报备 > 地区报备；报备均在有效日期（含当日）内生效。"
       />
 
       {/* 报备类型 Tab */}
@@ -487,14 +487,14 @@ export default function PartnerReports() {
               {/* 第一行：报备客户 + 有效日期 并排 */}
               <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
                 <div style={{ flex: 1.4 }}>
-                  <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>报备客户 *（仅入客户池的客户）</label>
+                  <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>报备客户 *（仅入合作池的客户）</label>
                   <select className="filter-select" value={form.customerName} onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))} style={{ width: '100%' }}>
                     <option value="">请选择要报备的客户</option>
                     {poolCustomers.map((c) => (
                       <option key={c.id} value={c.name}>{c.name}（{c.region} · {c.level}）</option>
                     ))}
                   </select>
-                  {poolCustomers.length === 0 && <div style={{ fontSize: 12, color: '#B26A00', marginTop: 6 }}>暂无入客户池的客户，请等待平台将客户入池。</div>}
+                  {poolCustomers.length === 0 && <div style={{ fontSize: 12, color: '#B26A00', marginTop: 6 }}>暂无入合作池的客户，请等待平台将客户入池。</div>}
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>有效日期（结束日，含当日）*</label>

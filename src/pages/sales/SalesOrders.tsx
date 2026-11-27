@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useCustomerStore } from '../../stores/customerStore';
 import HScrollBox from '../../components/common/HScrollBox';
 import DetailDrawer, { DrawerSection } from '../../components/common/DetailDrawer';
 import ContentHeader from '../../components/layout/ContentHeader';
@@ -8,7 +9,6 @@ import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { usePriceStore } from '../../stores/priceStore';
-import { customerItems } from '../../data/customers';
 import { PROVINCE_NAMES, getCityNames, getDistricts, regionTextOf } from '../../data/regions';
 import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS, TRANSFER_SOURCE_LABELS, platformLabelOf } from '../../data/externalOrders';
 import {
@@ -46,12 +46,18 @@ function regionText(o: ExternalOrder): string {
   return regionTextOf(o.customerRegion, o.receiverAddress);
 }
 
+/** 客户列宽：履约单分发 / 履约单履约 / 履约单结算的客户列同此宽度（经 Table 的 colMinWidths 指定） */
+export const CUSTOMER_COL_WIDTH = 130;
+/** 履约主体列宽：本页履约单子行的履约主体跨「销售路径（96px）+ 客户」两列（含 8px 列间距）；履约单分发 / 履约单履约的履约主体列同此宽度 */
+export const PARTNER_COL_WIDTH = 96 + CUSTOMER_COL_WIDTH + 8;
+
 /**
  * 销售 · 销售单管理
  * 全部销售单总览：以母销售单（手工录入 / 直连推送）为一行，点击展开该母销售单下全部子履约单；
  * 母销售单行含三状态（分发 / 发货 / 结算），「查看」进入销售单履约详情页。分发订单 Tab 保留自营接单与履约跟踪。
  */
 export default function SalesOrders() {
+  const customerItems = useCustomerStore((st) => st.customers);
   const [entryOpen, setEntryOpen] = useState(false);
 
   /* ── 全部销售单（母单聚合） ── */
@@ -193,7 +199,7 @@ export default function SalesOrders() {
 
   
   /* 列表网格列定义（母单行 + 表头共用，保证对齐） */
-  const GRID = '34px 24px 168px 104px 96px 130px 140px 104px 88px 112px 100px 100px 100px 96px 64px';
+  const GRID = `34px 24px 168px 104px 96px ${CUSTOMER_COL_WIDTH}px 140px 104px 88px 112px 100px 100px 100px 96px 64px`;
 
   const pageBtn = (n: number) => (
     <button

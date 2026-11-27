@@ -123,6 +123,9 @@ export interface AddExternalInput {
   customerOrderTime?: string;
   /** 客户侧订单号(客户在自己下单渠道的订单号,非必输) */
   customerOrderNo?: string;
+  /** 关联客户档案 ID（客户名精确匹配档案时回填；销售单按客户编号关联客户） */
+  customerId?: string;
+  customerCode?: string;
   customerName: string;
   customerType: string;
   customerRegion: string;

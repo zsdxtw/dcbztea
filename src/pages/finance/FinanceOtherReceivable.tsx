@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useCustomerStore } from '../../stores/customerStore';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
@@ -7,7 +8,6 @@ import Button from '../../components/common/Button';
 import FilterBar from '../../components/business/FilterBar';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import type {} from '../../types';
-import { platformItems } from '../../data/platforms';
 
 
 interface OtherReceivableRecord {
@@ -58,20 +58,21 @@ function reasonColor(reason: string) {
   }
 }
 
-/** 平台保证金 → 其他应收款-暂付款项 联动记录 */
-const platformDepositReceivables: OtherReceivableRecord[] = platformItems
-  .filter((p) => typeof p.deposit === 'number' && p.deposit > 0)
-  .map((p, idx) => ({
-    code: `OR-PT-${String(idx + 1).padStart(4, '0')}`,
-    partner: p.name,
-    reason: '暂付款项',
-    amount: `¥ ${p.deposit!.toLocaleString('en-US')}`,
-    dueDate: p.depositDueDate || p.cooperationDate,
-    status: 'pending',
-    remark: `平台客户「${p.shortName}」支付保证金（编号 ${p.code}）`,
-  }));
 
 export default function FinanceOtherReceivable() {
+  const platformItems = useCustomerStore((st) => st.platforms);
+  /** 平台保证金 → 其他应收款-暂付款项 联动记录（读平台档案 store，随平台维护实时更新） */
+  const platformDepositReceivables: OtherReceivableRecord[] = useMemo(() => platformItems
+    .filter((p) => typeof p.deposit === 'number' && p.deposit > 0)
+    .map((p, idx) => ({
+      code: `OR-PT-${String(idx + 1).padStart(4, '0')}`,
+      partner: p.name,
+      reason: '暂付款项',
+      amount: `¥ ${p.deposit!.toLocaleString('en-US')}`,
+      dueDate: p.depositDueDate || p.cooperationDate,
+      status: 'pending' as const,
+      remark: `平台客户「${p.shortName}」支付保证金（编号 ${p.code}）`,
+    })), [platformItems]);
   const [showDetail, setShowDetail] = useState(false);
   const [selectedItem, setSelectedItem] = useState<OtherReceivableRecord | null>(null);
   const [keyword, setKeyword] = useState('');
