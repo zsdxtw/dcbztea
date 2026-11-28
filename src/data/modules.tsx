@@ -251,8 +251,8 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
         { key: 'purchase-pricing', label: '采购报价', icon: <PriceIcon /> },
         { key: 'purchase-return', label: '采购退货', icon: <ReturnIcon /> },
         { key: 'purchase-order-settlement', label: '采购单结算', icon: <ReconciliationIcon /> },
-        { key: 'purchase-statements', label: '采购结算', icon: <ReconciliationIcon /> },
       ] },
+      { key: 'purchase-statements', label: '采购结算', icon: <ReconciliationIcon /> },
       { key: 'warehouse-io', label: '入库出库', icon: <InboundIcon />, children: [
         { key: 'purchase-inbound', label: '采购收货', icon: <InboundIcon /> },
         { key: 'inventory-sales-outbound', label: '销售出库', icon: <OutboundIcon /> },
@@ -290,13 +290,12 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
     label: '销售',
     menus: [
       { key: 'sales-overview', label: '销售概览', icon: <OverviewIcon /> },
-      { key: 'sales-order-manage', label: '销售单管理', icon: <OrdersIcon />, children: [
+      { key: 'sales-order-manage', label: '销售管理', icon: <OrdersIcon />, children: [
         { key: 'sales-order-processing', label: '销售单处理', icon: <TodoIcon /> },
         { key: 'sales-orders', label: '销售单列表', icon: <OrdersIcon /> },
         { key: 'order-distribute', label: '履约单分发', icon: <OrdersIcon /> },
         { key: 'sales-fulfillment', label: '履约单履约', icon: <InboundIcon /> },
         { key: 'sales-settlement', label: '履约单结算', icon: <ReconciliationIcon /> },
-        { key: 'sales-settlement-confirm', label: '销售结算', icon: <ReconciliationIcon /> },
       ] },
       { key: 'customer-manage', label: '客户管理', icon: <CustomersIcon />, children: [
         { key: 'sales-customers', label: '客户列表', icon: <CustomersIcon /> },
@@ -334,18 +333,16 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
       { key: 'finance-receivables', label: '应收应付', icon: <CollectionIcon />, children: [
         { key: 'finance-ar', label: '应收管理', icon: <ReceivableIcon /> },
         { key: 'finance-ap', label: '应付管理', icon: <PaymentIcon /> },
-        { key: 'finance-sales-collection', label: '收款管理', icon: <CollectionIcon /> },
-        { key: 'finance-purchase-payment', label: '付款管理', icon: <PaymentIcon /> },
+        { key: 'finance-other-receivable', label: '其他应收', icon: <ReceivableIcon /> },
+        { key: 'finance-other-payable', label: '其他应付', icon: <ExpenseIcon /> },
       ] },
       { key: 'finance-reconciliation', label: '对账结算', icon: <ReconciliationIcon />, children: [
-        { key: 'purchase-statements', label: '采购结算（确认 / 查看）', icon: <ReconciliationIcon /> },
-        { key: 'sales-settlement-confirm', label: '销售结算（确认 / 查看）', icon: <ReconciliationIcon /> },
+        { key: 'finance-sales-collection', label: '收款管理', icon: <CollectionIcon /> },
+        { key: 'finance-purchase-payment', label: '付款管理', icon: <PaymentIcon /> },
+        { key: 'finance-invoice', label: '发票管理', icon: <InvoiceIcon /> },
       ] },
       { key: 'finance-profit', label: '经营利润', icon: <FinanceReportIcon /> },
       { key: 'finance-other', label: '核算与其他', icon: <InvoiceIcon />, children: [
-        { key: 'finance-other-receivable', label: '其他应收', icon: <ReceivableIcon /> },
-        { key: 'finance-other-payable', label: '其他应付', icon: <ExpenseIcon /> },
-        { key: 'finance-invoice', label: '发票管理', icon: <InvoiceIcon /> },
         { key: 'finance-cost', label: '成本核算', icon: <FinanceReportIcon /> },
         { key: 'finance-expense', label: '费用管理', icon: <ExpenseIcon /> },
         { key: 'finance-balance', label: '余额管理', icon: <AccountIcon /> },
@@ -421,8 +418,6 @@ export const moduleBasePath = (module: ModuleKey): string =>
  */
 const MENU_PATH_PREFIX_OVERRIDES: Record<string, string> = {
   'inventory-': '/inventory',
-  'purchase-statements': '/purchase',
-  'sales-settlement-confirm': '/sales',
 };
 
 /** 菜单项完整路径 */

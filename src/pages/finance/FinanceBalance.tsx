@@ -1,3 +1,8 @@
+/**
+ * 财务 · 余额管理（淡茶半盏收付款银行账户）
+ * 数据源 = settlementStore.companyAccounts（共享）：收款管理的收款账户、付款管理的付款账户
+ * 下拉选择本列表；收付款登记中手动填写的新账户自动回写本页。
+ */
 import { useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
@@ -5,95 +10,10 @@ import Table from '../../components/common/Table';
 import StatusTag from '../../components/common/StatusTag';
 import Button from '../../components/common/Button';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
-import type {} from '../../types';
+import { useSettlementStore } from '../../stores/settlementStore';
+import type { CompanyBankAccount } from '../../types';
 
-
-interface AccountRecord {
-  name: string;
-  type: string;
-  bank: string;
-  accountNo: string;
-  balance: string;
-  status: 'active' | 'frozen';
-  recentTransactions?: { date: string; description: string; amount: string; type: 'in' | 'out' }[];
-}
-
-const accountItems: AccountRecord[] = [
-  {
-    name: '工商银行基本户',
-    type: '银行存款',
-    bank: '中国工商银行杭州分行',
-    accountNo: '1202 0200 1234 5678',
-    balance: '¥ 1,256,800',
-    status: 'active',
-    recentTransactions: [
-      { date: '2025-07-15', description: '华茗堂茶庄回款', amount: '¥ 68,000', type: 'in' },
-      { date: '2025-07-14', description: '杭州西湖茶叶付款', amount: '¥ 86,000', type: 'out' },
-      { date: '2025-07-12', description: '雅韵茶社回款', amount: '¥ 45,600', type: 'in' },
-      { date: '2025-07-10', description: '福建正山堂付款', amount: '¥ 56,000', type: 'out' },
-      { date: '2025-07-08', description: '品茗轩回款', amount: '¥ 38,000', type: 'in' },
-    ],
-  },
-  {
-    name: '建设银行一般户',
-    type: '银行存款',
-    bank: '中国建设银行杭州分行',
-    accountNo: '3302 0100 9876 5432',
-    balance: '¥ 580,000',
-    status: 'active',
-    recentTransactions: [
-      { date: '2025-07-13', description: '八马茶业付款', amount: '¥ 42,500', type: 'out' },
-      { date: '2025-07-11', description: '清心茶坊回款', amount: '¥ 22,400', type: 'in' },
-      { date: '2025-07-09', description: '福鼎白茶厂付款', amount: '¥ 32,800', type: 'out' },
-    ],
-  },
-  {
-    name: '农业银行一般户',
-    type: '银行存款',
-    bank: '中国农业银行杭州分行',
-    accountNo: '1302 0300 5678 1234',
-    balance: '¥ 320,000',
-    status: 'active',
-    recentTransactions: [
-      { date: '2025-07-15', description: '武夷山茶业付款', amount: '¥ 82,400', type: 'out' },
-      { date: '2025-07-12', description: '翠竹茶行回款', amount: '¥ 12,500', type: 'in' },
-    ],
-  },
-  {
-    name: '中国银行一般户',
-    type: '银行存款',
-    bank: '中国银行杭州分行',
-    accountNo: '5402 0400 4321 8765',
-    balance: '¥ 0',
-    status: 'frozen',
-    recentTransactions: [],
-  },
-  {
-    name: '现金账户',
-    type: '现金',
-    bank: '—',
-    accountNo: '—',
-    balance: '¥ 12,500',
-    status: 'active',
-    recentTransactions: [
-      { date: '2025-07-15', description: '日常零星支出', amount: '¥ 500', type: 'out' },
-      { date: '2025-07-14', description: '客户现金收款', amount: '¥ 2,000', type: 'in' },
-    ],
-  },
-  {
-    name: '支付宝账户',
-    type: '其他',
-    bank: '支付宝',
-    accountNo: 'tea_erp@alipay.com',
-    balance: '¥ 399,000',
-    status: 'active',
-    recentTransactions: [
-      { date: '2025-07-15', description: '和风茶屋回款', amount: '¥ 96,800', type: 'in' },
-      { date: '2025-07-14', description: '黄山毛峰付款', amount: '¥ 22,600', type: 'out' },
-      { date: '2025-07-12', description: '茗香斋回款', amount: '¥ 38,600', type: 'in' },
-    ],
-  },
-];
+const money = (n: number) => `¥${n.toLocaleString()}`;
 
 function accountTypeColor(type: string) {
   switch (type) {
@@ -105,28 +25,35 @@ function accountTypeColor(type: string) {
 }
 
 export default function FinanceBalance() {
+  const accounts = useSettlementStore((s) => s.companyAccounts);
   const [showDetail, setShowDetail] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<AccountRecord | null>(null);
+  const [selectedAccount, setSelectedAccount] = useState<CompanyBankAccount | null>(null);
 
-  const handleView = (item: AccountRecord) => {
+  const handleView = (item: CompanyBankAccount) => {
     setSelectedAccount(item);
     setShowDetail(true);
   };
 
+  const totalBalance = accounts.reduce((s, a) => s + (a.balance ?? 0), 0);
+
   return (
     <>
-      <ContentHeader title="余额管理" breadcrumbs={['财务', '余额管理']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新增账户</Button></>} />
+      <ContentHeader title="余额管理" breadcrumbs={['财务', '余额管理']} actions={<><Button variant="ghost">导出</Button><Button><svg viewBox="0 0 16 16" fill="none" style={{ width: 14, height: 14, marginRight: 4 }}><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>新增账户</Button></>} />
       <div className="content-body">
+        <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
+          淡茶半盏收付款银行账户台账（共享数据源）：收款管理「收款账户」、付款管理「付款账户」下拉选择本列表账户；
+          收付款登记中手动填写的新账户自动回写本页。账户合计 <strong className="mono">{money(totalBalance)}</strong> · 共 {accounts.length} 个账户。
+        </div>
         <Card>
           <Table
             headers={['账户名称', '账户类型', '开户行', '账号', '余额', '状态', '操作']}
-            rows={accountItems.map((a) => [
+            rows={accounts.map((a) => [
               <span className="cell-emph">{a.name}</span>,
               <span style={{ padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: `${accountTypeColor(a.type)}12`, color: accountTypeColor(a.type), border: `1px solid ${accountTypeColor(a.type)}30` }}>{a.type}</span>,
-              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{a.bank}</span>,
+              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{a.bankName}</span>,
               <span className="mono" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-module-finance-secondary)' }}>{a.accountNo}</span>,
-              <span className="mono" style={{ fontWeight: 'var(--font-semibold)' }}>{a.balance}</span>,
-              <StatusTag variant={a.status === 'active' ? 'success' : 'error'} label={a.status === 'active' ? '正常' : '冻结'} />,
+              <span className="mono" style={{ fontWeight: 'var(--font-semibold)' }}>{money(a.balance ?? 0)}</span>,
+              <StatusTag variant={a.status === 'frozen' ? 'error' : 'success'} label={a.status === 'frozen' ? '冻结' : '正常'} />,
               <div className="row-actions">
                 <Button size="sm" variant="ghost" onClick={() => handleView(a)}>查看</Button>
                 <Button size="sm" variant="ghost" onClick={() => handleView(a)}>编辑</Button>
@@ -141,8 +68,8 @@ export default function FinanceBalance() {
         onClose={() => setShowDetail(false)}
         badge="BA"
         title={selectedAccount?.name}
-        statusTag={selectedAccount && <StatusTag variant={selectedAccount.status === 'active' ? 'success' : 'error'} label={selectedAccount.status === 'active' ? '正常' : '冻结'} />}
-        subtitle={selectedAccount && `${selectedAccount.type} · ${selectedAccount.bank}`}
+        statusTag={selectedAccount && <StatusTag variant={selectedAccount.status === 'frozen' ? 'error' : 'success'} label={selectedAccount.status === 'frozen' ? '冻结' : '正常'} />}
+        subtitle={selectedAccount && `${selectedAccount.type} · ${selectedAccount.bankName}`}
         mode="view"
       >
         {selectedAccount && (
@@ -151,10 +78,10 @@ export default function FinanceBalance() {
               <InfoGrid cols={3}>
                 <InfoItem label="账户名称" emph>{selectedAccount.name}</InfoItem>
                 <InfoItem label="账户类型">{selectedAccount.type}</InfoItem>
-                <InfoItem label="状态">{selectedAccount.status === 'active' ? '正常' : '冻结'}</InfoItem>
-                <InfoItem label="开户行" span={2}>{selectedAccount.bank}</InfoItem>
+                <InfoItem label="状态">{selectedAccount.status === 'frozen' ? '冻结' : '正常'}</InfoItem>
+                <InfoItem label="开户行" span={2}>{selectedAccount.bankName}</InfoItem>
                 <InfoItem label="账号" mono valueStyle={{ color: 'var(--color-module-finance-secondary)' }}>{selectedAccount.accountNo}</InfoItem>
-                <InfoItem label="当前余额" span={3} mono valueStyle={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-bold)', color: 'var(--color-module-current-base)' }}>{selectedAccount.balance}</InfoItem>
+                <InfoItem label="当前余额" span={3} mono valueStyle={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-bold)', color: 'var(--color-module-current-base)' }}>{money(selectedAccount.balance ?? 0)}</InfoItem>
               </InfoGrid>
             </DrawerSection>
 
@@ -175,7 +102,7 @@ export default function FinanceBalance() {
                         <td style={{ fontWeight: 'var(--font-medium)' }}>{tx.description}</td>
                         <td style={{ textAlign: 'right' }} className="mono">
                           <span style={{ color: tx.type === 'in' ? '#2E7D32' : '#C62828', fontWeight: 'var(--font-semibold)' }}>
-                            {tx.type === 'in' ? '+' : '-'}{tx.amount}
+                            {tx.type === 'in' ? '+' : '-'}{money(tx.amount)}
                           </span>
                         </td>
                       </tr>
@@ -191,8 +118,4 @@ export default function FinanceBalance() {
       </DetailDrawer>
     </>
   );
-}
-
-function PlusIcon() {
-  return <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
 }

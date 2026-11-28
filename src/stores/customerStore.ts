@@ -60,6 +60,8 @@ interface CustomerState {
   poolConfigs: Record<string, CustomerPoolConfig>;
   /** 管理台设置某客户入合作池配置（即时生效） */
   setPoolConfig: (customerId: string, cfg: CustomerPoolConfig) => void;
+  /** 新增客户结算账户（收付款登记手填新增回写客户档案；同账号去重） */
+  addCustomerBankAccount: (customerName: string, account: { accountName: string; accountNo: string; bankName: string }) => void;
 
   /* ── 登录 / 账号 ── */
   login: (username: string, password: string) => CustomerAccount | null;
@@ -236,6 +238,15 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   setPoolConfig: (customerId, cfg) => set({
     poolConfigs: { ...get().poolConfigs, [customerId]: cfg },
   }),
+
+  addCustomerBankAccount: (customerName, account) => set((s) => ({
+    customers: s.customers.map((c) => {
+      if (c.name !== customerName) return c;
+      const list = c.bankAccounts ?? [];
+      if (list.some((b) => b.accountNo === account.accountNo)) return c;
+      return { ...c, bankAccounts: [...list, { accountName: account.accountName, accountNo: account.accountNo, bankName: account.bankName, bankNo: '' }] };
+    }),
+  })),
 
   /* ── 登录 / 账号 ── */
   login: (username, password) => {

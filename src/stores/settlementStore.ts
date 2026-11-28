@@ -17,8 +17,18 @@
 import { create } from 'zustand';
 import { useCustomerStore, orderPlatformRate } from './customerStore';
 import type {
-  ExternalOrder, PurchaseIncomingInvoice, PurchasePayment, PurchaseStatement, PurchaseStatementLine,
-  ReceiptMethod, SalesStatement, StatementLine, StatementSource,
+  ExternalOrder,
+  PurchaseIncomingInvoice,
+  PurchasePayment,
+  PurchaseStatement,
+  PurchaseStatementLine,
+  ReceiptMethod,
+  SalesStatement,
+  StatementLine,
+  StatementSource,
+  BankAccountInfo,
+  CompanyBankAccount,
+  InvoiceFile,
 } from '../types';
 import { externalOrderSeeds } from '../data/externalOrders';
 import { useOrderFlowStore } from './orderFlowStore';
@@ -81,11 +91,20 @@ export function purchaseStatementOfPo(statements: PurchaseStatement[], poId: str
   return statements.find((s) => s.lines.some((l) => l.poId === poId));
 }
 
-/* ── 单号 ── */
-const dateKey = () => today().replace(/-/g, '');
+/* ── 单号（前缀-6位创建日期YYMMDD-4位顺序号，同日从 0001 开始、按现有最大序号 + 1 生成，删除不回收） ── */
+const dateKey = () => {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${String(d.getFullYear()).slice(2)}${p(d.getMonth() + 1)}${p(d.getDate())}`;
+};
 const nextCode = (prefix: string, existing: string[]): string => {
-  const seq = existing.filter((c) => c.startsWith(`${prefix}-${dateKey()}`)).length + 1;
-  return `${prefix}-${dateKey()}-${String(seq).padStart(2, '0')}`;
+  const dayPrefix = `${prefix}-${dateKey()}`;
+  const max = existing.reduce((m, c) => {
+    if (!c.startsWith(`${dayPrefix}-`)) return m;
+    const n = Number(c.slice(dayPrefix.length + 1));
+    return Number.isFinite(n) ? Math.max(m, n) : m;
+  }, 0);
+  return `${dayPrefix}${String(max + 1).padStart(4, '0')}`;
 };
 
 /* ── 明细行核销：按 FIFO 把金额分摊到行，返回每行累计覆盖金额 ── */
@@ -119,7 +138,7 @@ function seedSalesStatements(): SalesStatement[] {
     const amount = lines.reduce((s, l) => s + l.amount, 0);
     const stmt: SalesStatement = {
       id: `stmt_seed_${seq}`,
-      code: `JSXS-20261123-${String(seq).padStart(2, '0')}`,
+      code: `JSXS-261123${String(seq).padStart(4, '0')}`,
       source: seq === 2 ? 'customer' : 'dacha',
       settleTarget: target,
       customerType: list[0].salesPath === 'via_platform' ? '平台客户' : list[0].customerType,
@@ -186,7 +205,7 @@ function seedPurchaseStatements(): PurchaseStatement[] {
   const amount = lines.reduce((s, l) => s + l.amount, 0);
   const out: PurchaseStatement[] = [{
     id: 'pstmt_seed_1',
-    code: `JSCG-20261120-01`,
+    code: 'JSCG-2611200001',
     supplierId: first.supplierId,
     supplierName: first.supplierName,
     hasTerminal: true,
@@ -215,7 +234,7 @@ function seedPurchaseStatements(): PurchaseStatement[] {
   if (bDoc) {
     out.push({
       id: 'pstmt_seed_2',
-      code: 'JSCG-20261125-01',
+      code: 'JSCG-2611250001',
       supplierId: bDoc.supplierId,
       supplierName: bDoc.supplierName,
       hasTerminal: false,
@@ -261,10 +280,14 @@ interface SettlementState {
   disputeSalesStatement: (id: string, reason: string) => OkResult;
   adjustSalesStatement: (id: string, input: { amount: number; reason: string; refCode?: string }) => OkResult;
   /** 开票登记（财务 · 发票管理）：对已确认销售结算单，部分开票多张累计覆盖 */
-  registerSalesInvoice: (id: string, input: { invoiceNo: string; amount: number; date: string; remark?: string }) => OkResult;
+  registerSalesInvoice: (id: string, input: { invoiceNo: string; amount: number; date: string; remark?: string; file?: InvoiceFile }) => OkResult;
   /** 收款登记（财务 · 收款管理）：对已确认销售结算单，部分收款多笔核销；预存客户可选余额支付 */
-  registerSalesReceipt: (id: string, input: { amount: number; date: string; method: ReceiptMethod; remark?: string }) => OkResult;
+  registerSalesReceipt: (id: string, input: { amount: number; date: string; method: ReceiptMethod; remark?: string; payerAccount?: BankAccountInfo; receiverAccount?: BankAccountInfo }) => OkResult;
   closeSalesStatement: (id: string) => OkResult;
+  /** 新增淡茶半盏银行账户（收付款登记手填新增回写余额管理） */
+  addCompanyAccount: (account: { name: string; bankName: string; accountNo: string }) => void;
+  /** 淡茶半盏收付款银行账户（财务 · 余额管理维护；收付款登记下拉选择，新增回写本列表） */
+  companyAccounts: CompanyBankAccount[];
   /** 第三期：办结后退货提醒（已办结结算单发生退货时的待处理标记） */
   markClosedStatementReturn: (id: string, notice: string) => void;
 
@@ -276,8 +299,8 @@ interface SettlementState {
   generatePurchaseStatement: (input: { supplierId: string; supplierName: string; hasTerminal: boolean; poIds: string[]; period: string; paymentStage: 'prepaid' | 'after_receipt'; prepaidRatio?: number }) => { ok: boolean; msg: string; code?: string };
   confirmPurchaseStatement: (id: string, operator?: string) => OkResult;
   disputePurchaseStatement: (id: string, reason: string) => OkResult;
-  registerIncomingInvoice: (id: string, input: { invoiceNo: string; amount: number; date: string }) => OkResult;
-  registerPurchasePayment: (id: string, input: { amount: number; date: string; account?: string; remark?: string }) => OkResult;
+  registerIncomingInvoice: (id: string, input: { invoiceNo: string; amount: number; date: string; file?: InvoiceFile }) => OkResult;
+  registerPurchasePayment: (id: string, input: { amount: number; date: string; account?: string; remark?: string; payerAccount?: BankAccountInfo; payeeAccount?: BankAccountInfo }) => OkResult;
 }
 
 export const useSettlementStore = create<SettlementState>((set, get) => {
@@ -294,8 +317,19 @@ export const useSettlementStore = create<SettlementState>((set, get) => {
     salesStatements: seedSalesStatements(),
     wallets: seedWallets(),
     purchaseStatements: seedPurchaseStatements(),
+    companyAccounts: [
+      { id: 'ca_bank_icbc', name: '工商银行基本户', type: '银行存款', bankName: '中国工商银行杭州分行', accountNo: '1202 0200 1234 5678', balance: 1256800, status: 'active' },
+      { id: 'ca_bank_ccb', name: '建设银行一般户', type: '银行存款', bankName: '中国建设银行杭州分行', accountNo: '3302 0100 9876 5432', balance: 580000, status: 'active' },
+      { id: 'ca_bank_abc', name: '农业银行一般户', type: '银行存款', bankName: '中国农业银行杭州分行', accountNo: '1302 0300 5678 1234', balance: 320000, status: 'active' },
+      { id: 'ca_cash', name: '现金账户', type: '现金', bankName: '—', accountNo: '—', balance: 12500, status: 'active' },
+      { id: 'ca_alipay', name: '支付宝账户', type: '其他', bankName: '支付宝', accountNo: 'tea_erp@alipay.com', balance: 399000, status: 'active' },
+    ],
 
     /* ═══ 销售结算单 ═══ */
+    addCompanyAccount: (account) => set((s) => ({
+      companyAccounts: [...s.companyAccounts, { id: `ca_${Date.now()}`, name: account.name, type: '银行存款', bankName: account.bankName, accountNo: account.accountNo, balance: 0, status: 'active' as const }],
+    })),
+
     generateSalesStatement: ({ settleTarget, customerType, period, orderIds }) => {
       const orders = useOrderFlowStore.getState().orders;
       const picked = orderIds.map((id) => orders.find((o) => o.id === id)).filter(Boolean) as ExternalOrder[];
@@ -430,7 +464,7 @@ export const useSettlementStore = create<SettlementState>((set, get) => {
     },
 
     /** 开票登记（财务 · 发票管理）：部分开票，多张发票累计覆盖；行核销回写履约单开票状态 */
-    registerSalesInvoice: (id, { invoiceNo, amount, date, remark }) => {
+    registerSalesInvoice: (id, { invoiceNo, amount, date, remark, file }) => {
       const stmt = get().salesStatements.find((s) => s.id === id);
       if (!stmt) return { ok: false, msg: '结算单不存在' };
       if (stmt.status !== 'confirmed') return { ok: false, msg: '仅已确认的销售结算单可开票（先对账确认）' };
@@ -439,7 +473,7 @@ export const useSettlementStore = create<SettlementState>((set, get) => {
       if (!(amount > 0)) return { ok: false, msg: '开票金额须大于 0' };
       if (invoiced + amount > net + 0.001) return { ok: false, msg: `开票金额超出未开票余额（剩余 ¥${(net - invoiced).toLocaleString()}）` };
       if (!invoiceNo.trim()) return { ok: false, msg: '请填写发票号' };
-      const invoice = { id: `inv_${Date.now()}`, invoiceNo: invoiceNo.trim(), amount, date, remark };
+      const invoice = { id: `inv_${Date.now()}`, invoiceNo: invoiceNo.trim(), amount, date, remark, file };
       set((s) => ({ salesStatements: s.salesStatements.map((x) => (x.id === id ? { ...x, invoices: [...x.invoices, invoice], ops: [...x.ops, op('开票登记', `${invoice.invoiceNo} · ¥${amount.toLocaleString()}`)] } : x)) }));
       // 行核销 FIFO 回写履约单开票状态
       const fresh = get().salesStatements.find((x) => x.id === id)!;
@@ -456,7 +490,7 @@ export const useSettlementStore = create<SettlementState>((set, get) => {
     },
 
     /** 收款登记（财务 · 收款管理）：部分收款多笔核销；预存客户可选余额支付；行核销回写履约单收款状态 */
-    registerSalesReceipt: (id, { amount, date, method, remark }) => {
+    registerSalesReceipt: (id, { amount, date, method, remark, payerAccount, receiverAccount }) => {
       const stmt = get().salesStatements.find((s) => s.id === id);
       if (!stmt) return { ok: false, msg: '结算单不存在' };
       if (stmt.status !== 'confirmed') return { ok: false, msg: '仅已确认的销售结算单可收款（先对账确认）' };
@@ -475,7 +509,7 @@ export const useSettlementStore = create<SettlementState>((set, get) => {
             : w)),
         }));
       }
-      const receipt = { id: `rc_${Date.now()}`, amount, date, method, remark };
+      const receipt = { id: `rc_${Date.now()}`, amount, date, method, remark, payerAccount, receiverAccount };
       set((s) => ({ salesStatements: s.salesStatements.map((x) => (x.id === id ? { ...x, receipts: [...x.receipts, receipt], ops: [...x.ops, op('收款登记', `¥${amount.toLocaleString()}${method === 'wallet' ? '（预存余额支付）' : ''}`)] } : x)) }));
       // 行核销 FIFO 回写履约单收款状态
       const fresh = get().salesStatements.find((x) => x.id === id)!;
@@ -585,18 +619,18 @@ export const useSettlementStore = create<SettlementState>((set, get) => {
       return { ok: true, msg: `采购结算单 ${stmt.code} 已标记有异议` };
     },
 
-    registerIncomingInvoice: (id, { invoiceNo, amount, date }) => {
+    registerIncomingInvoice: (id, { invoiceNo, amount, date, file }) => {
       const stmt = get().purchaseStatements.find((s) => s.id === id);
       if (!stmt) return { ok: false, msg: '结算单不存在' };
       if (stmt.status !== 'confirmed') return { ok: false, msg: '仅已确认的结算单可收票（先对账确认）' };
       if (!invoiceNo.trim()) return { ok: false, msg: '请填写发票号' };
       if (!(amount > 0)) return { ok: false, msg: '发票金额须大于 0' };
-      const inv: PurchaseIncomingInvoice = { id: `pinv_${Date.now()}`, invoiceNo: invoiceNo.trim(), amount, date };
+      const inv: PurchaseIncomingInvoice = { id: `pinv_${Date.now()}`, invoiceNo: invoiceNo.trim(), amount, date, file };
       set((s) => ({ purchaseStatements: s.purchaseStatements.map((x) => (x.id === id ? { ...x, invoices: [...x.invoices, inv], ops: [...x.ops, op('收票登记', `${inv.invoiceNo} · ¥${amount.toLocaleString()}`)] } : x)) }));
       return { ok: true, msg: `进项发票 ${inv.invoiceNo} 已登记` };
     },
 
-    registerPurchasePayment: (id, { amount, date, account, remark }) => {
+    registerPurchasePayment: (id, { amount, date, account, remark, payerAccount, payeeAccount }) => {
       const stmt = get().purchaseStatements.find((s) => s.id === id);
       if (!stmt) return { ok: false, msg: '结算单不存在' };
       if (stmt.status !== 'confirmed') return { ok: false, msg: '仅已确认的结算单可付款（先对账确认）' };
@@ -606,7 +640,7 @@ export const useSettlementStore = create<SettlementState>((set, get) => {
       const stage = stmt.paymentStage === 'prepaid' && paid < cap - 0.001 ? '预付款' : '付款';
       if (stage === '预付款' && amount > cap + 0.001) return { ok: false, msg: `预付款超出发货前应付额度（¥${cap.toLocaleString()}）` };
       if (paid + amount > stmt.amount + 0.001) return { ok: false, msg: `付款金额超出未付余额（剩余 ¥${(stmt.amount - paid).toLocaleString()}）` };
-      const pay: PurchasePayment = { id: `ppay_${Date.now()}`, amount, date, account, remark: remark ?? (stage === '预付款' ? '发货前预付款' : undefined) };
+      const pay: PurchasePayment = { id: `ppay_${Date.now()}`, amount, date, account, remark: remark ?? (stage === '预付款' ? '发货前预付款' : undefined), payerAccount, payeeAccount };
       // 先款后货预付款到账 → 采购单置预付状态；签收后（或尾款补齐）→ 办结并置已结算
       const isPrepaidStage = stage === '预付款';
       set((s) => ({

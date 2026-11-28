@@ -99,7 +99,7 @@ export default function FinanceOtherReceivable() {
 
   return (
     <>
-      <ContentHeader title="其他应收" breadcrumbs={['财务', '结算管理', '其他应收']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建应收</Button></>} />
+      <ContentHeader title="其他应收" breadcrumbs={['财务', '应收应付', '其他应收']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建应收</Button></>} />
       <div className="content-body">
         <FilterBar>
           <input className="filter-input" placeholder="搜索单号、往来单位、事由..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 260 }} />

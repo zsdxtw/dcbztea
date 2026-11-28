@@ -1067,6 +1067,13 @@ export interface PartnerReturn {
   finishTime?: string;
   /** 处理轨迹 */
   history: { time: string; action: string; detail?: string }[];
+  /** 退货完成的采购联动（关联采购单退货记录，完成时自动定位生成） */
+  purchaseLinkage?: {
+    poCode: string;
+    supplierName: string;
+    amount: number;
+    date: string;
+  };
 }
 
 /* ─────────────────────────── 合作商通知公告 ─────────────────────────── */
@@ -1946,21 +1953,57 @@ export interface StatementLine {
 }
 
 /** 对账单发票记录（部分开票：多张发票累计覆盖对账金额） */
+/** 收付款账户信息（户名 / 账号 / 开户行；银行转账收付款登记用，支持选择档案账户或新增回写档案） */
+export interface BankAccountInfo {
+  accountName: string;
+  accountNo: string;
+  bankName: string;
+}
+
+/** 发票文件（上传保存待查验；dataUrl 内存保存供查看 / 下载） */
+export interface InvoiceFile {
+  fileName: string;
+  fileType: string;
+  fileData: string;
+  /** 是否自动识别预填（演示识别） */
+  recognized?: boolean;
+}
+
+/** 淡茶半盏收付款银行账户（财务 · 余额管理维护；收付款登记下拉选择，新增回写本列表） */
+export interface CompanyBankAccount {
+  id: string;
+  /** 账户名（如 工商银行基本户） */
+  name: string;
+  /** 账户类型（银行存款 / 现金 / 其他） */
+  type: string;
+  bankName: string;
+  accountNo: string;
+  balance?: number;
+  status?: 'active' | 'frozen';
+  recentTransactions?: { date: string; description: string; amount: number; type: 'in' | 'out' }[];
+}
+
 export interface StatementInvoice {
   id: string;
   invoiceNo: string;
   amount: number;
   date: string;
   remark?: string;
+  /** 发票文件（上传自动识别并保存待查验） */
+  file?: InvoiceFile;
 }
 
-/** 对账单收款记录（部分收款：多笔到账逐步核销） */
+/** 对账单收款记录（部分收款：多笔到账逐步核销；银行转账记录收付款双方账户） */
 export interface StatementReceipt {
   id: string;
   amount: number;
   date: string;
   method: ReceiptMethod;
   remark?: string;
+  /** 付款账户（客户，银行转账时登记；手填新增回写客户档案结算账户） */
+  payerAccount?: BankAccountInfo;
+  /** 收款账户（淡茶半盏，来自余额管理账户；手填新增回写余额管理） */
+  receiverAccount?: BankAccountInfo;
 }
 
 /** 对账单退货冲减记录（未开票直接冲减；已开票开红字发票后在此登记） */
@@ -1986,7 +2029,7 @@ export type StatementSource = 'dacha' | 'customer';
 /** 销售结算单（应收结算一级单据，明细行 = 履约单） */
 export interface SalesStatement {
   id: string;
-  /** 结算单号 JSXS-YYYYMMDD-XX */
+  /** 结算单号 JSXS-YYMMDDXXXX（如 JSXS-2611230001） */
   code: string;
   /** 来源：dacha=淡茶发起对账（先发结算单给客户）/ customer=客户发起对账（客户提供对账单） */
   source: StatementSource;
@@ -2052,15 +2095,21 @@ export interface PurchaseIncomingInvoice {
   invoiceNo: string;
   amount: number;
   date: string;
+  /** 发票文件（上传自动识别并保存待查验） */
+  file?: InvoiceFile;
 }
 
-/** 采购结算单付款记录（付款核销） */
+/** 采购结算单付款记录（付款核销；银行转账记录付收款双方账户） */
 export interface PurchasePayment {
   id: string;
   amount: number;
   date: string;
   account?: string;
   remark?: string;
+  /** 付款账户（淡茶半盏，来自余额管理账户；手填新增回写余额管理） */
+  payerAccount?: BankAccountInfo;
+  /** 收款账户（合作商，来自合作商档案结算账户；手填新增回写合作商档案） */
+  payeeAccount?: BankAccountInfo;
 }
 
 /** 采购结算单付款节点：prepaid=发货前（先款后货）/ after_receipt=签收后（月结等） */
@@ -2069,7 +2118,7 @@ export type PurchasePaymentStage = 'prepaid' | 'after_receipt';
 /** 采购结算单（应付结算一级单据，明细行 = 采购单；按合作商 + 账期汇总） */
 export interface PurchaseStatement {
   id: string;
-  /** 结算单号 JSCG-YYYYMMDD-XX */
+  /** 结算单号 JSCG-YYMMDDXXXX（如 JSCG-2611250001） */
   code: string;
   supplierId: string;
   supplierName: string;

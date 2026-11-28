@@ -10,6 +10,7 @@ import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import StatusTag from '../../components/common/StatusTag';
+import PurchaseStatementCreateDialog from '../../components/business/PurchaseStatementCreateDialog';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { useSettlementStore } from '../../stores/settlementStore';
@@ -36,6 +37,7 @@ export default function PurchaseReconciliation() {
   const purchaseStatements = useSettlementStore((s) => s.purchaseStatements);
   const store = useSettlementStore;
   const [msg, setMsg] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [status, setStatus] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -60,25 +62,29 @@ export default function PurchaseReconciliation() {
 
   return (
     <>
-      <ContentHeader title="采购结算" breadcrumbs={['采购', '采购管理', '采购结算']} />
+      <ContentHeader title="采购结算" breadcrumbs={['采购', '采购结算']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           本页负责采购结算单的<strong>对账阶段</strong>：后台代确认、登记异议（<strong>未开立合作商终端的品牌商等合作商一律由后台代确认</strong>；
           有终端的合作商在终端「结算管理」在线确认）。结算单确认后金额锁定，<strong>结算阶段</strong>（收票登记、付款登记、办结）在财务菜单完成，本页只读展示其进度。
-          采购结算单在「采购单结算」按采购单生成。
+          采购结算单通过「+ 生成采购结算单」弹窗生成；采购单维度的结算状态见「采购单结算」页。
         </div>
 
         {msg && (
           <div style={{ marginBottom: 'var(--space-3)', padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', background: '#E8F5E9', color: '#01795D' }}>{msg}</div>
         )}
 
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap', alignItems: 'center' }}>
           <input className="filter-input" placeholder="搜索结算单号、合作商、采购单号、履约单号..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 340 }} />
+          <span style={{ marginLeft: 'auto' }} />
+          <Button onClick={() => setCreateOpen(true)}>+ 生成采购结算单</Button>
           <select className="filter-select" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">全部状态</option>
             {(Object.keys(STATUS_LABELS) as (keyof typeof STATUS_LABELS)[]).map((k) => <option key={k} value={k}>{STATUS_LABELS[k]}</option>)}
           </select>
         </div>
+
+        <PurchaseStatementCreateDialog open={createOpen} onClose={() => setCreateOpen(false)} />
 
         <Card style={{ padding: 0 }}>
           <Table

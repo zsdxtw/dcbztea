@@ -1,8 +1,9 @@
 /**
  * 财务 · 发票管理（销项开票 / 进项收票操作页）
  * 销项开票登记 = 已确认销售结算单（部分开票，多张发票累计覆盖）；进项收票登记 = 已确认采购结算单。
+ * 开票 / 收票登记支持<strong>上传发票文件自动识别</strong>（演示识别：发票号 / 金额 / 日期预填，可修改），
+ * 发票文件随记录保存（内存）供台账查看。
  * 台账数据源 = 结算单发票记录；生成与确认在销售 / 采购菜单。
- * 设计见 docs/销售单结算流程设计建议.md 第七节。
  */
 import { useMemo, useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
@@ -11,7 +12,7 @@ import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import StatusTag from '../../components/common/StatusTag';
 import { useSettlementStore, netOf, invoicedOf } from '../../stores/settlementStore';
-import type { PurchaseStatement, SalesStatement } from '../../types';
+import type { InvoiceFile, PurchaseStatement, SalesStatement } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -23,9 +24,10 @@ interface InvoiceRow {
   amount: number;
   date: string;
   remark?: string;
+  file?: InvoiceFile;
 }
 
-type Dialog = { kind: 'output' | 'input'; id: string; code: string; party: string } | null;
+type Dialog = { kind: 'output' | 'input'; id: string; code: string; party: string; remain: number } | null;
 
 export default function FinanceInvoice() {
   const salesStatements = useSettlementStore((s) => s.salesStatements);
@@ -35,6 +37,7 @@ export default function FinanceInvoice() {
   const [tab, setTab] = useState<'' | 'output' | 'input'>('');
   const [dialog, setDialog] = useState<Dialog>(null);
   const [form, setForm] = useState({ invoiceNo: '', amount: '', date: new Date().toISOString().slice(0, 10), remark: '' });
+  const [file, setFile] = useState<InvoiceFile | null>(null);
   const [msg, setMsg] = useState('');
   const flash = (t: string) => { setMsg(t); setTimeout(() => setMsg(''), 4500); };
   const run = (res: { ok: boolean; msg: string }) => { flash(res.msg); if (res.ok) setDialog(null); };
@@ -52,11 +55,11 @@ export default function FinanceInvoice() {
   const rows = useMemo<InvoiceRow[]>(() => {
     const output = salesStatements.flatMap((s) => s.invoices.map((i) => ({
       invoiceNo: i.invoiceNo, type: '销项发票' as const, party: s.settleTarget, refCode: s.code,
-      amount: i.amount, date: i.date, remark: i.remark,
+      amount: i.amount, date: i.date, remark: i.remark, file: i.file,
     })));
     const input = purchaseStatements.flatMap((s) => s.invoices.map((i) => ({
       invoiceNo: i.invoiceNo, type: '进项发票' as const, party: s.supplierName, refCode: s.code,
-      amount: i.amount, date: i.date, remark: '采购进项收票',
+      amount: i.amount, date: i.date, remark: '采购进项收票', file: i.file,
     })));
     return [...output, ...input].sort((a, b) => b.date.localeCompare(a.date));
   }, [salesStatements, purchaseStatements]);
@@ -74,27 +77,61 @@ export default function FinanceInvoice() {
       : purchaseStatements.find((s) => s.id === id);
     if (!stmt) return;
     const party = kind === 'output' ? (stmt as SalesStatement).settleTarget : (stmt as PurchaseStatement).supplierName;
-    setDialog({ kind, id, code: stmt.code, party });
+    const remain = kind === 'output' ? netOf(stmt as SalesStatement) - invoicedOf(stmt as SalesStatement) : (stmt as PurchaseStatement).amount - (stmt as PurchaseStatement).invoices.reduce((acc, i) => acc + i.amount, 0);
+    setDialog({ kind, id, code: stmt.code, party, remain });
     setForm({ invoiceNo: '', amount: '', date: new Date().toISOString().slice(0, 10), remark: '' });
+    setFile(null);
+  };
+
+  /** 上传发票文件 → 自动识别（演示识别：按文件生成发票号，金额 / 日期按结算单预填），可修改 */
+  const handleFile = (f: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result ?? '');
+      const digits = String(Date.now()).slice(-8) + String(f.size % 9000 + 1000);
+      setFile({ fileName: f.name, fileType: f.type || 'application/octet-stream', fileData: dataUrl, recognized: true });
+      setForm((prev) => ({
+        ...prev,
+        invoiceNo: prev.invoiceNo.trim() || `${digits}`,
+        amount: prev.amount.trim() || String(dialog?.remain ?? ''),
+        date: prev.date || new Date().toISOString().slice(0, 10),
+        remark: prev.remark || '上传发票 · 自动识别（演示）',
+      }));
+    };
+    reader.readAsDataURL(f);
   };
 
   const submit = () => {
     if (!dialog) return;
     if (!form.invoiceNo.trim() || !(Number(form.amount) > 0)) return;
+    const filePayload: InvoiceFile | undefined = file ?? undefined;
     if (dialog.kind === 'output') {
-      run(store.getState().registerSalesInvoice(dialog.id, { invoiceNo: form.invoiceNo, amount: Number(form.amount), date: form.date, remark: form.remark }));
+      run(store.getState().registerSalesInvoice(dialog.id, { invoiceNo: form.invoiceNo, amount: Number(form.amount), date: form.date, remark: form.remark, file: filePayload }));
     } else {
-      run(store.getState().registerIncomingInvoice(dialog.id, { invoiceNo: form.invoiceNo, amount: Number(form.amount), date: form.date }));
+      run(store.getState().registerIncomingInvoice(dialog.id, { invoiceNo: form.invoiceNo, amount: Number(form.amount), date: form.date, file: filePayload }));
     }
+  };
+
+  /** 查看发票文件（新窗口打开 dataURL） */
+  const viewFile = (f: InvoiceFile) => {
+    const win = window.open('', '_blank');
+    if (!win) return;
+    if (f.fileType.startsWith('image')) {
+      win.document.write(`<title>${f.fileName}</title><img src="${f.fileData}" style="max-width:100%" />`);
+    } else {
+      win.document.write(`<title>${f.fileName}</title><iframe src="${f.fileData}" style="width:100%;height:100%;border:none"></iframe>`);
+    }
+    win.document.close();
   };
 
   return (
     <>
-      <ContentHeader title="发票管理" breadcrumbs={['财务', '核算与其他', '发票管理']} />
+      <ContentHeader title="发票管理" breadcrumbs={['财务', '对账结算', '发票管理']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           发票台账与结算单打通：销项发票对<strong>已确认的销售结算单</strong>开票登记（部分开票支持多张发票累计覆盖），
-          进项发票对<strong>已确认的采购结算单</strong>收票登记。销项合计 {money(outputTotal)} · 进项合计 {money(inputTotal)}。
+          进项发票对<strong>已确认的采购结算单</strong>收票登记。开票 / 收票登记支持<strong>上传发票文件自动识别</strong>（发票号 / 金额 / 日期预填，可修改），
+          文件随记录保存供台账查看。销项合计 {money(outputTotal)} · 进项合计 {money(inputTotal)}。
         </div>
 
         {msg && (
@@ -152,7 +189,7 @@ export default function FinanceInvoice() {
 
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['发票号', '类型', '购买方 / 销售方', '关联结算单', '金额', '开票 / 收票日期', '备注']}
+            headers={['发票号', '类型', '购买方 / 销售方', '关联结算单', '金额', '开票 / 收票日期', '发票文件', '备注']}
             rows={filtered.map((r) => [
               <span key="no" className="cell-mono-emph">{r.invoiceNo}</span>,
               <StatusTag key="t" variant={r.type === '销项发票' ? 'success' : 'info'} label={r.type} />,
@@ -160,6 +197,9 @@ export default function FinanceInvoice() {
               <span key="rc" className="mono" style={{ fontSize: 'var(--text-sm)' }}>{r.refCode}</span>,
               <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(r.amount)}</span>,
               <span key="d" className="mono">{r.date}</span>,
+              r.file
+                ? <Button key="f" size="sm" variant="ghost" style={{ color: 'var(--color-module-current-base)' }} onClick={() => viewFile(r.file!)}>查看（{r.file.fileName}）</Button>
+                : <span key="f" className="cell-muted" style={{ fontSize: 'var(--text-xs)' }}>—</span>,
               <span key="rm" className="cell-muted" style={{ fontSize: 'var(--text-sm)' }}>{r.remark || '—'}</span>,
             ])}
           />
@@ -172,7 +212,7 @@ export default function FinanceInvoice() {
       {/* 开票 / 收票登记弹窗 */}
       {dialog && (
         <div className="category-dialog-overlay" onClick={() => setDialog(null)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 480 }}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 560 }}>
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>
               {dialog.kind === 'output' ? '销项开票登记' : '进项收票登记'} · {dialog.code}
             </div>
@@ -188,9 +228,26 @@ export default function FinanceInvoice() {
                 return <> · 结算金额 {money(s.amount)} · 已收票 {money(inv)} · 未收票 <strong className="mono">{money(s.amount - inv)}</strong></>;
               })()}
             </div>
+
+            {/* 上传发票文件自动识别 */}
+            <div style={{ padding: 'var(--space-3)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-3)' }}>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>上传发票文件（自动识别发票信息）</label>
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                style={{ width: '100%', fontSize: 'var(--text-sm)' }}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+              />
+              {file && (
+                <div style={{ marginTop: 8, fontSize: 'var(--text-xs)', color: '#01795D', lineHeight: 1.7 }}>
+                  已识别发票文件 <strong>{file.fileName}</strong>：发票号 / 金额 / 日期已预填（可修改），文件将随登记保存待查验。
+                </div>
+              )}
+            </div>
+
             <div style={{ marginBottom: 'var(--space-3)' }}>
               <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>发票号 *</label>
-              <input className="filter-input" value={form.invoiceNo} onChange={(e) => setForm({ ...form, invoiceNo: e.target.value })} style={{ width: '100%' }} placeholder="如 FP-02611724" />
+              <input className="filter-input" value={form.invoiceNo} onChange={(e) => setForm({ ...form, invoiceNo: e.target.value })} style={{ width: '100%' }} placeholder="如 FP-02611724，或上传文件自动识别" />
             </div>
             <div style={{ marginBottom: 'var(--space-3)' }}>
               <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>发票金额 *</label>

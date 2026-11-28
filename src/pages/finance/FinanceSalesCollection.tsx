@@ -1,9 +1,9 @@
 /**
  * 财务 · 收款管理（客户回款操作页 + 预存账户）
  * 收款登记 = 已确认销售结算单（部分收款，多笔到账逐步核销；预付客户可选预存余额支付）；
- * 预收款登记 = 客户预存余额充值；手工办结 = 已收款未开票的客户。
+ * 银行转账登记收付款双方账户：收款账户 = 淡茶半盏（余额管理账户，可选/新增回写），
+ * 付款账户 = 客户（客户档案结算账户，可选/新增回写客户档案）。
  * 台账数据源 = 销售结算单收款记录；确认对账在销售菜单。
- * 设计见 docs/销售单结算流程设计建议.md 第七节、5.3。
  */
 import { useMemo, useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
@@ -12,8 +12,9 @@ import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import StatusTag from '../../components/common/StatusTag';
 import { useSettlementStore, netOf, receivedOf, invoicedOf } from '../../stores/settlementStore';
+import { useCustomerStore } from '../../stores/customerStore';
 import { RECEIPT_METHOD_LABELS } from '../../types';
-import type { ReceiptMethod, SalesStatement } from '../../types';
+import type { BankAccountInfo, ReceiptMethod, SalesStatement } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
@@ -21,16 +22,28 @@ const METHOD_TONE: Record<string, 'success' | 'info' | 'warning' | 'error' | 'de
   bank: 'success', wallet: 'info', cash: 'default', acceptance: 'warning', alipay: 'info', wechat: 'info',
 };
 
+/** 账户尾号显示 */
+const accTail = (a?: BankAccountInfo) => (a ? `${a.accountName}（${a.bankName} · 尾号 ${a.accountNo.replace(/\s/g, '').slice(-4)}）` : '—');
+
 type Dialog = { kind: 'receipt' | 'prepay' | 'close'; id?: string; code?: string; target?: string } | null;
+
+const EMPTY_ACC: BankAccountInfo = { accountName: '', accountNo: '', bankName: '' };
 
 export default function FinanceSalesCollection() {
   const salesStatements = useSettlementStore((s) => s.salesStatements);
   const wallets = useSettlementStore((s) => s.wallets);
+  const companyAccounts = useSettlementStore((s) => s.companyAccounts);
+  const addCompanyAccount = useSettlementStore((s) => s.addCompanyAccount);
+  const customers = useCustomerStore((s) => s.customers);
+  const addCustomerBankAccount = useCustomerStore((s) => s.addCustomerBankAccount);
   const store = useSettlementStore;
   const [keyword, setKeyword] = useState('');
   const [view, setView] = useState<'pending' | 'records' | 'accounts'>('pending');
   const [dialog, setDialog] = useState<Dialog>(null);
   const [form, setForm] = useState({ amount: '', date: new Date().toISOString().slice(0, 10), method: 'bank' as ReceiptMethod, remark: '', name: '', newName: '' });
+  /** 银行转账：付款账户（客户）/ 收款账户（淡茶半盏）；src=选中索引或 __manual */
+  const [payerAcc, setPayerAcc] = useState<{ src: string; info: BankAccountInfo }>({ src: '', info: EMPTY_ACC });
+  const [recvAcc, setRecvAcc] = useState<{ src: string; info: BankAccountInfo }>({ src: '', info: EMPTY_ACC });
   const [msg, setMsg] = useState('');
   const flash = (t: string) => { setMsg(t); setTimeout(() => setMsg(''), 4500); };
   const run = (res: { ok: boolean; msg: string }) => { flash(res.msg); if (res.ok) setDialog(null); };
@@ -46,7 +59,7 @@ export default function FinanceSalesCollection() {
   /** 回款记录 */
   const records = useMemo(() => salesStatements.flatMap((s) => s.receipts.map((r) => ({
     id: r.id, code: s.code, target: s.settleTarget, amount: r.amount, date: r.date,
-    method: r.method as string, remark: r.remark ?? '',
+    method: r.method as string, remark: r.remark ?? '', payer: r.payerAccount, receiver: r.receiverAccount,
   }))).sort((a, b) => b.date.localeCompare(a.date)), [salesStatements]);
 
   const kw = keyword.trim();
@@ -55,25 +68,41 @@ export default function FinanceSalesCollection() {
   const totalReceived = records.reduce((s, r) => s + r.amount, 0);
   const walletTotal = wallets.reduce((s, w) => s + w.balance, 0);
 
+  /** 当前结算对象的客户档案结算账户选项 */
+  const payerOptions = useMemo(() => {
+    if (dialog?.kind !== 'receipt') return [];
+    const cust = customers.find((c) => c.name === dialog.target);
+    return cust?.bankAccounts ?? [];
+  }, [dialog, customers]);
+
   const openReceipt = (s: SalesStatement) => {
-    const wallet = wallets.find((w) => w.customerName === s.settleTarget);
-    const prepaidCustomer = false; // 默认银行转账；预存客户可手动选余额支付
     setDialog({ kind: 'receipt', id: s.id, code: s.code, target: s.settleTarget });
-    setForm({ amount: String(Math.round(netOf(s) - receivedOf(s))), date: new Date().toISOString().slice(0, 10), method: "bank" as const, remark: "", name: "", newName: "" });
-    void prepaidCustomer; void wallet;
+    setForm({ amount: String(Math.round(netOf(s) - receivedOf(s))), date: new Date().toISOString().slice(0, 10), method: 'bank', remark: '', name: '', newName: '' });
+    setPayerAcc({ src: '', info: EMPTY_ACC });
+    setRecvAcc({ src: companyAccounts[0] ? '0' : '__manual', info: EMPTY_ACC });
   };
+
+  /** 解析选中的账户（下拉或手填） */
+  const resolveAcc = (acc: { src: string; info: BankAccountInfo }, options: BankAccountInfo[]): { acc?: BankAccountInfo; manual: boolean } => {
+    if (acc.src === '__manual') return { acc: acc.info.accountNo.trim() ? acc.info : undefined, manual: true };
+    const idx = Number(acc.src);
+    return { acc: Number.isFinite(idx) ? options[idx] : undefined, manual: false };
+  };
+
+  /** 收款账户（淡茶半盏）选项 */
+  const recvOptions = companyAccounts.map((a) => ({ accountName: a.name, accountNo: a.accountNo, bankName: a.bankName }));
 
   return (
     <>
       <ContentHeader
         title="收款管理"
-        breadcrumbs={['财务', '应收应付', '收款管理']}
+        breadcrumbs={['财务', '对账结算', '收款管理']}
         actions={<Button onClick={() => { setDialog({ kind: 'prepay' }); setForm({ ...form, date: new Date().toISOString().slice(0, 10), method: 'bank', amount: '' }); }}>预收款登记</Button>}
       />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           客户回款操作与台账：对<strong>已确认的销售结算单</strong>收款登记（部分收款，多笔到账逐步核销）；
-          预付客户的预收款登记为<strong>预存余额</strong>，收款时可选「预存余额支付」（核销扣减）。
+          银行转账登记<strong>收付款双方账户</strong>（收款账户 = 淡茶半盏余额管理账户；付款账户 = 客户档案结算账户，新增自动回写档案）。
           累计回款 <strong className="mono">{money(totalReceived)}</strong> · 预存余额合计 <strong className="mono">{money(walletTotal)}</strong>。
         </div>
 
@@ -114,13 +143,15 @@ export default function FinanceSalesCollection() {
         {view === 'records' && (
           <Card style={{ padding: 0 }}>
             <Table
-              headers={['回款日期', '结算单号', '结算对象', '回款金额', '收款方式', '备注']}
+              headers={['回款日期', '结算单号', '结算对象', '回款金额', '收款方式', '付款账户（客户）', '收款账户（淡茶半盏）', '备注']}
               rows={filteredRecords.map((r) => [
                 <span key="d" className="mono">{r.date}</span>,
                 <span key="c" className="cell-mono-emph">{r.code}</span>,
                 <span key="t" className="cell-emph">{r.target}</span>,
                 <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)', color: '#01795D' }}>{money(r.amount)}</span>,
                 <StatusTag key="m" variant={METHOD_TONE[r.method] ?? 'info'} label={RECEIPT_METHOD_LABELS[r.method as keyof typeof RECEIPT_METHOD_LABELS] ?? r.method} />,
+                <span key="pa" className="cell-muted" style={{ fontSize: 'var(--text-xs)' }}>{r.method === 'bank' ? accTail(r.payer) : '—'}</span>,
+                <span key="ra" className="cell-muted" style={{ fontSize: 'var(--text-xs)' }}>{r.method === 'bank' ? accTail(r.receiver) : '—'}</span>,
                 <span key="rm" className="cell-muted" style={{ fontSize: 'var(--text-sm)' }}>{r.remark || '—'}</span>,
               ])}
             />
@@ -156,7 +187,7 @@ export default function FinanceSalesCollection() {
       {/* 收款登记 / 预收款登记 弹窗 */}
       {dialog && (
         <div className="category-dialog-overlay" onClick={() => setDialog(null)}>
-          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 480 }}>
+          <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 560 }}>
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>
               {dialog.kind === 'receipt' ? `收款登记 · ${dialog.code}` : '预收款登记'}
             </div>
@@ -205,6 +236,41 @@ export default function FinanceSalesCollection() {
                 </select>
               </div>
             )}
+            {/* 银行转账：收付款双方账户 */}
+            {dialog.kind === 'receipt' && form.method === 'bank' && (
+              <>
+                <div style={{ padding: 'var(--space-3)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-3)' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>付款账户（客户）</label>
+                  <select className="filter-select" style={{ width: '100%' }} value={payerAcc.src} onChange={(e) => setPayerAcc({ src: e.target.value, info: EMPTY_ACC })}>
+                    <option value="">{payerOptions.length ? `从客户档案结算账户选择（${payerOptions.length}）` : '该客户档案暂无结算账户，请手动填写'}</option>
+                    {payerOptions.map((b, i) => <option key={i} value={String(i)}>{b.accountName} · {b.bankName} · {b.accountNo}</option>)}
+                    <option value="__manual">手动填写新账户（登记后回写客户档案）</option>
+                  </select>
+                  {payerAcc.src === '__manual' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-2)', marginTop: 8 }}>
+                      <input className="filter-input" placeholder="户名 *" value={payerAcc.info.accountName} onChange={(e) => setPayerAcc({ ...payerAcc, info: { ...payerAcc.info, accountName: e.target.value } })} />
+                      <input className="filter-input" placeholder="账号 *" value={payerAcc.info.accountNo} onChange={(e) => setPayerAcc({ ...payerAcc, info: { ...payerAcc.info, accountNo: e.target.value } })} />
+                      <input className="filter-input" placeholder="开户行" value={payerAcc.info.bankName} onChange={(e) => setPayerAcc({ ...payerAcc, info: { ...payerAcc.info, bankName: e.target.value } })} />
+                    </div>
+                  )}
+                </div>
+                <div style={{ padding: 'var(--space-3)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-3)' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>收款账户（淡茶半盏）</label>
+                  <select className="filter-select" style={{ width: '100%' }} value={recvAcc.src} onChange={(e) => setRecvAcc({ src: e.target.value, info: EMPTY_ACC })}>
+                    <option value="">{recvOptions.length ? `从余额管理账户选择（${recvOptions.length}）` : '请手动填写'}</option>
+                    {recvOptions.map((b, i) => <option key={i} value={String(i)}>{b.accountName} · {b.bankName} · {b.accountNo}</option>)}
+                    <option value="__manual">手动填写新账户（登记后回写余额管理）</option>
+                  </select>
+                  {recvAcc.src === '__manual' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-2)', marginTop: 8 }}>
+                      <input className="filter-input" placeholder="户名 *" value={recvAcc.info.accountName} onChange={(e) => setRecvAcc({ ...recvAcc, info: { ...recvAcc.info, accountName: e.target.value } })} />
+                      <input className="filter-input" placeholder="账号 *" value={recvAcc.info.accountNo} onChange={(e) => setRecvAcc({ ...recvAcc, info: { ...recvAcc.info, accountNo: e.target.value } })} />
+                      <input className="filter-input" placeholder="开户行" value={recvAcc.info.bankName} onChange={(e) => setRecvAcc({ ...recvAcc, info: { ...recvAcc.info, bankName: e.target.value } })} />
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
             <div style={{ marginBottom: 'var(--space-3)' }}>
               <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>日期</label>
               <input className="filter-input" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} style={{ width: '100%' }} />
@@ -215,7 +281,18 @@ export default function FinanceSalesCollection() {
                 disabled={!(Number(form.amount) > 0) || (dialog.kind === 'prepay' && !form.name.trim())}
                 onClick={() => {
                   if (dialog.kind === 'receipt') {
-                    run(store.getState().registerSalesReceipt(dialog.id!, { amount: Number(form.amount), date: form.date, method: form.method, remark: form.remark }));
+                    let payerAccount: BankAccountInfo | undefined;
+                    let receiverAccount: BankAccountInfo | undefined;
+                    if (form.method === 'bank') {
+                      const p = resolveAcc(payerAcc, payerOptions);
+                      const r = resolveAcc(recvAcc, recvOptions);
+                      payerAccount = p.acc;
+                      receiverAccount = r.acc;
+                      // 手填新增回写：客户档案结算账户 / 余额管理账户
+                      if (p.manual && p.acc) addCustomerBankAccount(dialog.target ?? '', p.acc);
+                      if (r.manual && r.acc) addCompanyAccount({ name: r.acc.accountName, accountNo: r.acc.accountNo, bankName: r.acc.bankName });
+                    }
+                    run(store.getState().registerSalesReceipt(dialog.id!, { amount: Number(form.amount), date: form.date, method: form.method, remark: form.remark, payerAccount, receiverAccount }));
                   } else {
                     run(store.getState().walletRecharge(form.name.trim(), Number(form.amount), '预付款充值'));
                   }

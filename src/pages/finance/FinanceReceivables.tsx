@@ -100,7 +100,7 @@ export default function FinanceReceivables() {
           <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>
             应收总额 {money(totalAR)} · 已核销 {money(totalReceived)} · 余额 <strong className="mono">{money(totalAR - totalReceived)}</strong>
           </span>
-          <Button onClick={() => navigate('/sales/sales-reconciliation')}>去客户对账操作 →</Button>
+          <Button onClick={() => navigate('/sales/sales-settlement-confirm')}>去销售结算 →</Button>
         </div>
       </div>
     </>

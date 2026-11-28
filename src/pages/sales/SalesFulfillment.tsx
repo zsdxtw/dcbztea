@@ -9,6 +9,7 @@ import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { usePriceStore } from '../../stores/priceStore';
 import SalesOrderInfoModal from '../../components/business/SalesOrderInfoModal';
+import { useSettlementStore, statementOfOrder } from '../../stores/settlementStore';
 import { SalesOrderDetailTabs } from './SalesOrderDetail';
 import { CUSTOMER_COL_WIDTH, PARTNER_COL_WIDTH } from './SalesOrders';
 import TakebackDialog from '../../components/business/TakebackDialog';
@@ -54,6 +55,7 @@ export default function SalesFulfillment() {
   const [page, setPage] = useState(1);
   /** 履约单详情抽屉（右侧拉出，样式同销售单列表详情） */
   const [view, setView] = useState<{ root: string; child?: string } | null>(null);
+  const salesStatements = useSettlementStore((s) => s.salesStatements);
   const families = useMemo(() => buildFamilies(orders), [orders]);
   const [linkOrderCode, setLinkOrderCode] = useState<string | null>(null);
   /** 待接单取回弹窗 */
@@ -77,6 +79,8 @@ export default function SalesFulfillment() {
     return orders
       // 履约环节仅含已分发且未取消的订单（未分发 / 待分发 / 比单中留在销售单处理 / 履约单分发；已取消仅在销售单列表查看）
       .filter((o) => !['unprocessed', 'pending', 'comparing', 'cancelled'].includes(o.processStatus))
+      // 已纳入销售结算单的履约单抽离到「履约单结算」阶段，不在履约列表展示
+      .filter((o) => !statementOfOrder(salesStatements, o.id))
       .filter((o) => !o.parentCode && !rootHasChild.has(o.code) || o.parentCode)
       .map((o) => {
         const fulfill = fulfillStateOf(o);

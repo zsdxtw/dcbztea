@@ -68,7 +68,7 @@ export default function FinanceOtherPayable() {
 
   return (
     <>
-      <ContentHeader title="其他应付" breadcrumbs={['财务', '结算管理', '其他应付']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建应付</Button></>} />
+      <ContentHeader title="其他应付" breadcrumbs={['财务', '应收应付', '其他应付']} actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建应付</Button></>} />
       <div className="content-body">
         <FilterBar>
           <FilterInput placeholder="搜索单号、往来单位、事由..." />

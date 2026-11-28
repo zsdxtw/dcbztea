@@ -172,6 +172,8 @@ const seedQuoteSettings: Record<string, PartnerQuoteSetting> = {
 interface SupplierStoreState {
   /** 合作商列表 */
   suppliers: SupplierItem[];
+  /** 新增合作商结算账户（付款登记手填新增回写合作商档案结算账户，覆盖原账户） */
+  addSupplierBankAccount: (supplierName: string, account: { accountName: string; accountNo: string; bankName: string }) => void;
   /** 注册/修改审批单 */
   approvals: SupplierApproval[];
   /** 新品提醒（合作商提报 → 管理端「合作商 > 新品提醒」处理） */
@@ -278,6 +280,12 @@ export const useSupplierStore = create<SupplierStoreState>((set, get) => ({
   },
 
   addSupplier: (s) => set({ suppliers: [...get().suppliers, s] }),
+
+  addSupplierBankAccount: (supplierName, account) => set((state) => ({
+    suppliers: state.suppliers.map((x) => (x.name === supplierName
+      ? { ...x, bankAccount: { accountName: account.accountName, accountNo: account.accountNo, bankName: account.bankName, bankNo: x.bankAccount?.bankNo ?? '' } }
+      : x)),
+  })),
 
   updateSupplier: (s) => set({ suppliers: get().suppliers.map(x => x.id === s.id ? s : x) }),
 

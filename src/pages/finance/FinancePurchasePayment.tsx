@@ -1,8 +1,8 @@
 /**
  * 财务 · 付款管理（合作商付款操作页 + 台账）
- * 付款登记 = 已确认采购结算单（签收后付款 / 先款后货预付款，分批登记；预付到账后合作商可发货）。
+ * 付款登记 = 已确认采购结算单（签收后付款 / 先款后货预付款，分批登记；预付到账后合作商可发货）；
+ * 付款账户 = 淡茶半盏（余额管理账户，可选/新增回写），收款账户 = 合作商（合作商档案结算账户，可选/新增回写档案）。
  * 台账数据源 = 采购结算单付款记录；生成与确认在采购菜单（采购单结算 / 采购结算）。
- * 设计见 docs/销售单结算流程设计建议.md 第七节、第六节。
  */
 import { useMemo, useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
@@ -11,19 +11,32 @@ import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import StatusTag from '../../components/common/StatusTag';
 import { useSettlementStore } from '../../stores/settlementStore';
-import type { PurchaseStatement } from '../../types';
+import { useSupplierStore } from '../../stores/supplierStore';
+import type { BankAccountInfo, PurchaseStatement } from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
+/** 账户尾号显示 */
+const accTail = (a?: BankAccountInfo) => (a ? `${a.accountName}（${a.bankName} · 尾号 ${a.accountNo.replace(/\s/g, '').slice(-4)}）` : '—');
+
 type Dialog = { kind: 'pay'; id: string; code: string; supplier: string } | null;
+
+const EMPTY_ACC: BankAccountInfo = { accountName: '', accountNo: '', bankName: '' };
 
 export default function FinancePurchasePayment() {
   const purchaseStatements = useSettlementStore((s) => s.purchaseStatements);
+  const companyAccounts = useSettlementStore((s) => s.companyAccounts);
+  const addCompanyAccount = useSettlementStore((s) => s.addCompanyAccount);
+  const suppliers = useSupplierStore((s) => s.suppliers);
+  const addSupplierBankAccount = useSupplierStore((s) => s.addSupplierBankAccount);
   const store = useSettlementStore;
   const [keyword, setKeyword] = useState('');
   const [view, setView] = useState<'pending' | 'records'>('pending');
   const [dialog, setDialog] = useState<Dialog>(null);
-  const [form, setForm] = useState({ amount: '', date: new Date().toISOString().slice(0, 10), account: '', remark: '' });
+  const [form, setForm] = useState({ amount: '', date: new Date().toISOString().slice(0, 10), remark: '' });
+  /** 银行转账：付款账户（淡茶半盏）/ 收款账户（合作商）；src=选中索引或 __manual */
+  const [payerAcc, setPayerAcc] = useState<{ src: string; info: BankAccountInfo }>({ src: '0', info: EMPTY_ACC });
+  const [payeeAcc, setPayeeAcc] = useState<{ src: string; info: BankAccountInfo }>({ src: '', info: EMPTY_ACC });
   const [msg, setMsg] = useState('');
   const flash = (t: string) => { setMsg(t); setTimeout(() => setMsg(''), 4500); };
   const run = (res: { ok: boolean; msg: string }) => { flash(res.msg); if (res.ok) setDialog(null); };
@@ -45,7 +58,7 @@ export default function FinancePurchasePayment() {
   /** 付款记录 */
   const records = useMemo(() => purchaseStatements.flatMap((s) => s.payments.map((p) => ({
     id: p.id, code: s.code, supplier: s.supplierName, amount: p.amount, date: p.date,
-    account: p.account ?? '', remark: p.remark ?? '',
+    account: p.account ?? '', payer: p.payerAccount, payee: p.payeeAccount, remark: p.remark ?? '',
   }))).sort((a, b) => b.date.localeCompare(a.date)), [purchaseStatements]);
 
   const kw = keyword.trim();
@@ -53,21 +66,37 @@ export default function FinancePurchasePayment() {
   const filteredRecords = kw ? records.filter((r) => r.code.includes(kw) || r.supplier.includes(kw)) : records;
   const totalPaid = records.reduce((s, r) => s + r.amount, 0);
 
+  /** 当前结算单合作商的收款账户选项 */
+  const payeeOptions = useMemo(() => {
+    if (dialog?.kind !== 'pay') return [];
+    const sup = suppliers.find((x) => x.name === dialog.supplier);
+    return sup?.bankAccount?.accountNo ? [sup.bankAccount] : [];
+  }, [dialog, suppliers]);
+
+  const payerOptions = useMemo(() => companyAccounts.map((a) => ({ accountName: a.name, accountNo: a.accountNo, bankName: a.bankName })), [companyAccounts]);
+
   const openPay = (x: typeof pending[0]) => {
     setDialog({ kind: 'pay', id: x.stmt.id, code: x.code, supplier: x.supplier });
-    setForm({
-      amount: String(x.isPrepaid ? Math.min(x.cap - x.paid, x.balance) : x.balance),
-      date: new Date().toISOString().slice(0, 10), account: '', remark: '',
-    });
+    setForm({ amount: String(x.isPrepaid ? Math.min(x.cap - x.paid, x.balance) : x.balance), date: new Date().toISOString().slice(0, 10), remark: '' });
+    setPayerAcc({ src: companyAccounts[0] ? '0' : '__manual', info: EMPTY_ACC });
+    setPayeeAcc({ src: '', info: EMPTY_ACC });
+  };
+
+  /** 解析选中的账户（下拉或手填） */
+  const resolveAcc = (acc: { src: string; info: BankAccountInfo }, options: BankAccountInfo[]): { acc?: BankAccountInfo; manual: boolean } => {
+    if (acc.src === '__manual') return { acc: acc.info.accountNo.trim() ? acc.info : undefined, manual: true };
+    const idx = Number(acc.src);
+    return { acc: Number.isFinite(idx) ? options[idx] : undefined, manual: false };
   };
 
   return (
     <>
-      <ContentHeader title="付款管理" breadcrumbs={['财务', '应收应付', '付款管理']} />
+      <ContentHeader title="付款管理" breadcrumbs={['财务', '对账结算', '付款管理']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           合作商付款操作与台账：对<strong>已确认的采购结算单</strong>付款登记（签收后付款分批核销；
           <strong>先款后货</strong>按发货前应付额度登记预付款，预付到账后合作商可发货，办结时采购单置为已结算）。
+          付款登记<strong>付收款双方账户</strong>（付款账户 = 淡茶半盏余额管理账户；收款账户 = 合作商档案结算账户，新增自动回写档案）。
           累计付款 <strong className="mono">{money(totalPaid)}</strong>。
         </div>
 
@@ -109,13 +138,14 @@ export default function FinancePurchasePayment() {
         {view === 'records' && (
           <Card style={{ padding: 0 }}>
             <Table
-              headers={['付款日期', '结算单号', '合作商', '付款金额', '付款账户', '备注']}
+              headers={['付款日期', '结算单号', '合作商', '付款金额', '付款账户（淡茶半盏）', '收款账户（合作商）', '备注']}
               rows={filteredRecords.map((r) => [
                 <span key="d" className="mono">{r.date}</span>,
                 <span key="c" className="cell-mono-emph">{r.code}</span>,
                 <span key="s" className="cell-emph">{r.supplier}</span>,
                 <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)', color: '#01795D' }}>{money(r.amount)}</span>,
-                <span key="ac" style={{ fontSize: 'var(--text-sm)' }}>{r.account || '—'}</span>,
+                <span key="pa" className="cell-muted" style={{ fontSize: 'var(--text-xs)' }}>{r.payer ? accTail(r.payer) : (r.account || '—')}</span>,
+                <span key="ea" className="cell-muted" style={{ fontSize: 'var(--text-xs)' }}>{accTail(r.payee)}</span>,
                 <span key="rm" className="cell-muted" style={{ fontSize: 'var(--text-sm)' }}>{r.remark || '—'}</span>,
               ])}
             />
@@ -134,7 +164,7 @@ export default function FinancePurchasePayment() {
         const isPrepaid = s.paymentStage === 'prepaid' && paid < cap - 0.001;
         return (
           <div className="category-dialog-overlay" onClick={() => setDialog(null)}>
-            <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 500 }}>
+            <div className="category-dialog" onClick={(e) => e.stopPropagation()} style={{ width: 560 }}>
               <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>
                 {isPrepaid ? '预付款登记（发货前）' : '付款登记'} · {dialog.code}
               </div>
@@ -151,9 +181,36 @@ export default function FinancePurchasePayment() {
                 <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>付款日期</label>
                 <input className="filter-input" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} style={{ width: '100%' }} />
               </div>
-              <div style={{ marginBottom: 'var(--space-3)' }}>
-                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>付款账户</label>
-                <input className="filter-input" placeholder="如 招商银行基本户" value={form.account} onChange={(e) => setForm({ ...form, account: e.target.value })} style={{ width: '100%' }} />
+              {/* 付收款双方账户 */}
+              <div style={{ padding: 'var(--space-3)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-3)' }}>
+                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>付款账户（淡茶半盏）</label>
+                <select className="filter-select" style={{ width: '100%' }} value={payerAcc.src} onChange={(e) => setPayerAcc({ src: e.target.value, info: EMPTY_ACC })}>
+                  <option value="">{payerOptions.length ? `从余额管理账户选择（${payerOptions.length}）` : '请手动填写'}</option>
+                  {payerOptions.map((b, i) => <option key={i} value={String(i)}>{b.accountName} · {b.bankName} · {b.accountNo}</option>)}
+                  <option value="__manual">手动填写新账户（登记后回写余额管理）</option>
+                </select>
+                {payerAcc.src === '__manual' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-2)', marginTop: 8 }}>
+                    <input className="filter-input" placeholder="户名 *" value={payerAcc.info.accountName} onChange={(e) => setPayerAcc({ ...payerAcc, info: { ...payerAcc.info, accountName: e.target.value } })} />
+                    <input className="filter-input" placeholder="账号 *" value={payerAcc.info.accountNo} onChange={(e) => setPayerAcc({ ...payerAcc, info: { ...payerAcc.info, accountNo: e.target.value } })} />
+                    <input className="filter-input" placeholder="开户行" value={payerAcc.info.bankName} onChange={(e) => setPayerAcc({ ...payerAcc, info: { ...payerAcc.info, bankName: e.target.value } })} />
+                  </div>
+                )}
+              </div>
+              <div style={{ padding: 'var(--space-3)', background: 'var(--color-neutral-50)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-3)' }}>
+                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>收款账户（合作商）</label>
+                <select className="filter-select" style={{ width: '100%' }} value={payeeAcc.src} onChange={(e) => setPayeeAcc({ src: e.target.value, info: EMPTY_ACC })}>
+                  <option value="">{payeeOptions.length ? `从合作商档案结算账户选择（${payeeOptions.length}）` : '该合作商档案暂无结算账户，请手动填写'}</option>
+                  {payeeOptions.map((b, i) => <option key={i} value={String(i)}>{b.accountName} · {b.bankName} · {b.accountNo}</option>)}
+                  <option value="__manual">手动填写新账户（登记后回写合作商档案）</option>
+                </select>
+                {payeeAcc.src === '__manual' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-2)', marginTop: 8 }}>
+                    <input className="filter-input" placeholder="户名 *" value={payeeAcc.info.accountName} onChange={(e) => setPayeeAcc({ ...payeeAcc, info: { ...payeeAcc.info, accountName: e.target.value } })} />
+                    <input className="filter-input" placeholder="账号 *" value={payeeAcc.info.accountNo} onChange={(e) => setPayeeAcc({ ...payeeAcc, info: { ...payeeAcc.info, accountNo: e.target.value } })} />
+                    <input className="filter-input" placeholder="开户行" value={payeeAcc.info.bankName} onChange={(e) => setPayeeAcc({ ...payeeAcc, info: { ...payeeAcc.info, bankName: e.target.value } })} />
+                  </div>
+                )}
               </div>
               <div style={{ marginBottom: 'var(--space-3)' }}>
                 <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-1)' }}>备注</label>
@@ -161,7 +218,20 @@ export default function FinancePurchasePayment() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
                 <Button variant="ghost" onClick={() => setDialog(null)}>关闭</Button>
-                <Button disabled={!(Number(form.amount) > 0)} onClick={() => run(store.getState().registerPurchasePayment(dialog.id, { amount: Number(form.amount), date: form.date, account: form.account, remark: form.remark }))}>确认付款</Button>
+                <Button
+                  disabled={!(Number(form.amount) > 0)}
+                  onClick={() => {
+                    const p = resolveAcc(payerAcc, payerOptions);
+                    const e2 = resolveAcc(payeeAcc, payeeOptions);
+                    // 手填新增回写：余额管理账户 / 合作商档案结算账户
+                    if (p.manual && p.acc) addCompanyAccount({ name: p.acc.accountName, accountNo: p.acc.accountNo, bankName: p.acc.bankName });
+                    if (e2.manual && e2.acc) addSupplierBankAccount(dialog.supplier, e2.acc);
+                    run(store.getState().registerPurchasePayment(dialog.id, {
+                      amount: Number(form.amount), date: form.date, remark: form.remark,
+                      account: p.acc?.accountName, payerAccount: p.acc, payeeAccount: e2.acc,
+                    }));
+                  }}
+                >确认付款</Button>
               </div>
             </div>
           </div>

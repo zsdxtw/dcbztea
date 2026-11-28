@@ -10,6 +10,7 @@ import { useOrderFlowStore, getSelfPurchaseEstimate } from '../../stores/orderFl
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { useSupplierStore } from '../../stores/supplierStore';
 import { usePriceStore } from '../../stores/priceStore';
+import { useSettlementStore, statementOfOrder } from '../../stores/settlementStore';
 import { useScoreStore, getScoreSummary } from '../../stores/scoreStore';
 import { EXTERNAL_PLATFORM_LABELS, EXTERNAL_CHANNEL_LABELS,
   TRANSFER_SOURCE_LABELS, SOURCE_TAG_LABELS, platformLabelOf } from '../../data/externalOrders';
@@ -161,7 +162,9 @@ export default function ExternalOrders() {
 
   // 已拆分的母销售单不在分发列表/计数展示（由其下各子履约单呈现）
   const motherCodes = useMemo(() => new Set(orders.map((x) => x.parentCode).filter(Boolean) as string[]), [orders]);
-  const listOrders = useMemo(() => orders.filter((o) => o.processStatus !== 'unprocessed' && o.processStatus !== 'cancelled' && (o.parentCode || !motherCodes.has(o.code))), [orders, motherCodes]);
+  const salesStatements = useSettlementStore((s) => s.salesStatements);
+  /** 已纳入销售结算单的履约单抽离到「履约单结算」阶段，不在分发列表展示 */
+  const listOrders = useMemo(() => orders.filter((o) => o.processStatus !== 'unprocessed' && o.processStatus !== 'cancelled' && (o.parentCode || !motherCodes.has(o.code)) && !statementOfOrder(salesStatements, o.id)), [orders, motherCodes, salesStatements]);
   const filtered = useMemo(() => listOrders.filter((o) => {
     if (keyword && !kwMatch(o, keyword.trim())) return false;
     if (filterStatus !== '') return mergedStatus(o.processStatus) === filterStatus;

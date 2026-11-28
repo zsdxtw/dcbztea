@@ -1,231 +1,239 @@
-import { useState } from 'react';
+/**
+ * 销售 · 销售退货（管理后台退货管理）
+ * 数据源 = returnStore（与合作商终端退货管理同一数据源，登记 / 受理 / 推进双向同步）。
+ * 退货发起关联：销售单（已确收履约单才可发起）；财务（发起时不冲减，详情预告冲减 / 钱包路径）；采购（定位关联采购单）。
+ * 退货完成关联：财务 = 冲减所属销售结算单应收（未办结）/ 退货标记（已办结）/ 预付客户退款回钱包；
+ * 采购 = 自动定位关联采购单生成采购退货联动记录（单号 / 合作商 / 金额 / 日期）。
+ * 设计见 docs/销售单结算流程设计建议.md（退货冲减相关章节）。
+ */
+import { useMemo, useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import StatusTag from '../../components/common/StatusTag';
-import FilterBar, { FilterInput, FilterSelect } from '../../components/business/FilterBar';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
-import type {} from '../../types';
+import { useReturnStore } from '../../stores/returnStore';
+import { useOrderFlowStore } from '../../stores/orderFlowStore';
+import { usePurchaseStore } from '../../stores/purchaseStore';
+import { useSettlementStore } from '../../stores/settlementStore';
+import { soRootOf } from '../../utils/orderCodes';
+import type { PartnerReturn, PartnerReturnStatus } from '../../types';
 
-/* ── 统计卡片 ── */
+const money = (n: number) => `¥${n.toLocaleString()}`;
 
-/* ── 退货状态 ── */
-type ReturnStatus = 'pending' | 'approved' | 'completed' | 'rejected';
+const STATUS_VARIANT: Record<PartnerReturnStatus, 'warning' | 'info' | 'success' | 'error' | 'default'> = {
+  pending: 'warning', accepted: 'info', rejected: 'error', shipped: 'info', received: 'warning', completed: 'success',
+};
+const STATUS_LABEL: Record<PartnerReturnStatus, string> = {
+  pending: '待受理', accepted: '已受理（待寄回）', rejected: '已拒绝', shipped: '客户已寄回', received: '已收货（待处理）', completed: '已完成',
+};
 
-function returnStatusToVariant(status: ReturnStatus) {
-  switch (status) {
-    case 'pending': return 'warning' as const;
-    case 'approved': return 'info' as const;
-    case 'completed': return 'success' as const;
-    case 'rejected': return 'error' as const;
-  }
-}
-
-function returnStatusLabel(status: ReturnStatus) {
-  switch (status) {
-    case 'pending': return '待处理';
-    case 'approved': return '已审批';
-    case 'completed': return '已退款';
-    case 'rejected': return '已驳回';
-  }
-}
-
-/* ── 退货记录 ── */
-interface ReturnRecord {
-  id: string;
-  originalOrder: string;
-  customer: string;
-  product: string;
-  quantity: string;
-  amount: string;
-  reason: string;
-  status: ReturnStatus;
-  contactPerson: string;
-  contactPhone: string;
-  returnDate: string;
-  originalAmount: string;
-  originalDate: string;
-  reasonDetail: string;
-  handler: string;
-  handleDate: string;
-}
-
-const returnItems: ReturnRecord[] = [
-  {
-    id: 'SRT-2025-0008', originalOrder: 'SO-2025-0242', customer: '华茗堂茶庄', product: '明前龙井 — 特级',
-    quantity: '5 kg', amount: '¥ 2,900', reason: '客户不满意口感', status: 'pending',
-    contactPerson: '王经理', contactPhone: '0571-87651234', returnDate: '2025-07-13',
-    originalAmount: '¥ 34,800', originalDate: '2025-07-12',
-    reasonDetail: '客户反馈茶叶口感与样品不一致，汤色偏黄，香气不足，要求退回5kg明前龙井特级',
-    handler: '', handleDate: '',
-  },
-  {
-    id: 'SRT-2025-0007', originalOrder: 'SO-2025-0240', customer: '清心茶坊', product: '凤凰单丛 — 特级',
-    quantity: '10 kg', amount: '¥ 5,600', reason: '包装破损', status: 'approved',
-    contactPerson: '林老板', contactPhone: '0768-2345678', returnDate: '2025-07-11',
-    originalAmount: '¥ 44,800', originalDate: '2025-07-10',
-    reasonDetail: '运输过程中外包装严重破损，内袋撕裂，茶叶受潮，影响品质，客户要求退货',
-    handler: '陈经理', handleDate: '2025-07-12',
-  },
-  {
-    id: 'SRT-2025-0006', originalOrder: 'SO-2025-0238', customer: '翠竹茶行', product: '六堡茶 — 二级',
-    quantity: '8 kg', amount: '¥ 4,000', reason: '发货错误', status: 'completed',
-    contactPerson: '周经理', contactPhone: '0774-7234567', returnDate: '2025-07-09',
-    originalAmount: '¥ 18,000', originalDate: '2025-07-08',
-    reasonDetail: '错发为熟普洱三级，与订单六堡茶二级不符，客户要求退回换货',
-    handler: '赵仓管', handleDate: '2025-07-10',
-  },
-  {
-    id: 'SRT-2025-0005', originalOrder: 'SO-2025-0239', customer: '品茗轩', product: '白毫银针 — 特级',
-    quantity: '3 kg', amount: '¥ 2,880', reason: '质量问题', status: 'completed',
-    contactPerson: '张女士', contactPhone: '0593-5678901', returnDate: '2025-07-08',
-    originalAmount: '¥ 38,400', originalDate: '2025-07-09',
-    reasonDetail: '白毫银针含水量超标，部分芽叶发黑，疑似存储不当，质检确认不合格',
-    handler: '李工', handleDate: '2025-07-09',
-  },
-  {
-    id: 'SRT-2025-0004', originalOrder: 'SO-2025-0235', customer: '雅韵茶社', product: '碧螺春 — 一级',
-    quantity: '6 kg', amount: '¥ 2,580', reason: '规格不符', status: 'rejected',
-    contactPerson: '赵总', contactPhone: '0599-51234567', returnDate: '2025-07-06',
-    originalAmount: '¥ 36,000', originalDate: '2025-07-05',
-    reasonDetail: '客户称收到的碧螺春为二级而非一级，经核实发货确为一级，客户无法提供开箱视频',
-    handler: '陈经理', handleDate: '2025-07-07',
-  },
-  {
-    id: 'SRT-2025-0003', originalOrder: 'SO-2025-0237', customer: '和风茶屋', product: '君山银针 — 特级',
-    quantity: '2 kg', amount: '¥ 3,520', reason: '客户取消订单', status: 'pending',
-    contactPerson: '何老板', contactPhone: '0730-8234567', returnDate: '2025-07-08',
-    originalAmount: '¥ 17,600', originalDate: '2025-07-07',
-    reasonDetail: '客户因经营调整，取消君山银针订单，货物尚未签收，要求退回',
-    handler: '', handleDate: '',
-  },
-  {
-    id: 'SRT-2025-0002', originalOrder: 'SO-2025-0236', customer: '云隐茶庄', product: '铁观音 — 二级',
-    quantity: '15 kg', amount: '¥ 4,800', reason: '运输损坏', status: 'approved',
-    contactPerson: '江总', contactPhone: '0599-5234567', returnDate: '2025-07-05',
-    originalAmount: '¥ 24,000', originalDate: '2025-07-04',
-    reasonDetail: '物流途中遭遇暴雨，纸箱浸水，铁观音受潮变质，客户拍照留证要求退货',
-    handler: '陈经理', handleDate: '2025-07-06',
-  },
-  {
-    id: 'SRT-2025-0001', originalOrder: 'SO-2025-0234', customer: '茗香斋', product: '大红袍 — 特级',
-    quantity: '4 kg', amount: '¥ 3,540', reason: '色泽与样品不符', status: 'completed',
-    contactPerson: '吴经理', contactPhone: '0595-2345678', returnDate: '2025-07-02',
-    originalAmount: '¥ 38,400', originalDate: '2025-07-01',
-    reasonDetail: '客户反馈大红袍干茶色泽偏暗，与之前样品差异较大，冲泡后岩韵不足',
-    handler: '李工', handleDate: '2025-07-03',
-  },
-];
+type Tab = '' | 'pending' | 'processing' | 'received' | 'completed' | 'rejected';
 
 export default function SalesReturn() {
-  const [showDetail, setShowDetail] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<ReturnRecord | null>(null);
+  const returns = useReturnStore((s) => s.returns);
+  const setStatus = useReturnStore((s) => s.setStatus);
+  const orders = useOrderFlowStore((s) => s.orders);
+  const poDocs = usePurchaseStore((s) => s.docs);
+  const salesStatements = useSettlementStore((s) => s.salesStatements);
+  const wallets = useSettlementStore((s) => s.wallets);
 
-  const handleView = (record: ReturnRecord) => {
-    setSelectedRecord(record);
-    setShowDetail(true);
+  const [tab, setTab] = useState<Tab>('');
+  const [keyword, setKeyword] = useState('');
+  const [view, setView] = useState<string | null>(null);
+  const [msg, setMsg] = useState('');
+  const flash = (t: string) => { setMsg(t); setTimeout(() => setMsg(''), 4500); };
+
+  const inTab = (r: PartnerReturn) => {
+    if (tab === '') return true;
+    if (tab === 'processing') return ['accepted', 'shipped'].includes(r.status);
+    return r.status === tab;
+  };
+  const countOf = (k: Tab) => returns.filter((r) => (k === '' ? true : k === 'processing' ? ['accepted', 'shipped'].includes(r.status) : r.status === k)).length;
+
+  const filtered = useMemo(() => {
+    const kw = keyword.trim();
+    return returns.filter(inTab).filter((r) => (!kw ? true : r.code.includes(kw) || r.customerName.includes(kw) || r.sourceOrderCode.includes(kw) || r.supplierName.includes(kw)));
+  }, [returns, tab, keyword]);
+
+  /** 财务联动推导：所属销售结算单 / 冲减记录 / 办结标记 / 钱包退款 */
+  const financeOf = (r: PartnerReturn) => {
+    const root = soRootOf(r.sourceOrderCode);
+    const stmt = salesStatements.find((s) => s.lines.some((l) => l.orderCode === r.sourceOrderCode || l.orderCode === root || l.orderId === r.sourceOrderCode));
+    const adjust = stmt?.adjustments.find((a) => a.refCode === r.code);
+    const closedNotice = stmt?.status === 'closed' && stmt.closedReturnNotice?.includes(r.code) ? stmt.closedReturnNotice : undefined;
+    const walletTxn = wallets.find((w) => w.customerName === r.customerName)?.txns.find((t) => t.refCode === r.code);
+    return { stmt, adjust, closedNotice, walletTxn };
   };
 
-  const handleCloseDetail = () => {
-    setShowDetail(false);
-    setSelectedRecord(null);
+  /** 采购联动推导：退货单采购联动记录 + 关联采购单当前状态 */
+  const purchaseOf = (r: PartnerReturn) => {
+    const po = poDocs.find((d) => d.childOrderCode === r.sourceOrderCode || d.motherCode === soRootOf(r.sourceOrderCode));
+    return { linkage: r.purchaseLinkage, po };
   };
+
+  const act = (r: PartnerReturn, status: PartnerReturnStatus, note: string) => {
+    setStatus(r.id, status, note);
+    flash(`${r.code} ${STATUS_LABEL[status]}`);
+  };
+
+  const tabBtn = (k: Tab, label: string) => (
+    <button key={k || 'all'} className={`tab-card-simple${tab === k ? ' active' : ''}`} style={{ transition: 'none' }} onClick={() => setTab(k)}>
+      {label}
+      <span className="tab-card-simple-count">{countOf(k)}</span>
+    </button>
+  );
+
+  const current = returns.find((r) => r.id === view) ?? null;
 
   return (
     <>
       <ContentHeader
         title="销售退货"
         breadcrumbs={['销售', '销售退货']}
-        actions={<><Button variant="ghost">导出</Button><Button><PlusIcon />新建退货单</Button></>}
+        actions={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>退货发起在合作商终端「退货管理」登记（管理后台受理推进）</span>}
       />
       <div className="content-body">
+        <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
+          退货单由合作商终端登记（管理后台同步可见、可受理推进）。<strong>退货完成（退款类）自动联动</strong>：
+          财务侧冲减所属销售结算单应收（已办结结算单改为退货标记待处理；预付客户退款回预存钱包）；
+          采购侧定位关联采购单生成<strong>采购退货联动记录</strong>。
+        </div>
 
-        <FilterBar>
-          <FilterInput placeholder="搜索退货单号、客户..." />
-          <FilterSelect options={['全部状态', '待处理', '已审批', '已退款', '已驳回']} />
-          <FilterSelect options={['全部客户', '华茗堂茶庄', '雅韵茶社', '清心茶坊', '品茗轩', '翠竹茶行', '和风茶屋', '云隐茶庄', '茗香斋']} />
-          <FilterSelect options={['全部时间', '今日', '本周', '本月', '近3月']} />
-        </FilterBar>
+        {msg && (
+          <div style={{ marginBottom: 'var(--space-3)', padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', background: '#E8F5E9', color: '#01795D' }}>{msg}</div>
+        )}
 
-        <Card>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap', alignItems: 'center' }}>
+          {([['', '全部'], ['pending', '待受理'], ['processing', '处理中'], ['received', '已收货'], ['completed', '已完成'], ['rejected', '已拒绝']] as const).map(([k, label]) => tabBtn(k, label))}
+          <input className="filter-input" placeholder="搜索退货单号、客户、销售单号、合作商..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 300 }} />
+        </div>
+
+        <Card style={{ padding: 0 }}>
           <Table
-            headers={['退货单号', '原销售单号', '客户', '商品', '退货数量', '退货金额', '退货原因', '状态', '操作']}
-            rows={returnItems.map((r) => [
-              <span className="mono">{r.id}</span>,
-              <span className="mono">{r.originalOrder}</span>,
-              r.customer,
-              r.product,
-              <span className="mono">{r.quantity}</span>,
-              <span className="mono">{r.amount}</span>,
-              r.reason,
-              <StatusTag variant={returnStatusToVariant(r.status)} label={returnStatusLabel(r.status)} />,
-              <div className="row-actions">
-                <Button size="sm" variant="ghost" onClick={() => handleView(r)}>查看</Button>
-                <Button size="sm" variant="ghost" onClick={() => handleView(r)}>编辑</Button>
-              </div>,
-            ])}
+            headers={['退货单号', '关联销售单', '客户', '处理合作商', '退货商品', '退款金额', '处理方案', '状态', '财务联动', '采购联动', '操作']}
+            rows={filtered.map((r2) => {
+              const fin = financeOf(r2);
+              const pur = purchaseOf(r2);
+              const finText = r2.status === 'rejected' ? '已驳回'
+                : fin.closedNotice ? '办结后退货待处理'
+                  : fin.adjust ? `已冲减 ${money(fin.adjust.amount)}`
+                    : fin.walletTxn ? '已退回钱包'
+                      : r2.status === 'completed' ? '—' : '完成后冲减';
+              return [
+                <span key="c" className="cell-mono-emph">{r2.code}</span>,
+                <span key="o" className="mono" style={{ fontSize: 'var(--text-sm)' }}>{r2.sourceOrderCode}</span>,
+                <span key="t" className="cell-emph">{r2.customerName}</span>,
+                <span key="s" style={{ fontSize: 'var(--text-sm)' }}>{r2.supplierName}</span>,
+                <span key="i" style={{ fontSize: 'var(--text-sm)' }}>{r2.items.map((it) => `${it.productName}×${it.quantity}`).join('、')}</span>,
+                <span key="a" className="mono" style={{ color: '#CB405D', fontWeight: 'var(--font-medium)' }}>{money(r2.refundAmount)}</span>,
+                <StatusTag key="sl" variant={r2.solution === 'refund' ? 'warning' : 'info'} label={r2.solution === 'refund' ? '退款' : '换货'} />,
+                <StatusTag key="st" variant={STATUS_VARIANT[r2.status]} label={STATUS_LABEL[r2.status]} />,
+                <span key="f" style={{ fontSize: 'var(--text-xs)', color: fin.closedNotice ? '#E65100' : fin.adjust || fin.walletTxn ? '#01795D' : 'var(--color-neutral-400)' }}>{finText}</span>,
+                <span key="pu" className="mono" style={{ fontSize: 'var(--text-xs)', color: pur.linkage ? 'var(--color-neutral-800)' : 'var(--color-neutral-400)' }}>
+                  {pur.linkage ? `${pur.linkage.poCode}（退货 ${money(pur.linkage.amount)}）` : r2.status === 'completed' ? '—' : '待定位'}
+                </span>,
+                <div key="act" className="row-actions">
+                  {r2.status === 'pending' && (
+                    <>
+                      <Button size="sm" onClick={() => act(r2, 'accepted', '管理后台受理 · 通知客户寄回')}>受理</Button>
+                      <Button size="sm" variant="ghost" onClick={() => act(r2, 'rejected', '管理后台核实后拒绝')}>拒绝</Button>
+                    </>
+                  )}
+                  {r2.status === 'received' && (
+                    <Button size="sm" onClick={() => act(r2, 'completed', r2.solution === 'refund' ? '质检通过 · 退款完成（自动冲减应收 / 采购联动）' : '换货补发完成')}>完成处理</Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={() => setView(r2.id)}>查看</Button>
+                </div>,
+              ];
+            })}
           />
+          {filtered.length === 0 && (
+            <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>当前分类下暂无退货单</div>
+          )}
         </Card>
       </div>
 
       {/* 退货详情抽屉 */}
       <DetailDrawer
-        open={showDetail && !!selectedRecord}
-        onClose={handleCloseDetail}
-        badge="SR"
-        title={selectedRecord?.id}
-        statusTag={selectedRecord && <StatusTag variant={returnStatusToVariant(selectedRecord.status)} label={returnStatusLabel(selectedRecord.status)} />}
-        subtitle={selectedRecord && `${selectedRecord.customer} · ${selectedRecord.returnDate}`}
+        open={!!current}
+        onClose={() => setView(null)}
+        badge="TH"
+        title={current?.code}
+        statusTag={current && <StatusTag variant={STATUS_VARIANT[current.status]} label={STATUS_LABEL[current.status]} />}
+        subtitle={current && `${current.customerName} · ${current.supplierName} · ${current.applyTime}`}
         mode="view"
       >
-        {selectedRecord && (
-          <>
-            <DrawerSection title="退货信息">
-              <InfoGrid cols={4}>
-                <InfoItem label="退货单号" emph mono>{selectedRecord.id}</InfoItem>
-                <InfoItem label="退货日期">{selectedRecord.returnDate}</InfoItem>
-                <InfoItem label="客户" emph>{selectedRecord.customer}</InfoItem>
-                <InfoItem label="联系人">{selectedRecord.contactPerson}</InfoItem>
-                <InfoItem label="退货商品" emph>{selectedRecord.product}</InfoItem>
-                <InfoItem label="退货数量" mono>{selectedRecord.quantity}</InfoItem>
-                <InfoItem label="退货金额" mono valueStyle={{ color: '#CB405D', fontWeight: 'var(--font-semibold)' }}>{selectedRecord.amount}</InfoItem>
-                <InfoItem label="状态"><StatusTag variant={returnStatusToVariant(selectedRecord.status)} label={returnStatusLabel(selectedRecord.status)} /></InfoItem>
-              </InfoGrid>
-            </DrawerSection>
-
-            <DrawerSection title="原销售订单信息">
-              <InfoGrid cols={4}>
-                <InfoItem label="原销售单号" emph mono>{selectedRecord.originalOrder}</InfoItem>
-                <InfoItem label="下单日期">{selectedRecord.originalDate}</InfoItem>
-                <InfoItem label="原订单金额" mono>{selectedRecord.originalAmount}</InfoItem>
-                <InfoItem label="联系电话" mono>{selectedRecord.contactPhone}</InfoItem>
-              </InfoGrid>
-            </DrawerSection>
-
-            <DrawerSection title="退货原因详情">
-              <div style={{ padding: 'var(--space-3)', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-                  <span style={{
-                    padding: '1px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)',
-                    background: '#FFF3E0', color: '#E65100', border: '1px solid #FFCC80',
-                  }}>{selectedRecord.reason}</span>
+        {current && (() => {
+          const fin = financeOf(current);
+          const pur = purchaseOf(current);
+          const poStage = pur.po ? (pur.po.status === 'settled' ? '已结算' : pur.po.status === 'delivered' ? '已签收' : pur.po.status) : null;
+          return (
+            <>
+              <DrawerSection title="退货信息">
+                <InfoGrid cols={4}>
+                  <InfoItem label="退货单号" emph mono>{current.code}</InfoItem>
+                  <InfoItem label="关联销售单" mono>{current.sourceOrderCode}</InfoItem>
+                  <InfoItem label="客户" emph>{current.customerName}</InfoItem>
+                  <InfoItem label="处理合作商">{current.supplierName}</InfoItem>
+                  <InfoItem label="处理方案"><StatusTag variant={current.solution === 'refund' ? 'warning' : 'info'} label={current.solution === 'refund' ? '退款' : '换货'} /></InfoItem>
+                  <InfoItem label="退款金额" mono valueStyle={{ color: '#CB405D', fontWeight: 'var(--font-semibold)' }}>{money(current.refundAmount)}</InfoItem>
+                  <InfoItem label="发起日期">{current.applyTime}</InfoItem>
+                  <InfoItem label="状态"><StatusTag variant={STATUS_VARIANT[current.status]} label={STATUS_LABEL[current.status]} /></InfoItem>
+                  {current.items.map((it, i) => (
+                    <InfoItem key={i} label={`退货商品${current.items.length > 1 ? i + 1 : ''}`} span={2} emph>{it.productName}（{it.spec}）× {it.quantity} · 单价 {money(it.price)}</InfoItem>
+                  ))}
+                </InfoGrid>
+                <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-700)', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)', padding: 'var(--space-2) var(--space-3)', lineHeight: 1.7 }}>
+                  退货原因：{current.reason}
                 </div>
-                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', lineHeight: 1.6 }}>{selectedRecord.reasonDetail}</div>
-                {selectedRecord.handler && (
-                  <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
-                    处理人：{selectedRecord.handler} · 处理日期：{selectedRecord.handleDate}
+              </DrawerSection>
+
+              <DrawerSection title="财务联动">
+                <InfoGrid cols={4}>
+                  <InfoItem label="所属销售结算单" mono>{fin.stmt ? fin.stmt.code : '—（未纳入结算单）'}</InfoItem>
+                  <InfoItem label="结算单状态">{fin.stmt ? (fin.stmt.status === 'closed' ? '已办结' : fin.stmt.status === 'confirmed' ? '已确认' : fin.stmt.status === 'disputed' ? '有异议' : '待确认') : '—'}</InfoItem>
+                  {fin.adjust && <InfoItem label="应收冲减" span={2} mono emph>已冲减 {money(fin.adjust.amount)}（{fin.adjust.reason}）</InfoItem>}
+                  {fin.closedNotice && <InfoItem label="办结后退货标记" span={2} emph valueStyle={{ color: '#E65100' }}>{fin.closedNotice}</InfoItem>}
+                  {fin.walletTxn && <InfoItem label="预存钱包退款" span={2} mono emph>已退回钱包 {money(fin.walletTxn.amount)}</InfoItem>}
+                  {current.status !== 'completed' && !fin.adjust && (
+                    <InfoItem label="完成时处理" span={2} valueStyle={{ color: 'var(--color-neutral-500)' }}>
+                      退款类退货完成时自动冲减{fin.stmt ? `结算单 ${fin.stmt.code}` : '所属对账单'}应收{current.customerName && '；预付客户退款回预存钱包'}
+                    </InfoItem>
+                  )}
+                </InfoGrid>
+              </DrawerSection>
+
+              <DrawerSection title="采购联动">
+                <InfoGrid cols={4}>
+                  <InfoItem label="关联采购单" mono emph>{pur.po ? pur.po.code : '—'}</InfoItem>
+                  <InfoItem label="合作商">{pur.po?.supplierName ?? current.supplierName}</InfoItem>
+                  <InfoItem label="采购单状态">{poStage ?? '—'}</InfoItem>
+                  {pur.linkage && <InfoItem label="采购退货联动" span={2} mono emph>退货 {money(pur.linkage.amount)}（{pur.linkage.date}）</InfoItem>}
+                </InfoGrid>
+                {!pur.po && (
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)', marginTop: 'var(--space-2)' }}>
+                    未定位到关联采购单（如全库存直发或种子外订单），完成时不生成采购退货联动。
                   </div>
                 )}
-              </div>
-            </DrawerSection>
-          </>
-        )}
+              </DrawerSection>
+
+              <DrawerSection title="处理轨迹">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  {current.history.map((h, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 'var(--space-3)', fontSize: 'var(--text-sm)' }}>
+                      <span className="mono" style={{ color: 'var(--color-neutral-400)', flexShrink: 0 }}>{h.time}</span>
+                      <span style={{ fontWeight: 'var(--font-medium)', flexShrink: 0 }}>{h.action}</span>
+                      {h.detail && <span style={{ color: 'var(--color-neutral-500)' }}>{h.detail}</span>}
+                    </div>
+                  ))}
+                </div>
+              </DrawerSection>
+            </>
+          );
+        })()}
       </DetailDrawer>
     </>
   );
-}
-
-function PlusIcon() {
-  return <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
 }

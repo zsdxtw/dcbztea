@@ -7,6 +7,7 @@ import { useCustomerStore } from './customerStore';
 import type { PartnerReturn, PartnerReturnStatus } from '../types';
 import { genReturnCode, soRootOf } from '../utils/orderCodes';
 import { useSettlementStore } from './settlementStore';
+import { usePurchaseStore } from './purchaseStore';
 
 const now = () => new Date().toISOString().slice(0, 10);
 
@@ -71,6 +72,22 @@ const seedReturns: PartnerReturn[] = [
       { time: '2026-10-29', action: '已受理', detail: '退款处理 · 待收货确认' },
       { time: '2026-11-02', action: '客户已寄回', detail: '德邦物流 DB6720****1109' },
       { time: '2026-11-03', action: '已收货', detail: '质检确认：包装完好，商品未拆封 · 待退款' },
+    ],
+  },
+  {
+    id: 'rt_seed_5', code: 'SO-2610210001LY02TH01',
+    supplierId: '11', supplierName: '杭州云茶供应链管理有限公司',
+    sourceOrderCode: 'SO-2610210001LY02', customerName: '南京翠竹茶行',
+    items: [{ productName: '雨花茶·特级', spec: '100g/罐', price: 268, quantity: 2 }],
+    reason: '客户反馈两罐受潮，申请退款',
+    solution: 'refund', refundAmount: 536,
+    status: 'completed', applyTime: '2026-11-10', acceptTime: '2026-11-11', finishTime: '2026-11-15',
+    purchaseLinkage: { poCode: 'CG-SO-2610210001LY02', supplierName: '杭州云茶供应链管理有限公司', amount: 536, date: '2026-11-15' },
+    history: [
+      { time: '2026-11-10', action: '客户申请退货', detail: '南京翠竹茶行 · SO-2610210001LY02 · 雨花茶×2' },
+      { time: '2026-11-11', action: '已受理', detail: '退款处理' },
+      { time: '2026-11-14', action: '已收货', detail: '质检通过' },
+      { time: '2026-11-15', action: '完成处理', detail: '退款完成 ¥536 · 采购退货联动 CG-SO-2610210001LY02' },
     ],
   },
   {
@@ -146,6 +163,14 @@ export const useReturnStore = create<ReturnState>((set, get) => ({
       // 预付客户（档案结算方式=预付）退款回钱包余额
       const isPrepaid = useCustomerStore.getState().customers.find((c) => c.name === target.customerName)?.settlementMethod === '预付';
       if (isPrepaid) settle.walletRefund(target.customerName, target.refundAmount, target.code, `退货退款回钱包（${target.code}）`);
+
+      /* 采购联动：定位关联采购单（按履约单号 / 母单号匹配），登记采购退货联动记录 */
+      const po = usePurchaseStore.getState().docs.find((d) => d.childOrderCode === target.sourceOrderCode || d.motherCode === soRootOf(target.sourceOrderCode));
+      if (po) {
+        set({ returns: get().returns.map((r) => (r.id === id
+          ? { ...r, purchaseLinkage: { poCode: po.code, supplierName: po.supplierName, amount: target.refundAmount, date: now() } }
+          : r)) });
+      }
     }
   },
 

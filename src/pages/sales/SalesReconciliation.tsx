@@ -10,6 +10,7 @@ import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import StatusTag from '../../components/common/StatusTag';
+import SalesStatementCreateDialog from '../../components/business/SalesStatementCreateDialog';
 import DetailDrawer, { DrawerSection, InfoGrid, InfoItem } from '../../components/common/DetailDrawer';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import {
@@ -40,6 +41,7 @@ export default function SalesSettlementConfirm() {
   const statements = useSettlementStore((s) => s.salesStatements);
   const store = useSettlementStore;
   const [msg, setMsg] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [status, setStatus] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -75,20 +77,24 @@ export default function SalesSettlementConfirm() {
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
           本页负责销售结算单的<strong>对账阶段</strong>：确认对账、登记异议、差异调整与退货冲减。
           结算单确认后金额锁定，<strong>结算阶段</strong>（开票登记、收款登记、办结）在财务菜单完成，本页只读展示其进度。
-          结算单在「销售单管理 → 履约单结算」生成（淡茶发起 / 客户发起对账）。
+          结算单通过「+ 生成销售结算单」弹窗生成（淡茶发起 / 客户发起对账）；履约单维度的结算进度见「履约单结算」页。
         </div>
 
         {msg && (
           <div style={{ marginBottom: 'var(--space-3)', padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', background: '#E8F5E9', color: '#01795D' }}>{msg}</div>
         )}
 
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap', alignItems: 'center' }}>
           <input className="filter-input" placeholder="搜索结算单号、结算对象、履约单号、客户对账单号..." value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 320 }} />
+          <span style={{ marginLeft: 'auto' }} />
+          <Button onClick={() => setCreateOpen(true)}>+ 生成销售结算单</Button>
           <select className="filter-select" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">全部状态</option>
             {(Object.keys(STATUS_LABELS) as StatementStatus[]).map((k) => <option key={k} value={k}>{STATUS_LABELS[k]}</option>)}
           </select>
         </div>
+
+        <SalesStatementCreateDialog open={createOpen} onClose={() => setCreateOpen(false)} />
 
         <Card style={{ padding: 0 }}>
           <Table
