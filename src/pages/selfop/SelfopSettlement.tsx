@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageHead } from '../partner/PartnerUI';
 import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
@@ -15,6 +16,7 @@ const pill = (bg: string, color: string, text: string) => (
 
 /** 自营工作台 · 结算：已确认收货（完成）自营订单台账 + 关联采购单结算状态与毛利估算 */
 export default function SelfopSettlement() {
+  const navigate = useNavigate();
   const orders = useOrderFlowStore((s) => s.orders);
   const docs = usePurchaseStore((s) => s.docs);
   const poStore = usePurchaseStore;
@@ -84,7 +86,7 @@ export default function SelfopSettlement() {
               <span key="t" className="cell-muted" style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{doneAt}</span>,
               <div key="act" className="row-actions">
                 {pos.length > 0 && !allSettled && (
-                  <Button size="sm" onClick={() => pos.forEach((d) => poStore.getState().settleByChild(d.childOrderCode))}>按单结算</Button>
+                  <Button size="sm" variant="ghost" onClick={() => navigate("/purchase/purchase-order-settlement")}>去采购单结算 →</Button>
                 )}
                 {allSettled && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>已完结</span>}
               </div>,

@@ -6,7 +6,7 @@ import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import { usePurchaseStore } from '../../stores/purchaseStore';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
-import { useSettlementStore, partnerPaidOfPo, partnerStatementOfPo } from '../../stores/settlementStore';
+import { useSettlementStore, purchasePaidOfPo, purchaseStatementOfPo } from '../../stores/settlementStore';
 import type {} from '../../types';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
@@ -24,7 +24,7 @@ export default function FinancePayables() {
   const navigate = useNavigate();
   const docs = usePurchaseStore((s) => s.docs);
   const orders = useOrderFlowStore((s) => s.orders);
-  const statements = useSettlementStore((s) => s.partnerStatements);
+  const statements = useSettlementStore((s) => s.purchaseStatements);
   const [tab, setTab] = useState<'' | 'unsettled' | 'settled'>('');
 
   const orderById = useMemo(() => new Map(orders.map((o) => [o.id, o])), [orders]);
@@ -36,14 +36,14 @@ export default function FinancePayables() {
     const confirmed = d.deliveryMode === 'warehouse'
       ? ['received', 'partial_shipped', 'fully_shipped', 'delivered', 'settled'].includes(d.status)
       : ['delivered', 'settled'].includes(d.status);
-    const paid = partnerPaidOfPo(statements, d.id);
+    const paid = purchasePaidOfPo(statements, d.id);
     const settled = d.status === 'settled' || paid >= d.amount - 0.001;
     return {
       code: d.code, poCode: d.code, supplier: d.supplierName,
       type: d.source === 'distribute' ? '合作商直发' : d.deliveryMode === 'direct' ? '以销定采·直发' : '以销定采·入库',
       orderCode: d.childOrderCode, motherCode: o?.parentCode ?? d.motherCode,
       amount: d.amount, paid: settled ? d.amount : paid, confirmPoint, confirmed, settled,
-      statement: partnerStatementOfPo(statements, d.id)?.code,
+      statement: purchaseStatementOfPo(statements, d.id)?.code,
     };
   }), [docs, orderById, statements]);
 

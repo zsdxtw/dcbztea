@@ -257,7 +257,10 @@ body {
 .topnav-brand { display: flex; align-items: center; gap: var(--space-3); margin-right: var(--space-8); flex-shrink: 0; }
 .topnav-brand-icon { width: 28px; height: 28px; }
 .topnav-brand-text { font-family: var(--font-family-serif); font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--color-neutral-800); white-space: nowrap; }
-.topnav-tabs { display: flex; align-items: center; gap: var(--space-1); height: 100%; flex: 1; }
+.topnav-tabs { display: flex; align-items: center; gap: var(--space-1); height: 100%; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+/* 窄视口横向滚动兜底：模块标签 nowrap 不可收缩，空间不足时允许滚动而非压住右侧快捷入口 */
+.topnav-tabs::-webkit-scrollbar { display: none; }
+.topnav-tab { flex-shrink: 0; }
 .topnav-tab {
   display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-5);
   height: 100%; font-size: var(--text-md); font-weight: var(--font-medium);
@@ -334,7 +337,12 @@ body {
 .sidebar-toggle:hover { background: var(--color-neutral-100); color: var(--color-neutral-700); }
 .sidebar-toggle svg { width: 16px; height: 16px; transition: transform var(--duration-normal) var(--ease-default); }
 .sidebar.collapsed .sidebar-toggle svg { transform: rotate(180deg); }
-.sidebar-nav { flex: 1; padding: var(--space-2); overflow-y: auto; }
+.sidebar-nav { flex: 1; padding: var(--space-2); overflow-y: auto; min-height: 0; }
+/* 多分组展开导致溢出时显示细滚动条（Windows overlay 默认不可见，需显式样式保证可发现） */
+.sidebar-nav::-webkit-scrollbar { width: 6px; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: var(--color-neutral-300); border-radius: var(--radius-full); }
+.sidebar-nav::-webkit-scrollbar-thumb:hover { background: var(--color-neutral-400); }
+.sidebar-nav::-webkit-scrollbar-track { background: transparent; }
 .sidebar-nav-item {
   display: flex; align-items: center; gap: var(--space-3); height: 40px;
   padding: 0 var(--space-4); border-radius: var(--radius-md);
@@ -367,7 +375,8 @@ body {
 .sidebar-nav-arrow svg { width: 12px; height: 12px; }
 .sidebar-nav-arrow.expanded { transform: rotate(90deg); }
 .sidebar-nav-children { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; }
-.sidebar-nav-children.expanded { max-height: 200px; }
+/* 展开上限需容纳最大分组（现最多 8 子项 × 36px = 288px），过小会把尾部子项截断一半 */
+.sidebar-nav-children.expanded { max-height: 320px; }
 .sidebar-nav-child-item {
   display: flex; align-items: center; gap: var(--space-2); height: 36px;
   padding: 0 var(--space-4) 0 calc(var(--space-4) + 20px + var(--space-3));

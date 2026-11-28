@@ -1972,32 +1972,54 @@ export interface StatementAdjustment {
   refCode?: string;
 }
 
-/** 客户对账单状态：待对账 → 对账中 → 已确认 →（部分开票 / 部分收款）→ 已办结；有异议为分支状态 */
-export type StatementStatus = 'pending' | 'reconciling' | 'confirmed' | 'disputed' | 'closed';
+/* ═══════════════════════════════════════════════════════════
+ * 结算中心（采销分离 · 两单制）：销售结算单（应收）与采购结算单（应付）
+ * 对账与结算是同一张结算单的两个阶段；设计见 docs/销售单结算流程设计建议.md
+ * ═══════════════════════════════════════════════════════════ */
 
-/** 客户对账单（应收结算一级单据） */
-export interface CustomerStatement {
+/** 结算单状态：待确认 → 已确认 →（部分开票 / 部分收付）→ 已办结；有异议为分支状态 */
+export type StatementStatus = 'pending' | 'confirmed' | 'disputed' | 'closed';
+
+/** 销售结算单来源：淡茶发起对账 / 客户发起对账（客户提供对账单） */
+export type StatementSource = 'dacha' | 'customer';
+
+/** 销售结算单（应收结算一级单据，明细行 = 履约单） */
+export interface SalesStatement {
   id: string;
-  /** 对账单号 DZ-S-YYYYMMDD-XX */
+  /** 结算单号 JSXS-YYYYMMDD-XX */
   code: string;
+  /** 来源：dacha=淡茶发起对账（先发结算单给客户）/ customer=客户发起对账（客户提供对账单） */
+  source: StatementSource;
   /** 结算对象（直接销售＝客户本人；经平台销售＝平台客户） */
   settleTarget: string;
   customerType: string;
   /** 账期说明（默认账期仅作参考，手工生成时填写） */
   period: string;
   lines: StatementLine[];
-  /** 对账金额（净额 = Σ 明细行金额 − 退货冲减） */
+  /** 结算金额（淡茶侧计入金额合计；净额 = Σ 明细行金额 − 退货冲减） */
   amount: number;
+  /** 客户发起对账：客户对账单号（来源=customer 时填写） */
+  customerStatementNo?: string;
+  /** 客户发起对账：客户侧对账金额（来源=customer 时填写，与 amount 的差额即差异） */
+  customerAmount?: number;
   adjustments: StatementAdjustment[];
   invoices: StatementInvoice[];
   receipts: StatementReceipt[];
   status: StatementStatus;
+  /** 确认对账信息（确认人 / 时间） */
+  confirmedBy?: string;
+  confirmedAt?: string;
   disputeReason?: string;
   createdAt: string;
+  createdBy?: string;
   closedAt?: string;
+  /** 办结后退货提醒：已办结结算单发生退货时的待处理标记 */
+  closedReturnNotice?: string;
+  /** 操作记录（阶段显性化） */
+  ops: { time: string; operator: string; action: string; detail?: string }[];
 }
 
-/** 客户钱包流水 */
+/** 客户预存余额流水 */
 export interface WalletTxn {
   id: string;
   time: string;
@@ -2008,7 +2030,7 @@ export interface WalletTxn {
   note?: string;
 }
 
-/** 客户钱包余额（客户维度预付账户：预付收款登记为余额，对账收款可选钱包余额支付） */
+/** 客户预存余额（客户维度预付账户：预付收款登记为余额，对账收款可选余额支付） */
 export interface CustomerWallet {
   customerId: string;
   customerName: string;
@@ -2016,24 +2038,24 @@ export interface CustomerWallet {
   txns: WalletTxn[];
 }
 
-/** 合作商对账单明细行：纳入的采购单 */
-export interface PartnerStatementLine {
+/** 采购结算单明细行：纳入的采购单 */
+export interface PurchaseStatementLine {
   poId: string;
   poCode: string;
   orderCode: string;
   amount: number;
 }
 
-/** 合作商进项发票记录（收票登记） */
-export interface PartnerIncomingInvoice {
+/** 采购结算单进项发票记录（收票登记） */
+export interface PurchaseIncomingInvoice {
   id: string;
   invoiceNo: string;
   amount: number;
   date: string;
 }
 
-/** 合作商付款记录（付款核销） */
-export interface PartnerPayment {
+/** 采购结算单付款记录（付款核销） */
+export interface PurchasePayment {
   id: string;
   amount: number;
   date: string;
@@ -2041,26 +2063,38 @@ export interface PartnerPayment {
   remark?: string;
 }
 
-/** 合作商对账单状态：待对账 → 已确认 / 有异议 → 付款核销完成已办结 */
-export type PartnerStatementStatus = 'pending' | 'confirmed' | 'disputed' | 'closed';
+/** 采购结算单付款节点：prepaid=发货前（先款后货）/ after_receipt=签收后（月结等） */
+export type PurchasePaymentStage = 'prepaid' | 'after_receipt';
 
-/** 合作商对账单（应付结算一级单据：按合作商 + 账期汇总已确收采购单） */
-export interface PartnerStatement {
+/** 采购结算单（应付结算一级单据，明细行 = 采购单；按合作商 + 账期汇总） */
+export interface PurchaseStatement {
   id: string;
-  /** 对账单号 DZ-P-YYYYMMDD-XX */
+  /** 结算单号 JSCG-YYYYMMDD-XX */
   code: string;
   supplierId: string;
   supplierName: string;
+  /** 是否有合作商终端（false=品牌商等，对账确认一律由管理后台代确认） */
+  hasTerminal: boolean;
   period: string;
-  lines: PartnerStatementLine[];
+  lines: PurchaseStatementLine[];
   /** 应付金额（= Σ 明细行采购金额） */
   amount: number;
-  invoices: PartnerIncomingInvoice[];
-  payments: PartnerPayment[];
-  status: PartnerStatementStatus;
+  /** 付款节点：prepaid=发货前（先款后货）/ after_receipt=签收后 */
+  paymentStage: PurchasePaymentStage;
+  /** 发货前应付金额（= amount × 预付比例；仅 paymentStage='prepaid' 时使用） */
+  prepaidAmount?: number;
+  invoices: PurchaseIncomingInvoice[];
+  payments: PurchasePayment[];
+  status: 'pending' | 'confirmed' | 'disputed' | 'closed';
+  /** 确认对账信息（确认人 / 时间；后台代确认时 operator 标注） */
+  confirmedBy?: string;
+  confirmedAt?: string;
   disputeReason?: string;
   createdAt: string;
+  createdBy?: string;
   closedAt?: string;
+  /** 操作记录（阶段显性化） */
+  ops: { time: string; operator: string; action: string; detail?: string }[];
 }
 
 /** 订单流转设置 */

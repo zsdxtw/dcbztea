@@ -129,15 +129,19 @@ export const useReturnStore = create<ReturnState>((set, get) => ({
     if (target && status === 'completed' && target.solution === 'refund') {
       const settle = useSettlementStore.getState();
       const root = soRootOf(target.sourceOrderCode);
-      const stmt = settle.statements.find((s) => s.lines.some(
+      const stmt = settle.salesStatements.find((s) => s.lines.some(
         (l) => l.orderCode === target.sourceOrderCode || l.orderCode === root,
       ));
       if (stmt && stmt.status !== 'closed') {
-        settle.adjustStatement(stmt.id, {
+        settle.adjustSalesStatement(stmt.id, {
           amount: Math.min(target.refundAmount, stmt.amount),
           reason: `退货退款（${target.code} · ${target.customerName}）`,
           refCode: target.code,
         });
+      }
+      // 第三期：办结后退货提醒——结算单已办结时退货，标记退款 / 红冲待处理
+      if (stmt && stmt.status === 'closed') {
+        settle.markClosedStatementReturn(stmt.id, `退货退款（${target.code} · ${target.customerName}）· 退款 ¥${target.refundAmount.toLocaleString()} 待处理`);
       }
       // 预付客户（档案结算方式=预付）退款回钱包余额
       const isPrepaid = useCustomerStore.getState().customers.find((c) => c.name === target.customerName)?.settlementMethod === '预付';

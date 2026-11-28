@@ -21,7 +21,7 @@ const pill = (bg: string, color: string, text: string) => (
 
 export default function FinanceReceivables() {
   const navigate = useNavigate();
-  const statements = useSettlementStore((s) => s.statements);
+  const statements = useSettlementStore((s) => s.salesStatements);
   const [tab, setTab] = useState<'' | 'unsettled' | 'settled'>('');
 
   /** 应收台账：进入对账环节的对账单（待对账为预对账、确认后为正式应收） */
@@ -29,12 +29,19 @@ export default function FinanceReceivables() {
     const net = netOf(s);
     const rec = receivedOf(s);
     const inv = invoicedOf(s);
+    // 第三期：到期 / 逾期提示（确认日期 + 30 天默认账期；未收余额 > 0 且超期 → 逾期）
+    const confirmedDate = s.confirmedAt?.slice(0, 10) ?? '';
+    const dueDate = confirmedDate ? new Date(new Date(confirmedDate).getTime() + 30 * 86400000).toISOString().slice(0, 10) : '';
+    const today = new Date().toISOString().slice(0, 10);
+    const overdue = !!dueDate && today > dueDate && rec < net - 0.001;
     return {
       code: s.code, target: s.settleTarget, type: s.customerType, period: s.period,
       lines: s.lines.length, net, inv, rec, balance: net - rec,
       status: s.status as StatementStatus,
       settled: rec >= net - 0.001,
       confirmed: s.status === 'confirmed' || s.status === 'closed',
+      dueDate, overdue,
+      closedNotice: s.closedReturnNotice ?? '',
     };
   }), [statements]);
 
@@ -62,19 +69,23 @@ export default function FinanceReceivables() {
 
         <Card style={{ padding: 0 }}>
           <Table
-            headers={['对账单号', '结算对象', '客户类型', '账期', '对账明细', '应收金额', '已开票', '已收金额', '应收余额', '应收状态']}
+            headers={['对账单号', '结算对象', '客户类型', '账期', '到期日', '对账明细', '应收金额', '已开票', '已收金额', '应收余额', '应收状态']}
             rows={filtered.map((r) => [
-              <span key="c" className="cell-mono-emph">{r.code}</span>,
+              <span key="c" className="cell-mono-emph">
+                {r.code}
+                {r.closedNotice && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#CB405D', marginTop: 2 }}>⚠ {r.closedNotice}</span>}
+              </span>,
               <span key="cu" className="cell-emph">{r.target}</span>,
               <span key="t" style={{ fontSize: 'var(--text-sm)' }}>{r.type}</span>,
               <span key="p" className="cell-muted" style={{ fontSize: 'var(--text-xs)' }}>{r.period}</span>,
+              <span key="d" className="mono" style={{ fontSize: 'var(--text-xs)', color: r.overdue ? '#CB405D' : 'var(--color-neutral-500)' }}>{r.dueDate || '—'}{r.overdue ? ' ⚠逾期' : ''}</span>,
               <span key="l" className="mono">{r.lines} 行</span>,
               <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(r.net)}</span>,
               <span key="i" className="mono" style={{ color: r.inv > 0 ? '#01795D' : 'var(--color-neutral-400)' }}>{money(r.inv)}</span>,
               <span key="r" className="mono" style={{ color: r.rec > 0 ? '#01795D' : 'var(--color-neutral-400)' }}>{money(r.rec)}</span>,
               <span key="u" className="mono" style={{ color: r.balance > 0 ? '#B26A00' : 'var(--color-neutral-400)', fontWeight: r.balance > 0 ? 'var(--font-semibold)' : undefined }}>{money(r.balance)}</span>,
               r.settled
-                ? pill('#ECEFF1', '#455A64', r.status === 'closed' ? '已办结 · 已结清' : '已结清')
+                ? pill('#ECEFF1', '#455A64', r.status === 'closed' ? (r.closedNotice ? '已办结 · ⚠退货待处理' : '已办结 · 已结清') : '已结清')
                 : r.rec > 0
                   ? pill('#E0F2F1', '#00695C', '部分已收')
                   : pill(r.confirmed ? '#FBF3E2' : '#F5F5F5', r.confirmed ? '#9A7A1C' : '#9E9E9E', r.confirmed ? '已确认 · 待收' : '待对账'),

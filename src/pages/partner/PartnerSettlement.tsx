@@ -16,7 +16,7 @@ import { useSettlementStore } from '../../stores/settlementStore';
 import { useSupplierStore } from '../../stores/supplierStore';
 import { TRANSFER_SOURCE_LABELS } from '../../data/externalOrders';
 import { PARTNER_ORDER_STATUS_LABELS } from '../../data/partner';
-import type { PartnerStatement } from '../../types';
+import type { PurchaseStatement } from '../../types';
 
 const PS_STATUS_LABELS: Record<string, string> = { pending: '待确认', confirmed: '对账中', disputed: '有异议', closed: '已办结' };
 const PS_STATUS_TONE: Record<string, 'amber' | 'purple' | 'red' | 'green' | 'gray'> = {
@@ -29,10 +29,10 @@ export default function PartnerSettlement() {
   const suppliers = useSupplierStore((s) => s.suppliers);
   const orders = useOrderFlowStore((s) => s.orders);
   const poDocs = usePurchaseStore((s) => s.docs);
-  const statements = useSettlementStore((s) => s.partnerStatements);
+  const statements = useSettlementStore((s) => s.purchaseStatements);
   const store = useSettlementStore;
   const [filterStatus, setFilterStatus] = useState('');
-  const [selected, setSelected] = useState<PartnerStatement | null>(null);
+  const [selected, setSelected] = useState<PurchaseStatement | null>(null);
   const [msg, setMsg] = useState('');
 
   const myId = auth?.supplierId ?? suppliers.find((s) => s.terminal.enabled && s.terminal.username === auth?.username)?.id ?? '';
@@ -72,7 +72,7 @@ export default function PartnerSettlement() {
   const settledAmount = myStatements.filter((s) => s.status === 'closed').reduce((sum, s) => sum + s.amount, 0);
 
   const confirmStatement = (id: string) => {
-    const res = store.getState().confirmPartnerStatement(id);
+    const res = store.getState().confirmPurchaseStatement(id);
     flash(res.msg);
   };
 

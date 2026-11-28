@@ -250,6 +250,8 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
         { key: 'purchase-orders', label: '采购订单', icon: <OrdersIcon /> },
         { key: 'purchase-pricing', label: '采购报价', icon: <PriceIcon /> },
         { key: 'purchase-return', label: '采购退货', icon: <ReturnIcon /> },
+        { key: 'purchase-order-settlement', label: '采购单结算', icon: <ReconciliationIcon /> },
+        { key: 'purchase-statements', label: '采购结算', icon: <ReconciliationIcon /> },
       ] },
       { key: 'warehouse-io', label: '入库出库', icon: <InboundIcon />, children: [
         { key: 'purchase-inbound', label: '采购收货', icon: <InboundIcon /> },
@@ -294,12 +296,13 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
         { key: 'order-distribute', label: '履约单分发', icon: <OrdersIcon /> },
         { key: 'sales-fulfillment', label: '履约单履约', icon: <InboundIcon /> },
         { key: 'sales-settlement', label: '履约单结算', icon: <ReconciliationIcon /> },
+        { key: 'sales-settlement-confirm', label: '销售结算', icon: <ReconciliationIcon /> },
       ] },
       { key: 'customer-manage', label: '客户管理', icon: <CustomersIcon />, children: [
         { key: 'sales-customers', label: '客户列表', icon: <CustomersIcon /> },
         { key: 'sales-pricing', label: '报品报（调）价', icon: <QuotationIcon /> },
       ] },
-      { key: 'sales-reconciliation', label: '客户对账', icon: <ReconciliationIcon /> },
+      { key: 'sales-settlement-confirm', label: '销售结算', icon: <ReconciliationIcon /> },
       { key: 'sales-return', label: '销售退货', icon: <ReturnIcon /> },
     ],
   },
@@ -335,8 +338,8 @@ export const MODULE_CONFIGS: Record<ModuleKey, ModuleConfig> = {
         { key: 'finance-purchase-payment', label: '付款管理', icon: <PaymentIcon /> },
       ] },
       { key: 'finance-reconciliation', label: '对账结算', icon: <ReconciliationIcon />, children: [
-        { key: 'finance-partner-settlement', label: '合作商结算', icon: <ReconciliationIcon /> },
-        { key: 'finance-customer-reconciliation', label: '客户对账', icon: <CollectionIcon /> },
+        { key: 'purchase-statements', label: '采购结算（确认 / 查看）', icon: <ReconciliationIcon /> },
+        { key: 'sales-settlement-confirm', label: '销售结算（确认 / 查看）', icon: <ReconciliationIcon /> },
       ] },
       { key: 'finance-profit', label: '经营利润', icon: <FinanceReportIcon /> },
       { key: 'finance-other', label: '核算与其他', icon: <InvoiceIcon />, children: [
@@ -418,6 +421,8 @@ export const moduleBasePath = (module: ModuleKey): string =>
  */
 const MENU_PATH_PREFIX_OVERRIDES: Record<string, string> = {
   'inventory-': '/inventory',
+  'purchase-statements': '/purchase',
+  'sales-settlement-confirm': '/sales',
 };
 
 /** 菜单项完整路径 */

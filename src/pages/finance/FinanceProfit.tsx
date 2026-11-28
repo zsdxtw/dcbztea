@@ -20,7 +20,7 @@ export default function FinanceProfit() {
   const orders = useOrderFlowStore((s) => s.orders);
   const purchaseDocs = usePurchaseStore((s) => s.docs);
   const products = usePriceStore((s) => s.products);
-  const statements = useSettlementStore((s) => s.statements);
+  const statements = useSettlementStore((s) => s.salesStatements);
   const [dim, setDim] = useState<'order' | 'customer' | 'product' | 'partner'>('order');
 
   /** 已完结订单利润行 */

@@ -95,9 +95,9 @@ export default function DirectDeliveryConfirm() {
                     </Button>
                   )}
                   {allDelivered && d.status !== 'settled' && (
-                    <Button size="sm" onClick={() => poStore.getState().settleByChild(d.childOrderCode)}>确认交付·应付</Button>
+                    <span style={{ fontSize: 'var(--text-xs)', color: '#01795D' }}>交付确认完成 · 应付结算在采购单结算中操作</span>
                   )}
-                  {d.status === 'settled' && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>已确认应付</span>}
+                  {d.status === 'settled' && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>已结算</span>}
                 </div>,
               ];
             })}

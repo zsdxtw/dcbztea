@@ -36,6 +36,8 @@ import SalesSettlement from './pages/sales/SalesSettlement';
 import CompareManage from './pages/sales/CompareManage';
 import SalesPricing from './pages/sales/SalesPricing';
 import SalesReconciliation from './pages/sales/SalesReconciliation';
+import PurchaseOrderSettlement from './pages/purchase/PurchaseOrderSettlement';
+import PurchaseReconciliation from './pages/purchase/PurchaseReconciliation';
 import SalesCustomers from './pages/sales/SalesCustomers';
 import SalesStores from './pages/sales/SalesStores';
 import SalesReturn from './pages/sales/SalesReturn';
@@ -76,7 +78,6 @@ import FinanceExpense from './pages/finance/FinanceExpense';
 import FinanceBalance from './pages/finance/FinanceBalance';
 import FinanceReceivables from './pages/finance/FinanceReceivables';
 import FinancePayables from './pages/finance/FinancePayables';
-import FinancePartnerSettlement from './pages/finance/FinancePartnerSettlement';
 import FinanceProfit from './pages/finance/FinanceProfit';
 
 import StatisticsSales from './pages/statistics/StatisticsSales';
@@ -175,6 +176,8 @@ export const router = createBrowserRouter([
       { path: 'purchase/purchase-reconciliation', element: <Navigate to="/finance/finance-partner-settlement" replace /> },
       { path: 'purchase/direct-delivery-confirm', element: <DirectDeliveryConfirm /> },
       { path: 'purchase/purchase-return', element: <PurchaseReturn /> },
+      { path: 'purchase/purchase-order-settlement', element: <PurchaseOrderSettlement /> },
+      { path: 'purchase/purchase-statements', element: <PurchaseReconciliation /> },
       /* ── 销售 ── */
       { path: 'sales', element: <SalesOverview /> },
       { path: 'sales/sales-overview', element: <SalesOverview /> },
@@ -187,6 +190,7 @@ export const router = createBrowserRouter([
       { path: 'sales/order-shipping', element: <Navigate to="/selfop/orders" replace /> },
       { path: 'sales/sales-fulfillment', element: <SalesFulfillment /> },
       { path: 'sales/sales-settlement', element: <SalesSettlement /> },
+      { path: 'sales/sales-settlement-confirm', element: <SalesReconciliation /> },
       { path: 'sales/fulfillment-orders', element: <Navigate to="/sales/sales-fulfillment" replace /> },
       { path: 'sales/order-settlement', element: <Navigate to="/finance/finance-partner-settlement" replace /> },
       { path: 'sales/sales-orders', element: <SalesOrders /> },
@@ -196,7 +200,7 @@ export const router = createBrowserRouter([
       { path: 'sales/sales-customers', element: <SalesCustomers /> },
       { path: 'sales/sales-customer-accounts', element: <Navigate to="/sales/sales-customers" replace /> },
       { path: 'sales/sales-platforms', element: <Navigate to="/sales/sales-customers" replace /> },
-      { path: 'sales/sales-reconciliation', element: <SalesReconciliation /> },
+      { path: 'sales/sales-reconciliation', element: <Navigate to="/sales/sales-settlement-confirm" replace /> },
       { path: 'sales/sales-return', element: <SalesReturn /> },
       /* ── 仓储 ── */
       { path: 'inventory', element: <Navigate to="/purchase/purchase-overview" replace /> },
@@ -235,9 +239,9 @@ export const router = createBrowserRouter([
       { path: 'finance/finance-ap', element: <FinancePayables /> },
       { path: 'finance/finance-purchase-payment', element: <FinancePurchasePayment /> },
       { path: 'finance/finance-sales-collection', element: <FinanceSalesCollection /> },
-      { path: 'finance/finance-partner-settlement', element: <FinancePartnerSettlement /> },
-      { path: 'finance/finance-customer-reconciliation', element: <SalesReconciliation /> },
-      { path: 'finance/finance-supplier-reconciliation', element: <Navigate to="/finance/finance-partner-settlement" replace /> },
+      { path: 'finance/finance-partner-settlement', element: <Navigate to="/purchase/purchase-statements" replace /> },
+      { path: 'finance/finance-customer-reconciliation', element: <Navigate to="/sales/sales-settlement-confirm" replace /> },
+      { path: 'finance/finance-supplier-reconciliation', element: <Navigate to="/purchase/purchase-statements" replace /> },
       { path: 'finance/finance-profit', element: <FinanceProfit /> },
       { path: 'finance/finance-other-receivable', element: <FinanceOtherReceivable /> },
       { path: 'finance/finance-other-payable', element: <FinanceOtherPayable /> },

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
 import { TOPNAV_TABS, MODULE_HOME_PATH } from '../../data/modules';
@@ -34,6 +35,15 @@ export default function TopNav() {
   const navigate = useNavigate();
   const currentModule = useAppStore((s) => s.currentModule);
   const switchModule = useAppStore((s) => s.switchModule);
+  const tabsRef = useRef<HTMLElement>(null);
+
+  /* 窄视口下模块 tab 区可横向滚动：切换模块时把选中 tab 滚入可视区 */
+  useEffect(() => {
+    const nav = tabsRef.current;
+    if (!nav) return;
+    const active = nav.querySelector('.topnav-tab.active');
+    active?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [currentModule]);
 
   const handleTabClick = (key: ModuleKey) => {
     switchModule(key);
@@ -49,7 +59,7 @@ export default function TopNav() {
       </div>
 
       {/* 模块 Tab */}
-      <nav className="topnav-tabs">
+      <nav className="topnav-tabs" ref={tabsRef}>
         {TOPNAV_TABS.map((tab) => (
           <button
             key={tab.key}

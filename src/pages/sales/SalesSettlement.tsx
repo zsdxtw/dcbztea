@@ -1,195 +1,165 @@
+/**
+ * 销售 · 履约单结算（销售结算单生成页）
+ * 只负责生成：淡茶发起（生成销售结算单）与客户发起对账（登记客户提供的对账单，含差异核对）。
+ * 确认对账在「销售 → 销售结算」；开票 / 收款在财务。设计见 docs/销售单结算流程设计建议.md 第五节。
+ */
 import { useMemo, useState } from 'react';
 import ContentHeader from '../../components/layout/ContentHeader';
 import Card from '../../components/common/Card';
-import Table from '../../components/common/Table';
 import Button from '../../components/common/Button';
-import DetailDrawer from '../../components/common/DetailDrawer';
+import { useNavigate } from 'react-router-dom';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
-import { usePurchaseStore } from '../../stores/purchaseStore';
-import { useSettlementStore, statementOfOrder, netOf, receivedOf } from '../../stores/settlementStore';
-import { SalesOrderDetailTabs } from './SalesOrderDetail';
-import { CUSTOMER_COL_WIDTH } from './SalesOrders';
-import { platformLabelOf } from '../../data/externalOrders';
-import {
-  buildFamilies, familyStatesOf, fulfillmentUnitsOf, fulfillStateOf, orderProgressOf,
-  receiveStateOf, invoiceStateOf, settleStateOf, FAMILY_STATE_COLORS,
-} from '../../utils/salesOrderFamily';
-import type { ExternalOrder } from '../../types';
+import { useSettlementStore, settleTargetOf, statementAmountOf, statementOfOrder } from '../../stores/settlementStore';
 
 const money = (n: number) => `¥${n.toLocaleString()}`;
 
-/** 列内容最小宽度：客户列同销售单列表的客户列宽 */
-const COL_MIN_WIDTHS = { 客户: CUSTOMER_COL_WIDTH };
-
-const pill = (text: string) => {
-  const c = (FAMILY_STATE_COLORS as Record<string, { bg: string; color: string }>)[text] ?? { bg: '#F5F5F5', color: '#9E9E9E' };
-  return (
-    <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', background: c.bg, color: c.color, whiteSpace: 'nowrap' }}>{text}</span>
-  );
-};
-
-/** 结算 TAB：待结算（已确收未发起）/ 结算中 / 已办结 */
-type SettleTab = 'pending' | 'settling' | 'closed' | 'all';
+type Mode = 'dacha' | 'customer';
 
 export default function SalesSettlement() {
+  const navigate = useNavigate();
   const orders = useOrderFlowStore((s) => s.orders);
-  const poDocs = usePurchaseStore((s) => s.docs);
-  const statements = useSettlementStore((s) => s.statements);
-  const [tab, setTab] = useState<SettleTab>('pending');
+  const statements = useSettlementStore((s) => s.salesStatements);
+  const store = useSettlementStore;
   const [msg, setMsg] = useState('');
-  const [view, setView] = useState<{ root: string; child?: string } | null>(null);
+  const [mode, setMode] = useState<Mode>('dacha');
+  const [genTarget, setGenTarget] = useState('');
+  const [genPeriod, setGenPeriod] = useState('');
+  const [genPicked, setGenPicked] = useState<Set<string>>(new Set());
+  /** 客户发起对账 */
+  const [custNo, setCustNo] = useState('');
+  const [custAmount, setCustAmount] = useState('');
 
-  const families = useMemo(() => buildFamilies(orders), [orders]);
+  const flash = (t: string) => { setMsg(t); setTimeout(() => setMsg(''), 5000); };
 
-  /** 履约单单元（携带母单编号，便于查看详情） */
-  const units = useMemo(() => families.flatMap((f) =>
-    fulfillmentUnitsOf(f).map((u) => {
-      const pos = poDocs.filter((d) => d.childOrderId === u.underlying.id);
-      return {
-        unit: u,
-        rootCode: f.rootCode,
-        order: u.underlying,
-        fulfill: fulfillStateOf(u.underlying),
-        progress: orderProgressOf(u.underlying, pos),
-        received: receiveStateOf(u.underlying, pos),
-        invoice: invoiceStateOf(u.underlying),
-        settle: settleStateOf(u.underlying, pos),
-        pos,
-      };
-    }),
-  // 结算页仅含已确收及之后的履约单（已取消 / 未确收不进结算）
-  ).filter((x) => x.order.processStatus !== 'cancelled' && x.fulfill === '已确收'), [families, poDocs]);
+  /** 可纳入结算单的履约单：已确收、未取消、未在任何结算单中 */
+  const eligibleOrders = useMemo(() => orders.filter((o) => (
+    o.processStatus !== 'cancelled' && o.fulfillment?.stage === 'confirmed' && !statementOfOrder(statements, o.id)
+  )), [orders, statements]);
 
-  const pendingUnits = units.filter((x) => x.progress !== '结算中' && x.progress !== '已办结');
-  const settlingUnits = units.filter((x) => x.progress === '结算中');
-  const closedUnits = units.filter((x) => x.progress === '已办结');
+  /** 按结算对象分组 */
+  const groups = useMemo(() => {
+    const map = new Map<string, typeof eligibleOrders>();
+    for (const o of eligibleOrders) {
+      const k = settleTargetOf(o);
+      map.set(k, [...(map.get(k) ?? []), o]);
+    }
+    return [...map.entries()].sort((a, b) => b[1].length - a[1].length);
+  }, [eligibleOrders]);
 
-  const shown = tab === 'pending' ? pendingUnits : tab === 'settling' ? settlingUnits : tab === 'closed' ? closedUnits : units;
+  const genOrders = genTarget ? (groups.find(([k]) => k === genTarget)?.[1] ?? []) : [];
+  const dachaAmount = genOrders.filter((o) => genPicked.has(o.id)).reduce((s, o) => s + statementAmountOf(o), 0);
+  const diff = Number(custAmount || 0) - dachaAmount;
+  const canSubmit = genTarget && genPicked.size > 0 && (mode === 'dacha' || (custNo.trim() && Number(custAmount) > 0));
 
-  const flash = (text: string) => {
-    setMsg(text);
-    setTimeout(() => setMsg(''), 3600);
-  };
-
-  const startSettlement = (o: ExternalOrder) => {
-    const res = useOrderFlowStore.getState().startSettlement(o.id);
+  const submit = () => {
+    if (!canSubmit) return;
+    const customerType = genOrders.find((o) => genPicked.has(o.id))?.salesPath === 'via_platform' ? '平台客户' : (genOrders.find((o) => genPicked.has(o.id))?.customerType ?? '直营客户');
+    const orderIds = [...genPicked];
+    const res = mode === 'dacha'
+      ? store.getState().generateSalesStatement({ settleTarget: genTarget, customerType, period: genPeriod, orderIds })
+      : store.getState().registerCustomerStatement({
+          settleTarget: genTarget, customerType, period: genPeriod, orderIds,
+          customerStatementNo: custNo, customerAmount: Number(custAmount),
+        });
     flash(res.msg);
+    if (res.ok) {
+      setGenOpenFalse();
+      // 生成后跳到销售结算确认对账
+      navigate('/sales/sales-settlement-confirm');
+    }
   };
-  const registerReceipt = (o: ExternalOrder) => {
-    if (!window.confirm(`确认已收到该履约单款项？\n${o.code} · ${money(o.totalAmount)}`)) return;
-    const res = useOrderFlowStore.getState().settleOrder(o.id, { onTime: true });
-    flash(res.msg);
-  };
-  const registerInvoice = (o: ExternalOrder) => {
-    const res = useOrderFlowStore.getState().registerInvoice(o.id, 'full');
-    flash(res.msg);
-  };
-  const closeManually = (o: ExternalOrder) => {
-    if (!window.confirm(`已收款但未开票，确认将该履约单手工办结？\n${o.code}`)) return;
-    const res = useOrderFlowStore.getState().closeOrder(o.id);
-    flash(res.msg);
-  };
-
-  const tabBtn = (key: SettleTab, label: string, count: number) => (
-    <button key={key} className={`tab-card-simple${tab === key ? ' active' : ''}`} style={{ transition: 'none' }} onClick={() => setTab(key)}>
-      {label}
-      <span className="tab-card-simple-count">{count} 单</span>
-    </button>
-  );
+  const setGenOpenFalse = () => { setGenTarget(''); setGenPeriod(''); setGenPicked(new Set()); setCustNo(''); setCustAmount(''); };
 
   return (
     <>
       <ContentHeader title="履约单结算" breadcrumbs={['销售', '销售单管理', '履约单结算']} />
       <div className="content-body">
         <div style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-module-current-lightest)', borderRadius: 'var(--radius-md)', lineHeight: 1.7 }}>
-          对<strong>已确收</strong>的履约单发起<strong>对账结算</strong>（订单进度＝结算中）。已纳入<strong>客户对账单</strong>的履约单由对账单统一
-          <strong>开票 / 收款核销</strong>（部分开票、部分收款支持，操作入口见「销售 → 客户对账」），本页展示其所属对账单与核销进度；
-          未纳入对账单的履约单可在本页零星登记收款 / 开票。收款与开票均完成 → 订单进度自动<strong>已办结</strong>。
+          本页只负责<strong>生成销售结算单</strong>（对账阶段）：从<strong>已确收未对账</strong>的履约单中按结算对象勾选生成，
+          或登记<strong>客户发起对账</strong>（客户提供对账单，含差异核对）。生成后到「销售 → 销售结算」确认对账；
+          确认后的开票、收款在财务菜单完成。
         </div>
 
         {msg && (
           <div style={{ marginBottom: 'var(--space-3)', padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', background: '#E8F5E9', color: '#01795D' }}>{msg}</div>
         )}
 
-        <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
-          {tabBtn('pending', '待结算', pendingUnits.length)}
-          {tabBtn('settling', '结算中', settlingUnits.length)}
-          {tabBtn('closed', '已办结', closedUnits.length)}
-          {tabBtn('all', '全部已确收', units.length)}
+        <div style={{ marginBottom: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)' }}>结算单来源：</span>
+          <button className={`tab-card-simple${mode === 'dacha' ? ' active' : ''}`} style={{ transition: 'none' }} onClick={() => { setMode('dacha'); setGenPicked(new Set()); }}>淡茶发起对账</button>
+          <button className={`tab-card-simple${mode === 'customer' ? ' active' : ''}`} style={{ transition: 'none' }} onClick={() => { setMode('customer'); setGenPicked(new Set()); }}>客户发起对账（客户提供对账单）</button>
+          <span style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>待对账履约单 {eligibleOrders.length} 张（{groups.length} 个结算对象）</span>
         </div>
 
         <Card style={{ padding: 0 }}>
-          <Table
-            colMinWidths={COL_MIN_WIDTHS}
-            headers={['履约单号', '关联销售单', '客户', '履约主体', '金额', '履约状态', '所属对账单', '收款状态', '开票状态', '结算状态', '订单进度', '操作']}
-            rows={shown.map((x) => {
-              const o = x.order;
-              const stmt = statementOfOrder(statements, o.id);
-              const inStmt = !!stmt && stmt.status !== 'closed';
-              return [
-                <span key="c" className="cell-mono-emph">{o.code}</span>,
-                o.parentCode
-                  ? <span key="p" className="mono" style={{ fontSize: 'var(--text-sm)' }}>{o.parentCode}</span>
-                  : <span key="p" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>—</span>,
-                <span key="cu" className="cell-emph">{o.customerName}</span>,
-                <span key="sub" style={{ fontSize: 'var(--text-sm)' }}>{o.path === 'self' ? '淡茶半盏（自营）' : (o.partnerName ?? '—')}</span>,
-                <span key="a" className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{money(o.totalAmount)}</span>,
-                pill(x.fulfill),
-                stmt
-                  ? <span key="dz" className="mono" style={{ fontSize: 'var(--text-xs)' }}>
-                      {stmt.code}
-                      <span style={{ display: 'block', fontWeight: 400, color: 'var(--color-neutral-400)' }}>
-                        已收 {money(receivedOf(stmt))} / 净 {money(netOf(stmt))}
-                      </span>
-                    </span>
-                  : <span key="dz" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>未纳入</span>,
-                pill(x.received),
-                pill(x.invoice),
-                pill(x.settle),
-                pill(x.progress),
-                <div key="act" className="row-actions">
-                  {x.progress === '履约中' && <Button size="sm" variant="ghost" onClick={() => startSettlement(o)}>发起对账结算</Button>}
-                  {!inStmt && x.progress !== '已办结' && x.received === '未收款' && <Button size="sm" variant="ghost" onClick={() => registerReceipt(o)}>登记收款</Button>}
-                  {!inStmt && x.progress !== '已办结' && x.invoice === '未开票' && <Button size="sm" variant="ghost" onClick={() => registerInvoice(o)}>登记开票</Button>}
-                  {!inStmt && x.progress !== '已办结' && x.received === '已收款' && x.invoice === '未开票' && <Button size="sm" variant="ghost" onClick={() => closeManually(o)}>手工办结</Button>}
-                  {inStmt && x.progress !== '已办结' && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-400)' }}>由对账单核销</span>}
-                  <Button size="sm" variant="ghost" onClick={() => setView({ root: x.rootCode, child: o.code })}>查看</Button>
-                </div>,
-              ];
-            })}
-          />
-          {shown.length === 0 && (
-            <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>
-              当前分类下暂无履约单（仅已确收履约单进入结算）。
+          <div style={{ padding: '10px 14px', display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center', borderBottom: '1px solid var(--color-neutral-100)' }}>
+            <select style={{ minWidth: 240 }} value={genTarget} onChange={(e) => { setGenTarget(e.target.value); setGenPicked(new Set()); }} className="filter-select" disabled={groups.length === 0}>
+              <option value="">选择结算对象（{groups.length} 个待对账）</option>
+              {groups.map(([k, list]) => <option key={k} value={k}>{k}（{list.length} 单）</option>)}
+            </select>
+            <input className="filter-input" placeholder="账期说明（如 2026-11 月结，仅作参考）" value={genPeriod} onChange={(e) => setGenPeriod(e.target.value)} style={{ width: 260 }} />
+            {mode === 'customer' && (
+              <>
+                <input className="filter-input mono" placeholder="客户对账单号 *" value={custNo} onChange={(e) => setCustNo(e.target.value)} style={{ width: 170 }} />
+                <input className="filter-input mono" type="number" placeholder="客户对账金额 *" value={custAmount} onChange={(e) => setCustAmount(e.target.value)} style={{ width: 140 }} />
+              </>
+            )}
+          </div>
+          {genTarget && genOrders.length > 0 && (
+            <div style={{ padding: '0 14px 6px' }}>
+              <table className="detail-inline-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 44 }}>纳入</th><th>履约单号</th><th>客户</th><th>计入金额</th>
+                    {mode === 'customer' && <th>差异说明</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {genOrders.map((o) => {
+                    const amt = statementAmountOf(o);
+                    const checked = genPicked.has(o.id);
+                    return (
+                      <tr key={o.id}>
+                        <td style={{ textAlign: 'center' }}>
+                          <input type="checkbox" checked={checked} onChange={() => setGenPicked((prev) => { const n = new Set(prev); if (n.has(o.id)) n.delete(o.id); else n.add(o.id); return n; })} />
+                        </td>
+                        <td className="mono" style={{ fontWeight: 'var(--font-medium)' }}>{o.code}</td>
+                        <td style={{ fontSize: 'var(--text-sm)' }}>{o.customerName}</td>
+                        <td className="mono">{money(amt)}{o.salesPath === 'via_platform' ? '（销平台实价）' : ''}</td>
+                        {mode === 'customer' && (
+                          <td style={{ fontSize: 'var(--text-xs)', color: checked ? (diff === 0 ? 'var(--color-neutral-400)' : diff > 0 ? '#01795D' : '#B26A00') : 'var(--color-neutral-300)' }}>
+                            {checked ? (diff === 0 ? '无差异' : `客户金额较淡茶侧 ${diff > 0 ? '+' : ''}${money(diff)}`) : '—'}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
+          <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-neutral-100)' }}>
+            <span style={{ fontSize: 'var(--text-sm)' }}>
+              已选 {genPicked.size} 行 · 淡茶侧合计 <strong className="mono">{money(dachaAmount)}</strong>
+              {mode === 'customer' && genPicked.size > 0 && (
+                <span style={{ marginLeft: 12, color: diff === 0 ? 'var(--color-neutral-500)' : diff > 0 ? '#01795D' : '#B26A00' }}>
+                  客户金额 <strong className="mono">{money(Number(custAmount || 0))}</strong> · 差异 <strong className="mono">{diff >= 0 ? '+' : ''}{money(diff)}</strong>
+                  {diff !== 0 && '（生成后可录差异调整）'}
+                </span>
+              )}
+            </span>
+            <Button disabled={!canSubmit} onClick={submit}>
+              {mode === 'dacha' ? '生成销售结算单' : '登记客户发起对账'}
+            </Button>
+          </div>
         </Card>
-      </div>
 
-      {/* 履约单详情抽屉（销售单信息 / 各履约单 Tab） */}
-      <DetailDrawer
-        open={!!view}
-        onClose={() => setView(null)}
-        badge="SO"
-        title={view?.root ?? ''}
-        statusTag={(() => {
-          const fam = families.find((f) => f.rootCode === view?.root);
-          if (!fam) return null;
-          const st = familyStatesOf(fam);
-          return <>{pill(st.orderStatus)}{pill(st.distribute)}{pill(st.fulfill)}{pill(st.settle)}</>;
-        })()}
-        subtitle={(() => {
-          const m = families.find((f) => f.rootCode === view?.root)?.mother;
-          return m ? `${platformLabelOf(m)} · ${m.customerName}（${m.customerType}）` : '';
-        })()}
-        mode="view"
-      >
-        {(() => {
-          const fam = families.find((f) => f.rootCode === view?.root);
-          if (!fam) return null;
-          return <SalesOrderDetailTabs family={fam} poDocs={poDocs} initialTab={view?.child ?? 'info'} />;
-        })()}
-      </DetailDrawer>
+        {groups.length === 0 && (
+          <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--color-neutral-400)' }}>
+            暂无待对账履约单（履约单客户确收后自动进入待对账）。
+          </div>
+        )}
+      </div>
     </>
   );
 }

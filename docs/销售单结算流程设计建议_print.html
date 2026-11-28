@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>销售单结算流程设计建议（采销分离 · 两单制）</title>
+<style>
+  body { font-family: "Microsoft YaHei", "SimSun", sans-serif; font-size: 10.5pt; color: #26261F; line-height: 1.66; }
+  h1 { font-size: 17pt; color: #1A3C34; margin: 0 0 4pt 0; }
+  h2 { font-size: 13.5pt; color: #1A3C34; border-bottom: 1.5pt solid #1A3C34; padding-bottom: 3pt; margin: 16pt 0 8pt 0; }
+  h3 { font-size: 11.5pt; color: #1A3C34; margin: 11pt 0 5pt 0; }
+  p { margin: 4pt 0; }
+  table { border-collapse: collapse; width: 100%; margin: 4pt 0 8pt 0; }
+  th { border: 0.75pt solid #8A9A94; background: #E4EDE9; color: #1A3C34; padding: 4pt 6pt; font-size: 9pt; text-align: left; }
+  td { border: 0.75pt solid #B8C2BD; padding: 3.5pt 6pt; font-size: 9.5pt; }
+  table.nf td:first-child { white-space: nowrap; }
+  blockquote { background: #F0F4F2; border-left: 3pt solid #1A3C34; margin: 8pt 0; padding: 7pt 12pt; font-size: 9.5pt; color: #3D3B36; }
+  blockquote p { margin: 3pt 0; }
+  blockquote ul { margin: 4pt 0; }
+  code { font-family: Consolas, monospace; font-size: 9pt; background: #EFF1F0; padding: 0 3pt; }
+  pre { background: #F4F6F5; border: 0.75pt solid #D5DBD8; padding: 8pt 10pt; font-family: Consolas, monospace; font-size: 9pt; line-height: 1.5; white-space: pre-wrap; }
+  ul, ol { margin: 4pt 0; padding-left: 22pt; }
+  li { margin: 2pt 0; }
+  hr { border: none; border-top: 0.75pt solid #C9D0CD; margin: 11pt 0; }
+  strong { font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>销售单结算流程设计建议（采销分离 · 两单制）</h1>
+<blockquote>
+<p>代码基线：分支 <code>dcbz</code>，提交 <code>50fe6f5</code>（此后至 <code>20a6b61</code> 仅文档变更）。</p>
+<p><strong>文档沿革</strong></p>
+<ul>
+<li>2026-11-24 初版：客户对账单驱动 + 合作商采购应付联动。其中第 1~4 步已开发落地（<code>settlementStore.ts</code> 客户对账单 / 钱包 / 合作商对账单；销售·客户对账、履约单结算、应收 / 收款 / 发票 / 付款 / 合作商结算 / 应付 / 经营利润 / 财务概览接真实数据；退货冲减；积分双门槛）。</li>
+<li>2026-11-28 修订一：改为<strong>采销分离</strong>——销售端与采购端各自生成单据、各自确认，履约单对账完成后不联动生成采购端付款结算；对账单生成与确认归业务菜单（销售 / 采购），开票、收票、收款、付款、办结归财务菜单；新增客户来账、先款后货两条流程变体。</li>
+<li><strong>2026-11-28 修订二（本版）</strong>：采纳「对账单与结算单是否分立」的分析结论，确定<strong>两单制</strong>——销售、采购各一张结算单，对账与结算是同一张单据的两个阶段；采纳三项补强（阶段显性化、权限分段、命名澄清）；单据统一命名为<strong>销售结算单</strong>与<strong>采购结算单</strong>，菜单、金额字段、编号随之更名。</li>
+</ul>
+<p><strong>文档定位</strong>：合并后的完整方案，单独阅读即可，无需对照此前版本。供开发参照，未开发部分见第十二节分期。</p>
+</blockquote>
+<hr />
+<h2>一、结论（总览）</h2>
+<table>
+<thead>
+<tr>
+<th width="133">事项</th>
+<th width="534">本版方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="133">总体结构</td>
+<td width="534"><strong>采销分离</strong>：销售线（应收）与采购线（应付）各自生成结算单、各自确认、各自在财务侧收付；履约单对账完成后不联动生成采购端付款结算</td>
+</tr>
+<tr>
+<td width="133">单据数量</td>
+<td width="534"><strong>两单制</strong>：全系统只有两张结算单——<strong>销售结算单</strong>（明细行 = 履约单）与<strong>采购结算单</strong>（明细行 = 采购单）；不另设对账单，也不拆成四张</td>
+</tr>
+<tr>
+<td width="133">单据内阶段</td>
+<td width="534">每张结算单分两个阶段：<strong>对账阶段</strong>（生成 → 确认，产出双方确认的结算金额）与<strong>结算阶段</strong>（开票 / 收票、收款 / 付款 → 办结）</td>
+</tr>
+<tr>
+<td width="133">职责分工</td>
+<td width="534">对账阶段归业务（销售 / 采购），结算阶段归财务；合作商在终端确认对账</td>
+</tr>
+<tr>
+<td width="133">销售端客户差异</td>
+<td width="534">淡茶发起对账 / 客户来账 / 预存余额三种情况，同一张销售结算单承载，差别只在来源与付款方式</td>
+</tr>
+<tr>
+<td width="133">采购端合作商差异</td>
+<td width="534">签收后付款（月结 / 季结 / 周期结 / 见票结）与先款后货，同一张采购结算单承载，差别只在付款节点</td>
+</tr>
+<tr>
+<td width="133">采购单已结算</td>
+<td width="534">改为所属采购结算单<strong>办结时</strong>置位</td>
+</tr>
+<tr>
+<td width="133">积分</td>
+<td width="534">结算完成 = 采购结算单已办结，且对应履约单客户回款到位（待确认 6）</td>
+</tr>
+<tr>
+<td width="133">三项补强</td>
+<td width="534">阶段显性化（两段式状态条、时间点、操作记录）、权限分段、命名统一</td>
+</tr>
+<tr>
+<td width="133">财务页面</td>
+<td width="534">发票管理、收款管理、付款管理由只读台账改为操作页；应收 / 应付管理保持只读台账；财务概览增加结算待办卡</td>
+</tr>
+</tbody>
+</table>
+<h2>二、总体结构</h2>
+<h3>2.1 采销分离</h3>
+<p><code>销售线（应收）：履约单确收 → 销售·生成销售结算单 → 销售·确认对账 → 财务·开票 + 收款 → 销售结算单办结 → 履约单/销售单办结
+采购线（应付）：采购单签收(直发)或入库 → 采购·生成采购结算单 → 合作商/采购·确认对账 → 财务·收票 + 付款 → 采购结算单办结 → 采购单已结算</code></p>
+<ul>
+<li>两条线<strong>互不触发</strong>：客户对账完成不生成采购端付款结算，采购端付款也不依赖客户回款。</li>
+<li>两侧的单据互相<strong>引用不互相生成</strong>：采购结算单明细行的关联履约单号来自采购单的 <code>childOrderCode</code>，仅作对照展示与积分判定，不产生单据联动。</li>
+<li>结算对象：直接销售 = 客户本人；经平台销售 = 平台客户，金额按销平台实价（订单价格快照，缺省回退客户档案现值）。</li>
+</ul>
+<h3>2.2 两单制：一张结算单承载对账与结算</h3>
+<p>对账与结算不是两张单据，而是同一张单据前后相接的两个阶段。明细行与金额口径从头到尾是同一份：确认对账时金额锁定，财务在其上登记开票与收付。</p>
+<table>
+<thead>
+<tr>
+<th width="107">单据</th>
+<th width="227">对账阶段（业务）</th>
+<th width="173">结算阶段（财务）</th>
+<th width="160">明细行与金额</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="107">销售结算单</td>
+<td width="227">生成 → 发客户核对，或登记客户来账 → 确认对账（有异议则调整后重新确认）</td>
+<td width="173">开票登记、收款登记 → 办结</td>
+<td width="160">已确收履约单；计入金额 = 订单金额（直接销售）或销平台实价（经平台销售）</td>
+</tr>
+<tr>
+<td width="107">采购结算单</td>
+<td width="227">生成 → 合作商确认，或后台代确认</td>
+<td width="173">收票登记、付款登记 → 办结</td>
+<td width="160">采购单；金额 = 采购单金额</td>
+</tr>
+</tbody>
+</table>
+<p>阶段是派生显示，不新增存储状态：</p>
+<table>
+<thead>
+<tr>
+<th width="187">单据状态</th>
+<th width="160">待确认 / 有异议</th>
+<th width="160">已确认</th>
+<th width="160">已办结</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="187">所处阶段</td>
+<td width="160">对账中</td>
+<td width="160">结算中</td>
+<td width="160">已办结</td>
+</tr>
+</tbody>
+</table>
+<p>是否拆成四张单据的分析见附录 A，结论是不拆。</p>
+<h2>三、命名统一</h2>
+<p>原名称里「对账单」包含开票收款、「合作商结算」里做对账确认，名实不符。统一后单据叫结算单，「对账」只作为阶段名和动作名保留。</p>
+<table class="nf">
+<thead>
+<tr>
+<th width="67">对象</th>
+<th width="213">现名</th>
+<th width="147">统一为</th>
+<th width="240">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="67">单据</td>
+<td width="213">客户对账单（<code>CustomerStatement</code>）</td>
+<td width="147"><strong>销售结算单</strong></td>
+<td width="240">编号前缀 <code>DZ-S</code> 改为 <code>JS-S</code></td>
+</tr>
+<tr>
+<td width="67">单据</td>
+<td width="213">合作商对账单（<code>PartnerStatement</code>）</td>
+<td width="147"><strong>采购结算单</strong></td>
+<td width="240">编号前缀 <code>DZ-P</code> 改为 <code>JS-P</code></td>
+</tr>
+<tr>
+<td width="67">金额字段</td>
+<td width="213">对账金额、对账净额</td>
+<td width="147">结算金额、结算净额</td>
+<td width="240">销售侧的应收余额改称未收余额</td>
+</tr>
+<tr>
+<td width="67">菜单</td>
+<td width="213">销售 → 客户对账</td>
+<td width="147">销售 → <strong>销售结算</strong></td>
+<td width="240">按销售结算单展示，负责确认对账</td>
+</tr>
+<tr>
+<td width="67">菜单</td>
+<td width="213">采购 → 采购管理 → 采购结算（修订一拟名，按采购单）</td>
+<td width="147">采购管理 → <strong>采购单结算</strong></td>
+<td width="240">与「履约单结算」对应</td>
+</tr>
+<tr>
+<td width="67">菜单</td>
+<td width="213">采购 → 采购管理 → 采购对账（修订一拟名，按结算单）</td>
+<td width="147">采购管理 → <strong>采购结算</strong></td>
+<td width="240">与「销售结算」对应</td>
+</tr>
+<tr>
+<td width="67">阶段与动作</td>
+<td width="213">对账、确认对账、登记异议、客户对账单号、对账中</td>
+<td width="147">不变</td>
+<td width="240">「对账」描述的是与对方核对金额这件事</td>
+</tr>
+<tr>
+<td width="67">合作商终端</td>
+<td width="213">结算管理</td>
+<td width="147">不变</td>
+<td width="240">与采购结算单名称一致</td>
+</tr>
+</tbody>
+</table>
+<p>菜单命名规则：「业务单据 + 结算」（履约单结算、采购单结算）按业务单据看并生成结算单；「业务线 + 结算」（销售结算、采购结算）按结算单看并确认对账。代码标识符同步重命名（<code>CustomerStatement</code> → <code>SalesStatement</code>，<code>PartnerStatement</code> → <code>PurchaseStatement</code>），只改名不改结构。</p>
+<h2>四、现状与差距</h2>
+<p>已落地、本版继续沿用的能力：</p>
+<table>
+<thead>
+<tr>
+<th width="414">能力</th>
+<th width="253">落点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="414">销售结算单（现名客户对账单）：生成 → 确认 → 部分开票 → 部分收款 → 退货冲减 → 自动办结</td>
+<td width="253"><code>src/stores/settlementStore.ts</code></td>
+</tr>
+<tr>
+<td width="414">客户预存余额（现名钱包）：预付充值、余额支付、退货退款回余额</td>
+<td width="253">同上</td>
+</tr>
+<tr>
+<td width="414">采购结算单（现名合作商对账单）：生成 → 确认 → 收票 → 付款核销（按行依次分摊）</td>
+<td width="253">同上</td>
+</tr>
+<tr>
+<td width="414">履约单结算状态回写：确认后进入结算中，开票 / 收款按行核销回写，齐备后自动已办结</td>
+<td width="253">同上 + <code>orderFlowStore</code></td>
+</tr>
+<tr>
+<td width="414">财务台账接真实数据：应收管理、收款管理、付款管理、发票管理、应付管理、经营利润、财务概览</td>
+<td width="253"><code>src/pages/finance/*</code></td>
+</tr>
+<tr>
+<td width="414">销售退货冲减结算单、预付客户退款回余额</td>
+<td width="253"><code>returnStore.ts</code></td>
+</tr>
+<tr>
+<td width="414"><code>settleOrder</code> 拆分（仅客户回款）、比单定标补建采购单、扣点采购价按客户档案取数</td>
+<td width="253">已解决</td>
+</tr>
+</tbody>
+</table>
+<p>尚未落地的差距：</p>
+<table class="nf">
+<thead>
+<tr>
+<th width="60">编号</th>
+<th width="367">差距</th>
+<th width="240">本版落点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="60">G1</td>
+<td width="367">结算单生成入口只在「客户对账」页的「新建对账单」，销售侧的履约单结算是断头路</td>
+<td width="240">五·5.1：入口迁到销售·履约单结算</td>
+</tr>
+<tr>
+<td width="60">G2</td>
+<td width="367">同一个「客户对账」页面挂在销售和财务两个菜单下，财务入口的面包屑仍显示销售</td>
+<td width="240">八：菜单归位</td>
+</tr>
+<tr>
+<td width="60">G3</td>
+<td width="367">销售侧残留单张结算操作（登记收款 / 开票 / 手工办结只打标记，不留金额与凭证）</td>
+<td width="240">八：删除，统一由销售结算单承载</td>
+</tr>
+<tr>
+<td width="60">G4</td>
+<td width="367">采购端结算只有合作商直发采购单；自营以销定采、手工采购订单没有结算入口</td>
+<td width="240">六：采购结算单覆盖全部采购单来源</td>
+</tr>
+<tr>
+<td width="60">G5</td>
+<td width="367">没有先款后货流程</td>
+<td width="240">六·6.2</td>
+</tr>
+<tr>
+<td width="60">G6</td>
+<td width="367">没有客户来账流程</td>
+<td width="240">五·5.2</td>
+</tr>
+<tr>
+<td width="60">G7</td>
+<td width="367">采购单「已结算」在付款金额覆盖时就置位</td>
+<td width="240">十：改为结算单办结时置位</td>
+</tr>
+<tr>
+<td width="60">G8</td>
+<td width="367">确收后订单进度停在「履约中」，要点「发起对账结算」才变</td>
+<td width="240">十：确收即结算中</td>
+</tr>
+<tr>
+<td width="60">G9</td>
+<td width="367">财务台账页的按钮把人带回销售菜单，且只到列表、不定位到单据</td>
+<td width="240">七、九：财务页面改为操作页，就地打开结算单详情</td>
+</tr>
+<tr>
+<td width="60">G10</td>
+<td width="367">没有到期 / 逾期提示（结算方式是文本）</td>
+<td width="240">十二·第三期</td>
+</tr>
+<tr>
+<td width="60">G11</td>
+<td width="367">单据名称与内容不符（对账单里做开票收款）</td>
+<td width="240">三：命名统一</td>
+</tr>
+<tr>
+<td width="60">G12</td>
+<td width="367">结算单没有阶段视图，没有确认人和操作记录，业务与财务的操作没有分段</td>
+<td width="240">九：阶段显性化、权限分段</td>
+</tr>
+</tbody>
+</table>
+<h2>五、销售端结算（应收线）</h2>
+<p>三种客户情况的差别只落在两处：<strong>结算单来源</strong>与<strong>付款方式</strong>。开票与收款不分先后，两者都覆盖结算净额时销售结算单自动办结。</p>
+<h3>5.1 流程一：淡茶发起对账（现流程沿用）</h3>
+<table class="nf">
+<thead>
+<tr>
+<th width="60">步</th>
+<th width="173">点哪里</th>
+<th width="220">做什么</th>
+<th width="213">结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="60">1</td>
+<td width="173">销售 → 销售单管理 → 履约单履约</td>
+<td width="220">对已妥投履约单点「确认收货」</td>
+<td width="213">履约状态 = 已确收；订单进度直接 = 结算中（G8），进入待对账</td>
+</tr>
+<tr>
+<td width="60">2</td>
+<td width="173">销售 → 销售单管理 → 履约单结算 → 待对账</td>
+<td width="220">勾选同一结算对象的履约单，点「生成销售结算单」，填账期说明</td>
+<td width="213">销售结算单待确认；明细行 = 履约单计入金额</td>
+</tr>
+<tr>
+<td width="60">3</td>
+<td width="173">线下</td>
+<td width="220">把结算单发客户核对回签</td>
+<td width="213">无</td>
+</tr>
+<tr>
+<td width="60">4</td>
+<td width="173">销售 → 销售结算</td>
+<td width="220">点「确认对账」；有异议点「登记异议」，调整后重新确认</td>
+<td width="213">销售结算单已确认，金额锁定，正式形成应收</td>
+</tr>
+<tr>
+<td width="60">5</td>
+<td width="173">财务 → 核算与其他 → 发票管理 → 待开票</td>
+<td width="220">开票登记（发票号 / 金额 / 日期，可分多张）</td>
+<td width="213">开票进度更新，履约单回写开票状态，发票进销项台账</td>
+</tr>
+<tr>
+<td width="60">6</td>
+<td width="173">财务 → 应收应付 → 收款管理 → 待回款</td>
+<td width="220">收款登记（金额 / 日期 / 方式，可分多笔）</td>
+<td width="213">收款进度更新，履约单回写已收款，回款进台账</td>
+</tr>
+<tr>
+<td width="60">7</td>
+<td width="173">无需操作</td>
+<td width="220">开票与收款均覆盖结算净额</td>
+<td width="213">销售结算单已办结 → 履约单已办结 → 销售单全部履约单办结后订单状态 = 已办结</td>
+</tr>
+</tbody>
+</table>
+<h3>5.2 流程二：客户提供对账单（客户来账）</h3>
+<table class="nf">
+<thead>
+<tr>
+<th width="60">步</th>
+<th width="173">点哪里</th>
+<th width="220">做什么</th>
+<th width="213">结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="60">1</td>
+<td width="173">同流程一</td>
+<td width="220">确认收货</td>
+<td width="213">同上</td>
+</tr>
+<tr>
+<td width="60">2</td>
+<td width="173">销售 → 销售单管理 → 履约单结算 → 待对账</td>
+<td width="220">勾选来账涉及的履约单，点「登记客户来账」：录客户对账单号、对账金额、账期</td>
+<td width="213">销售结算单待确认，来源 = 客户来账；弹窗并列展示淡茶侧计入金额与差异</td>
+</tr>
+<tr>
+<td width="60">2a</td>
+<td width="173">同一弹窗</td>
+<td width="220">金额有差异：录差异调整（可正可负）并填说明；或先登记异议，退回客户改账</td>
+<td width="213">结算净额 = 客户确认金额</td>
+</tr>
+<tr>
+<td width="60">3</td>
+<td width="173">销售 → 销售结算</td>
+<td width="220">核对无误后点「确认对账」；这类结算单不用再发客户确认，确认即淡茶核对通过</td>
+<td width="213">销售结算单已确认</td>
+</tr>
+<tr>
+<td width="60">4~6</td>
+<td width="173">同流程一</td>
+<td width="220">开票、收款、办结</td>
+<td width="213">同上</td>
+</tr>
+</tbody>
+</table>
+<p>登记弹窗底部放两个按钮：「保存为待确认」和「核对无误直接确认」。</p>
+<h3>5.3 预存余额（预付客户）</h3>
+<table class="nf">
+<thead>
+<tr>
+<th width="60">步</th>
+<th width="173">点哪里</th>
+<th width="220">做什么</th>
+<th width="213">结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="60">预充</td>
+<td width="173">财务 → 应收应付 → 收款管理 → 预存账户</td>
+<td width="220">预收款登记：客户 / 金额 / 日期 / 方式</td>
+<td width="213">客户预存余额增加</td>
+</tr>
+<tr>
+<td width="60">消费</td>
+<td width="173">同流程一或流程二</td>
+<td width="220">生成并确认销售结算单，财务开票</td>
+<td width="213">同上</td>
+</tr>
+<tr>
+<td width="60">扣款</td>
+<td width="173">财务 → 应收应付 → 收款管理 → 待回款</td>
+<td width="220">收款登记，方式选「预存余额支付」，默认带出可扣金额</td>
+<td width="213">余额扣减，结算单核销</td>
+</tr>
+<tr>
+<td width="60">余额不足</td>
+<td width="173">同上</td>
+<td width="220">先用余额支付，差额再登记一笔转账</td>
+<td width="213">同上</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>可扣金额取未收余额与预存余额中较小的那个。</li>
+<li>预存客户同样走结算单（沿用 2026-11-24 业务确认 3）；预收款本身不开票，开票随结算单。</li>
+<li>客户档案结算方式由文本改为选项（月结 / 季结 / 见票结算 / 预存）；结算方式为预存的客户，收款登记默认选「预存余额支付」。</li>
+</ul>
+<h2>六、采购端结算（应付线）</h2>
+<p>采购结算单承载全部采购单来源：合作商直发、自营以销定采、手工采购订单（G4）。付款节点分两种，默认取合作商档案的结算方式（月结 / 季结 / 周期结 / 见票结 / 先款后货），生成时可以改。</p>
+<h3>6.1 流程三：签收后付款（月结、季结、周期结、见票结）</h3>
+<table class="nf">
+<thead>
+<tr>
+<th width="60">步</th>
+<th width="173">点哪里</th>
+<th width="220">做什么</th>
+<th width="213">结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="60">1</td>
+<td width="173">无需操作</td>
+<td width="220">采购单已签收（直发）或已入库</td>
+<td width="213">进入待结算</td>
+</tr>
+<tr>
+<td width="60">2</td>
+<td width="173">采购 → 采购管理 → 采购单结算 → 待结算</td>
+<td width="220">勾选同一合作商的采购单，生成采购结算单</td>
+<td width="213">采购结算单待确认</td>
+</tr>
+<tr>
+<td width="60">3</td>
+<td width="173">合作商工作台 → 结算管理（或采购 → 采购管理 → 采购结算 代确认）</td>
+<td width="220">合作商点「确认对账」；有异议点「登记异议」</td>
+<td width="213">采购结算单已确认，金额锁定</td>
+</tr>
+<tr>
+<td width="60">4</td>
+<td width="173">财务 → 核算与其他 → 发票管理 → 进项发票 → 待收票</td>
+<td width="220">收票登记</td>
+<td width="213">收票进度更新</td>
+</tr>
+<tr>
+<td width="60">5</td>
+<td width="173">财务 → 应收应付 → 付款管理 → 待付款</td>
+<td width="220">付款登记（金额 / 日期 / 账户，可分批）</td>
+<td width="213">付款进度更新</td>
+</tr>
+<tr>
+<td width="60">6</td>
+<td width="173">无需操作</td>
+<td width="220">收票与付款均齐备</td>
+<td width="213">采购结算单已办结 → 采购单已结算</td>
+</tr>
+</tbody>
+</table>
+<h3>6.2 流程四：先款后货（预付款节点）</h3>
+<table class="nf">
+<thead>
+<tr>
+<th width="60">步</th>
+<th width="173">点哪里</th>
+<th width="220">做什么</th>
+<th width="213">结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="60">1</td>
+<td width="173">无需操作</td>
+<td width="220">合作商接单，采购单已确认且未发货</td>
+<td width="213">进入待预付</td>
+</tr>
+<tr>
+<td width="60">2</td>
+<td width="173">采购 → 采购管理 → 采购单结算 → 待预付</td>
+<td width="220">生成采购结算单，付款节点 = 发货前，带出发货前应付金额（= 结算金额 × 预付比例，默认 100%）</td>
+<td width="213">采购结算单待确认</td>
+</tr>
+<tr>
+<td width="60">3</td>
+<td width="173">合作商工作台 → 结算管理</td>
+<td width="220">合作商确认对账</td>
+<td width="213">采购结算单已确认</td>
+</tr>
+<tr>
+<td width="60">4</td>
+<td width="173">财务 → 应收应付 → 付款管理 → 待付款</td>
+<td width="220">付款登记</td>
+<td width="213">采购结算单已预付；采购单与合作商终端显示「预付款已到账，可发货」</td>
+</tr>
+<tr>
+<td width="60">5</td>
+<td width="173">合作商工作台 → 订单管理</td>
+<td width="220">发货；客户确收后采购单已签收</td>
+<td width="213">无</td>
+</tr>
+<tr>
+<td width="60">6</td>
+<td width="173">财务 → 发票管理 → 进项发票</td>
+<td width="220">收票登记</td>
+<td width="213">同流程三</td>
+</tr>
+<tr>
+<td width="60">7</td>
+<td width="173">无需操作，或在付款管理登记尾款</td>
+<td width="220">预付比例 100% 时自动办结；有尾款的登记尾款后办结</td>
+<td width="213">采购结算单已办结 → 采购单已结算</td>
+</tr>
+</tbody>
+</table>
+<p>先款后货的三条规则：</p>
+<ol>
+<li><strong>不拦截发货</strong>：未收到预付款时，合作商点发货只弹提醒，可以继续，便于紧急放货。已发货但没预付的采购单回到待结算，按流程三走。</li>
+<li><strong>一张采购单同一时间只能在一张未办结的采购结算单内</strong>（沿用防重复纳入校验）。</li>
+<li><strong>结算单确认后金额锁定</strong>，付款按发货前应付与尾款分期登记。</li>
+</ol>
+<h3>6.3 后台代确认</h3>
+<p>采购 → 采购管理 → 采购结算：按采购结算单展示待确认清单，供后台代合作商确认、登记异议，用于线下已确认的情况。在线确认仍以合作商终端的结算管理为主。</p>
+<h2>七、财务端页面职责</h2>
+<table>
+<thead>
+<tr>
+<th width="147">页面</th>
+<th width="253">改动</th>
+<th width="267">操作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="147">发票管理</td>
+<td width="253">只读台账改为操作页，分销项（待开票）、进项（待收票）两个页签</td>
+<td width="267">开票登记（已确认的销售结算单）、收票登记（已确认的采购结算单）</td>
+</tr>
+<tr>
+<td width="147">收款管理</td>
+<td width="253">只读台账改为操作页，分待回款、回款记录、预存账户</td>
+<td width="267">收款登记、预收款登记、手工办结（已收款但无需开票的客户）</td>
+</tr>
+<tr>
+<td width="147">付款管理</td>
+<td width="253">只读台账改为操作页，分待付款（含待预付）、付款记录</td>
+<td width="267">付款登记、手工办结（已付款但无需收票的供应商）</td>
+</tr>
+<tr>
+<td width="147">应收管理、应付管理</td>
+<td width="253">保持只读台账</td>
+<td width="267">点击行就地打开结算单详情</td>
+</tr>
+<tr>
+<td width="147">财务概览</td>
+<td width="253">新增结算待办卡：待对账履约单、待确认结算单、待开票、待收票、待回款、待付款</td>
+<td width="267">角标用已确认的右上角红色数字样式（订单管理页比单管理 / 退货管理按钮的实装样式）</td>
+</tr>
+<tr>
+<td width="147">对账结算分组（合作商结算、客户对账）</td>
+<td width="253">删除</td>
+<td width="267">生成与确认迁到销售、采购菜单；收票与付款迁到发票管理、付款管理</td>
+</tr>
+</tbody>
+</table>
+<p>财务侧两条规则：</p>
+<ul>
+<li>只能对<strong>已确认</strong>的结算单登记开票与收付（现行校验保留）。</li>
+<li>结算单详情抽屉做成共享组件：销售结算、采购结算和财务各页打开的是同一个详情，按钮按角色显示（第九节）；财务台账页就地打开，不跳菜单。</li>
+</ul>
+<h2>八、菜单调整</h2>
+<table class="nf">
+<thead>
+<tr>
+<th width="60">模块</th>
+<th width="200">菜单</th>
+<th width="407">调整</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="60">销售</td>
+<td width="200">销售单管理 → 履约单结算</td>
+<td width="407">保留原名。按履约单展示，只负责生成：生成销售结算单、登记客户来账。删除发起对账结算、登记收款、登记开票、手工办结四个单张操作</td>
+</tr>
+<tr>
+<td width="60">销售</td>
+<td width="200">销售结算（原「客户对账」更名）</td>
+<td width="407">按销售结算单展示。负责对账阶段的确认对账、登记异议、差异调整、退货冲减；只读展示结算阶段进度。移除新建对账单、开票登记、收款登记、手工办结、钱包充值</td>
+</tr>
+<tr>
+<td width="60">采购</td>
+<td width="200">采购管理 → 采购单结算</td>
+<td width="407">新增。按采购单展示：待预付、待结算、结算中、已结算；生成采购结算单</td>
+</tr>
+<tr>
+<td width="60">采购</td>
+<td width="200">采购管理 → 采购结算</td>
+<td width="407">新增。按采购结算单展示：后台代确认、登记异议、查看；只读展示结算阶段进度</td>
+</tr>
+<tr>
+<td width="60">采购</td>
+<td width="200">入库出库 → 直发确认</td>
+<td width="407">「确认交付·应付」只保留交付确认，不再直接把采购单置为已结算</td>
+</tr>
+<tr>
+<td width="60">合作商工作台</td>
+<td width="200">结算管理</td>
+<td width="407">保留确认对账；新增登记异议、待我开票提醒、付款与预付款到账展示</td>
+</tr>
+<tr>
+<td width="60">自营工作台</td>
+<td width="200">结算</td>
+<td width="407">删除「按单结算」，改为跳转采购单结算</td>
+</tr>
+<tr>
+<td width="60">财务</td>
+<td width="200">对账结算分组（合作商结算、客户对账）</td>
+<td width="407">删除</td>
+</tr>
+<tr>
+<td width="60">旧路由</td>
+<td width="200"><code>/sales/sales-reconciliation</code>、<code>/finance/finance-partner-settlement</code> 等</td>
+<td width="407">重定向到新归属页面</td>
+</tr>
+</tbody>
+</table>
+<h2>九、结算单界面与权限（三项补强）</h2>
+<h3>9.1 阶段显性化</h3>
+<p>结算单详情抽屉分「对账」「结算」两段，顶部状态条同步分两段：</p>
+<table>
+<thead>
+<tr>
+<th width="173">单据</th>
+<th width="247">对账段</th>
+<th width="247">结算段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="173">销售结算单</td>
+<td width="247">待确认 → 已确认（有异议为分支，显示异议原因）</td>
+<td width="247">开票进度（已开票 / 结算净额）、收款进度（已收 / 结算净额）→ 已办结</td>
+</tr>
+<tr>
+<td width="173">采购结算单 · 签收后付款</td>
+<td width="247">待确认 → 已确认（有异议为分支）</td>
+<td width="247">收票进度、付款进度 → 已办结</td>
+</tr>
+<tr>
+<td width="173">采购结算单 · 先款后货</td>
+<td width="247">待确认 → 已确认（有异议为分支）</td>
+<td width="247">待预付 → 已预付 → 已签收，其后收票进度与尾款进度 → 已办结</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>三个时间点显示在状态条上：生成、确认、办结；每次操作记入单据的操作记录（操作人、时间、动作、金额）。</li>
+<li>结算单列表增加「阶段」列：对账中、结算中、已办结，按 2.2 的规则派生。</li>
+<li>履约单和采购单同步显示结算阶段：待对账、对账中、结算中、已办结。订单进度里的「结算中」是后三者的上位状态，确收即进入。</li>
+<li>「对账」段放明细行、异议、调整与冲减、确认信息；「结算」段放发票与收付记录、办结信息。</li>
+</ul>
+<h3>9.2 权限分段</h3>
+<table class="nf">
+<thead>
+<tr>
+<th width="80">角色</th>
+<th width="374">可做</th>
+<th width="213">入口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="80">销售运营</td>
+<td width="374">生成销售结算单、登记客户来账、确认对账、登记异议、差异调整、退货冲减</td>
+<td width="213">销售 → 履约单结算、销售结算</td>
+</tr>
+<tr>
+<td width="80">采购运营</td>
+<td width="374">生成采购结算单、后台代确认、登记异议</td>
+<td width="213">采购 → 采购单结算、采购结算</td>
+</tr>
+<tr>
+<td width="80">财务</td>
+<td width="374">开票登记、收票登记、收款登记、预收款登记、付款登记、手工办结</td>
+<td width="213">财务 → 发票管理、收款管理、付款管理</td>
+</tr>
+<tr>
+<td width="80">合作商</td>
+<td width="374">确认对账、登记异议、查看付款与开票进度</td>
+<td width="213">合作商工作台 → 结算管理</td>
+</tr>
+<tr>
+<td width="80">管理员</td>
+<td width="374">全部</td>
+<td width="213">全部</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>金额确认对账后锁定，财务不能改金额；业务不能登记开票与收付。</li>
+<li>本期按登录角色控制按钮的可见与可点，每步操作记录操作人；接入后端后补接口级校验。</li>
+</ul>
+<h3>9.3 命名澄清</h3>
+<p>已落实为第三节的命名统一：单据、菜单、金额字段、编号前缀一并更名为结算单口径。</p>
+<h2>十、单据与状态的改动</h2>
+<table>
+<thead>
+<tr>
+<th width="173">对象</th>
+<th width="494">改动</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="173">销售结算单（现客户对账单）</td>
+<td width="494">更名。增加来源（淡茶发起 / 客户来账）、客户对账单号、客户对账金额、差异调整（可正可负）、确认说明、确认时间、确认人、办结时间、操作记录</td>
+</tr>
+<tr>
+<td width="173">采购结算单（现合作商对账单）</td>
+<td width="494">更名。增加付款节点（发货前 / 签收后）、发货前应付金额、确认时间、确认人、办结时间、操作记录</td>
+</tr>
+<tr>
+<td width="173">结算阶段</td>
+<td width="494">派生显示，不新增存储状态（见 2.2）</td>
+</tr>
+<tr>
+<td width="173">客户档案</td>
+<td width="494">结算方式由文本改为选项（月结 / 季结 / 见票结算 / 预存），用于带出默认收款方式</td>
+</tr>
+<tr>
+<td width="173">合作商档案</td>
+<td width="494">增加预付比例，默认 100%</td>
+</tr>
+<tr>
+<td width="173">采购单</td>
+<td width="494">增加结算进度（待结算 / 结算中 / 已结算）与预付状态（待预付 / 已预付）</td>
+</tr>
+<tr>
+<td width="173">履约单订单进度</td>
+<td width="494">确收后即为结算中，删除「发起对账结算」动作（<code>project_rules.md</code> 的订单进度判定同步修订）</td>
+</tr>
+<tr>
+<td width="173">采购单已结算</td>
+<td width="494">改为所属采购结算单办结时置位。现行实现是付款金额覆盖即置位，先款后货的采购单会在发货前就显示已结算，所以必须改</td>
+</tr>
+</tbody>
+</table>
+<h2>十一、异常处理</h2>
+<table>
+<thead>
+<tr>
+<th width="173">场景</th>
+<th width="494">处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="173">客户或合作商有异议</td>
+<td width="494">登记异议 → 业务侧调整 → 重新确认。已登记过开票、收款、收票、付款的结算单金额锁定，不能再改</td>
+</tr>
+<tr>
+<td width="173">退货，结算单未办结</td>
+<td width="494">销售退货完成后自动冲减销售结算单（已实现）；采购退货完成后自动冲减未办结的采购结算单（新增）</td>
+</tr>
+<tr>
+<td width="173">退货，结算单已办结</td>
+<td width="494">需要退款或红冲。本期只在页面标记提醒，退款登记与红冲放第三期</td>
+</tr>
+<tr>
+<td width="173">不需要发票的客户或供应商</td>
+<td width="494">款项齐备后由财务手工办结</td>
+</tr>
+<tr>
+<td width="173">已取消的履约单</td>
+<td width="494">不进入销售结算单</td>
+</tr>
+<tr>
+<td width="173">经平台销售</td>
+<td width="494">结算对象 = 平台客户，金额按销平台实价；平台客户一般走客户来账</td>
+</tr>
+<tr>
+<td width="173">已发货但未收到预付款</td>
+<td width="494">不拦截发货，只提醒；未预付的部分回到待结算，按签收后付款流程走</td>
+</tr>
+</tbody>
+</table>
+<h2>十二、开发分期</h2>
+<p><strong>第一期：归位与定名</strong>（不改数据结构）</p>
+<ul>
+<li>单据、菜单、金额字段、编号统一更名（第三节），代码标识符同步重命名。</li>
+<li>菜单按第八节调整，旧路由重定向。</li>
+<li>新增采购单结算、采购结算两页，内容从合作商结算迁出；采购结算单覆盖自营以销定采与手工采购订单。</li>
+<li>发票管理、收款管理、付款管理改为操作页；财务概览增加结算待办卡。</li>
+<li>确收后订单进度即为结算中；删除单张结算入口（履约单结算 4 个按钮、直发确认 1 个、自营工作台 1 个）。</li>
+<li>阶段显性化：结算单详情两段式、状态条、阶段列；补确认时间、确认人、办结时间、操作记录四个轻量字段。</li>
+<li>权限分段：按角色控制按钮可见。</li>
+</ul>
+<p><strong>第二期：流程变体</strong></p>
+<ul>
+<li>客户来账：来源字段、登记弹窗、差异调整。</li>
+<li>先款后货：付款节点、预付比例、待预付池、采购单预付状态、合作商终端提示。</li>
+<li>预收款登记迁到收款管理；客户结算方式改为选项。</li>
+<li>采购单「已结算」改由采购结算单办结时置位。</li>
+</ul>
+<p><strong>第三期：完善</strong></p>
+<ul>
+<li>退款登记、红字冲销、采购退货冲减应付、办结后退货提醒。</li>
+<li>结算方式结构化（对账日 + 付款期限）后的到期与逾期提示。</li>
+<li>客户采买平台在线对账。</li>
+</ul>
+<h2>十三、待确认事项</h2>
+<table class="nf">
+<thead>
+<tr>
+<th width="67">编号</th>
+<th width="147">事项</th>
+<th width="454">拟定方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="67">1</td>
+<td width="147">先款后货如何承载</td>
+<td width="454">一张采购结算单加付款节点（发货前 / 签收后），预付比例可设（100% 为全额预付，30% 为定金加尾款），不做单独的预付款单</td>
+</tr>
+<tr>
+<td width="67">2</td>
+<td width="147">未收到预付款是否拦截发货</td>
+<td width="454">不拦截，只提醒；未预付的部分回到待结算</td>
+</tr>
+<tr>
+<td width="67">3</td>
+<td width="147">采购单「已结算」何时置位</td>
+<td width="454">采购结算单办结时置位；发货前预付到位只置预付状态</td>
+</tr>
+<tr>
+<td width="67">4</td>
+<td width="147">合作商确认方式</td>
+<td width="454">以合作商终端在线确认为主；采购结算页保留后台代确认，用于线下已确认的情况</td>
+</tr>
+<tr>
+<td width="67">5</td>
+<td width="147">命名联动范围</td>
+<td width="454">单据已确定更名为销售结算单、采购结算单；菜单（客户对账 → 销售结算，采购单结算 / 采购结算）、金额字段（对账净额 → 结算净额）、编号前缀（DZ → JS）是否一并更名</td>
+</tr>
+<tr>
+<td width="67">6</td>
+<td width="147">积分「结算完成」的取数</td>
+<td width="454">改为采购结算单已办结且客户回款到位。原口径是付款完成，但先款后货的付款发生在发货前，只看付款会提前计分</td>
+</tr>
+</tbody>
+</table>
+<h2>附录 A：对账单与结算单是否分立的分析</h2>
+<p><strong>问题</strong>：采购和销售是否需要分别生成对账单和结算单，即采购对账单、采购结算单、销售对账单、销售结算单四张单据。</p>
+<p><strong>结论</strong>：不需要。维持两单制，销售、采购各一张结算单，对账与结算作为单据内的两个阶段（见 2.2）。</p>
+<p>判断要点：</p>
+<table>
+<thead>
+<tr>
+<th width="93">判定点</th>
+<th width="147">两单制</th>
+<th width="200">四单制</th>
+<th width="227">分析</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="93">金额口径传递</td>
+<td width="147">单内延续，没有传递</td>
+<td width="200">对账单的确认金额传给结算单，需要一致性校验</td>
+<td width="227">四单制多一层映射；销平台实价与扣点快照已随单固化，拆分没有增量收益</td>
+</tr>
+<tr>
+<td width="93">操作者与权限</td>
+<td width="147">同一张单据按阶段分工</td>
+<td width="200">各自操作各自的单据</td>
+<td width="227">权限分段（见 9.2）之后边界同样清晰</td>
+</tr>
+<tr>
+<td width="93">先款后货</td>
+<td width="147">发货前创建，一张单走完</td>
+<td width="200">预付发生在对账之前，没有可对账的交割明细</td>
+<td width="227">四单制要再造预付款单，或允许没有对账单的结算单</td>
+</tr>
+<tr>
+<td width="93">操作负担</td>
+<td width="147">每次结算一张单</td>
+<td width="200">每次结算两张单，预付场景三张</td>
+<td width="227">结算单是手工生成，没有周期结转需求，多出的一步转结算单是重复操作</td>
+</tr>
+</tbody>
+</table>
+<p>场景压测：</p>
+<table>
+<thead>
+<tr>
+<th width="213">场景</th>
+<th width="454">结论</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="213">月结合作商，多张采购单</td>
+<td width="454">对账单与结算单的明细完全相同，转结算单是重复操作</td>
+</tr>
+<tr>
+<td width="213">一张结算单分三次收款</td>
+<td width="454">单内多笔登记已支持，拆分没有收益</td>
+</tr>
+<tr>
+<td width="213">先款后货，定金加尾款</td>
+<td width="454">两单制一张单走完；四单制需要预付款单</td>
+</tr>
+<tr>
+<td width="213">客户来账</td>
+<td width="454">登记来账后同一张单继续开票收款</td>
+</tr>
+<tr>
+<td width="213">退货冲减</td>
+<td width="454">两单制只冲减一张单；四单制两张单都要冲减</td>
+</tr>
+<tr>
+<td width="213">审计追溯</td>
+<td width="454">用阶段显示、时间点、操作记录补足（见 9.1）</td>
+</tr>
+</tbody>
+</table>
+<p>今后出现以下任一情况时再评估拆分：</p>
+<table>
+<thead>
+<tr>
+<th width="320">触发条件</th>
+<th width="347">原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td width="320">对账确认与付款审批分设审批人，各有一条审批流</td>
+<td width="347">单内阶段无法承载两级审批链</td>
+</tr>
+<tr>
+<td width="320">一张结算单开票给不同主体</td>
+<td width="347">结算主体与对账主体分离，必须拆单</td>
+</tr>
+<tr>
+<td width="320">合作商要求按采购单逐单结算并匹配银行流水</td>
+<td width="347">粒度下沉到采购单</td>
+</tr>
+<tr>
+<td width="320">客户采买平台上线在线对账，签认单据需要独立存档编号</td>
+<td width="347">平台侧对账单需要与后台分离</td>
+</tr>
+</tbody>
+</table>
+<p>届时可在结算单确认环节引用其明细生成下一张单据，历史数据不受影响。</p>
+<h2>附录 B：法规依据</h2>
+<p>沿用 2026-11-24 的业务确认：淡茶半盏不是大型企业，对合作商按独立账期付款，不以客户回款为付款前提。本方案的采销分离与该结论一致。</p>
+<ul>
+<li>最高人民法院《关于大型企业与中小企业约定以第三方支付款项为付款前提条款效力问题的批复》（法释〔2024〕11号）：<a href="https://www.court.gov.cn/zixun/xiangqing/441281.html">https://www.court.gov.cn/zixun/xiangqing/441281.html</a></li>
+<li>君合律师事务所《〈保障中小企业款项支付条例〉修订要点解读及实务法律问题研究》（2025-04-30）：<a href="https://www.junhe.com/law-reviews/2679">https://www.junhe.com/law-reviews/2679</a></li>
+</ul>
+</body>
+</html>

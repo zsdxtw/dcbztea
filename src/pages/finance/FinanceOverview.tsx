@@ -6,7 +6,7 @@ import PieChart from '../../components/charts/PieChart';
 import Button from '../../components/common/Button';
 import { useOrderFlowStore } from '../../stores/orderFlowStore';
 import { usePurchaseStore } from '../../stores/purchaseStore';
-import { useSettlementStore, netOf, receivedOf, partnerPaidOfPo } from '../../stores/settlementStore';
+import { useSettlementStore, netOf, receivedOf, purchasePaidOfPo } from '../../stores/settlementStore';
 import { receiveStateOf } from '../../utils/salesOrderFamily';
 import type { StatCardData } from '../../types';
 
@@ -50,19 +50,19 @@ function todoTypeColor(type: string) {
 export default function FinanceOverview() {
   const orders = useOrderFlowStore((s) => s.orders);
   const docs = usePurchaseStore((s) => s.docs);
-  const statements = useSettlementStore((s) => s.statements);
-  const partnerStatements = useSettlementStore((s) => s.partnerStatements);
+  const statements = useSettlementStore((s) => s.salesStatements);
+  const purchaseStatements = useSettlementStore((s) => s.purchaseStatements);
 
   const inStatement = new Set(statements.flatMap((s) => s.lines.map((l) => l.orderId)));
   const receivedTotal = statements.reduce((acc, s) => acc + receivedOf(s), 0)
     + orders.filter((o) => !inStatement.has(o.id) && o.processStatus !== 'cancelled' && receiveStateOf(o, docs.filter((d) => d.childOrderId === o.id)) === '已收款')
       .reduce((acc, o) => acc + o.totalAmount, 0);
-  const paidTotal = partnerStatements.reduce((acc, s) => acc + s.payments.reduce((x, p) => x + p.amount, 0), 0)
+  const paidTotal = purchaseStatements.reduce((acc, s) => acc + s.payments.reduce((x, p) => x + p.amount, 0), 0)
     + docs.filter((d) => d.source === 'self' && d.status === 'settled').reduce((acc, d) => acc + d.amount, 0);
   const arBalance = statements.filter((s) => s.status !== 'pending').reduce((acc, s) => acc + Math.max(0, netOf(s) - receivedOf(s)), 0);
   const apBalance = docs
     .filter((d) => ['confirmed', 'received', 'partial_shipped', 'fully_shipped', 'delivered'].includes(d.status))
-    .reduce((acc, d) => acc + Math.max(0, d.amount - partnerPaidOfPo(partnerStatements, d.id)), 0);
+    .reduce((acc, d) => acc + Math.max(0, d.amount - purchasePaidOfPo(purchaseStatements, d.id)), 0);
   const profit = receivedTotal - paidTotal;
   const profitRate = receivedTotal > 0 ? ((profit / receivedTotal) * 100).toFixed(1) : '0.0';
 
